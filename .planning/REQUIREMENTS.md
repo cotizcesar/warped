@@ -129,10 +129,10 @@ Deferred to future release.
 | SEC-03 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 29 total
-- Mapped to phases: 29
+- v1 requirements: 30 total
+- Mapped to phases: 30
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-30*
-*Last updated: 2026-04-30 after initial definition*
+*Last updated: 2026-04-30 after roadmap creation*
