@@ -41,11 +41,13 @@ fun MessageBubble(
         Surface(
             color = if (isUser) Color(0xFF121212) else Color.Transparent,
             shape = MaterialTheme.shapes.medium,
-            modifier = Modifier.widthIn(max = 340.dp)
+            modifier = Modifier
+                .widthIn(max = 340.dp)
+                .then(if (!isUser) Modifier.padding(bottom = 10.dp) else Modifier)
         ) {
             Column(
                 modifier = if (isUser) Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
-                           else Modifier.padding(top = 1.dp)
+                           else Modifier
             ) {
                 if (!isUser && !message.reasoning.isNullOrBlank()) {
                     Row(
