@@ -37,8 +37,8 @@ fun ChatInputBar(
             maxLines = 4,
             shape = MaterialTheme.shapes.extraLarge,
             colors = OutlinedTextFieldDefaults.colors(
-                unfocusedIndicatorColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent
+                unfocusedBorderColor = Color.Transparent,
+                focusedBorderColor = Color.Transparent
             )
         )
         Spacer(Modifier.width(8.dp))
