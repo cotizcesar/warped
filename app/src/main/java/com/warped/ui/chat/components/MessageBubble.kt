@@ -45,33 +45,41 @@ fun MessageBubble(
         ) {
             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                 if (!isUser && !message.reasoning.isNullOrBlank()) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-                        shape = MaterialTheme.shapes.small,
-                        modifier = Modifier.fillMaxWidth().clickable { showReasoning = !showReasoning }
+                    Row(
+                        modifier = Modifier
+                            .clickable { showReasoning = !showReasoning }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(modifier = Modifier.padding(10.dp)) {
-                            Text(
-                                text = if (showReasoning) "Thinking ▼" else "Thinking ▶",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        Text(
+                            text = "Thinking",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF545450)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = if (showReasoning) "▼" else "▶",
+                            color = Color(0xFF545450),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    AnimatedVisibility(
+                        visible = showReasoning,
+                        enter = expandVertically(),
+                        exit = shrinkVertically()
+                    ) {
+                        Surface(
+                            color = Color.Transparent,
+                            modifier = Modifier.padding(start = 16.dp)
+                        ) {
+                            MarkdownText(
+                                text = message.reasoning,
+                                baseColor = Color(0xFF545450),
+                                modifier = Modifier.padding(vertical = 4.dp),
+                                fontStyle = FontStyle.Italic
                             )
-                            AnimatedVisibility(
-                                visible = showReasoning,
-                                enter = expandVertically(),
-                                exit = shrinkVertically()
-                            ) {
-                                MarkdownText(
-                                    text = message.reasoning,
-                                    baseColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                    modifier = Modifier.padding(top = 6.dp),
-                                    fontStyle = FontStyle.Italic
-                                )
-                            }
                         }
                     }
-                    Spacer(Modifier.height(10.dp))
                 }
 
                 // Images in user messages
