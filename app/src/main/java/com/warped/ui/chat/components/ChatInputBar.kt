@@ -144,10 +144,22 @@ fun ChatInputBar(
                     }
                 } else {
                     val hasText = text.isNotBlank()
-                    IconButton(onClick = onSend, enabled = canSend && hasText, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Filled.ArrowUpward, "Send",
-                            tint = if (hasText && canSend) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.4f),
-                            modifier = Modifier.size(24.dp))
+                    if (hasText && canSend) {
+                        IconButton(
+                            onClick = onSend,
+                            modifier = Modifier.size(40.dp),
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(Icons.Filled.ArrowUpward, "Send", modifier = Modifier.size(24.dp))
+                        }
+                    } else {
+                        IconButton(onClick = onSend, enabled = false, modifier = Modifier.size(40.dp)) {
+                            Icon(Icons.Filled.ArrowUpward, "Send",
+                                tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(24.dp))
+                        }
                     }
                 }
             }
