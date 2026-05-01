@@ -1,5 +1,6 @@
 package com.warped.ui.chat.components
 
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -8,7 +9,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -34,7 +35,8 @@ fun ChatInputBar(
         shape = MaterialTheme.shapes.extraLarge,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .navigationBarsPadding()
+            .padding(12.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             // Row 1: Text input + send/stop button
@@ -59,42 +61,42 @@ fun ChatInputBar(
                 )
                 Spacer(Modifier.width(8.dp))
                 if (isGenerating) {
-                    IconButton(onClick = onStop) {
-                        Icon(Icons.Filled.Stop, contentDescription = "Stop", tint = Color.White)
+                    IconButton(onClick = onStop, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.Filled.Stop, contentDescription = "Stop", tint = Color.White, modifier = Modifier.size(24.dp))
                     }
                 } else {
-                    IconButton(onClick = onSend, enabled = canSend && text.isNotBlank()) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = Color.White)
+                    IconButton(onClick = onSend, enabled = canSend && text.isNotBlank(), modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = Color.White, modifier = Modifier.size(24.dp))
                     }
                 }
             }
 
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(12.dp))
 
             // Row 2: Image button (left), model picker + reasoning (right)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onAddImage) {
-                    Icon(Icons.Filled.AddPhotoAlternate, "Add image", tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
+                IconButton(onClick = onAddImage, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Filled.AddPhotoAlternate, "Add image", tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
                 }
 
                 Spacer(Modifier.weight(1f))
 
                 // Model picker button
                 TextButton(onClick = onModelPickerClick) {
-                    Text("Model", color = Color.White.copy(alpha = 0.6f), fontSize = MaterialTheme.typography.labelSmall.fontSize)
+                    Text("Model", color = Color.White.copy(alpha = 0.6f))
                     Icon(Icons.Filled.KeyboardArrowDown, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
                 }
 
                 // Reasoning toggle
-                IconButton(onClick = onToggleReasoning) {
+                IconButton(onClick = onToggleReasoning, modifier = Modifier.size(40.dp)) {
                     Icon(
                         Icons.Filled.Psychology,
                         contentDescription = "Reasoning",
                         tint = if (reasoningEnabled) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.3f),
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
