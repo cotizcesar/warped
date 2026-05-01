@@ -8,6 +8,7 @@ import com.warped.data.local.download.ModelDownloadManager
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.inference.ModelImportManager
 import com.warped.data.local.security.ApiKeyStore
+import com.warped.data.remote.provider.ProviderRouter
 import com.warped.domain.model.ActiveModelSelection
 import com.warped.domain.model.Endpoint
 import com.warped.domain.model.LocalModel
@@ -30,7 +31,8 @@ class ModelsViewModel @Inject constructor(
     private val modelImportManager: ModelImportManager,
     private val modelDownloadManager: ModelDownloadManager,
     private val memoryChecker: MemoryChecker,
-    private val apiKeyStore: ApiKeyStore
+    private val apiKeyStore: ApiKeyStore,
+    private val providerRouter: ProviderRouter
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ModelsUiState())
@@ -198,6 +200,24 @@ class ModelsViewModel @Inject constructor(
         viewModelScope.launch {
             endpointRepository.activateEndpoint(endpoint.id)
             activeModelSelection.select(modelId, endpoint.apiType)
+            // Fetch available models from the endpoint
+            fetchEndpointModels(endpoint)
+        }
+    }
+
+    private suspend fun fetchEndpointModels(endpoint: Endpoint) {
+        val modelId = endpoint.modelId ?: return
+        _uiState.update { it.copy(isFetchingModels = true) }
+        try {
+            val provider = providerRouter.resolve(endpoint, modelId)
+            val result = provider.listModels()
+            result.onSuccess { models ->
+                _uiState.update { it.copy(availableEndpointModels = models, isFetchingModels = false) }
+            }.onFailure { e ->
+                _uiState.update { it.copy(isFetchingModels = false, error = "Failed to fetch models: ${e.message}") }
+            }
+        } catch (e: Exception) {
+            _uiState.update { it.copy(isFetchingModels = false, error = e.message) }
         }
     }
 
