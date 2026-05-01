@@ -7,7 +7,6 @@ import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.remote.dto.HuggingFaceModel
 import com.warped.domain.repository.HuggingFaceRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -32,6 +31,26 @@ class HuggingFaceViewModel @Inject constructor(
     init {
         refreshMemoryInfo()
         search("gguf")
+        viewModelScope.launch {
+            downloadManager.downloadStates.collect { states ->
+                val activeId = _uiState.value.activeDownloadId
+                if (activeId != null) {
+                    val state = states[activeId]
+                    if (state != null) {
+                        _uiState.update {
+                            it.copy(
+                                isDownloading = state.isDownloading,
+                                downloadProgress = state.progress,
+                                downloadError = state.error
+                            )
+                        }
+                        if (!state.isDownloading && state.error == null && state.progress >= 1f) {
+                            _uiState.update { it.copy(downloadSuccess = true) }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private fun refreshMemoryInfo() {
@@ -100,47 +119,27 @@ class HuggingFaceViewModel @Inject constructor(
 
     fun downloadFile(modelId: String, fileName: String, fileSize: Long) {
         val fileUrl = "https://huggingface.co/$modelId/resolve/main/$fileName"
-        viewModelScope.launch(Dispatchers.Main) {
-            _uiState.update {
-                it.copy(
-                    isDownloading = true,
-                    downloadingFileName = fileName,
-                    downloadProgress = 0f,
-                    downloadError = null
-                )
-            }
-            try {
-                val result = downloadManager.downloadModel(
-                    modelId = modelId,
-                    fileName = fileName,
-                    fileUrl = fileUrl,
-                    fileSizeBytes = fileSize
-                ) { progress ->
-                    _uiState.update { it.copy(downloadProgress = progress) }
-                }
-                result.onSuccess {
-                    _uiState.update { it.copy(isDownloading = false, downloadProgress = 1f, downloadSuccess = true) }
-                }.onFailure { e ->
-                    _uiState.update {
-                        it.copy(
-                            isDownloading = false,
-                            downloadError = e.message ?: "Download failed"
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        isDownloading = false,
-                        downloadError = e.message ?: "Download error"
-                    )
-                }
-            }
+        val downloadId = "$modelId/$fileName"
+        _uiState.update {
+            it.copy(
+                isDownloading = true,
+                downloadingFileName = fileName,
+                downloadProgress = 0f,
+                downloadError = null,
+                activeDownloadId = downloadId
+            )
         }
+        downloadManager.startDownload(
+            modelId = downloadId,
+            fileName = fileName,
+            fileUrl = fileUrl,
+            fileSizeBytes = fileSize
+        )
     }
 
     fun pauseDownload() {
-        downloadManager.pauseDownload()
+        val activeId = _uiState.value.activeDownloadId ?: return
+        downloadManager.cancelDownload(activeId)
         _uiState.update { it.copy(isDownloading = false, downloadProgress = 0f, downloadingFileName = "") }
     }
 
