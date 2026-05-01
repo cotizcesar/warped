@@ -232,7 +232,7 @@ fun ChatScreen(
                     } else if (uiState.isStreaming) {
                         item(key = "generating") {
                             Row(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 CircularProgressIndicator(
