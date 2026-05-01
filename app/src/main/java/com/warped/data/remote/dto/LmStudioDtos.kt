@@ -65,7 +65,8 @@ data class LmStudioSseEvent(
     val done: Boolean = false,
     val error: LmStudioSseError? = null,
     val output: List<LmStudioOutputItem>? = null,
-    val result: LmStudioChatResult? = null
+    val result: LmStudioChatResult? = null,
+    val stats: LmStudioStats? = null
 )
 
 @Serializable

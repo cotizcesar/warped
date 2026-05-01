@@ -67,70 +67,67 @@ class LMStudioProvider(
                     emit(StreamToken.Error("Empty response"))
                     return@flow
                 }
-                val source = responseBody.source()
+                val fullBody = responseBody.string()
                 var hasTokens = false
                 var currentEvent = ""
                 var statsText: String? = null
                 val reasoningBuf = StringBuilder()
-                var chatEnded = false
-                try {
-                    while (!source.exhausted() && !chatEnded) {
-                        val line = source.readUtf8Line() ?: break
-                        if (chatEnded) break
-                        when {
-                            line.startsWith("event: ") -> currentEvent = line.removePrefix("event: ").trim()
-                            line.startsWith("data: ") -> {
-                                val data = line.removePrefix("data: ").trim()
-                                if (data == "[DONE]") {
-                                    emit(StreamToken.Done(statsText, reasoningBuf.toString().trim().takeIf { it.isNotEmpty() }))
-                                    chatEnded = true
+
+                // Try SSE line-by-line parsing first
+                val lines = fullBody.lines()
+                var sawSse = false
+                for (line in lines) {
+                    when {
+                        line.startsWith("event: ") -> {
+                            currentEvent = line.removePrefix("event: ").trim()
+                            sawSse = true
+                        }
+                        line.startsWith("data: ") -> {
+                            sawSse = true
+                            val data = line.removePrefix("data: ").trim()
+                            if (data == "[DONE]") break
+                            try {
+                                val event = json.decodeFromString<LmStudioSseEvent>(data)
+                                if (currentEvent == "message.delta" || event.type == "message.delta") {
+                                    val text = event.content ?: ""
+                                    if (text.isNotEmpty()) {
+                                        emit(StreamToken.Delta(text))
+                                        hasTokens = true
+                                    }
                                 }
-                                try {
-                                    val event = json.decodeFromString<LmStudioSseEvent>(data)
-                                    if (currentEvent == "message.delta" || event.type == "message.delta") {
-                                        val text = event.content ?: ""
-                                        if (text.isNotEmpty()) {
-                                            emit(StreamToken.Delta(text))
+                                if (currentEvent == "reasoning.delta" || event.type == "reasoning.delta") {
+                                    event.content?.let { reasoningBuf.append(it) }
+                                }
+                                if (currentEvent == "chat.end" || event.type == "chat.end") {
+                                    event.result?.stats?.let { stats ->
+                                        statsText = " · ${stats.totalOutputTokens} tokens (${stats.inputTokens} in, ${String.format("%.0f", stats.tokensPerSecond)} tok/s, ${String.format("%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first)"
+                                    }
+                                    event.result?.output?.forEach { item ->
+                                        if (item.type == "message" && item.content.isNotEmpty()) {
+                                            emit(StreamToken.Delta(item.content))
                                             hasTokens = true
                                         }
                                     }
-                                    if (currentEvent == "reasoning.delta" || event.type == "reasoning.delta") {
-                                        event.content?.let { reasoningBuf.append(it) }
-                                    }
-                                    if (currentEvent == "chat.end" || event.type == "chat.end") {
-                                        event.result?.stats?.let { stats ->
-                                            statsText = " · ${stats.totalOutputTokens} tokens (${stats.inputTokens} in, ${String.format("%.0f", stats.tokensPerSecond)} tok/s, ${String.format("%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first)"
-                                        }
-                                        event.result?.output?.forEach { item ->
-                                            if (item.type == "message" && item.content.isNotEmpty()) {
-                                                emit(StreamToken.Delta(item.content))
-                                                hasTokens = true
-                                            }
-                                        }
-                                        chatEnded = true
-                                        break
-                                    }
-                                    if (event.error != null) {
-                                        emit(StreamToken.Error(event.error.message))
-                                        chatEnded = true
-                                        break
-                                    }
-                                } catch (_: Exception) {}
-                            }
+                                }
+                                if (event.error != null) {
+                                    emit(StreamToken.Error(event.error.message))
+                                    return@flow
+                                }
+                            } catch (_: Exception) {}
                         }
                     }
-                } catch (e: Exception) {
-                    if (!chatEnded) emit(StreamToken.Error("SSE error: ${e.message}"))
                 }
-                // Fallback: non-streaming (full JSON)
-                if (!hasTokens && !chatEnded) {
+
+                // Fallback: non-streaming full JSON response
+                if (!sawSse || !hasTokens) {
                     try {
-                        val fullBody = responseBody.string()
                         val event = json.decodeFromString<LmStudioSseEvent>(fullBody)
-                        event.result?.stats?.let { stats ->
+                        val s = event.stats ?: event.result?.stats
+                        s?.let { stats ->
                             statsText = " · ${stats.totalOutputTokens} tokens (${stats.inputTokens} in, ${String.format("%.0f", stats.tokensPerSecond)} tok/s, ${String.format("%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first)"
                         }
-                        event.result?.output?.forEach { item ->
+                        val out = event.output ?: event.result?.output
+                        out?.forEach { item ->
                             when (item.type) {
                                 "reasoning" -> item.content.let { reasoningBuf.append(it) }
                                 "message" -> if (item.content.isNotEmpty()) {
@@ -142,7 +139,6 @@ class LMStudioProvider(
                     } catch (_: Exception) {}
                 }
                 emit(StreamToken.Done(statsText, reasoningBuf.toString().trim().takeIf { it.isNotEmpty() }))
-                try { responseBody.close() } catch (_: Exception) {}
             } else {
                 val errorBody = response.errorBody()?.string() ?: response.message()
                 emit(StreamToken.Error("HTTP ${response.code()}: $errorBody"))
