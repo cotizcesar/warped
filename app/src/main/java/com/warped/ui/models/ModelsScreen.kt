@@ -267,6 +267,8 @@ fun ModelCard(
                     Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("Delete")
+                }
+            }
         }
     }
 }
@@ -320,8 +322,6 @@ private fun DownloadCard(
                 OutlinedButton(onClick = onDeleteIncomplete) { Text("Delete partial file") }
             }
         }
-    }
-}
     }
 }
 
