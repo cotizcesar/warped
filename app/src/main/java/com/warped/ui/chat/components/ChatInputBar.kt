@@ -1,6 +1,5 @@
 package com.warped.ui.chat.components
 
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -45,64 +44,61 @@ fun ChatInputBar(
             .padding(horizontal = 12.dp, vertical = 5.dp)
     ) {
         Column(modifier = Modifier.padding(5.dp)) {
-            // Row 1: Text input + send/stop button
-            Row(
+            // Row 1: Input only
+            OutlinedTextField(
+                value = text,
+                onValueChange = onTextChange,
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = onTextChange,
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text(stringResource(R.string.type_message)) },
-                    enabled = !isGenerating && canSend,
-                    maxLines = 4,
-                    shape = MaterialTheme.shapes.medium,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                        disabledBorderColor = Color.Transparent,
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent
-                    )
+                placeholder = { Text(stringResource(R.string.type_message)) },
+                enabled = !isGenerating && canSend,
+                maxLines = 4,
+                shape = MaterialTheme.shapes.medium,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent,
+                    disabledBorderColor = Color.Transparent,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent
                 )
-                Spacer(Modifier.width(8.dp))
-                if (isGenerating) {
-                    IconButton(onClick = onStop, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Filled.Stop, contentDescription = "Stop", tint = Color.White, modifier = Modifier.size(24.dp))
-                    }
-                } else {
-                    IconButton(onClick = onSend, enabled = canSend && text.isNotBlank(), modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = Color.White, modifier = Modifier.size(24.dp))
-                    }
-                }
-            }
+            )
 
             Spacer(Modifier.height(5.dp))
 
-            // Row 2: Image button (left), model picker + reasoning (right)
+            // Row 2: Left (image + brain) | Right (model + send/stop)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onAddImage, modifier = Modifier.size(40.dp)) {
-                    Icon(Icons.Filled.AddPhotoAlternate, "Add image", tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
+                // Left group
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onAddImage, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Filled.AddPhotoAlternate, "Add image",
+                            tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(22.dp))
+                    }
+                    IconButton(onClick = onToggleReasoning, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Filled.Psychology, "Reasoning",
+                            tint = if (reasoningEnabled) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.3f),
+                            modifier = Modifier.size(22.dp))
+                    }
                 }
 
                 Spacer(Modifier.weight(1f))
 
-                // Model picker button with dropdown
+                // Right group: Model dropdown + send/stop
                 var modelExpanded by remember { mutableStateOf(false) }
-                val modelLabel = selectedModelId?.substringAfterLast("/") ?: "Model"
                 Box {
                     TextButton(onClick = { modelExpanded = true }) {
-                        Text(modelLabel, color = Color.White.copy(alpha = 0.6f), maxLines = 1)
-                        Icon(Icons.Filled.KeyboardArrowDown, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
+                        Text(
+                            selectedModelId?.substringAfterLast("/") ?: "Model",
+                            color = Color.White.copy(alpha = 0.6f),
+                            maxLines = 1
+                        )
+                        Icon(Icons.Filled.KeyboardArrowDown, null,
+                            tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
                     }
                     DropdownMenu(
                         expanded = modelExpanded,
-                        onDismissRequest = { modelExpanded = false },
-                        modifier = Modifier.align(Alignment.TopEnd)
+                        onDismissRequest = { modelExpanded = false }
                     ) {
                         localModels.forEach { model ->
                             DropdownMenuItem(
@@ -131,14 +127,14 @@ fun ChatInputBar(
                     }
                 }
 
-                // Reasoning toggle
-                IconButton(onClick = onToggleReasoning, modifier = Modifier.size(40.dp)) {
-                    Icon(
-                        Icons.Filled.Psychology,
-                        contentDescription = "Reasoning",
-                        tint = if (reasoningEnabled) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.3f),
-                        modifier = Modifier.size(24.dp)
-                    )
+                if (isGenerating) {
+                    IconButton(onClick = onStop, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.Filled.Stop, "Stop", tint = Color.White, modifier = Modifier.size(24.dp))
+                    }
+                } else {
+                    IconButton(onClick = onSend, enabled = canSend && text.isNotBlank(), modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.AutoMirrored.Filled.Send, "Send", tint = Color.White, modifier = Modifier.size(24.dp))
+                    }
                 }
             }
         }
