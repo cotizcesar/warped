@@ -135,12 +135,12 @@ class ChatViewModel @Inject constructor(
                         is StreamToken.Done -> {
                             val content = _uiState.value.streamingContent + tokenBuffer.joinToString("")
                             if (content.isNotBlank()) {
-                                val finalContent = if (!token.stats.isNullOrBlank()) "$content\n\n${token.stats}" else content
                                 val assistantMessage = ChatMessage(
                                     role = Role.ASSISTANT,
-                                    content = finalContent,
+                                    content = content,
                                     tokenCount = content.length / 4,
-                                    reasoning = token.reasoning
+                                    reasoning = token.reasoning,
+                                    stats = token.stats
                                 )
                                 _uiState.update {
                                     it.copy(

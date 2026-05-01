@@ -9,5 +9,6 @@ data class ChatMessage(
     val content: String,
     val tokenCount: Int = 0,
     val createdAt: Instant = Instant.now(),
-    val reasoning: String? = null
+    val reasoning: String? = null,
+    val stats: String? = null
 )

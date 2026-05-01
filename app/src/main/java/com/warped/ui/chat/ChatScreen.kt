@@ -41,7 +41,10 @@ fun ChatScreen(
         }
         when {
             local != null -> local.name
-            endpoint != null -> endpoint.name
+            endpoint != null -> {
+                val shortId = uiState.selectedModelId?.substringAfterLast("/") ?: uiState.selectedModelId
+                "${endpoint.name} ($shortId)"
+            }
             else -> null
         }
     }
