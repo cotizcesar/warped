@@ -130,7 +130,7 @@ class AnthropicProvider(
                                         // Stop reason received, stream ending
                                     }
                                     "message_stop" -> {
-                                        emit(StreamToken.Done)
+                                        emit(StreamToken.Done())
                                         return@flow
                                     }
                                     "error" -> {
@@ -146,7 +146,7 @@ class AnthropicProvider(
                     }
                 }
                 if (source.exhausted()) {
-                    emit(StreamToken.Done)
+                    emit(StreamToken.Done())
                 }
             } catch (e: Exception) {
                 emit(StreamToken.Error("SSE parse error: ${e.message}"))

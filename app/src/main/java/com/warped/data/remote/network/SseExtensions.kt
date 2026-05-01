@@ -21,7 +21,7 @@ fun ResponseBody.asSseFlow(json: Json): Flow<StreamToken> = flow {
             for (event in events) {
                 when {
                     event.data == "[DONE]" -> {
-                        emit(StreamToken.Done)
+                        emit(StreamToken.Done())
                         return@flow
                     }
                     event.data.isBlank() -> continue
@@ -54,7 +54,7 @@ fun ResponseBody.asOllamaFlow(json: Json): Flow<StreamToken> = flow {
             try {
                 val chunk = json.decodeFromString<OllamaStreamChunk>(line)
                 if (chunk.done) {
-                    emit(StreamToken.Done)
+                    emit(StreamToken.Done())
                     return@flow
                 }
                 val content = chunk.message?.content

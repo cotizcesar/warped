@@ -68,23 +68,28 @@ class LMStudioProvider(
                 val lines = fullBody.lines()
                 var hasTokens = false
                 var currentEvent = ""
+                var statsText: String? = null
                 for (line in lines) {
                     when {
                         line.startsWith("event: ") -> currentEvent = line.removePrefix("event: ").trim()
                         line.startsWith("data: ") -> {
                             val data = line.removePrefix("data: ").trim()
                             if (data == "[DONE]") {
-                                emit(StreamToken.Done)
+                                emit(StreamToken.Done(statsText))
                                 return@flow
                             }
                             try {
                                 val event = json.decodeFromString<LmStudioSseEvent>(data)
-                                // Only emit text from message.delta, skip reasoning and other events
                                 if (currentEvent == "message.delta" || event.type == "message.delta") {
                                     val text = event.content ?: ""
                                     if (text.isNotEmpty()) {
                                         emit(StreamToken.Delta(text))
                                         hasTokens = true
+                                    }
+                                }
+                                if (currentEvent == "chat.end" || event.type == "chat.end") {
+                                    event.result?.stats?.let { stats ->
+                                        statsText = " · ${stats.totalOutputTokens} tokens (${stats.inputTokens} in, ${String.format("%.0f", stats.tokensPerSecond)} tok/s, ${String.format("%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first)"
                                     }
                                 }
                                 if (event.error != null) {
@@ -95,11 +100,14 @@ class LMStudioProvider(
                         }
                     }
                 }
-                // Fallback: non-streaming, parse entire body as JSON
+                // Fallback: non-streaming
                 if (!hasTokens) {
                     try {
                         val event = json.decodeFromString<LmStudioSseEvent>(fullBody)
-                        event.output?.forEach { item ->
+                        event.result?.stats?.let { stats ->
+                            statsText = " · ${stats.totalOutputTokens} tokens (${stats.inputTokens} in, ${String.format("%.0f", stats.tokensPerSecond)} tok/s, ${String.format("%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first)"
+                        }
+                        event.result?.output?.forEach { item ->
                             if (item.type == "message" && item.content.isNotEmpty()) {
                                 emit(StreamToken.Delta(item.content))
                                 hasTokens = true
@@ -107,7 +115,7 @@ class LMStudioProvider(
                         }
                     } catch (_: Exception) {}
                 }
-                emit(StreamToken.Done)
+                emit(StreamToken.Done(statsText))
             } else {
                 val errorBody = response.errorBody()?.string() ?: response.message()
                 emit(StreamToken.Error("HTTP ${response.code()}: $errorBody"))

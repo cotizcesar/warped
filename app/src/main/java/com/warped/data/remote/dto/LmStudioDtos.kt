@@ -56,7 +56,25 @@ data class LmStudioSseEvent(
     val type: String? = null,
     val done: Boolean = false,
     val error: LmStudioSseError? = null,
-    val output: List<LmStudioOutputItem>? = null
+    val output: List<LmStudioOutputItem>? = null,
+    val result: LmStudioChatResult? = null
+)
+
+@Serializable
+data class LmStudioChatResult(
+    @SerialName("model_instance_id") val modelInstanceId: String = "",
+    val output: List<LmStudioOutputItem> = emptyList(),
+    val stats: LmStudioStats? = null
+)
+
+@Serializable
+data class LmStudioStats(
+    @SerialName("input_tokens") val inputTokens: Int = 0,
+    @SerialName("total_output_tokens") val totalOutputTokens: Int = 0,
+    @SerialName("reasoning_output_tokens") val reasoningOutputTokens: Int = 0,
+    @SerialName("tokens_per_second") val tokensPerSecond: Double = 0.0,
+    @SerialName("time_to_first_token_seconds") val timeToFirstTokenSeconds: Double = 0.0,
+    @SerialName("model_load_time_seconds") val modelLoadTimeSeconds: Double? = null
 )
 
 @Serializable

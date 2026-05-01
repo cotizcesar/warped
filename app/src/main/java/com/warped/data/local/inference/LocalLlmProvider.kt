@@ -41,7 +41,7 @@ class LocalLlmProvider @Inject constructor(
         llamaEngine.generate(prompt).collect { token ->
             emit(StreamToken.Delta(token))
         }
-        emit(StreamToken.Done)
+        emit(StreamToken.Done())
     }.flowOn(Dispatchers.Default)
 
     override suspend fun listModels(): Result<List<ModelInfo>> {
