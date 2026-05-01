@@ -1,5 +1,6 @@
 package com.warped.ui.chat.components
 
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -30,8 +31,9 @@ fun ChatInputBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .navigationBarsPadding()
             .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.Bottom
+        verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onAddImage) {
             Icon(Icons.Filled.AddPhotoAlternate, "Add image", modifier = Modifier.size(22.dp))
