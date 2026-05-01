@@ -40,6 +40,10 @@ class ChatViewModel @Inject constructor(
     private var generationJob: Job? = null
 
     init {
+        // Restore persisted loaded instance ID
+        activeModelSelection.activeModel.value?.instanceId?.let {
+            _uiState.value = _uiState.value.copy(loadedInstanceId = it)
+        }
         viewModelScope.launch {
             chatRepository.observeConversations().collect { conversations ->
                 _uiState.update { it.copy(conversations = conversations) }
@@ -69,17 +73,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             activeModelSelection.activeModel.collect { activeModel ->
                 if (activeModel != null) {
-                    _uiState.update {
-                        it.copy(
-                            selectedModelId = activeModel.modelId,
-                            selectedProvider = activeModel.providerType,
-                            error = null
-                        )
-                    }
-                    // Pre-load local models immediately when selected
-                    if (activeModel.providerType == ProviderType.LOCAL) {
-                        preloadLocalModel(activeModel.modelId)
-                    }
+                    setSelectedModel(activeModel.modelId, activeModel.providerType)
                 }
             }
         }
@@ -225,35 +219,51 @@ class ChatViewModel @Inject constructor(
         
         if (isSameModel) return
         
-        // Unload old LM Studio model if switching away
-        if (oldProvider == ProviderType.LM_STUDIO && oldInstance != null && 
-            modelId != oldModelId) {
-            viewModelScope.launch {
-                try {
-                    val endpoint = endpointRepository.getActive()
-                    if (endpoint != null) {
-                        val provider = com.warped.data.remote.provider.LMStudioProvider(endpoint.url, oldModelId ?: modelId)
-                        provider.unloadModel(oldInstance)
+        // Unload previous model
+        when (oldProvider) {
+            ProviderType.LM_STUDIO -> {
+                if (oldInstance != null && oldModelId != null) {
+                    viewModelScope.launch {
+                        try {
+                            val endpoint = endpointRepository.getActive()
+                            if (endpoint != null) {
+                                val provider = com.warped.data.remote.provider.LMStudioProvider(endpoint.url, oldModelId)
+                                provider.unloadModel(oldInstance)
+                            }
+                        } catch (_: Exception) {}
                     }
-                } catch (_: Exception) {}
+                }
             }
+            ProviderType.LOCAL -> {
+                viewModelScope.launch(Dispatchers.Default) {
+                    try { llamaEngine.unload() } catch (_: Exception) {}
+                }
+            }
+            else -> {}
         }
         
-        // Load new LM Studio model
-        if (providerType == ProviderType.LM_STUDIO) {
-            viewModelScope.launch {
-                try {
-                    _uiState.update { it.copy(loadedInstanceId = null) }
-                    val endpoint = endpointRepository.getActive()
-                    if (endpoint != null) {
-                        val provider = com.warped.data.remote.provider.LMStudioProvider(endpoint.url, modelId)
-                        val result = provider.loadModel(modelId)
-                        result.onSuccess { instanceId ->
-                            _uiState.update { it.copy(loadedInstanceId = instanceId) }
+        // Load new model
+        when (providerType) {
+            ProviderType.LM_STUDIO -> {
+                viewModelScope.launch {
+                    try {
+                        _uiState.update { it.copy(loadedInstanceId = null) }
+                        val endpoint = endpointRepository.getActive()
+                        if (endpoint != null) {
+                            val provider = com.warped.data.remote.provider.LMStudioProvider(endpoint.url, modelId)
+                            val result = provider.loadModel(modelId)
+                            result.onSuccess { instanceId ->
+                                _uiState.update { it.copy(loadedInstanceId = instanceId) }
+                                activeModelSelection.select(modelId, providerType, instanceId)
+                            }
                         }
-                    }
-                } catch (_: Exception) {}
+                    } catch (_: Exception) {}
+                }
             }
+            ProviderType.LOCAL -> {
+                preloadLocalModel(modelId)
+            }
+            else -> {}
         }
     }
 

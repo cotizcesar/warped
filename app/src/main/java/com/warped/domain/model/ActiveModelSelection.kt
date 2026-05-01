@@ -12,7 +12,8 @@ import javax.inject.Singleton
 
 data class ActiveModel(
     val modelId: String,
-    val providerType: ProviderType
+    val providerType: ProviderType,
+    val instanceId: String? = null
 )
 
 @Singleton
@@ -27,13 +28,17 @@ class ActiveModelSelection @Inject constructor(
         try {
             keystoreManager.get(LAST_MODEL_KEY)?.let { raw ->
                 val saved = json.decodeFromString<SavedModel>(raw)
-                _activeModel.value = ActiveModel(modelId = saved.modelId, providerType = ProviderType.valueOf(saved.providerType))
+                _activeModel.value = ActiveModel(
+                    modelId = saved.modelId, 
+                    providerType = ProviderType.valueOf(saved.providerType),
+                    instanceId = saved.instanceId
+                )
             }
         } catch (_: Exception) {}
     }
 
-    fun select(modelId: String, providerType: ProviderType) {
-        _activeModel.value = ActiveModel(modelId = modelId, providerType = providerType)
+    fun select(modelId: String, providerType: ProviderType, instanceId: String? = null) {
+        _activeModel.value = ActiveModel(modelId = modelId, providerType = providerType, instanceId = instanceId)
         try { persist() } catch (_: Exception) {}
     }
 
@@ -44,12 +49,18 @@ class ActiveModelSelection @Inject constructor(
 
     private fun persist() {
         _activeModel.value?.let { model ->
-            keystoreManager.put(LAST_MODEL_KEY, json.encodeToString(SavedModel(model.modelId, model.providerType.name)))
+            keystoreManager.put(LAST_MODEL_KEY, json.encodeToString(
+                SavedModel(model.modelId, model.providerType.name, model.instanceId)
+            ))
         }
     }
 
     @Serializable
-    private data class SavedModel(val modelId: String, val providerType: String)
+    private data class SavedModel(
+        val modelId: String,
+        val providerType: String,
+        val instanceId: String? = null
+    )
 
     companion object {
         private const val LAST_MODEL_KEY = "last_active_model"
