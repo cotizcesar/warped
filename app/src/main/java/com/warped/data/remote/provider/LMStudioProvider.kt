@@ -103,7 +103,7 @@ class LMStudioProvider(
                                 }
                                 if (currentEvent == "chat.end" || event.type == "chat.end") {
                                     event.result?.stats?.let { stats ->
-                                        statsText = " · ${stats.totalOutputTokens} tokens (${stats.inputTokens} in, ${String.format("%.0f", stats.tokensPerSecond)} tok/s, ${String.format("%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first)"
+                                        statsText = "${stats.totalOutputTokens} tokens · ${stats.inputTokens} in · ${String.format("%.0f", stats.tokensPerSecond)} tok/s · ${String.format("%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first"
                                     }
                                     event.result?.output?.forEach { item ->
                                         if (item.type == "message" && item.content.isNotEmpty()) {
@@ -127,7 +127,7 @@ class LMStudioProvider(
                         val event = json.decodeFromString<LmStudioSseEvent>(fullBody)
                         val s = event.stats ?: event.result?.stats
                         s?.let { stats ->
-                            statsText = " · ${stats.totalOutputTokens} tokens (${stats.inputTokens} in, ${String.format("%.0f", stats.tokensPerSecond)} tok/s, ${String.format("%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first)"
+                            statsText = "${stats.totalOutputTokens} tokens · ${stats.inputTokens} in · ${String.format("%.0f", stats.tokensPerSecond)} tok/s · ${String.format("%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first"
                         }
                         val out = event.output ?: event.result?.output
                         out?.forEach { item ->
