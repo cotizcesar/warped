@@ -73,7 +73,18 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             activeModelSelection.activeModel.collect { activeModel ->
                 if (activeModel != null) {
-                    setSelectedModel(activeModel.modelId, activeModel.providerType)
+                    _uiState.update {
+                        it.copy(
+                            selectedModelId = activeModel.modelId,
+                            selectedProvider = activeModel.providerType,
+                            loadedInstanceId = activeModel.instanceId ?: it.loadedInstanceId,
+                            error = null
+                        )
+                    }
+                    // Only preload LOCAL models — LM_STUDIO loads on-demand via chat request
+                    if (activeModel.providerType == ProviderType.LOCAL) {
+                        preloadLocalModel(activeModel.modelId)
+                    }
                 }
             }
         }
