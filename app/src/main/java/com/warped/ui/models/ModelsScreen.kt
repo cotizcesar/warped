@@ -69,9 +69,6 @@ fun ModelsScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(title = { Text("Models & Endpoints") })
-        },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddWizard = true }) {
                 Text("+")
@@ -109,7 +106,13 @@ fun ModelsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .statusBarsPadding()
         ) {
+            Text(
+                "Models & Endpoints",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
             if (uiState.isImporting) {
                 LinearProgressIndicator(
                     progress = { uiState.importProgress },
