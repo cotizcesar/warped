@@ -3,6 +3,7 @@ package com.warped.ui.chat.components
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -20,7 +21,9 @@ fun ChatInputBar(
     canSend: Boolean,
     onTextChange: (String) -> Unit,
     onSend: () -> Unit,
-    onStop: () -> Unit
+    onStop: () -> Unit,
+    selectedModelName: String? = null,
+    onModelPickerClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -28,6 +31,10 @@ fun ChatInputBar(
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.Bottom
     ) {
+        IconButton(onClick = onModelPickerClick) {
+            Icon(Icons.Filled.Psychology, contentDescription = "Select model")
+        }
+        Spacer(Modifier.width(4.dp))
         OutlinedTextField(
             value = text,
             onValueChange = onTextChange,

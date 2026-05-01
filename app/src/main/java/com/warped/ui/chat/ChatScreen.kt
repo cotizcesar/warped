@@ -27,6 +27,20 @@ fun ChatScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
+    var showModelPicker by remember { mutableStateOf(false) }
+
+    // Compute selected model display name for ChatInputBar
+    val selectedModelName = run {
+        val local = uiState.localModels.firstOrNull { it.filePath == uiState.selectedModelId }
+        val endpoint = uiState.endpoints.firstOrNull {
+            it.modelId == uiState.selectedModelId && it.apiType == uiState.selectedProvider
+        }
+        when {
+            local != null -> local.name
+            endpoint != null -> endpoint.name
+            else -> null
+        }
+    }
 
     LaunchedEffect(uiState.streamingContent.length, uiState.messages.size) {
         if (uiState.messages.isNotEmpty() || uiState.streamingContent.isNotEmpty()) {
@@ -34,6 +48,29 @@ fun ChatScreen(
             val totalItems = listState.layoutInfo.totalItemsCount
             if (lastVisible >= totalItems - 3 || totalItems == 0) {
                 listState.animateScrollToItem(maxOf(0, totalItems - 1))
+            }
+        }
+    }
+
+    // Model picker bottom sheet
+    if (showModelPicker) {
+        ModalBottomSheet(
+            onDismissRequest = { showModelPicker = false }
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Select Model", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(12.dp))
+                ModelSelector(
+                    selectedModelId = uiState.selectedModelId,
+                    selectedProvider = uiState.selectedProvider,
+                    localModels = uiState.localModels,
+                    endpoints = uiState.endpoints,
+                    onModelSelected = { modelId, provider ->
+                        viewModel.setSelectedModel(modelId, provider)
+                        showModelPicker = false
+                    }
+                )
+                Spacer(Modifier.height(32.dp))
             }
         }
     }
@@ -59,7 +96,9 @@ fun ChatScreen(
                     canSend = uiState.selectedModelId != null,
                     onTextChange = { viewModel.updateInput(it) },
                     onSend = { viewModel.sendMessage(uiState.inputText) },
-                    onStop = { viewModel.stopGeneration() }
+                    onStop = { viewModel.stopGeneration() },
+                    selectedModelName = selectedModelName,
+                    onModelPickerClick = { showModelPicker = true }
                 )
             }
         ) { padding ->
@@ -68,22 +107,6 @@ fun ChatScreen(
                     .fillMaxSize()
                     .padding(padding)
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp)
-                ) {
-                    ModelSelector(
-                        selectedModelId = uiState.selectedModelId,
-                        selectedProvider = uiState.selectedProvider,
-                        localModels = uiState.localModels,
-                        endpoints = uiState.endpoints,
-                        onModelSelected = { modelId, provider ->
-                            viewModel.setSelectedModel(modelId, provider)
-                        }
-                    )
-                }
-
                 LazyColumn(
                     modifier = Modifier
                         .weight(1f)
