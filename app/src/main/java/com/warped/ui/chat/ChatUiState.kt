@@ -25,7 +25,8 @@ data class ChatUiState(
     val generationParameters: GenerationParameters = GenerationParameters(),
     val isLoadingModel: Boolean = false,
     val loadingModelName: String = "",
-    val modelLoadError: String? = null
+    val modelLoadError: String? = null,
+    val loadedInstanceId: String? = null
 )
 
 sealed class ChatError {

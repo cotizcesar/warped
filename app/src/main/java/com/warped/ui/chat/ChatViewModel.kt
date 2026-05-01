@@ -206,8 +206,30 @@ class ChatViewModel @Inject constructor(
     }
 
     fun setSelectedModel(modelId: String, providerType: ProviderType) {
+        val oldProvider = _uiState.value.selectedProvider
+        val oldModelId = _uiState.value.selectedModelId
+        
         activeModelSelection.select(modelId, providerType)
         _uiState.update { it.copy(selectedModelId = modelId, selectedProvider = providerType) }
+        
+        if (providerType == ProviderType.LM_STUDIO && oldProvider == ProviderType.LM_STUDIO) {
+            viewModelScope.launch {
+                try {
+                    val endpoint = endpointRepository.getActive()
+                    if (endpoint != null) {
+                        val provider = com.warped.data.remote.provider.LMStudioProvider(endpoint.url, modelId)
+                        val oldInstance = _uiState.value.loadedInstanceId
+                        if (oldInstance != null) {
+                            provider.unloadModel(oldInstance)
+                        }
+                        val result = provider.loadModel(modelId)
+                        result.onSuccess { instanceId ->
+                            _uiState.update { it.copy(loadedInstanceId = instanceId) }
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+        }
     }
 
     fun updateParameters(params: GenerationParameters) {

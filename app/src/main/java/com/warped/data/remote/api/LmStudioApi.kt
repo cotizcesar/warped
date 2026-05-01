@@ -1,7 +1,11 @@
 package com.warped.data.remote.api
 
 import com.warped.data.remote.dto.LmStudioChatRequest
+import com.warped.data.remote.dto.LmStudioLoadRequest
+import com.warped.data.remote.dto.LmStudioLoadResponse
 import com.warped.data.remote.dto.LmStudioModelListResponse
+import com.warped.data.remote.dto.LmStudioUnloadRequest
+import com.warped.data.remote.dto.LmStudioUnloadResponse
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
@@ -16,4 +20,12 @@ interface LmStudioApi {
 
     @GET("api/v1/models")
     suspend fun listModels(): Response<LmStudioModelListResponse>
+
+    @POST("api/v1/models/load")
+    @Headers("Content-Type: application/json")
+    suspend fun loadModel(@Body request: LmStudioLoadRequest): Response<LmStudioLoadResponse>
+
+    @POST("api/v1/models/unload")
+    @Headers("Content-Type: application/json")
+    suspend fun unloadModel(@Body request: LmStudioUnloadRequest): Response<LmStudioUnloadResponse>
 }

@@ -152,13 +152,28 @@ class LMStudioProvider(
         }
     }
 
-    suspend fun listModelsRaw(): Result<List<com.warped.data.remote.dto.LmStudioModelData>> {
+    suspend fun loadModel(modelKey: String): Result<String> {
         return try {
-            val response = api.listModels()
+            val request = com.warped.data.remote.dto.LmStudioLoadRequest(model = modelKey)
+            val response = api.loadModel(request)
             if (response.isSuccessful) {
-                Result.success(response.body()?.models ?: emptyList())
+                Result.success(response.body()?.instanceId ?: modelKey)
             } else {
-                Result.failure(Exception("HTTP ${response.code()}"))
+                Result.failure(Exception("Load failed: HTTP ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun unloadModel(instanceId: String): Result<Unit> {
+        return try {
+            val request = com.warped.data.remote.dto.LmStudioUnloadRequest(instanceId = instanceId)
+            val response = api.unloadModel(request)
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Unload failed: HTTP ${response.code()}"))
             }
         } catch (e: Exception) {
             Result.failure(e)

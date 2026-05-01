@@ -96,3 +96,27 @@ data class LmStudioSseError(
     val type: String = "",
     val code: String = ""
 )
+
+@Serializable
+data class LmStudioLoadRequest(
+    val model: String,
+    @SerialName("context_length") val contextLength: Int? = null
+)
+
+@Serializable
+data class LmStudioLoadResponse(
+    val type: String = "",
+    @SerialName("instance_id") val instanceId: String = "",
+    @SerialName("load_time_seconds") val loadTimeSeconds: Double = 0.0,
+    val status: String = ""
+)
+
+@Serializable
+data class LmStudioUnloadRequest(
+    @SerialName("instance_id") val instanceId: String
+)
+
+@Serializable
+data class LmStudioUnloadResponse(
+    @SerialName("instance_id") val instanceId: String = ""
+)

@@ -240,20 +240,12 @@ class ModelsViewModel @Inject constructor(
             try {
                 val provider = LMStudioProvider(baseUrl = url, modelId = "fetch")
                 val result = provider.listModels()
-                val rawResult = provider.listModelsRaw()
                 result.onSuccess { models ->
-                    rawResult.onSuccess { rawModels ->
-                        _uiState.update {
-                            it.copy(
-                                availableEndpointModels = models.map { m -> m.id },
-                                availableEndpointModelsData = rawModels,
-                                isFetchingEndpointModels = false
-                            )
-                        }
-                    }.onFailure {
-                        _uiState.update {
-                            it.copy(availableEndpointModels = models.map { m -> m.id }, isFetchingEndpointModels = false)
-                        }
+                    _uiState.update {
+                        it.copy(
+                            availableEndpointModels = models.map { m -> m.id },
+                            isFetchingEndpointModels = false
+                        )
                     }
                 }.onFailure { e ->
                     _uiState.update { it.copy(isFetchingEndpointModels = false, error = "Failed to fetch: ${e.message}") }
