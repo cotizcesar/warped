@@ -2,10 +2,13 @@ package com.warped.ui.chat.components
 
 import android.graphics.BitmapFactory
 import android.net.Uri
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.ArrowUpward
@@ -58,7 +61,7 @@ fun ChatInputBar(
             // Image previews
             if (attachedImages.isNotEmpty()) {
                 LazyRow(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 5.dp),
+                    modifier = Modifier.fillMaxWidth().padding(10.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(attachedImages.size) { i ->
@@ -79,11 +82,17 @@ fun ChatInputBar(
                                     contentScale = ContentScale.Crop
                                 )
                             }
-                            IconButton(
-                                onClick = { onRemoveImage(i) },
-                                modifier = Modifier.align(Alignment.TopEnd).size(22.dp).offset(x = 8.dp, y = (-8).dp)
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .offset(x = 6.dp, y = (-6).dp)
+                                    .size(20.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(Color.Black.copy(alpha = 0.5f))
+                                    .clickable { onRemoveImage(i) },
+                                contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Filled.Close, "Remove", tint = Color.White, modifier = Modifier.size(14.dp))
+                                Icon(Icons.Filled.Close, "Remove", tint = Color.White, modifier = Modifier.size(12.dp))
                             }
                         }
                     }
