@@ -18,18 +18,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.warped.domain.model.Conversation
+import com.warped.domain.repository.ChatRepository
 import com.warped.ui.chat.ChatScreen
-import com.warped.ui.chat.ChatViewModel
 import com.warped.ui.huggingface.HuggingFaceScreen
 import com.warped.ui.models.ModelsScreen
 import com.warped.ui.presets.PresetsScreen
 import com.warped.ui.settings.SettingsScreen
+import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
 private val DrawerBg = Color(0xFF1C1C1C)
@@ -46,9 +51,15 @@ fun WarpedNavGraph() {
     val currentRoute = navBackStackEntry?.destination?.route
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    val chatViewModel: ChatViewModel = hiltViewModel()
 
-    val conversations by chatViewModel.uiState.collectAsState()
+    // Get ChatRepository for conversation list
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val chatRepository = remember {
+        val appContext = context.applicationContext
+        val entryPoint = EntryPointAccessors.fromApplication(appContext, ChatRepoEntryPoint::class.java)
+        entryPoint.chatRepository()
+    }
+    val conversations by chatRepository.observeConversations().collectAsStateWithLifecycle(emptyList())
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -59,13 +70,8 @@ fun WarpedNavGraph() {
             ) {
                 Column(modifier = Modifier.fillMaxHeight()) {
                     Spacer(Modifier.height(12.dp))
-                    Text(
-                        "Warped",
-                        color = DrawerTextPrimary,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
-                    )
+                    Text("Warped", color = DrawerTextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
 
                     NavigationDrawerItem(
                         icon = { Icon(Icons.Filled.Add, null, tint = DrawerAccent) },
@@ -73,56 +79,39 @@ fun WarpedNavGraph() {
                         selected = false,
                         colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent),
                         onClick = {
-                            chatViewModel.newConversation()
                             navController.navigate(Screen.Chat.route) {
                                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
+                                launchSingleTop = true; restoreState = true
                             }
                             scope.launch { drawerState.close() }
                         }
                     )
-
                     HorizontalDivider(color = Color(0xFF333333), thickness = 0.5.dp)
 
-                    // Chat history
                     LazyColumn(modifier = Modifier.weight(1f)) {
-                        items(conversations.conversations, key = { it.id }) { conv ->
-                            val active = conv.id == conversations.conversationId
+                        items(conversations, key = { it.id }) { conv ->
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        chatViewModel.selectConversation(conv.id)
-                                        scope.launch { drawerState.close() }
+                                modifier = Modifier.fillMaxWidth().clickable {
+                                    navController.navigate("${Screen.Chat.route}/${conv.id}") {
+                                        launchSingleTop = true
                                     }
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                    scope.launch { drawerState.close() }
+                                }.padding(horizontal = 16.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.Chat, null,
-                                    tint = if (active) DrawerTextPrimary else DrawerTextSecondary,
-                                    modifier = Modifier.size(16.dp)
-                                )
+                                Icon(Icons.AutoMirrored.Filled.Chat, null,
+                                    tint = DrawerTextSecondary, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(12.dp))
-                                Text(
-                                    conv.title,
-                                    color = if (active) DrawerTextPrimary else DrawerTextSecondary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                                    modifier = Modifier.weight(1f)
-                                )
+                                Text(conv.title, color = DrawerTextSecondary,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                    fontSize = 13.sp, modifier = Modifier.weight(1f))
                             }
                         }
                     }
 
                     HorizontalDivider(color = Color(0xFF333333), thickness = 0.5.dp)
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly) {
                         val isModels = currentRoute == Screen.Models.route
                         NavigationDrawerItem(
                             icon = { Icon(Icons.Filled.Memory, null, tint = if (isModels) DrawerAccent else DrawerTextSecondary, modifier = Modifier.size(22.dp)) },
@@ -133,8 +122,7 @@ fun WarpedNavGraph() {
                             onClick = {
                                 navController.navigate(Screen.Models.route) {
                                     popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
+                                    launchSingleTop = true; restoreState = true
                                 }
                                 scope.launch { drawerState.close() }
                             }
@@ -158,6 +146,13 @@ fun WarpedNavGraph() {
     ) {
         NavHost(navController, startDestination = Screen.Chat.route) {
             composable(Screen.Chat.route) { ChatScreen(onOpenDrawer = { scope.launch { drawerState.open() } }) }
+            composable(
+                route = "${Screen.Chat.route}/{conversationId}",
+                arguments = listOf(navArgument("conversationId") { type = NavType.LongType })
+            ) { backStackEntry ->
+                val convId = backStackEntry.arguments?.getLong("conversationId") ?: 0L
+                ChatScreen(conversationId = convId, onOpenDrawer = { scope.launch { drawerState.open() } })
+            }
             composable(Screen.Models.route) {
                 ModelsScreen(
                     onUseInChat = { navController.navigate(Screen.Chat.route) },
@@ -184,3 +179,8 @@ fun WarpedNavGraph() {
     }
 }
 
+@dagger.hilt.EntryPoint
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+interface ChatRepoEntryPoint {
+    fun chatRepository(): ChatRepository
+}

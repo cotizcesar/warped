@@ -185,6 +185,7 @@ class ChatViewModel @Inject constructor(
                     it.copy(
                         conversationId = conversation.id,
                         messages = messages,
+                        selectedModelId = conversation.modelId,
                         selectedProvider = conversation.providerType,
                         streamingContent = "",
                         error = null

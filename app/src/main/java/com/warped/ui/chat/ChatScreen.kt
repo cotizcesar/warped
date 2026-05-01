@@ -36,12 +36,17 @@ import com.warped.ui.chat.components.MessageBubble
 @Composable
 fun ChatScreen(
     viewModel: ChatViewModel = hiltViewModel(),
-    onOpenDrawer: () -> Unit = {}
+    onOpenDrawer: () -> Unit = {},
+    conversationId: Long = 0L
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     var modelDropdownExpanded by remember { mutableStateOf(false) }
     var attachedImages by remember { mutableStateOf<List<Uri>>(emptyList()) }
+
+    LaunchedEffect(conversationId) {
+        if (conversationId > 0) viewModel.selectConversation(conversationId)
+    }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
@@ -106,7 +111,7 @@ fun ChatScreen(
                             if (uiState.localModels.isNotEmpty()) {
                                 uiState.localModels.forEach { model ->
                                     DropdownMenuItem(
-                                        text = { Text("${model.name} (local)") },
+                                        text = { Text(model.name) },
                                         onClick = {
                                             viewModel.setSelectedModel(model.filePath, ProviderType.LOCAL)
                                             modelDropdownExpanded = false
@@ -120,8 +125,9 @@ fun ChatScreen(
                             uiState.endpoints.forEach { endpoint ->
                                 val modelId = endpoint.modelId
                                 if (modelId != null) {
+                                    val label = "${endpoint.name} · ${modelId.substringAfterLast("/")}"
                                     DropdownMenuItem(
-                                        text = { Text("${endpoint.name} · ${endpoint.apiType.name}") },
+                                        text = { Text(label) },
                                         onClick = {
                                             viewModel.setSelectedModel(modelId, endpoint.apiType)
                                             modelDropdownExpanded = false
