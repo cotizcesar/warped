@@ -16,6 +16,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontStyle
@@ -36,9 +37,9 @@ fun MessageBubble(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
     ) {
-        Surface(
-            color = if (isUser) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.surfaceVariant,
+            Surface(
+                color = if (isUser) Color(0xFF121212)
+                        else Color.Transparent,
             shape = MaterialTheme.shapes.medium,
             modifier = Modifier.widthIn(max = 340.dp)
         ) {
@@ -121,15 +122,7 @@ fun MessageBubble(
                     }
                 }
 
-                Text(
-                    text = if (isUser) "You" else "Assistant",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (isUser) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontStyle = FontStyle.Italic
-                )
                 if (message.content.isNotBlank()) {
-                    Spacer(Modifier.height(4.dp))
                     if (!isUser) {
                         MarkdownText(
                             text = message.content + if (isStreaming) "▌" else "",
