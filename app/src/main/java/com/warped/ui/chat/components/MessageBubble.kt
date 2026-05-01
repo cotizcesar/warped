@@ -47,7 +47,7 @@ fun MessageBubble(
         ) {
             Column(
                 modifier = if (isUser) Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
-                           else Modifier
+                           else Modifier.padding(0.dp)
             ) {
                 if (!isUser && !message.reasoning.isNullOrBlank()) {
                     Row(
