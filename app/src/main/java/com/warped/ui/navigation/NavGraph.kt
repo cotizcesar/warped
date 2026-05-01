@@ -81,9 +81,9 @@ fun WarpedNavGraph() {
                         colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent),
                         onClick = {
                             navController.navigate(Screen.Chat.route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true; restoreState = true
+                                popUpTo(Screen.Chat.route) { inclusive = true }
                             }
+                            navController.navigate(Screen.Chat.route)
                             scope.launch { drawerState.close() }
                         }
                     )
