@@ -170,6 +170,11 @@ class ModelsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 endpointRepository.deleteEndpoint(endpoint.id)
+                // If this endpoint was the active selection, clear it from chat
+                val active = activeModelSelection.activeModel.value
+                if (active != null && active.modelId == endpoint.modelId && active.providerType == endpoint.apiType) {
+                    activeModelSelection.clear()
+                }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message) }
             }
