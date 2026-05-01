@@ -39,7 +39,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
 private val DrawerBg = Color(0xFF1C1C1C)
-private val DrawerAccent = Color(0xFFD97706)
+private val DrawerAccent = Color(0xFFD97757)
 private val DrawerTextPrimary = Color(0xFFECECEC)
 private val DrawerTextSecondary = Color(0xFF9CA3AF)
 private val DrawerSelectedBg = Color(0xFF2A2A2A)
