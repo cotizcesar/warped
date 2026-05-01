@@ -15,7 +15,7 @@ progress:
 # Project State: Warped
 
 **Last updated:** 2026-05-01
-**Last activity:** 2026-05-01 - Completed quick task 260430-v7v: Model loading + network endpoint model listing.
+**Last activity:** 2026-05-01 - Completed quick task 260430-vsl: LM Studio native v1 API, removed OpenAI/Anthropic from UI.
 **Milestone:** v1.0 — Complete ✓
 **Status:** All 5 phases verified (30/30 requirements)
 
