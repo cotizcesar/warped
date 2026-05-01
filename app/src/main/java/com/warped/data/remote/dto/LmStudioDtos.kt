@@ -55,7 +55,14 @@ data class LmStudioSseEvent(
     val token: String? = null,
     val type: String? = null,
     val done: Boolean = false,
-    val error: LmStudioSseError? = null
+    val error: LmStudioSseError? = null,
+    val output: List<LmStudioOutputItem>? = null
+)
+
+@Serializable
+data class LmStudioOutputItem(
+    val type: String = "",
+    val content: String = ""
 )
 
 @Serializable

@@ -60,41 +60,62 @@ class LMStudioProvider(
         try {
             val response = api.chat(body)
             if (response.isSuccessful) {
-                response.body()?.let { responseBody ->
-                    val source = responseBody.source()
-                    try {
-                        while (!source.exhausted()) {
-                            val line = source.readUtf8Line() ?: break
-                            if (line.startsWith("data: ")) {
-                                val data = line.removePrefix("data: ").trim()
-                                if (data == "[DONE]") {
-                                    emit(StreamToken.Done)
-                                    return@flow
-                                }
-                                try {
-                                    val event = json.decodeFromString<LmStudioSseEvent>(data)
-                                    val text = event.content ?: event.token ?: ""
-                                    if (text.isNotEmpty()) {
-                                        emit(StreamToken.Delta(text))
-                                    }
-                                    if (event.done) {
-                                        emit(StreamToken.Done)
-                                        return@flow
-                                    }
-                                    if (event.error != null) {
-                                        emit(StreamToken.Error(event.error.message))
-                                        return@flow
-                                    }
-                                } catch (_: Exception) {
-                                    // Skip unparseable events
-                                }
-                            }
+                val responseBody = response.body() ?: run {
+                    emit(StreamToken.Error("Empty response"))
+                    return@flow
+                }
+                val fullBody = responseBody.string()
+                // Try SSE line-by-line parsing first
+                val lines = fullBody.lines()
+                var hasTokens = false
+                for (line in lines) {
+                    if (line.startsWith("data: ")) {
+                        val data = line.removePrefix("data: ").trim()
+                        if (data == "[DONE]") {
+                            emit(StreamToken.Done)
+                            return@flow
                         }
-                        emit(StreamToken.Done)
-                    } catch (e: Exception) {
-                        emit(StreamToken.Error("SSE error: ${e.message}"))
+                        try {
+                            val event = json.decodeFromString<LmStudioSseEvent>(data)
+                            val text = event.content ?: event.token ?: ""
+                            if (text.isNotEmpty()) {
+                                emit(StreamToken.Delta(text))
+                                hasTokens = true
+                            }
+                            if (event.done) {
+                                emit(StreamToken.Done)
+                                return@flow
+                            }
+                            if (event.error != null) {
+                                emit(StreamToken.Error(event.error.message))
+                                return@flow
+                            }
+                        } catch (_: Exception) {
+                            // Try as output-type event
+                            try {
+                                val full = json.decodeFromString<LmStudioSseEvent>(data)
+                                full.output?.forEach { item ->
+                                    if (item.type == "message" && item.content.isNotEmpty()) {
+                                        emit(StreamToken.Delta(item.content))
+                                        hasTokens = true
+                                    }
+                                }
+                            } catch (_: Exception) {}
+                        }
                     }
                 }
+                // Fallback: parse entire body as single JSON if no SSE tokens found
+                if (!hasTokens) {
+                    try {
+                        val event = json.decodeFromString<LmStudioSseEvent>(fullBody)
+                        event.output?.forEach { item ->
+                            if (item.type == "message" && item.content.isNotEmpty()) {
+                                emit(StreamToken.Delta(item.content))
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+                emit(StreamToken.Done)
             } else {
                 val errorBody = response.errorBody()?.string() ?: response.message()
                 emit(StreamToken.Error("HTTP ${response.code()}: $errorBody"))
