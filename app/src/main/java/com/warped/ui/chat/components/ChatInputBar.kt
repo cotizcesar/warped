@@ -20,9 +20,7 @@ fun ChatInputBar(
     canSend: Boolean,
     onTextChange: (String) -> Unit,
     onSend: () -> Unit,
-    onStop: () -> Unit,
-    selectedModelName: String? = null,
-    onModelPickerClick: () -> Unit = {}
+    onStop: () -> Unit
 ) {
     Row(
         modifier = Modifier

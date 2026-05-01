@@ -1,7 +1,7 @@
 package com.warped.ui.chat
 
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,10 +19,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.R
+import com.warped.domain.model.ProviderType
 import com.warped.domain.model.Role
 import com.warped.ui.chat.components.ChatInputBar
 import com.warped.ui.chat.components.MessageBubble
-import com.warped.ui.chat.components.ModelSelector
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,7 +32,7 @@ fun ChatScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
-    var showModelPicker by remember { mutableStateOf(false) }
+    var modelDropdownExpanded by remember { mutableStateOf(false) }
 
     val selectedModelName = run {
         val local = uiState.localModels.firstOrNull { it.filePath == uiState.selectedModelId }
@@ -56,46 +56,70 @@ fun ChatScreen(
         }
     }
 
-    if (showModelPicker) {
-        ModalBottomSheet(onDismissRequest = { showModelPicker = false }) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Select Model", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(12.dp))
-                ModelSelector(
-                    selectedModelId = uiState.selectedModelId,
-                    selectedProvider = uiState.selectedProvider,
-                    localModels = uiState.localModels,
-                    endpoints = uiState.endpoints,
-                    onModelSelected = { modelId, provider ->
-                        viewModel.setSelectedModel(modelId, provider)
-                        showModelPicker = false
-                    }
-                )
-                Spacer(Modifier.height(32.dp))
-            }
-        }
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(
-                        modifier = Modifier.clickable { showModelPicker = true },
-                        verticalAlignment = Alignment.CenterVertically
+                    ExposedDropdownMenuBox(
+                        expanded = modelDropdownExpanded,
+                        onExpandedChange = { modelDropdownExpanded = it }
                     ) {
-                        Text(
-                            text = selectedModelName ?: stringResource(R.string.select_model),
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                        Icon(
-                            Icons.Filled.KeyboardArrowDown,
-                            contentDescription = "Select model",
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Row(
+                            modifier = Modifier
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                                .clickable { modelDropdownExpanded = true },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = selectedModelName ?: stringResource(R.string.select_model),
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Icon(
+                                Icons.Filled.KeyboardArrowDown,
+                                contentDescription = "Select model",
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        ExposedDropdownMenu(
+                            expanded = modelDropdownExpanded,
+                            onDismissRequest = { modelDropdownExpanded = false }
+                        ) {
+                            if (uiState.localModels.isNotEmpty()) {
+                                uiState.localModels.forEach { model ->
+                                    DropdownMenuItem(
+                                        text = { Text("${model.name} (local)") },
+                                        onClick = {
+                                            viewModel.setSelectedModel(model.filePath, ProviderType.LOCAL)
+                                            modelDropdownExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                            if (uiState.localModels.isNotEmpty() && uiState.endpoints.isNotEmpty()) {
+                                HorizontalDivider()
+                            }
+                            uiState.endpoints.forEach { endpoint ->
+                                val modelId = endpoint.modelId
+                                if (modelId != null) {
+                                    DropdownMenuItem(
+                                        text = { Text("${endpoint.name} · ${endpoint.apiType.name}") },
+                                        onClick = {
+                                            viewModel.setSelectedModel(modelId, endpoint.apiType)
+                                            modelDropdownExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                            if (uiState.localModels.isEmpty() && uiState.endpoints.isEmpty()) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.no_models_select_model)) },
+                                    onClick = { modelDropdownExpanded = false },
+                                    enabled = false
+                                )
+                            }
+                        }
                     }
                 },
                 navigationIcon = {
@@ -112,9 +136,7 @@ fun ChatScreen(
                 canSend = uiState.selectedModelId != null,
                 onTextChange = { viewModel.updateInput(it) },
                 onSend = { viewModel.sendMessage(uiState.inputText) },
-                onStop = { viewModel.stopGeneration() },
-                selectedModelName = selectedModelName,
-                onModelPickerClick = { showModelPicker = true }
+                onStop = { viewModel.stopGeneration() }
             )
         }
     ) { padding ->
