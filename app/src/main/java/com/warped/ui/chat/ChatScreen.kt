@@ -3,6 +3,8 @@ package com.warped.ui.chat
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.imePadding
@@ -71,6 +73,7 @@ fun ChatScreen(
     }
 
     Scaffold(
+        modifier = Modifier.imePadding(),
         topBar = {
             TopAppBar(
                 title = {
@@ -164,17 +167,17 @@ fun ChatScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .imePadding()
         ) {
             // Image previews
             if (attachedImages.isNotEmpty()) {
-                Row(
+                LazyRow(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    attachedImages.forEach { uri ->
+                    items(attachedImages.size) { i ->
+                        val uri = attachedImages[i]
                         val context = androidx.compose.ui.platform.LocalContext.current
                         val bitmap = remember(uri) {
                             try {
@@ -186,7 +189,7 @@ fun ChatScreen(
                         bitmap?.let { bmp ->
                             Image(
                                 bitmap = bmp.asImageBitmap(),
-                                contentDescription = "Attached image",
+                                contentDescription = "Image ${i+1}",
                                 modifier = Modifier.size(60.dp)
                             )
                         }

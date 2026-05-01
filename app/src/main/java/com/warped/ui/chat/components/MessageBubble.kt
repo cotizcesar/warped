@@ -62,8 +62,10 @@ fun MessageBubble(
                                 ) {
                                     MarkdownText(
                                         text = message.reasoning,
-                                        baseColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                        modifier = Modifier.padding(top = 6.dp)
+                                        baseColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                        modifier = Modifier.padding(top = 6.dp),
+                                        fontSize = 12f,
+                                        fontStyle = FontStyle.Italic
                                     )
                                 }
                             }

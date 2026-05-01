@@ -22,7 +22,9 @@ import androidx.compose.ui.unit.sp
 fun MarkdownText(
     text: String,
     modifier: Modifier = Modifier,
-    baseColor: Color = Color.Unspecified
+    baseColor: Color = Color.Unspecified,
+    fontSize: Float? = null,
+    fontStyle: FontStyle? = null
 ) {
     if (text.isBlank()) {
         Text(text, modifier = modifier, color = baseColor)
@@ -34,12 +36,17 @@ fun MarkdownText(
         var inCodeBlock = false
         var codeBlockContent = StringBuilder()
 
+        val baseStyle = SpanStyle(
+            fontSize = fontSize?.sp ?: 14.sp,
+            fontStyle = fontStyle ?: androidx.compose.ui.text.font.FontStyle.Normal
+        )
+
         for (line in lines) {
             if (line.trimStart().startsWith("```")) {
                 if (inCodeBlock) {
                     withStyle(SpanStyle(
                         fontFamily = FontFamily.Monospace,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         background = Color(0xFF1E1E1E)
                     )) {
                         append(codeBlockContent.toString().trimEnd())
@@ -56,8 +63,7 @@ fun MarkdownText(
                 continue
             }
 
-            // Parse inline markdown
-            parseInlineMarkdown(line)
+            parseInlineMarkdown(line, baseStyle)
             append("\n")
         }
     }
@@ -65,12 +71,11 @@ fun MarkdownText(
     Text(annotated, modifier = modifier, color = baseColor)
 }
 
-private fun androidx.compose.ui.text.AnnotatedString.Builder.parseInlineMarkdown(line: String) {
+private fun androidx.compose.ui.text.AnnotatedString.Builder.parseInlineMarkdown(line: String, baseStyle: SpanStyle) {
     val trimmed = line.trimStart()
     val indent = line.length - trimmed.length
 
     when {
-        // Header
         trimmed.startsWith("### ") -> {
             append(" ".repeat(indent))
             withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 15.sp)) {
@@ -89,77 +94,56 @@ private fun androidx.compose.ui.text.AnnotatedString.Builder.parseInlineMarkdown
                 append(trimmed.removePrefix("# "))
             }
         }
-        // Bullet list
         trimmed.startsWith("- ") || trimmed.startsWith("* ") -> {
             append(" ".repeat(indent))
             append("  •  ")
-            parseInlineStyles(trimmed.removePrefix("- ").removePrefix("* "))
+            parseInlineStyles(trimmed.removePrefix("- ").removePrefix("* "), baseStyle)
         }
-        // Numbered list
         trimmed.matches(Regex("^\\d+\\.\\s.*")) -> {
             append(" ".repeat(indent))
             val num = trimmed.substringBefore(".")
             append("$num. ")
-            parseInlineStyles(trimmed.substringAfter(". "))
+            parseInlineStyles(trimmed.substringAfter(". "), baseStyle)
         }
         else -> {
             append(" ".repeat(indent))
-            parseInlineStyles(trimmed)
+            parseInlineStyles(trimmed, baseStyle)
         }
     }
 }
 
-private fun androidx.compose.ui.text.AnnotatedString.Builder.parseInlineStyles(text: String) {
+private fun androidx.compose.ui.text.AnnotatedString.Builder.parseInlineStyles(text: String, baseStyle: SpanStyle) {
     var i = 0
     while (i < text.length) {
         when {
-            // Bold **text**
             i + 1 < text.length && text[i] == '*' && text[i + 1] == '*' -> {
                 val end = text.indexOf("**", i + 2)
                 if (end != -1) {
-                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                    withStyle(baseStyle.copy(fontWeight = FontWeight.Bold)) {
                         append(text.substring(i + 2, end))
                     }
                     i = end + 2
-                } else {
-                    append(text[i])
-                    i++
-                }
+                } else { append(text[i]); i++ }
             }
-            // Italic *text*
             text[i] == '*' -> {
                 val end = text.indexOf("*", i + 1)
                 if (end != -1 && end > i + 1) {
-                    withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
+                    withStyle(baseStyle.copy(fontStyle = FontStyle.Italic)) {
                         append(text.substring(i + 1, end))
                     }
                     i = end + 1
-                } else {
-                    append(text[i])
-                    i++
-                }
+                } else { append(text[i]); i++ }
             }
-            // Inline code `text`
             text[i] == '`' -> {
                 val end = text.indexOf("`", i + 1)
                 if (end != -1) {
-                    withStyle(SpanStyle(
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 13.sp,
-                        background = Color(0xFF2D2D2D)
-                    )) {
+                    withStyle(SpanStyle(fontFamily = FontFamily.Monospace, fontSize = 12.sp, background = Color(0xFF2D2D2D))) {
                         append(text.substring(i + 1, end))
                     }
                     i = end + 1
-                } else {
-                    append(text[i])
-                    i++
-                }
+                } else { append(text[i]); i++ }
             }
-            else -> {
-                append(text[i])
-                i++
-            }
+            else -> { append(text[i]); i++ }
         }
     }
 }
