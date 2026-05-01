@@ -45,7 +45,6 @@ fun MarkdownText(
                 if (inCodeBlock) {
                     withStyle(SpanStyle(
                         fontFamily = FontFamily.Monospace,
-                        fontSize = 12.sp,
                         background = Color(0xFF1E1E1E)
                     )) {
                         append(codeBlockContent.toString().trimEnd())
@@ -77,19 +76,19 @@ private fun androidx.compose.ui.text.AnnotatedString.Builder.parseInlineMarkdown
     when {
         trimmed.startsWith("### ") -> {
             append(" ".repeat(indent))
-            withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 15.sp)) {
+            withStyle(baseStyle.copy(fontWeight = FontWeight.Bold)) {
                 append(trimmed.removePrefix("### "))
             }
         }
         trimmed.startsWith("## ") -> {
             append(" ".repeat(indent))
-            withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 17.sp)) {
+            withStyle(baseStyle.copy(fontWeight = FontWeight.Bold)) {
                 append(trimmed.removePrefix("## "))
             }
         }
         trimmed.startsWith("# ") -> {
             append(" ".repeat(indent))
-            withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 19.sp)) {
+            withStyle(baseStyle.copy(fontWeight = FontWeight.Bold)) {
                 append(trimmed.removePrefix("# "))
             }
         }
@@ -136,7 +135,7 @@ private fun androidx.compose.ui.text.AnnotatedString.Builder.parseInlineStyles(t
             text[i] == '`' -> {
                 val end = text.indexOf("`", i + 1)
                 if (end != -1) {
-                    withStyle(SpanStyle(fontFamily = FontFamily.Monospace, fontSize = 12.sp, background = Color(0xFF2D2D2D))) {
+                    withStyle(baseStyle.copy(fontFamily = FontFamily.Monospace, background = Color(0xFF2D2D2D))) {
                         append(text.substring(i + 1, end))
                     }
                     i = end + 1
