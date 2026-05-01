@@ -174,12 +174,13 @@ fun ChatScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Image previews
+            // Image previews — fixed above messages
             if (attachedImages.isNotEmpty()) {
                 LazyRow(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .heightIn(max = 64.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(attachedImages.size) { i ->
@@ -196,7 +197,8 @@ fun ChatScreen(
                             Image(
                                 bitmap = bmp.asImageBitmap(),
                                 contentDescription = "Image ${i+1}",
-                                modifier = Modifier.size(60.dp)
+                                modifier = Modifier.size(56.dp),
+                                contentScale = ContentScale.Crop
                             )
                         }
                     }

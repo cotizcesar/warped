@@ -10,5 +10,6 @@ data class ChatMessage(
     val tokenCount: Int = 0,
     val createdAt: Instant = Instant.now(),
     val reasoning: String? = null,
-    val stats: String? = null
+    val stats: String? = null,
+    val imageUris: List<String> = emptyList() // base64 data URLs
 )

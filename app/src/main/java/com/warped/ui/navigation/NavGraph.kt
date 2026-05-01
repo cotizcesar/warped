@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Settings
@@ -90,13 +91,28 @@ fun WarpedNavGraph() {
 
                     LazyColumn(modifier = Modifier.weight(1f)) {
                         items(conversations, key = { it.id }) { conv ->
+                            var showDeleteConfirm by remember { mutableStateOf(false) }
+                            if (showDeleteConfirm) {
+                                AlertDialog(
+                                    onDismissRequest = { showDeleteConfirm = false },
+                                    title = { Text("Delete chat") },
+                                    text = { Text("Delete \"${conv.title}\"? This cannot be undone.") },
+                                    confirmButton = {
+                                        TextButton(onClick = {
+                                            scope.launch {
+                                                chatRepository.deleteConversation(conv.id)
+                                                showDeleteConfirm = false
+                                            }
+                                        }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                                    },
+                                    dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") } }
+                                )
+                            }
                             Row(
                                 modifier = Modifier.fillMaxWidth().clickable {
-                                    navController.navigate("${Screen.Chat.route}/${conv.id}") {
-                                        launchSingleTop = true
-                                    }
+                                    navController.navigate("${Screen.Chat.route}/${conv.id}") { launchSingleTop = true }
                                     scope.launch { drawerState.close() }
-                                }.padding(horizontal = 16.dp, vertical = 8.dp),
+                                }.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.Chat, null,
@@ -105,6 +121,12 @@ fun WarpedNavGraph() {
                                 Text(conv.title, color = DrawerTextSecondary,
                                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                                     fontSize = 13.sp, modifier = Modifier.weight(1f))
+                                IconButton(
+                                    onClick = { showDeleteConfirm = true },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(Icons.Filled.Close, "Delete", tint = DrawerTextSecondary.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+                                }
                             }
                         }
                     }

@@ -94,7 +94,8 @@ class ChatViewModel @Inject constructor(
             return
         }
 
-        val userMessage = ChatMessage(role = Role.USER, content = text)
+        val imageDataUrls = images.mapNotNull { uriToBase64(it) }
+        val userMessage = ChatMessage(role = Role.USER, content = text, imageUris = imageDataUrls)
         _uiState.update { it.copy(messages = it.messages + userMessage, inputText = "", isStreaming = true) }
 
         generationJob = viewModelScope.launch {
@@ -112,7 +113,7 @@ class ChatViewModel @Inject constructor(
                     parameters = _uiState.value.generationParameters.copy(
                         reasoningEnabled = _uiState.value.reasoningEnabled
                     ),
-                    images = images.mapNotNull { uriToBase64(it) }
+                    images = imageDataUrls
                 )
                 val tokenBuffer = mutableListOf<String>()
                 var lastEmitTime = System.currentTimeMillis()
