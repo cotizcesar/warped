@@ -148,6 +148,11 @@ class HuggingFaceViewModel @Inject constructor(
 
     fun pauseDownload() {
         downloadManager.pauseDownload()
+        _uiState.update { it.copy(isDownloading = false, downloadProgress = 0f, downloadingFileName = "") }
+    }
+
+    fun onSearchTextChanged(text: String) {
+        _uiState.update { it.copy(searchQuery = text) }
     }
 
     fun clearSearch() {

@@ -55,7 +55,7 @@ fun HuggingFaceScreen(
     viewModel: HuggingFaceViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var searchText by remember { mutableStateOf("") }
+    var searchText by remember { mutableStateOf(uiState.searchQuery) }
     val canSearch = searchText.trim().length >= 3
 
     LaunchedEffect(searchText) {
@@ -78,6 +78,7 @@ fun HuggingFaceScreen(
             onDownload = { fileName, size ->
                 viewModel.downloadFile(uiState.selectedModel!!.id, fileName, size)
             },
+            onCancelDownload = { viewModel.pauseDownload() },
             onBack = { viewModel.clearDetail() }
         )
         return
@@ -96,7 +97,10 @@ fun HuggingFaceScreen(
         ) {
             OutlinedTextField(
                 value = searchText,
-                onValueChange = { searchText = it },
+                onValueChange = {
+                    searchText = it
+                    viewModel.onSearchTextChanged(it)
+                },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text(stringResource(R.string.search_models)) },
                 supportingText = {
@@ -402,6 +406,7 @@ private fun ModelDetailScreen(
     downloadingFileName: String,
     downloadError: String?,
     onDownload: (fileName: String, size: Long) -> Unit,
+    onCancelDownload: () -> Unit,
     onBack: () -> Unit
 ) {
     Scaffold(
@@ -473,11 +478,25 @@ private fun ModelDetailScreen(
 
                 if (isDownloading) {
                     item {
-                        LinearProgressIndicator(
-                            progress = { downloadProgress },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Text("Downloading: $downloadingFileName (${(downloadProgress * 100).toInt()}%)")
+                        Column {
+                            LinearProgressIndicator(
+                                progress = { downloadProgress },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "Downloading: $downloadingFileName (${(downloadProgress * 100).toInt()}%)",
+                                    modifier = Modifier.weight(1f)
+                                )
+                                TextButton(onClick = onCancelDownload) {
+                                    Text("Cancel")
+                                }
+                            }
+                        }
                     }
                 }
 
