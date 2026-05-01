@@ -5,14 +5,21 @@ import com.warped.domain.model.Conversation
 import com.warped.domain.model.Endpoint
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.Role
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.time.Instant
+
+private val mapperJson = Json
 
 fun MessageEntity.toDomain(): ChatMessage = ChatMessage(
     id = id.toString(),
     role = Role.valueOf(role),
     content = content,
     tokenCount = tokenCount,
-    createdAt = Instant.ofEpochMilli(createdAt)
+    createdAt = Instant.ofEpochMilli(createdAt),
+    imageUris = images?.let { 
+        try { mapperJson.decodeFromString<List<String>>(it) } catch (_: Exception) { emptyList() }
+    } ?: emptyList()
 )
 
 fun ChatMessage.toEntity(conversationId: Long): MessageEntity = MessageEntity(
@@ -20,7 +27,8 @@ fun ChatMessage.toEntity(conversationId: Long): MessageEntity = MessageEntity(
     role = role.name,
     content = content,
     tokenCount = tokenCount,
-    createdAt = createdAt.toEpochMilli()
+    createdAt = createdAt.toEpochMilli(),
+    images = if (imageUris.isNotEmpty()) mapperJson.encodeToString(imageUris) else null
 )
 
 fun ConversationEntity.toDomain(): Conversation = Conversation(

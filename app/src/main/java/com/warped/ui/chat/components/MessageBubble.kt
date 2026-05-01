@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -76,6 +78,7 @@ fun MessageBubble(
                 if (isUser && message.imageUris.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         message.imageUris.forEach { dataUrl ->
+                            var showFullImage by remember { mutableStateOf(false) }
                             val bitmap = remember(dataUrl) {
                                 try {
                                     val base64 = dataUrl.substringAfter("base64,")
@@ -83,11 +86,34 @@ fun MessageBubble(
                                     BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                                 } catch (_: Exception) { null }
                             }
+                            if (showFullImage) {
+                                androidx.compose.material3.AlertDialog(
+                                    onDismissRequest = { showFullImage = false },
+                                    confirmButton = {},
+                                    dismissButton = {
+                                        TextButton(onClick = { showFullImage = false }) {
+                                            Text("✕", color = androidx.compose.ui.graphics.Color.White)
+                                        }
+                                    },
+                                    text = {
+                                        bitmap?.let {
+                                            Image(
+                                                bitmap = it.asImageBitmap(),
+                                                contentDescription = "Full image",
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                    }
+                                )
+                            }
                             bitmap?.let {
                                 Image(
                                     bitmap = it.asImageBitmap(),
-                                    contentDescription = "Image",
-                                    modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp),
+                                    contentDescription = "Image (tap to enlarge)",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 200.dp)
+                                        .clickable { showFullImage = true },
                                     contentScale = ContentScale.FillWidth
                                 )
                             }

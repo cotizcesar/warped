@@ -24,5 +24,6 @@ data class MessageEntity(
     @ColumnInfo(name = "role") val role: String,
     @ColumnInfo(name = "content") val content: String,
     @ColumnInfo(name = "token_count") val tokenCount: Int = 0,
-    @ColumnInfo(name = "created_at") val createdAt: Long
+    @ColumnInfo(name = "created_at") val createdAt: Long,
+    @ColumnInfo(name = "images") val images: String? = null
 )
