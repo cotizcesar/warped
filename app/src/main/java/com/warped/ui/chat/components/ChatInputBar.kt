@@ -76,16 +76,18 @@ fun ChatInputBar(
                             tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(22.dp))
                     }
                     // Think toggle
-                    TextButton(
+                    Spacer(Modifier.width(10.dp))
+                    Button(
                         onClick = onToggleReasoning,
-                        colors = ButtonDefaults.textButtonColors(
+                        colors = ButtonDefaults.buttonColors(
                             containerColor = if (reasoningEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent
                         ),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        shape = MaterialTheme.shapes.small
                     ) {
                         Text(
                             "Think",
-                            color = if (reasoningEnabled) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.4f),
+                            color = if (reasoningEnabled) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.5f),
                             fontSize = MaterialTheme.typography.labelSmall.fontSize
                         )
                     }
