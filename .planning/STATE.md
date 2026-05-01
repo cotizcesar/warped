@@ -15,7 +15,7 @@ progress:
 # Project State: Warped
 
 **Last updated:** 2026-05-01
-**Last activity:** 2026-05-01 - Completed quick task 260430-wtn: Real delete fix + URL normalization + model fetch.
+**Last activity:** 2026-05-01 - Completed quick task 260430-wz5: LM Studio native v1 API format fix (input/max_output_tokens/models).
 **Milestone:** v1.0 — Complete ✓
 **Status:** All 5 phases verified (30/30 requirements)
 
