@@ -3,6 +3,7 @@ package com.warped.di
 import android.content.Context
 import androidx.room.Room
 import com.warped.data.local.db.AppDatabase
+import com.warped.data.local.db.MIGRATION_4_5
 import com.warped.data.local.db.dao.ConversationDao
 import com.warped.data.local.db.dao.LocalModelDao
 import com.warped.data.local.db.dao.MessageDao
@@ -23,7 +24,8 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "warped.db")
-            .fallbackToDestructiveMigration(dropAllTables = true)
+            .addMigrations(MIGRATION_4_5)
+            .fallbackToDestructiveMigration()
             .build()
 
     @Provides
