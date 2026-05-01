@@ -15,7 +15,7 @@ progress:
 # Project State: Warped
 
 **Last updated:** 2026-05-01
-**Last activity:** 2026-05-01 - Completed quick task 260430-u5f: Anthropic provider + endpoint edit/delete + API key fix.
+**Last activity:** 2026-05-01 - Completed quick task 260430-ulx: Endpoints in chat selector, compact title, model picker icon.
 **Milestone:** v1.0 — Complete ✓
 **Status:** All 5 phases verified (30/30 requirements)
 
@@ -39,6 +39,7 @@ See: .planning/PROJECT.md
 | 260430-sx3 | Auto-navigate to Models after GGUF download + GGUF parser OOM fix | 2026-05-01 | 8098986 | [260430-sx3-navegar-a-models-al-terminar-descarga-ar](./quick/260430-sx3-navegar-a-models-al-terminar-descarga-ar/)
 | 260430-tac | Background downloads, list incomplete models, cancel/delete | 2026-05-01 | 5a5f7cb | [260430-tac-descargas-en-segundo-plano-listar-modelo](./quick/260430-tac-descargas-en-segundo-plano-listar-modelo/)
 | 260430-u5f | Anthropic provider + endpoint edit/delete + API key storage fix | 2026-05-01 | 25b4e33 | [260430-u5f-editar-y-borrar-endpoints-anthropic-prov](./quick/260430-u5f-editar-y-borrar-endpoints-anthropic-prov/)
+| 260430-ulx | Endpoints in chat selector, model picker icon, compact title | 2026-05-01 | 070c1b5 | [260430-ulx-endpoints-en-selector-chat-titulo-models](./quick/260430-ulx-endpoints-en-selector-chat-titulo-models/)
 
 ## Next Steps
 Run `/gsd-new-milestone` to start the next milestone.
