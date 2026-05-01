@@ -58,7 +58,7 @@ fun ChatInputBar(
             // Image previews
             if (attachedImages.isNotEmpty()) {
                 LazyRow(
-                    modifier = Modifier.fillMaxWidth().padding(top = 5.dp, bottom = 5.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 5.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(attachedImages.size) { i ->
