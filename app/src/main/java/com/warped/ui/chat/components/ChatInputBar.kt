@@ -2,8 +2,8 @@ package com.warped.ui.chat.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Stop
@@ -71,9 +71,9 @@ fun ChatInputBar(
             ) {
                 // Left group
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onAddImage, modifier = Modifier.size(36.dp)) {
+                    IconButton(onClick = onAddImage, modifier = Modifier.size(40.dp)) {
                         Icon(Icons.Filled.AddPhotoAlternate, "Add image",
-                            tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(22.dp))
+                            tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
                     }
                     // Think toggle
                     Spacer(Modifier.width(10.dp))
@@ -143,8 +143,11 @@ fun ChatInputBar(
                         Icon(Icons.Filled.Stop, "Stop", tint = Color.White, modifier = Modifier.size(24.dp))
                     }
                 } else {
-                    IconButton(onClick = onSend, enabled = canSend && text.isNotBlank(), modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.AutoMirrored.Filled.Send, "Send", tint = Color.White, modifier = Modifier.size(24.dp))
+                    val hasText = text.isNotBlank()
+                    IconButton(onClick = onSend, enabled = canSend && hasText, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.Filled.ArrowUpward, "Send",
+                            tint = if (hasText && canSend) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.4f),
+                            modifier = Modifier.size(24.dp))
                     }
                 }
             }
