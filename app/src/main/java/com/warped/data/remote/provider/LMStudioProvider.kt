@@ -49,7 +49,8 @@ class LMStudioProvider(
             stream = true,
             temperature = request.parameters.temperature,
             topP = request.parameters.topP,
-            maxTokens = request.parameters.maxTokens.takeIf { it > 0 } ?: -1
+            maxTokens = request.parameters.maxTokens.takeIf { it > 0 },
+            stop = null
         )
         try {
             val response = api.chat(body)
