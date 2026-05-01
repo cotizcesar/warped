@@ -231,7 +231,7 @@ fun ChatScreen(
                     .fillMaxWidth(),
                 state = listState,
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 items(uiState.messages, key = { it.id }) { message ->
                     MessageBubble(message = message)

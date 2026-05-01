@@ -153,7 +153,7 @@ fun MessageBubble(
             Text(
                 text = message.stats,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                color = Color(0xFF545450),
                 fontStyle = FontStyle.Italic,
                 modifier = Modifier.padding(start = 8.dp, top = 2.dp)
             )
