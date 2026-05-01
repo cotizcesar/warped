@@ -7,6 +7,7 @@ import com.warped.data.local.download.DownloadState
 import com.warped.data.local.download.ModelDownloadManager
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.inference.ModelImportManager
+import com.warped.data.local.security.ApiKeyStore
 import com.warped.domain.model.ActiveModelSelection
 import com.warped.domain.model.Endpoint
 import com.warped.domain.model.LocalModel
@@ -28,7 +29,8 @@ class ModelsViewModel @Inject constructor(
     private val activeModelSelection: ActiveModelSelection,
     private val modelImportManager: ModelImportManager,
     private val modelDownloadManager: ModelDownloadManager,
-    private val memoryChecker: MemoryChecker
+    private val memoryChecker: MemoryChecker,
+    private val apiKeyStore: ApiKeyStore
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ModelsUiState())
@@ -121,7 +123,7 @@ class ModelsViewModel @Inject constructor(
         }
         viewModelScope.launch {
             try {
-                endpointRepository.saveEndpoint(
+                val savedId = endpointRepository.saveEndpoint(
                     Endpoint(
                         name = state.formName,
                         url = state.formUrl,
@@ -129,11 +131,66 @@ class ModelsViewModel @Inject constructor(
                         modelId = state.formModelId,
                     )
                 )
+                if (state.formApiKey.isNotBlank()) {
+                    apiKeyStore.storeKey(savedId, state.formApiKey.toCharArray())
+                }
                 _uiState.update { it.copy(isEndpointFormVisible = false, error = null) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message) }
             }
         }
+    }
+
+    fun editEndpoint(endpoint: Endpoint) {
+        _uiState.update {
+            it.copy(
+                isEditingEndpoint = true,
+                editingEndpoint = endpoint,
+                formName = endpoint.name,
+                formUrl = endpoint.url,
+                formApiType = endpoint.apiType.name,
+                formModelId = endpoint.modelId.orEmpty(),
+                formApiKey = ""
+            )
+        }
+    }
+
+    fun deleteEndpoint(endpoint: Endpoint) {
+        viewModelScope.launch {
+            try {
+                endpointRepository.deleteEndpoint(endpoint.id)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun saveEndpointEdit() {
+        val state = _uiState.value
+        if (state.formName.isBlank() || state.formUrl.isBlank()) return
+        viewModelScope.launch {
+            try {
+                val endpoint = Endpoint(
+                    id = state.editingEndpoint?.id ?: 0,
+                    name = state.formName,
+                    url = state.formUrl,
+                    apiType = ProviderType.valueOf(state.formApiType),
+                    modelId = state.formModelId.ifBlank { null },
+                    isActive = state.editingEndpoint?.isActive ?: false
+                )
+                val savedId = endpointRepository.saveEndpoint(endpoint)
+                if (state.formApiKey.isNotBlank()) {
+                    apiKeyStore.storeKey(savedId, state.formApiKey.toCharArray())
+                }
+                _uiState.update { it.copy(isEditingEndpoint = false, error = null) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
+    fun cancelEndpointEdit() {
+        _uiState.update { it.copy(isEditingEndpoint = false, error = null) }
     }
 
     fun useEndpoint(endpoint: Endpoint) {

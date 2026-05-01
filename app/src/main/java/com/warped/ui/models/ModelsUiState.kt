@@ -12,6 +12,8 @@ data class ModelsUiState(
     val isImporting: Boolean = false,
     val importProgress: Float = 0f,
     val isEndpointFormVisible: Boolean = false,
+    val isEditingEndpoint: Boolean = false,
+    val editingEndpoint: Endpoint? = null,
     val formName: String = "",
     val formUrl: String = "",
     val formApiType: String = "OPENAI",

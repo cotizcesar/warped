@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -131,6 +132,17 @@ fun ModelsScreen(
                     onSave = { viewModel.saveEndpoint() },
                     onDismiss = { viewModel.dismissEndpointForm() }
                 )
+            } else if (uiState.isEditingEndpoint) {
+                EndpointForm(
+                    name = uiState.formName,
+                    url = uiState.formUrl,
+                    apiType = uiState.formApiType,
+                    modelId = uiState.formModelId,
+                    apiKey = uiState.formApiKey,
+                    onFieldChange = { field, value -> viewModel.updateEndpointField(field, value) },
+                    onSave = { viewModel.saveEndpointEdit() },
+                    onDismiss = { viewModel.cancelEndpointEdit() }
+                )
             } else if (uiState.models.isEmpty() && uiState.endpoints.isEmpty() && !uiState.isImporting) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -180,7 +192,9 @@ fun ModelsScreen(
                             onUseInChat = {
                                 viewModel.useEndpoint(endpoint)
                                 onUseInChat()
-                            }
+                            },
+                            onEdit = { viewModel.editEndpoint(endpoint) },
+                            onDelete = { viewModel.deleteEndpoint(endpoint) }
                         )
                     }
                 }
@@ -338,8 +352,29 @@ private fun formatFileSize(bytes: Long): String {
 @Composable
 private fun DeployedEndpointCard(
     endpoint: Endpoint,
-    onUseInChat: () -> Unit
+    onUseInChat: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
 ) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete endpoint") },
+            text = { Text("Delete ${endpoint.name} (${endpoint.apiType.name})? This cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDelete()
+                    showDeleteConfirm = false
+                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(endpoint.name, style = MaterialTheme.typography.titleMedium)
@@ -355,11 +390,17 @@ private fun DeployedEndpointCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(12.dp))
-            Button(
-                onClick = onUseInChat,
-                enabled = endpoint.modelId != null,
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("Use in chat") }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onUseInChat, enabled = endpoint.modelId != null, modifier = Modifier.weight(1f)) {
+                    Text("Use in chat")
+                }
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Filled.Edit, contentDescription = "Edit")
+                }
+                IconButton(onClick = { showDeleteConfirm = true }) {
+                    Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                }
+            }
         }
     }
 }
