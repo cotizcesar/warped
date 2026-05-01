@@ -176,6 +176,8 @@ fun ChatScreen(
                 reasoningEnabled = uiState.reasoningEnabled,
                 onToggleReasoning = { viewModel.toggleReasoning() },
                 onAddImage = { imagePickerLauncher.launch("image/*") },
+                attachedImages = attachedImages,
+                onRemoveImage = { i -> attachedImages = attachedImages.filterIndexed { idx, _ -> idx != i } },
                 localModels = uiState.localModels,
                 endpoints = uiState.endpoints,
                 selectedModelId = uiState.selectedModelId,
@@ -190,49 +192,6 @@ fun ChatScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Image previews — fixed above messages
-            if (attachedImages.isNotEmpty()) {
-                LazyRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                        .heightIn(max = 68.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(attachedImages.size) { i ->
-                        val uri = attachedImages[i]
-                        val context = androidx.compose.ui.platform.LocalContext.current
-                        val bitmap = remember(uri) {
-                            try {
-                                context.contentResolver.openInputStream(uri)?.use { 
-                                    android.graphics.BitmapFactory.decodeStream(it) 
-                                }
-                            } catch (_: Exception) { null }
-                        }
-                        Box(modifier = Modifier.size(56.dp)) {
-                            bitmap?.let { bmp ->
-                                Image(
-                                    bitmap = bmp.asImageBitmap(),
-                                    contentDescription = "Image ${i+1}",
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(MaterialTheme.shapes.small),
-                                    contentScale = ContentScale.Crop
-                                )
-                            }
-                            IconButton(
-                                onClick = { attachedImages = attachedImages.filterIndexed { idx, _ -> idx != i } },
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .size(18.dp)
-                                    .offset(x = 6.dp, y = (-6).dp)
-                            ) {
-                                Icon(Icons.Filled.Close, "Remove", tint = Color.White, modifier = Modifier.size(12.dp))
-                            }
-                        }
-                    }
-                }
-            }
             if (uiState.isLoadingModel) {
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),

@@ -1,17 +1,26 @@
 package com.warped.ui.chat.components
 
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.warped.R
@@ -33,6 +42,8 @@ fun ChatInputBar(
     localModels: List<LocalModel> = emptyList(),
     endpoints: List<Endpoint> = emptyList(),
     selectedModelId: String? = null,
+    attachedImages: List<Uri> = emptyList(),
+    onRemoveImage: (Int) -> Unit = {},
     onModelSelected: (String, ProviderType) -> Unit = { _, _ -> }
 ) {
     Surface(
@@ -44,6 +55,41 @@ fun ChatInputBar(
             .padding(horizontal = 12.dp, vertical = 5.dp)
     ) {
         Column(modifier = Modifier.padding(5.dp)) {
+            // Image previews
+            if (attachedImages.isNotEmpty()) {
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(attachedImages.size) { i ->
+                        val ctx = LocalContext.current
+                        val bitmap = remember(attachedImages[i]) {
+                            try {
+                                ctx.contentResolver.openInputStream(attachedImages[i])?.use {
+                                    BitmapFactory.decodeStream(it)
+                                }
+                            } catch (_: Exception) { null }
+                        }
+                        Box(modifier = Modifier.size(112.dp)) {
+                            bitmap?.let { bmp ->
+                                Image(
+                                    bitmap = bmp.asImageBitmap(),
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.medium),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                            IconButton(
+                                onClick = { onRemoveImage(i) },
+                                modifier = Modifier.align(Alignment.TopEnd).size(22.dp).offset(x = 8.dp, y = (-8).dp)
+                            ) {
+                                Icon(Icons.Filled.Close, "Remove", tint = Color.White, modifier = Modifier.size(14.dp))
+                            }
+                        }
+                    }
+                }
+            }
+
             // Row 1: Input only
             OutlinedTextField(
                 value = text,
