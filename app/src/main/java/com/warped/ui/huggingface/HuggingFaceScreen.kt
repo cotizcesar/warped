@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
@@ -27,6 +28,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
@@ -53,7 +56,8 @@ import kotlinx.coroutines.delay
 @Composable
 fun HuggingFaceScreen(
     viewModel: HuggingFaceViewModel = hiltViewModel(),
-    onNavigateToModels: () -> Unit = {}
+    onNavigateToModels: () -> Unit = {},
+    onOpenDrawer: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var searchText by remember { mutableStateOf(uiState.searchQuery) }
@@ -94,7 +98,14 @@ fun HuggingFaceScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Hugging Face") })
+            TopAppBar(
+                title = { Text("Hugging Face") },
+                navigationIcon = {
+                    IconButton(onClick = onOpenDrawer) {
+                        Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                    }
+                }
+            )
         }
     ) { padding ->
         Column(

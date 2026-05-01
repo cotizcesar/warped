@@ -39,7 +39,7 @@ fun MessageBubble(
                 shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.widthIn(max = 340.dp)
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
+                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                     if (!isUser && !message.reasoning.isNullOrBlank()) {
                         Surface(
                             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
@@ -48,7 +48,7 @@ fun MessageBubble(
                                 .fillMaxWidth()
                                 .clickable { showReasoning = !showReasoning }
                         ) {
-                            Column(modifier = Modifier.padding(8.dp)) {
+                            Column(modifier = Modifier.padding(10.dp)) {
                                 Text(
                                     text = if (showReasoning) "Thinking ▼" else "Thinking ▶",
                                     style = MaterialTheme.typography.labelSmall,
@@ -63,12 +63,12 @@ fun MessageBubble(
                                     MarkdownText(
                                         text = message.reasoning,
                                         baseColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                        modifier = Modifier.padding(top = 4.dp)
+                                        modifier = Modifier.padding(top = 6.dp)
                                     )
                                 }
                             }
                         }
-                        Spacer(Modifier.height(6.dp))
+                        Spacer(Modifier.height(10.dp))
                     }
 
                     Text(
