@@ -83,7 +83,8 @@ fun ChatInputBar(
                             containerColor = if (reasoningEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent
                         ),
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                        shape = MaterialTheme.shapes.small
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.height(28.dp)
                     ) {
                         Text(
                             "Thinking",
