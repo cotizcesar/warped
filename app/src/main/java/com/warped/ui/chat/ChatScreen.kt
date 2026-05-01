@@ -220,16 +220,35 @@ fun ChatScreen(
                     MessageBubble(message = message)
                 }
                 if (uiState.streamingContent.isNotEmpty()) {
-                    item(key = "streaming") {
-                        MessageBubble(
-                            message = com.warped.domain.model.ChatMessage(
-                                role = Role.ASSISTANT,
-                                content = uiState.streamingContent
-                            ),
-                            isStreaming = true
-                        )
+                        item(key = "streaming") {
+                            MessageBubble(
+                                message = com.warped.domain.model.ChatMessage(
+                                    role = Role.ASSISTANT,
+                                    content = uiState.streamingContent
+                                ),
+                                isStreaming = true
+                            )
+                        }
+                    } else if (uiState.isStreaming) {
+                        item(key = "generating") {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(14.dp),
+                                    strokeWidth = 2.dp,
+                                    color = Color(0xFF545450)
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Text(
+                                    "Generating...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFF545450)
+                                )
+                            }
+                        }
                     }
-                }
             }
 
             if (uiState.modelLoadError != null) {
