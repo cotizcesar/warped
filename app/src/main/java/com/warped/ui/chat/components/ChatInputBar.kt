@@ -42,9 +42,9 @@ fun ChatInputBar(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = 5.dp)
     ) {
-        Column(modifier = Modifier.padding(8.dp)) {
+        Column(modifier = Modifier.padding(5.dp)) {
             // Row 1: Text input + send/stop button
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -78,7 +78,7 @@ fun ChatInputBar(
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(5.dp))
 
             // Row 2: Image button (left), model picker + reasoning (right)
             Row(
