@@ -26,6 +26,5 @@ data class MessageEntity(
     @ColumnInfo(name = "token_count") val tokenCount: Int = 0,
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "images") val images: String? = null,
-    @ColumnInfo(name = "stats") val stats: String? = null,
-    @ColumnInfo(name = "reasoning") val reasoning: String? = null
+    @ColumnInfo(name = "stats") val stats: String? = null
 )

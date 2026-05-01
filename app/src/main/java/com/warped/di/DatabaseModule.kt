@@ -5,7 +5,6 @@ import androidx.room.Room
 import com.warped.data.local.db.AppDatabase
 import com.warped.data.local.db.MIGRATION_4_5
 import com.warped.data.local.db.MIGRATION_5_6
-import com.warped.data.local.db.MIGRATION_6_7
 import com.warped.data.local.db.dao.ConversationDao
 import com.warped.data.local.db.dao.LocalModelDao
 import com.warped.data.local.db.dao.MessageDao
