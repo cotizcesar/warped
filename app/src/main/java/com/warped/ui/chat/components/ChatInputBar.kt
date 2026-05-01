@@ -70,7 +70,7 @@ fun ChatInputBar(
                                 }
                             } catch (_: Exception) { null }
                         }
-                        Box(modifier = Modifier.size(112.dp)) {
+                        Box(modifier = Modifier.size(72.dp)) {
                             bitmap?.let { bmp ->
                                 Image(
                                     bitmap = bmp.asImageBitmap(),
