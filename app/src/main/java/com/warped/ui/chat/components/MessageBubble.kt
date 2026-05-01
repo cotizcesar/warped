@@ -17,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontStyle
@@ -123,6 +124,7 @@ fun MessageBubble(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .heightIn(max = 200.dp)
+                                        .clip(MaterialTheme.shapes.medium)
                                         .clickable { showFullImage = true },
                                     contentScale = ContentScale.FillWidth
                                 )
