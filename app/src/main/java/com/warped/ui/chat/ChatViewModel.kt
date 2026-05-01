@@ -53,12 +53,16 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             localModelRepository.observeModels().collect { models ->
                 _uiState.update { state ->
-                    val selectedExists = models.any { it.filePath == state.selectedModelId }
-                    state.copy(
-                        localModels = models,
-                        selectedModelId = state.selectedModelId.takeIf { selectedExists },
-                        selectedProvider = state.selectedProvider.takeIf { selectedExists }
-                    )
+                    if (state.selectedProvider == ProviderType.LOCAL) {
+                        val selectedExists = models.any { it.filePath == state.selectedModelId }
+                        state.copy(
+                            localModels = models,
+                            selectedModelId = state.selectedModelId.takeIf { selectedExists },
+                            selectedProvider = state.selectedProvider.takeIf { selectedExists }
+                        )
+                    } else {
+                        state.copy(localModels = models)
+                    }
                 }
             }
         }
