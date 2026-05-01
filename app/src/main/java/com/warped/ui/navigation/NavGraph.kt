@@ -68,7 +68,17 @@ fun WarpedNavGraph() {
                 )
             }
             composable(Screen.HuggingFace.route) {
-                HuggingFaceScreen()
+                HuggingFaceScreen(
+                    onNavigateToModels = {
+                        navController.navigate(Screen.Models.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
             }
             composable(Screen.Presets.route) {
                 PresetsScreen()

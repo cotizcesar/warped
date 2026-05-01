@@ -119,7 +119,7 @@ class HuggingFaceViewModel @Inject constructor(
                     _uiState.update { it.copy(downloadProgress = progress) }
                 }
                 result.onSuccess {
-                    _uiState.update { it.copy(isDownloading = false, downloadProgress = 1f) }
+                    _uiState.update { it.copy(isDownloading = false, downloadProgress = 1f, downloadSuccess = true) }
                 }.onFailure { e ->
                     _uiState.update {
                         it.copy(
@@ -133,13 +133,6 @@ class HuggingFaceViewModel @Inject constructor(
                     it.copy(
                         isDownloading = false,
                         downloadError = e.message ?: "Download error"
-                    )
-                }
-            } catch (e: OutOfMemoryError) {
-                _uiState.update {
-                    it.copy(
-                        isDownloading = false,
-                        downloadError = "Not enough memory to download this model"
                     )
                 }
             }
@@ -175,6 +168,10 @@ class HuggingFaceViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { it.copy(error = null, downloadError = null) }
+    }
+
+    fun clearDownloadSuccess() {
+        _uiState.update { it.copy(downloadSuccess = false) }
     }
 
     private suspend fun loadCompatibility(models: List<HuggingFaceModel>): Map<String, Boolean> {

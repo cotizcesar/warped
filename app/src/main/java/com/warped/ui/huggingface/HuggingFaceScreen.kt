@@ -52,7 +52,8 @@ import kotlinx.coroutines.delay
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HuggingFaceScreen(
-    viewModel: HuggingFaceViewModel = hiltViewModel()
+    viewModel: HuggingFaceViewModel = hiltViewModel(),
+    onNavigateToModels: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var searchText by remember { mutableStateOf(uiState.searchQuery) }
@@ -64,6 +65,13 @@ fun HuggingFaceScreen(
         delay(400)
         if (searchText.trim() != query) return@LaunchedEffect
         viewModel.search(query)
+    }
+
+    LaunchedEffect(uiState.downloadSuccess) {
+        if (uiState.downloadSuccess) {
+            viewModel.clearDownloadSuccess()
+            onNavigateToModels()
+        }
     }
 
     if (uiState.selectedModel != null) {
