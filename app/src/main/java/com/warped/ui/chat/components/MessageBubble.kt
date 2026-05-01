@@ -37,13 +37,15 @@ fun MessageBubble(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
     ) {
-            Surface(
-                color = if (isUser) Color(0xFF121212)
-                        else Color.Transparent,
+        Surface(
+            color = if (isUser) Color(0xFF121212) else Color.Transparent,
             shape = MaterialTheme.shapes.medium,
             modifier = Modifier.widthIn(max = 340.dp)
         ) {
-            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Column(
+                modifier = if (isUser) Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                           else Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+            ) {
                 if (!isUser && !message.reasoning.isNullOrBlank()) {
                     Row(
                         modifier = Modifier
