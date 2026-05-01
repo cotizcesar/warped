@@ -58,17 +58,17 @@ public class AppDatabase_Impl : AppDatabase() {
   }
 
   protected override fun createOpenDelegate(): RoomOpenDelegate {
-    val _openDelegate: RoomOpenDelegate = object : RoomOpenDelegate(4,
-        "3aadb74f8d79b047698a734e42cc456f", "400d79f9d41e05accc3bfaf85c19a963") {
+    val _openDelegate: RoomOpenDelegate = object : RoomOpenDelegate(6,
+        "aea86221be3f6d9b6ed91862068ea562", "2ed3828f6c6fe453fb9f4ee6f80fed7e") {
       public override fun createAllTables(connection: SQLiteConnection) {
         connection.execSQL("CREATE TABLE IF NOT EXISTS `conversations` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `provider_type` TEXT NOT NULL, `endpoint_id` INTEGER NOT NULL, `model_id` TEXT, `system_prompt` TEXT)")
-        connection.execSQL("CREATE TABLE IF NOT EXISTS `messages` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `conversation_id` INTEGER NOT NULL, `role` TEXT NOT NULL, `content` TEXT NOT NULL, `token_count` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, FOREIGN KEY(`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
+        connection.execSQL("CREATE TABLE IF NOT EXISTS `messages` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `conversation_id` INTEGER NOT NULL, `role` TEXT NOT NULL, `content` TEXT NOT NULL, `token_count` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, `images` TEXT, `reasoning` TEXT, FOREIGN KEY(`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
         connection.execSQL("CREATE INDEX IF NOT EXISTS `index_messages_conversation_id` ON `messages` (`conversation_id`)")
         connection.execSQL("CREATE TABLE IF NOT EXISTS `endpoints` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `url` TEXT NOT NULL, `api_type` TEXT NOT NULL, `model_id` TEXT, `encrypted_api_key_ref` TEXT, `created_at` INTEGER NOT NULL, `is_active` INTEGER NOT NULL)")
         connection.execSQL("CREATE TABLE IF NOT EXISTS `local_models` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `file_path` TEXT NOT NULL, `size_bytes` INTEGER NOT NULL, `quantization` TEXT NOT NULL, `parameter_count` TEXT NOT NULL, `architecture` TEXT NOT NULL, `imported_at` INTEGER NOT NULL)")
         connection.execSQL("CREATE TABLE IF NOT EXISTS `presets` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `temperature` REAL NOT NULL, `top_p` REAL NOT NULL, `top_k` INTEGER NOT NULL, `repeat_penalty` REAL NOT NULL, `max_tokens` INTEGER NOT NULL, `context_size` INTEGER NOT NULL, `seed` INTEGER NOT NULL, `threads` INTEGER NOT NULL, `created_at` INTEGER NOT NULL)")
         connection.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)")
-        connection.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3aadb74f8d79b047698a734e42cc456f')")
+        connection.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'aea86221be3f6d9b6ed91862068ea562')")
       }
 
       public override fun dropAllTables(connection: SQLiteConnection) {
@@ -139,6 +139,10 @@ public class AppDatabase_Impl : AppDatabase() {
         _columnsMessages.put("token_count", TableInfo.Column("token_count", "INTEGER", true, 0,
             null, TableInfo.CREATED_FROM_ENTITY))
         _columnsMessages.put("created_at", TableInfo.Column("created_at", "INTEGER", true, 0, null,
+            TableInfo.CREATED_FROM_ENTITY))
+        _columnsMessages.put("images", TableInfo.Column("images", "TEXT", false, 0, null,
+            TableInfo.CREATED_FROM_ENTITY))
+        _columnsMessages.put("reasoning", TableInfo.Column("reasoning", "TEXT", false, 0, null,
             TableInfo.CREATED_FROM_ENTITY))
         val _foreignKeysMessages: MutableSet<TableInfo.ForeignKey> = mutableSetOf()
         _foreignKeysMessages.add(TableInfo.ForeignKey("conversations", "CASCADE", "NO ACTION",

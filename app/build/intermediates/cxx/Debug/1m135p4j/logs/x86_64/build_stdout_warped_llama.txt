@@ -1,2 +1,0 @@
-ninja: Entering directory `/home/cotizcesar/Documents/warped/app/.cxx/Debug/1m135p4j/x86_64'
-ninja: no work to do.

@@ -1,3 +1,0 @@
-ninja: Entering directory `/home/cotizcesar/Documents/warped/app/.cxx/Debug/2x4c5d6x/x86_64'
-[1/2] Building CXX object CMakeFiles/warped_llama.dir/jni_bridge.cpp.o
-[2/2] Linking CXX shared library /home/cotizcesar/Documents/warped/app/build/intermediates/cxx/Debug/2x4c5d6x/obj/x86_64/x86_64/libwarped_llama.so

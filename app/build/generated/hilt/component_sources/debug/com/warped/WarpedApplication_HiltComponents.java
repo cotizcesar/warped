@@ -12,6 +12,7 @@ import com.warped.ui.chat.ChatViewModel_HiltModules;
 import com.warped.ui.endpoints.EndpointsViewModel_HiltModules;
 import com.warped.ui.huggingface.HuggingFaceViewModel_HiltModules;
 import com.warped.ui.models.ModelsViewModel_HiltModules;
+import com.warped.ui.navigation.ChatRepoEntryPoint;
 import com.warped.ui.presets.PresetsViewModel_HiltModules;
 import com.warped.ui.settings.SettingsViewModel_HiltModules;
 import dagger.Binds;
@@ -155,6 +156,7 @@ public final class WarpedApplication_HiltComponents {
   @Singleton
   @jakarta.inject.Singleton
   public abstract static class SingletonC implements WarpedApplication_GeneratedInjector,
+      ChatRepoEntryPoint,
       FragmentGetContextFix.FragmentGetContextFixEntryPoint,
       HiltWrapper_ActivityRetainedComponentManager_ActivityRetainedComponentBuilderEntryPoint,
       ServiceComponentManager.ServiceComponentBuilderEntryPoint,

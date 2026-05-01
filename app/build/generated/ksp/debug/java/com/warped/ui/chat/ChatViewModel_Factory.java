@@ -1,5 +1,6 @@
 package com.warped.ui.chat;
 
+import android.content.Context;
 import androidx.lifecycle.SavedStateHandle;
 import com.warped.data.local.inference.LlamaEngine;
 import com.warped.data.remote.provider.ProviderRouter;
@@ -16,7 +17,7 @@ import dagger.internal.ScopeMetadata;
 import javax.annotation.processing.Generated;
 
 @ScopeMetadata
-@QualifierMetadata
+@QualifierMetadata("dagger.hilt.android.qualifiers.ApplicationContext")
 @DaggerGenerated
 @Generated(
     value = "dagger.internal.codegen.ComponentProcessor",
@@ -48,13 +49,16 @@ public final class ChatViewModel_Factory implements Factory<ChatViewModel> {
 
   private final Provider<LlamaEngine> llamaEngineProvider;
 
+  private final Provider<Context> contextProvider;
+
   private ChatViewModel_Factory(Provider<ChatRepository> chatRepositoryProvider,
       Provider<EndpointRepository> endpointRepositoryProvider,
       Provider<LocalModelRepository> localModelRepositoryProvider,
       Provider<ActiveModelSelection> activeModelSelectionProvider,
       Provider<ProviderRouter> providerRouterProvider,
       Provider<SavedStateHandle> savedStateHandleProvider,
-      Provider<ParameterStore> parameterStoreProvider, Provider<LlamaEngine> llamaEngineProvider) {
+      Provider<ParameterStore> parameterStoreProvider, Provider<LlamaEngine> llamaEngineProvider,
+      Provider<Context> contextProvider) {
     this.chatRepositoryProvider = chatRepositoryProvider;
     this.endpointRepositoryProvider = endpointRepositoryProvider;
     this.localModelRepositoryProvider = localModelRepositoryProvider;
@@ -63,11 +67,12 @@ public final class ChatViewModel_Factory implements Factory<ChatViewModel> {
     this.savedStateHandleProvider = savedStateHandleProvider;
     this.parameterStoreProvider = parameterStoreProvider;
     this.llamaEngineProvider = llamaEngineProvider;
+    this.contextProvider = contextProvider;
   }
 
   @Override
   public ChatViewModel get() {
-    return newInstance(chatRepositoryProvider.get(), endpointRepositoryProvider.get(), localModelRepositoryProvider.get(), activeModelSelectionProvider.get(), providerRouterProvider.get(), savedStateHandleProvider.get(), parameterStoreProvider.get(), llamaEngineProvider.get());
+    return newInstance(chatRepositoryProvider.get(), endpointRepositoryProvider.get(), localModelRepositoryProvider.get(), activeModelSelectionProvider.get(), providerRouterProvider.get(), savedStateHandleProvider.get(), parameterStoreProvider.get(), llamaEngineProvider.get(), contextProvider.get());
   }
 
   public static ChatViewModel_Factory create(Provider<ChatRepository> chatRepositoryProvider,
@@ -76,14 +81,16 @@ public final class ChatViewModel_Factory implements Factory<ChatViewModel> {
       Provider<ActiveModelSelection> activeModelSelectionProvider,
       Provider<ProviderRouter> providerRouterProvider,
       Provider<SavedStateHandle> savedStateHandleProvider,
-      Provider<ParameterStore> parameterStoreProvider, Provider<LlamaEngine> llamaEngineProvider) {
-    return new ChatViewModel_Factory(chatRepositoryProvider, endpointRepositoryProvider, localModelRepositoryProvider, activeModelSelectionProvider, providerRouterProvider, savedStateHandleProvider, parameterStoreProvider, llamaEngineProvider);
+      Provider<ParameterStore> parameterStoreProvider, Provider<LlamaEngine> llamaEngineProvider,
+      Provider<Context> contextProvider) {
+    return new ChatViewModel_Factory(chatRepositoryProvider, endpointRepositoryProvider, localModelRepositoryProvider, activeModelSelectionProvider, providerRouterProvider, savedStateHandleProvider, parameterStoreProvider, llamaEngineProvider, contextProvider);
   }
 
   public static ChatViewModel newInstance(ChatRepository chatRepository,
       EndpointRepository endpointRepository, LocalModelRepository localModelRepository,
       ActiveModelSelection activeModelSelection, ProviderRouter providerRouter,
-      SavedStateHandle savedStateHandle, ParameterStore parameterStore, LlamaEngine llamaEngine) {
-    return new ChatViewModel(chatRepository, endpointRepository, localModelRepository, activeModelSelection, providerRouter, savedStateHandle, parameterStore, llamaEngine);
+      SavedStateHandle savedStateHandle, ParameterStore parameterStore, LlamaEngine llamaEngine,
+      Context context) {
+    return new ChatViewModel(chatRepository, endpointRepository, localModelRepository, activeModelSelection, providerRouter, savedStateHandle, parameterStore, llamaEngine, context);
   }
 }

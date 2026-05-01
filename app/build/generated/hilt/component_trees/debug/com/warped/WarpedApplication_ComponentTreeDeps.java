@@ -35,6 +35,7 @@ import hilt_aggregated_deps._com_warped_ui_huggingface_HuggingFaceViewModel_Hilt
 import hilt_aggregated_deps._com_warped_ui_huggingface_HuggingFaceViewModel_HiltModules_KeyModule;
 import hilt_aggregated_deps._com_warped_ui_models_ModelsViewModel_HiltModules_BindsModule;
 import hilt_aggregated_deps._com_warped_ui_models_ModelsViewModel_HiltModules_KeyModule;
+import hilt_aggregated_deps._com_warped_ui_navigation_ChatRepoEntryPoint;
 import hilt_aggregated_deps._com_warped_ui_presets_PresetsViewModel_HiltModules_BindsModule;
 import hilt_aggregated_deps._com_warped_ui_presets_PresetsViewModel_HiltModules_KeyModule;
 import hilt_aggregated_deps._com_warped_ui_settings_SettingsViewModel_HiltModules_BindsModule;
@@ -97,6 +98,7 @@ import hilt_aggregated_deps._dagger_hilt_android_internal_modules_HiltWrapper_Ac
         _com_warped_ui_huggingface_HuggingFaceViewModel_HiltModules_KeyModule.class,
         _com_warped_ui_models_ModelsViewModel_HiltModules_BindsModule.class,
         _com_warped_ui_models_ModelsViewModel_HiltModules_KeyModule.class,
+        _com_warped_ui_navigation_ChatRepoEntryPoint.class,
         _com_warped_ui_presets_PresetsViewModel_HiltModules_BindsModule.class,
         _com_warped_ui_presets_PresetsViewModel_HiltModules_KeyModule.class,
         _com_warped_ui_settings_SettingsViewModel_HiltModules_BindsModule.class,

@@ -25,6 +25,7 @@
     "variantName": "debug",
     "isDebuggableEnabled": true,
     "validAbiList": [
+      "arm64-v8a",
       "x86_64"
     ],
     "buildTargetSet": [],
@@ -151,7 +152,6 @@
         "rootBuildGradleFolder": "/home/cotizcesar/Documents/warped",
         "sdkFolder": "/home/cotizcesar/Android/Sdk",
         "isBuildOnlyTargetAbiEnabled": true,
-        "ideBuildTargetAbi": "x86_64,arm64-v8a",
         "isCmakeBuildCohabitationEnabled": false,
         "isPrefabEnabled": false
       },

@@ -1,7 +1,9 @@
 package com.warped.domain.model;
 
+import com.warped.data.local.security.KeystoreManager;
 import dagger.internal.DaggerGenerated;
 import dagger.internal.Factory;
+import dagger.internal.Provider;
 import dagger.internal.QualifierMetadata;
 import dagger.internal.ScopeMetadata;
 import javax.annotation.processing.Generated;
@@ -23,20 +25,23 @@ import javax.annotation.processing.Generated;
     "nullness:initialization.field.uninitialized"
 })
 public final class ActiveModelSelection_Factory implements Factory<ActiveModelSelection> {
+  private final Provider<KeystoreManager> keystoreManagerProvider;
+
+  private ActiveModelSelection_Factory(Provider<KeystoreManager> keystoreManagerProvider) {
+    this.keystoreManagerProvider = keystoreManagerProvider;
+  }
+
   @Override
   public ActiveModelSelection get() {
-    return newInstance();
+    return newInstance(keystoreManagerProvider.get());
   }
 
-  public static ActiveModelSelection_Factory create() {
-    return InstanceHolder.INSTANCE;
+  public static ActiveModelSelection_Factory create(
+      Provider<KeystoreManager> keystoreManagerProvider) {
+    return new ActiveModelSelection_Factory(keystoreManagerProvider);
   }
 
-  public static ActiveModelSelection newInstance() {
-    return new ActiveModelSelection();
-  }
-
-  private static final class InstanceHolder {
-    static final ActiveModelSelection_Factory INSTANCE = new ActiveModelSelection_Factory();
+  public static ActiveModelSelection newInstance(KeystoreManager keystoreManager) {
+    return new ActiveModelSelection(keystoreManager);
   }
 }

@@ -157,7 +157,7 @@ fun MessageBubble(
                 style = MaterialTheme.typography.labelSmall,
                 color = Color(0xFF545450),
                 fontStyle = FontStyle.Italic,
-                modifier = Modifier.padding(start = 8.dp, top = 2.dp)
+                modifier = Modifier.padding(start = 0.dp, top = 0.dp)
             )
         }
     }

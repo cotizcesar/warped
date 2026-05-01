@@ -42,6 +42,7 @@ import com.warped.di.SecurityModule_ProvideApiKeyStoreFactory;
 import com.warped.di.SecurityModule_ProvideKeystoreManagerFactory;
 import com.warped.domain.model.ActiveModelSelection;
 import com.warped.domain.model.ParameterStore;
+import com.warped.domain.repository.ChatRepository;
 import com.warped.ui.chat.ChatViewModel;
 import com.warped.ui.chat.ChatViewModel_HiltModules;
 import com.warped.ui.chat.ChatViewModel_HiltModules_BindsModule_Binds_LazyMapKey;
@@ -520,7 +521,7 @@ public final class DaggerWarpedApplication_HiltComponents_SingletonC {
       public T get() {
         switch (id) {
           case 0: // com.warped.ui.chat.ChatViewModel
-          return (T) new ChatViewModel(singletonCImpl.chatRepositoryImplProvider.get(), singletonCImpl.endpointRepositoryImplProvider.get(), singletonCImpl.localModelRepositoryImplProvider.get(), singletonCImpl.activeModelSelectionProvider.get(), singletonCImpl.providerRouterProvider.get(), viewModelCImpl.savedStateHandle, singletonCImpl.parameterStoreProvider.get(), singletonCImpl.provideLlamaEngineProvider.get());
+          return (T) new ChatViewModel(singletonCImpl.chatRepositoryImplProvider.get(), singletonCImpl.endpointRepositoryImplProvider.get(), singletonCImpl.localModelRepositoryImplProvider.get(), singletonCImpl.activeModelSelectionProvider.get(), singletonCImpl.providerRouterProvider.get(), viewModelCImpl.savedStateHandle, singletonCImpl.parameterStoreProvider.get(), singletonCImpl.provideLlamaEngineProvider.get(), ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
 
           case 1: // com.warped.ui.endpoints.EndpointsViewModel
           return (T) new EndpointsViewModel(singletonCImpl.endpointRepositoryImplProvider.get(), singletonCImpl.providerRouterProvider.get(), singletonCImpl.provideApiKeyStoreProvider.get(), viewModelCImpl.savedStateHandle);
@@ -712,6 +713,11 @@ public final class DaggerWarpedApplication_HiltComponents_SingletonC {
     }
 
     @Override
+    public ChatRepository chatRepository() {
+      return chatRepositoryImplProvider.get();
+    }
+
+    @Override
     public Set<Boolean> getDisableFragmentGetContextFix() {
       return Collections.<Boolean>emptySet();
     }
@@ -759,7 +765,7 @@ public final class DaggerWarpedApplication_HiltComponents_SingletonC {
           return (T) new LocalModelRepositoryImpl(singletonCImpl.localModelDao());
 
           case 6: // com.warped.domain.model.ActiveModelSelection
-          return (T) new ActiveModelSelection();
+          return (T) new ActiveModelSelection(singletonCImpl.provideKeystoreManagerProvider.get());
 
           case 7: // com.warped.data.remote.provider.ProviderRouter
           return (T) new ProviderRouter(singletonCImpl.provideApiKeyStoreProvider.get(), DoubleCheck.lazy(singletonCImpl.provideLocalLlmProvider));
