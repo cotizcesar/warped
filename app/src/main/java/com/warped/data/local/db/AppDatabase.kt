@@ -22,7 +22,7 @@ import com.warped.data.local.db.entity.RemoteEndpointEntity
         PresetEntity::class
     ],
     version = 6,
-    exportSchema = true
+    exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun conversationDao(): ConversationDao
