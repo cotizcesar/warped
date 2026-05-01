@@ -47,6 +47,11 @@ fun ChatScreen(
     LaunchedEffect(conversationId) {
         if (conversationId > 0) viewModel.selectConversation(conversationId)
     }
+    LaunchedEffect(Unit) {
+        if (conversationId == 0L) {
+            viewModel.loadLastConversation()
+        }
+    }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()

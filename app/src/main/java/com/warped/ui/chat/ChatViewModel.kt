@@ -192,6 +192,7 @@ class ChatViewModel @Inject constructor(
                         error = null
                     )
                 }
+                activeModelSelection.saveLastConversation(conversation.id)
             }
         }
     }
@@ -253,6 +254,13 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(reasoningEnabled = !it.reasoningEnabled) }
     }
 
+    fun loadLastConversation() {
+        val lastId = activeModelSelection.getLastConversation()
+        if (lastId > 0) {
+            selectConversation(lastId)
+        }
+    }
+
     fun clearError() {
         _uiState.update { it.copy(error = null) }
     }
@@ -286,9 +294,11 @@ class ChatViewModel @Inject constructor(
         val conversationId = chatRepository.createConversation(
             title = title,
             providerType = state.selectedProvider!!,
+            modelId = state.selectedModelId,
             endpointId = 0
         )
         _uiState.update { it.copy(conversationId = conversationId) }
+        activeModelSelection.saveLastConversation(conversationId)
         return conversationId
     }
 

@@ -53,5 +53,16 @@ class ActiveModelSelection @Inject constructor(
 
     companion object {
         private const val LAST_MODEL_KEY = "last_active_model"
+        private const val LAST_CONVERSATION_KEY = "last_conversation_id"
+    }
+
+    fun saveLastConversation(conversationId: Long) {
+        try { keystoreManager.put(LAST_CONVERSATION_KEY, conversationId.toString()) } catch (_: Exception) {}
+    }
+
+    fun getLastConversation(): Long {
+        return try {
+            keystoreManager.get(LAST_CONVERSATION_KEY)?.toLongOrNull() ?: 0L
+        } catch (_: Exception) { 0L }
     }
 }

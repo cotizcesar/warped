@@ -29,7 +29,7 @@ class ChatRepositoryImpl @Inject constructor(
         return conv.toDomain() to msgs
     }
 
-    override suspend fun createConversation(title: String, providerType: ProviderType, endpointId: Long): Long {
+    override suspend fun createConversation(title: String, providerType: ProviderType, modelId: String?, endpointId: Long): Long {
         val now = System.currentTimeMillis()
         val entity = ConversationEntity(
             title = title,
@@ -37,7 +37,7 @@ class ChatRepositoryImpl @Inject constructor(
             updatedAt = now,
             providerType = providerType.name,
             endpointId = endpointId,
-            modelId = null,
+            modelId = modelId,
             systemPrompt = null
         )
         return conversationDao.upsert(entity)
