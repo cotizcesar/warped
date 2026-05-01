@@ -124,12 +124,19 @@ class ModelsViewModel @Inject constructor(
             _uiState.update { it.copy(error = "Name, URL, and Model ID are required") }
             return
         }
+        var url = state.formUrl
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            url = "http://$url"
+        }
+        if (!url.endsWith("/")) {
+            url = "$url/"
+        }
         viewModelScope.launch {
             try {
                 val savedId = endpointRepository.saveEndpoint(
                     Endpoint(
                         name = state.formName,
-                        url = state.formUrl,
+                        url = url,
                         apiType = ProviderType.valueOf(state.formApiType),
                         modelId = state.formModelId,
                     )
@@ -159,6 +166,7 @@ class ModelsViewModel @Inject constructor(
     }
 
     fun deleteEndpoint(endpoint: Endpoint) {
+        _uiState.update { it.copy(endpoints = it.endpoints.filter { e -> e.id != endpoint.id }) }
         viewModelScope.launch {
             try {
                 endpointRepository.deleteEndpoint(endpoint.id)
@@ -171,12 +179,19 @@ class ModelsViewModel @Inject constructor(
     fun saveEndpointEdit() {
         val state = _uiState.value
         if (state.formName.isBlank() || state.formUrl.isBlank()) return
+        var url = state.formUrl
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            url = "http://$url"
+        }
+        if (!url.endsWith("/")) {
+            url = "$url/"
+        }
         viewModelScope.launch {
             try {
                 val endpoint = Endpoint(
                     id = state.editingEndpoint?.id ?: 0,
                     name = state.formName,
-                    url = state.formUrl,
+                    url = url,
                     apiType = ProviderType.valueOf(state.formApiType),
                     modelId = state.formModelId.ifBlank { null },
                     isActive = state.editingEndpoint?.isActive ?: false
@@ -208,7 +223,13 @@ class ModelsViewModel @Inject constructor(
 
     fun fetchEndpointModels() {
         val state = _uiState.value
-        val url = state.formUrl.ifBlank { return }
+        var url = state.formUrl.ifBlank { return }
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            url = "http://$url"
+        }
+        if (!url.endsWith("/")) {
+            url = "$url/"
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(isFetchingEndpointModels = true, availableEndpointModels = emptyList()) }
             try {

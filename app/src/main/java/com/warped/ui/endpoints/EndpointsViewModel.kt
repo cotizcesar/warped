@@ -70,12 +70,19 @@ class EndpointsViewModel @Inject constructor(
             _uiState.update { it.copy(error = "Name and URL are required") }
             return
         }
+        var url = state.formUrl
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            url = "http://$url"
+        }
+        if (!url.endsWith("/")) {
+            url = "$url/"
+        }
         viewModelScope.launch {
             try {
                 val endpoint = Endpoint(
                     id = state.editingEndpoint?.id ?: 0,
                     name = state.formName,
-                    url = state.formUrl,
+                    url = url,
                     apiType = ProviderType.valueOf(state.formApiType),
                     modelId = state.formModelId.ifBlank { null },
                     isActive = state.editingEndpoint?.isActive ?: false
@@ -92,6 +99,7 @@ class EndpointsViewModel @Inject constructor(
     }
 
     fun deleteEndpoint(endpointId: Long) {
+        _uiState.update { it.copy(endpoints = it.endpoints.filter { e -> e.id != endpointId }) }
         viewModelScope.launch {
             try {
                 endpointRepository.deleteEndpoint(endpointId)
