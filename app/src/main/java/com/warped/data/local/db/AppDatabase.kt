@@ -21,7 +21,7 @@ import com.warped.data.local.db.entity.RemoteEndpointEntity
         LocalModelEntity::class,
         PresetEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
