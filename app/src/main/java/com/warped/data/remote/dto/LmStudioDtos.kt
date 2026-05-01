@@ -40,7 +40,14 @@ data class LmStudioModelData(
     @SerialName("size_bytes") val sizeBytes: Long = 0,
     @SerialName("params_string") val paramsString: String? = null,
     @SerialName("max_context_length") val maxContextLength: Int = 0,
-    val format: String? = null
+    val format: String? = null,
+    val capabilities: LmStudioCapabilities? = null
+)
+
+@Serializable
+data class LmStudioCapabilities(
+    val vision: Boolean = false,
+    @SerialName("trained_for_tool_use") val trainedForToolUse: Boolean = false
 )
 
 @Serializable

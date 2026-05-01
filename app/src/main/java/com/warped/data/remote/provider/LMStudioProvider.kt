@@ -145,6 +145,19 @@ class LMStudioProvider(
         }
     }
 
+    suspend fun listModelsRaw(): Result<List<com.warped.data.remote.dto.LmStudioModelData>> {
+        return try {
+            val response = api.listModels()
+            if (response.isSuccessful) {
+                Result.success(response.body()?.models ?: emptyList())
+            } else {
+                Result.failure(Exception("HTTP ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     override suspend fun testConnection(): Result<ConnectionStatus> {
         return try {
             val response = api.listModels()

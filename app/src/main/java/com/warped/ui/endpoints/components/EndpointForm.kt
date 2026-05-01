@@ -6,6 +6,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -20,6 +24,7 @@ fun EndpointForm(
     onSave: () -> Unit,
     onDismiss: () -> Unit,
     availableModels: List<String> = emptyList(),
+    availableModelsData: List<com.warped.data.remote.dto.LmStudioModelData> = emptyList(),
     isFetchingModels: Boolean = false,
     onFetchModels: () -> Unit = {},
 ) {
@@ -84,9 +89,23 @@ fun EndpointForm(
                     expanded = modelDropdownExpanded,
                     onDismissRequest = { modelDropdownExpanded = false }
                 ) {
-                    availableModels.forEach { model ->
+                    availableModels.forEachIndexed { index, model ->
+                        val caps = availableModelsData.getOrNull(index)?.capabilities
                         DropdownMenuItem(
-                            text = { Text(model) },
+                            text = {
+                                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                    Text(model, modifier = Modifier.weight(1f))
+                                    if (caps?.vision == true) {
+                                        Icon(Icons.Filled.Visibility, contentDescription = "Vision",
+                                            modifier = Modifier.size(14.dp), tint = Color(0xFF4CAF50))
+                                        Spacer(Modifier.width(2.dp))
+                                    }
+                                    if (caps?.trainedForToolUse == true) {
+                                        Icon(Icons.Filled.Build, contentDescription = "Tool use",
+                                            modifier = Modifier.size(14.dp), tint = Color(0xFFFF9800))
+                                    }
+                                }
+                            },
                             onClick = {
                                 onFieldChange("modelId", model)
                                 modelDropdownExpanded = false

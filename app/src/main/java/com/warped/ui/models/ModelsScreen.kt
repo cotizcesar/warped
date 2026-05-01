@@ -135,6 +135,7 @@ fun ModelsScreen(
                     onSave = { viewModel.saveEndpoint() },
                     onDismiss = { viewModel.dismissEndpointForm() },
                     availableModels = uiState.availableEndpointModels,
+                    availableModelsData = uiState.availableEndpointModelsData,
                     isFetchingModels = uiState.isFetchingEndpointModels,
                     onFetchModels = { viewModel.fetchEndpointModels() },
                 )
@@ -149,6 +150,7 @@ fun ModelsScreen(
                     onSave = { viewModel.saveEndpointEdit() },
                     onDismiss = { viewModel.cancelEndpointEdit() },
                     availableModels = uiState.availableEndpointModels,
+                    availableModelsData = uiState.availableEndpointModelsData,
                     isFetchingModels = uiState.isFetchingEndpointModels,
                     onFetchModels = { viewModel.fetchEndpointModels() },
                 )

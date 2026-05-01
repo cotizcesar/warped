@@ -1,6 +1,7 @@
 package com.warped.ui.models
 
 import com.warped.data.local.download.DownloadState
+import com.warped.data.remote.dto.LmStudioModelData
 import com.warped.domain.model.LocalModel
 import com.warped.domain.model.Endpoint
 data class ModelsUiState(
@@ -20,5 +21,6 @@ data class ModelsUiState(
     val formApiKey: String = "",
     val error: String? = null,
     val availableEndpointModels: List<String> = emptyList(),
+    val availableEndpointModelsData: List<LmStudioModelData> = emptyList(),
     val isFetchingEndpointModels: Boolean = false
 )
