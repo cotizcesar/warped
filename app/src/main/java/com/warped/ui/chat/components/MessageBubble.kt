@@ -83,6 +83,7 @@ fun MessageBubble(
                             )
                         }
                     }
+                    Spacer(Modifier.height(4.dp))
                 }
 
                 // Images in user messages
