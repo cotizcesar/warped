@@ -11,8 +11,10 @@ import com.warped.domain.model.ProviderType
 import com.warped.domain.model.Role
 import com.warped.domain.model.StreamToken
 import com.warped.domain.provider.LlmProvider
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -74,6 +76,7 @@ class LMStudioProvider(
                 try {
                     while (!source.exhausted() && !chatEnded) {
                         val line = source.readUtf8Line() ?: break
+                        if (chatEnded) break
                         when {
                             line.startsWith("event: ") -> currentEvent = line.removePrefix("event: ").trim()
                             line.startsWith("data: ") -> {
@@ -105,10 +108,12 @@ class LMStudioProvider(
                                             }
                                         }
                                         chatEnded = true
+                                        break
                                     }
                                     if (event.error != null) {
                                         emit(StreamToken.Error(event.error.message))
                                         chatEnded = true
+                                        break
                                     }
                                 } catch (_: Exception) {}
                             }
@@ -137,6 +142,7 @@ class LMStudioProvider(
                     } catch (_: Exception) {}
                 }
                 emit(StreamToken.Done(statsText, reasoningBuf.toString().trim().takeIf { it.isNotEmpty() }))
+                try { responseBody.close() } catch (_: Exception) {}
             } else {
                 val errorBody = response.errorBody()?.string() ?: response.message()
                 emit(StreamToken.Error("HTTP ${response.code()}: $errorBody"))
@@ -144,7 +150,7 @@ class LMStudioProvider(
         } catch (e: Exception) {
             emit(StreamToken.Error("Connection failed: ${e.message}"))
         }
-    }
+    }.flowOn(Dispatchers.IO)
 
     override suspend fun listModels(): Result<List<ModelInfo>> {
         return try {
