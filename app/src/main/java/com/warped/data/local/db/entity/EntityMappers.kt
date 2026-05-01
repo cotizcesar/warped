@@ -18,7 +18,6 @@ fun MessageEntity.toDomain(): ChatMessage = ChatMessage(
     tokenCount = tokenCount,
     createdAt = Instant.ofEpochMilli(createdAt),
     stats = stats,
-    reasoning = reasoning,
     imageUris = images?.let { 
         try { mapperJson.decodeFromString<List<String>>(it) } catch (_: Exception) { emptyList() }
     } ?: emptyList()
@@ -31,7 +30,6 @@ fun ChatMessage.toEntity(conversationId: Long): MessageEntity = MessageEntity(
     tokenCount = tokenCount,
     createdAt = createdAt.toEpochMilli(),
     stats = stats,
-    reasoning = reasoning,
     images = if (imageUris.isNotEmpty()) mapperJson.encodeToString(imageUris) else null
 )
 
