@@ -31,14 +31,6 @@ fun ChatInputBar(
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.Bottom
     ) {
-        // Reasoning toggle
-        IconButton(onClick = onToggleReasoning) {
-            Icon(
-                Icons.Filled.Psychology,
-                contentDescription = "Toggle reasoning",
-                tint = if (reasoningEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-            )
-        }
         OutlinedTextField(
             value = text,
             onValueChange = onTextChange,
@@ -52,7 +44,16 @@ fun ChatInputBar(
                 focusedBorderColor = Color.Transparent
             )
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(4.dp))
+        // Reasoning toggle
+        IconButton(onClick = onToggleReasoning) {
+            Icon(
+                Icons.Filled.Psychology,
+                contentDescription = "Toggle reasoning",
+                tint = if (reasoningEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                modifier = Modifier.size(20.dp)
+            )
+        }
         if (isGenerating) {
             IconButton(onClick = onStop) {
                 Icon(Icons.Filled.Stop, contentDescription = "Stop generating")

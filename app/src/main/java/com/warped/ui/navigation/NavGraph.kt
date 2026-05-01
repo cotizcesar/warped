@@ -1,11 +1,9 @@
 package com.warped.ui.navigation
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,7 +18,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.warped.ui.chat.ChatScreen
-import com.warped.ui.endpoints.EndpointsScreen
 import com.warped.ui.huggingface.HuggingFaceScreen
 import com.warped.ui.models.ModelsScreen
 import com.warped.ui.presets.PresetsScreen
@@ -42,13 +39,6 @@ fun WarpedNavGraph() {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    val navItems = listOf(
-        Triple("Chat", Screen.Chat.route, Icons.AutoMirrored.Filled.Chat),
-        Triple("Models", Screen.Models.route, Icons.Filled.Memory),
-        Triple("Discover", Screen.HuggingFace.route, Icons.Filled.Search),
-        Triple("Presets", Screen.Presets.route, Icons.Filled.Settings),
-    )
-
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -56,63 +46,70 @@ fun WarpedNavGraph() {
                 drawerContainerColor = DrawerBg,
                 drawerContentColor = DrawerTextPrimary
             ) {
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    "Warped",
-                    color = DrawerTextPrimary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
-                )
-                HorizontalDivider(color = Color(0xFF333333), thickness = 0.5.dp)
-                Spacer(Modifier.height(8.dp))
-                navItems.forEach { (label, route, icon) ->
-                    val selected = currentRoute == route
+                Column(modifier = Modifier.fillMaxHeight()) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "Warped",
+                        color = DrawerTextPrimary,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                    )
+
                     NavigationDrawerItem(
-                        icon = { 
-                            Icon(icon, contentDescription = label, 
-                                tint = if (selected) DrawerAccent else DrawerTextSecondary)
-                        },
-                        label = { 
-                            Text(label, 
-                                color = if (selected) DrawerAccent else DrawerTextSecondary,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
-                        },
-                        selected = selected,
-                        colors = NavigationDrawerItemDefaults.colors(
-                            selectedContainerColor = DrawerSelectedBg,
-                            unselectedContainerColor = Color.Transparent
-                        ),
+                        icon = { Icon(Icons.Filled.Add, contentDescription = null, tint = DrawerAccent) },
+                        label = { Text("New Chat", color = DrawerAccent, fontWeight = FontWeight.SemiBold) },
+                        selected = false,
+                        colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent),
                         onClick = {
-                            navController.navigate(route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
+                            navController.navigate(Screen.Chat.route) {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
                             }
                             scope.launch { drawerState.close() }
                         }
                     )
-                }
-                Spacer(Modifier.weight(1f))
-                HorizontalDivider(color = Color(0xFF333333), thickness = 0.5.dp)
-                NavigationDrawerItem(
-                    icon = { 
-                        Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = DrawerTextSecondary)
-                    },
-                    label = { Text("Settings", color = DrawerTextSecondary) },
-                    selected = currentRoute == Screen.Settings.route,
-                    colors = NavigationDrawerItemDefaults.colors(
-                        selectedContainerColor = DrawerSelectedBg,
-                        unselectedContainerColor = Color.Transparent
-                    ),
-                    onClick = {
-                        navController.navigate(Screen.Settings.route)
-                        scope.launch { drawerState.close() }
+
+                    HorizontalDivider(color = Color(0xFF333333), thickness = 0.5.dp)
+
+                    Spacer(Modifier.weight(1f))
+
+                    HorizontalDivider(color = Color(0xFF333333), thickness = 0.5.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        val isModels = currentRoute == Screen.Models.route
+                        NavigationDrawerItem(
+                            icon = { Icon(Icons.Filled.Memory, null, tint = if (isModels) DrawerAccent else DrawerTextSecondary, modifier = Modifier.size(22.dp)) },
+                            label = { Text("Models", color = if (isModels) DrawerAccent else DrawerTextSecondary, fontSize = 11.sp) },
+                            selected = isModels,
+                            colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = DrawerSelectedBg, unselectedContainerColor = Color.Transparent),
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                navController.navigate(Screen.Models.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                                scope.launch { drawerState.close() }
+                            }
+                        )
+                        val isSettings = currentRoute == Screen.Settings.route
+                        NavigationDrawerItem(
+                            icon = { Icon(Icons.Filled.Settings, null, tint = if (isSettings) DrawerAccent else DrawerTextSecondary, modifier = Modifier.size(22.dp)) },
+                            label = { Text("Settings", color = if (isSettings) DrawerAccent else DrawerTextSecondary, fontSize = 11.sp) },
+                            selected = isSettings,
+                            colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = DrawerSelectedBg, unselectedContainerColor = Color.Transparent),
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                navController.navigate(Screen.Settings.route)
+                                scope.launch { drawerState.close() }
+                            }
+                        )
                     }
-                )
-                Spacer(Modifier.height(12.dp))
+                }
             }
         }
     ) {
@@ -143,9 +140,6 @@ fun WarpedNavGraph() {
             }
             composable(Screen.Presets.route) {
                 PresetsScreen()
-            }
-            composable(Screen.Endpoints.route) {
-                EndpointsScreen()
             }
             composable(Screen.Settings.route) {
                 SettingsScreen()
