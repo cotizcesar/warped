@@ -69,13 +69,14 @@ class LMStudioProvider(
                 var hasTokens = false
                 var currentEvent = ""
                 var statsText: String? = null
+                val reasoningBuf = StringBuilder()
                 for (line in lines) {
                     when {
                         line.startsWith("event: ") -> currentEvent = line.removePrefix("event: ").trim()
                         line.startsWith("data: ") -> {
                             val data = line.removePrefix("data: ").trim()
                             if (data == "[DONE]") {
-                                emit(StreamToken.Done(statsText))
+                                emit(StreamToken.Done(statsText, reasoningBuf.toString().trim().takeIf { it.isNotEmpty() }))
                                 return@flow
                             }
                             try {
@@ -86,6 +87,9 @@ class LMStudioProvider(
                                         emit(StreamToken.Delta(text))
                                         hasTokens = true
                                     }
+                                }
+                                if (currentEvent == "reasoning.delta" || event.type == "reasoning.delta") {
+                                    event.content?.let { reasoningBuf.append(it) }
                                 }
                                 if (currentEvent == "chat.end" || event.type == "chat.end") {
                                     event.result?.stats?.let { stats ->
@@ -108,14 +112,17 @@ class LMStudioProvider(
                             statsText = " · ${stats.totalOutputTokens} tokens (${stats.inputTokens} in, ${String.format("%.0f", stats.tokensPerSecond)} tok/s, ${String.format("%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first)"
                         }
                         event.result?.output?.forEach { item ->
-                            if (item.type == "message" && item.content.isNotEmpty()) {
-                                emit(StreamToken.Delta(item.content))
-                                hasTokens = true
+                            when (item.type) {
+                                "reasoning" -> item.content.let { reasoningBuf.append(it) }
+                                "message" -> if (item.content.isNotEmpty()) {
+                                    emit(StreamToken.Delta(item.content))
+                                    hasTokens = true
+                                }
                             }
                         }
                     } catch (_: Exception) {}
                 }
-                emit(StreamToken.Done(statsText))
+                emit(StreamToken.Done(statsText, reasoningBuf.toString().trim().takeIf { it.isNotEmpty() }))
             } else {
                 val errorBody = response.errorBody()?.string() ?: response.message()
                 emit(StreamToken.Error("HTTP ${response.code()}: $errorBody"))

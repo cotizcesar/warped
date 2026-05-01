@@ -137,7 +137,8 @@ class ChatViewModel @Inject constructor(
                                 val assistantMessage = ChatMessage(
                                     role = Role.ASSISTANT,
                                     content = finalContent,
-                                    tokenCount = content.length / 4
+                                    tokenCount = content.length / 4,
+                                    reasoning = token.reasoning
                                 )
                                 _uiState.update {
                                     it.copy(
