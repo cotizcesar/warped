@@ -1,13 +1,14 @@
 package com.warped.data.remote.provider
 
 import com.warped.data.remote.api.LmStudioApi
-import com.warped.data.remote.dto.OpenAiChatRequest
-import com.warped.data.remote.dto.OpenAiMessage
-import com.warped.data.remote.network.asSseFlow
+import com.warped.data.remote.dto.LmStudioChatRequest
+import com.warped.data.remote.dto.LmStudioInputItem
+import com.warped.data.remote.dto.LmStudioSseEvent
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.ModelInfo
 import com.warped.domain.model.ProviderType
+import com.warped.domain.model.Role
 import com.warped.domain.model.StreamToken
 import com.warped.domain.provider.LlmProvider
 import kotlinx.coroutines.flow.Flow
@@ -40,22 +41,60 @@ class LMStudioProvider(
     private val api = retrofit.create(LmStudioApi::class.java)
 
     override fun chat(request: ChatRequest): Flow<StreamToken> = flow {
-        val messages = request.messages.map {
-            OpenAiMessage(role = it.role.name.lowercase(), content = it.content)
-        }
-        val body = OpenAiChatRequest(
+        val systemMessage = request.messages.firstOrNull { it.role == Role.SYSTEM }?.content
+        val chatMessages = request.messages
+            .filter { it.role != Role.SYSTEM }
+            .map { LmStudioInputItem(type = "message", content = it.content) }
+
+        val body = LmStudioChatRequest(
             model = modelId,
-            messages = messages,
+            input = chatMessages,
+            systemPrompt = systemMessage,
             stream = true,
             temperature = request.parameters.temperature,
             topP = request.parameters.topP,
-            maxTokens = request.parameters.maxTokens.takeIf { it > 0 },
-            stop = null
+            topK = request.parameters.topK,
+            repeatPenalty = request.parameters.repeatPenalty,
+            maxOutputTokens = request.parameters.maxTokens.takeIf { it > 0 }
         )
         try {
             val response = api.chat(body)
             if (response.isSuccessful) {
-                response.body()?.asSseFlow(json)?.collect { emit(it) }
+                response.body()?.let { responseBody ->
+                    val source = responseBody.source()
+                    try {
+                        while (!source.exhausted()) {
+                            val line = source.readUtf8Line() ?: break
+                            if (line.startsWith("data: ")) {
+                                val data = line.removePrefix("data: ").trim()
+                                if (data == "[DONE]") {
+                                    emit(StreamToken.Done)
+                                    return@flow
+                                }
+                                try {
+                                    val event = json.decodeFromString<LmStudioSseEvent>(data)
+                                    val text = event.content ?: event.token ?: ""
+                                    if (text.isNotEmpty()) {
+                                        emit(StreamToken.Delta(text))
+                                    }
+                                    if (event.done) {
+                                        emit(StreamToken.Done)
+                                        return@flow
+                                    }
+                                    if (event.error != null) {
+                                        emit(StreamToken.Error(event.error.message))
+                                        return@flow
+                                    }
+                                } catch (_: Exception) {
+                                    // Skip unparseable events
+                                }
+                            }
+                        }
+                        emit(StreamToken.Done)
+                    } catch (e: Exception) {
+                        emit(StreamToken.Error("SSE error: ${e.message}"))
+                    }
+                }
             } else {
                 val errorBody = response.errorBody()?.string() ?: response.message()
                 emit(StreamToken.Error("HTTP ${response.code()}: $errorBody"))
@@ -69,8 +108,12 @@ class LMStudioProvider(
         return try {
             val response = api.listModels()
             if (response.isSuccessful) {
-                val models = response.body()?.data?.map {
-                    ModelInfo(id = it.id, name = it.id, providerType = ProviderType.LM_STUDIO)
+                val models = response.body()?.models?.map {
+                    ModelInfo(
+                        id = it.key,
+                        name = it.displayName.ifBlank { it.key },
+                        providerType = ProviderType.LM_STUDIO
+                    )
                 } ?: emptyList()
                 Result.success(models)
             } else {
