@@ -65,52 +65,44 @@ class LMStudioProvider(
                     return@flow
                 }
                 val fullBody = responseBody.string()
-                // Try SSE line-by-line parsing first
                 val lines = fullBody.lines()
                 var hasTokens = false
+                var currentEvent = ""
                 for (line in lines) {
-                    if (line.startsWith("data: ")) {
-                        val data = line.removePrefix("data: ").trim()
-                        if (data == "[DONE]") {
-                            emit(StreamToken.Done)
-                            return@flow
-                        }
-                        try {
-                            val event = json.decodeFromString<LmStudioSseEvent>(data)
-                            val text = event.content ?: event.token ?: ""
-                            if (text.isNotEmpty()) {
-                                emit(StreamToken.Delta(text))
-                                hasTokens = true
-                            }
-                            if (event.done) {
+                    when {
+                        line.startsWith("event: ") -> currentEvent = line.removePrefix("event: ").trim()
+                        line.startsWith("data: ") -> {
+                            val data = line.removePrefix("data: ").trim()
+                            if (data == "[DONE]") {
                                 emit(StreamToken.Done)
                                 return@flow
                             }
-                            if (event.error != null) {
-                                emit(StreamToken.Error(event.error.message))
-                                return@flow
-                            }
-                        } catch (_: Exception) {
-                            // Try as output-type event
                             try {
-                                val full = json.decodeFromString<LmStudioSseEvent>(data)
-                                full.output?.forEach { item ->
-                                    if (item.type == "message" && item.content.isNotEmpty()) {
-                                        emit(StreamToken.Delta(item.content))
+                                val event = json.decodeFromString<LmStudioSseEvent>(data)
+                                // Only emit text from message.delta, skip reasoning and other events
+                                if (currentEvent == "message.delta" || event.type == "message.delta") {
+                                    val text = event.content ?: ""
+                                    if (text.isNotEmpty()) {
+                                        emit(StreamToken.Delta(text))
                                         hasTokens = true
                                     }
+                                }
+                                if (event.error != null) {
+                                    emit(StreamToken.Error(event.error.message))
+                                    return@flow
                                 }
                             } catch (_: Exception) {}
                         }
                     }
                 }
-                // Fallback: parse entire body as single JSON if no SSE tokens found
+                // Fallback: non-streaming, parse entire body as JSON
                 if (!hasTokens) {
                     try {
                         val event = json.decodeFromString<LmStudioSseEvent>(fullBody)
                         event.output?.forEach { item ->
                             if (item.type == "message" && item.content.isNotEmpty()) {
                                 emit(StreamToken.Delta(item.content))
+                                hasTokens = true
                             }
                         }
                     } catch (_: Exception) {}
