@@ -140,7 +140,7 @@ class ChatViewModel @Inject constructor(
                             }
                         }
                         is StreamToken.Done -> {
-                            val content = _uiState.value.streamingContent + tokenBuffer.joinToString("")
+                            val content = (_uiState.value.streamingContent + tokenBuffer.joinToString("")).trimStart()
                             if (content.isNotBlank()) {
                                 val assistantMessage = ChatMessage(
                                     role = Role.ASSISTANT,
