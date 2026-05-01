@@ -170,7 +170,8 @@ fun ChatScreen(
                 onStop = { viewModel.stopGeneration() },
                 reasoningEnabled = uiState.reasoningEnabled,
                 onToggleReasoning = { viewModel.toggleReasoning() },
-                onAddImage = { imagePickerLauncher.launch("image/*") }
+                onAddImage = { imagePickerLauncher.launch("image/*") },
+                onModelPickerClick = { modelDropdownExpanded = true }
             )
         }
     ) { padding ->
