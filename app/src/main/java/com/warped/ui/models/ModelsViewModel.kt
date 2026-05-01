@@ -93,7 +93,7 @@ class ModelsViewModel @Inject constructor(
                 isEndpointFormVisible = true,
                 formName = "",
                 formUrl = "",
-                formApiType = "OPENAI",
+                formApiType = "LM_STUDIO",
                 formModelId = "",
                 formApiKey = ""
             )

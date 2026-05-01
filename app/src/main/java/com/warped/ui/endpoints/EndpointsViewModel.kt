@@ -43,7 +43,7 @@ class EndpointsViewModel @Inject constructor(
                 editingEndpoint = null,
                 formName = "",
                 formUrl = "",
-                formApiType = "OPENAI",
+                formApiType = "LM_STUDIO",
                 formModelId = "",
                 formApiKey = ""
             )
