@@ -16,6 +16,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.warped.R
+import com.warped.domain.model.Endpoint
+import com.warped.domain.model.LocalModel
+import com.warped.domain.model.ProviderType
 
 @Composable
 fun ChatInputBar(
@@ -28,7 +31,9 @@ fun ChatInputBar(
     reasoningEnabled: Boolean = true,
     onToggleReasoning: () -> Unit = {},
     onAddImage: () -> Unit = {},
-    onModelPickerClick: () -> Unit = {}
+    localModels: List<LocalModel> = emptyList(),
+    endpoints: List<Endpoint> = emptyList(),
+    onModelSelected: (String, ProviderType) -> Unit = { _, _ -> }
 ) {
     Surface(
         color = Color(0xFF2B2B29),
@@ -84,10 +89,43 @@ fun ChatInputBar(
 
                 Spacer(Modifier.weight(1f))
 
-                // Model picker button
-                TextButton(onClick = onModelPickerClick) {
-                    Text("Model", color = Color.White.copy(alpha = 0.6f))
-                    Icon(Icons.Filled.KeyboardArrowDown, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
+                // Model picker button with dropdown
+                var modelExpanded by remember { mutableStateOf(false) }
+                Box {
+                    TextButton(onClick = { modelExpanded = true }) {
+                        Text("Model", color = Color.White.copy(alpha = 0.6f))
+                        Icon(Icons.Filled.KeyboardArrowDown, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
+                    }
+                    DropdownMenu(
+                        expanded = modelExpanded,
+                        onDismissRequest = { modelExpanded = false },
+                        modifier = Modifier.align(Alignment.TopEnd)
+                    ) {
+                        localModels.forEach { model ->
+                            DropdownMenuItem(
+                                text = { Text(model.name) },
+                                onClick = {
+                                    onModelSelected(model.filePath, ProviderType.LOCAL)
+                                    modelExpanded = false
+                                }
+                            )
+                        }
+                        if (localModels.isNotEmpty() && endpoints.isNotEmpty()) {
+                            HorizontalDivider()
+                        }
+                        endpoints.forEach { ep ->
+                            val mid = ep.modelId
+                            if (mid != null) {
+                                DropdownMenuItem(
+                                    text = { Text("${ep.name} · ${mid.substringAfterLast("/")}") },
+                                    onClick = {
+                                        onModelSelected(mid, ep.apiType)
+                                        modelExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
 
                 // Reasoning toggle

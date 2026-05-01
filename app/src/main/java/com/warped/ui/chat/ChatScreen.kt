@@ -171,7 +171,11 @@ fun ChatScreen(
                 reasoningEnabled = uiState.reasoningEnabled,
                 onToggleReasoning = { viewModel.toggleReasoning() },
                 onAddImage = { imagePickerLauncher.launch("image/*") },
-                onModelPickerClick = { modelDropdownExpanded = true }
+                localModels = uiState.localModels,
+                endpoints = uiState.endpoints,
+                onModelSelected = { modelId, provider ->
+                    viewModel.setSelectedModel(modelId, provider)
+                }
             )
         }
     ) { padding ->
