@@ -173,6 +173,7 @@ fun ChatScreen(
                 onAddImage = { imagePickerLauncher.launch("image/*") },
                 localModels = uiState.localModels,
                 endpoints = uiState.endpoints,
+                selectedModelId = uiState.selectedModelId,
                 onModelSelected = { modelId, provider ->
                     viewModel.setSelectedModel(modelId, provider)
                 }

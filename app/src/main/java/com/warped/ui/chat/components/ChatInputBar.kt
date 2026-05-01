@@ -33,6 +33,7 @@ fun ChatInputBar(
     onAddImage: () -> Unit = {},
     localModels: List<LocalModel> = emptyList(),
     endpoints: List<Endpoint> = emptyList(),
+    selectedModelId: String? = null,
     onModelSelected: (String, ProviderType) -> Unit = { _, _ -> }
 ) {
     Surface(
@@ -92,9 +93,10 @@ fun ChatInputBar(
 
                 // Model picker button with dropdown
                 var modelExpanded by remember { mutableStateOf(false) }
+                val modelLabel = selectedModelId?.substringAfterLast("/") ?: "Model"
                 Box {
                     TextButton(onClick = { modelExpanded = true }) {
-                        Text("Model", color = Color.White.copy(alpha = 0.6f))
+                        Text(modelLabel, color = Color.White.copy(alpha = 0.6f), maxLines = 1)
                         Icon(Icons.Filled.KeyboardArrowDown, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
                     }
                     DropdownMenu(
