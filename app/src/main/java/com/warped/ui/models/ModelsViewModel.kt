@@ -218,10 +218,9 @@ class ModelsViewModel @Inject constructor(
 
     fun useEndpoint(endpoint: Endpoint) {
         val modelId = endpoint.modelId ?: return
+        activeModelSelection.select(modelId, endpoint.apiType)
         viewModelScope.launch {
             endpointRepository.activateEndpoint(endpoint.id)
-            activeModelSelection.select(modelId, endpoint.apiType)
-            // Fetch available models from the endpoint
             fetchEndpointModels(endpoint)
         }
     }
