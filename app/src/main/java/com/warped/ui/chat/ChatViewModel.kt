@@ -113,7 +113,9 @@ class ChatViewModel @Inject constructor(
 
                 val request = ChatRequest(
                     messages = _uiState.value.messages,
-                    parameters = _uiState.value.generationParameters
+                    parameters = _uiState.value.generationParameters.copy(
+                        reasoningEnabled = _uiState.value.reasoningEnabled
+                    )
                 )
                 val tokenBuffer = mutableListOf<String>()
                 var lastEmitTime = System.currentTimeMillis()
@@ -234,6 +236,10 @@ class ChatViewModel @Inject constructor(
 
     fun updateParameters(params: GenerationParameters) {
         _uiState.update { it.copy(generationParameters = params) }
+    }
+
+    fun toggleReasoning() {
+        _uiState.update { it.copy(reasoningEnabled = !it.reasoningEnabled) }
     }
 
     fun clearError() {

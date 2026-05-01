@@ -15,6 +15,7 @@ data class LmStudioChatRequest(
     @SerialName("repeat_penalty") val repeatPenalty: Float? = null,
     @SerialName("max_output_tokens") val maxOutputTokens: Int? = null,
     @SerialName("context_length") val contextLength: Int? = null,
+    val reasoning: String? = null,
     val store: Boolean = false
 )
 

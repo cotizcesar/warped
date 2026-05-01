@@ -26,7 +26,8 @@ data class ChatUiState(
     val isLoadingModel: Boolean = false,
     val loadingModelName: String = "",
     val modelLoadError: String? = null,
-    val loadedInstanceId: String? = null
+    val loadedInstanceId: String? = null,
+    val reasoningEnabled: Boolean = true
 )
 
 sealed class ChatError {

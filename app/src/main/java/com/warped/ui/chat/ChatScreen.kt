@@ -136,7 +136,9 @@ fun ChatScreen(
                 canSend = uiState.selectedModelId != null,
                 onTextChange = { viewModel.updateInput(it) },
                 onSend = { viewModel.sendMessage(uiState.inputText) },
-                onStop = { viewModel.stopGeneration() }
+                onStop = { viewModel.stopGeneration() },
+                reasoningEnabled = uiState.reasoningEnabled,
+                onToggleReasoning = { viewModel.toggleReasoning() }
             )
         }
     ) { padding ->

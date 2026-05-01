@@ -55,7 +55,8 @@ class LMStudioProvider(
             topP = request.parameters.topP,
             topK = request.parameters.topK,
             repeatPenalty = request.parameters.repeatPenalty,
-            maxOutputTokens = request.parameters.maxTokens.takeIf { it > 0 }
+            maxOutputTokens = request.parameters.maxTokens.takeIf { it > 0 },
+            reasoning = if (request.parameters.reasoningEnabled != false) null else "off"
         )
         try {
             val response = api.chat(body)
@@ -94,6 +95,12 @@ class LMStudioProvider(
                                 if (currentEvent == "chat.end" || event.type == "chat.end") {
                                     event.result?.stats?.let { stats ->
                                         statsText = " · ${stats.totalOutputTokens} tokens (${stats.inputTokens} in, ${String.format("%.0f", stats.tokensPerSecond)} tok/s, ${String.format("%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first)"
+                                    }
+                                    event.result?.output?.forEach { item ->
+                                        if (item.type == "message" && item.content.isNotEmpty()) {
+                                            emit(StreamToken.Delta(item.content))
+                                            hasTokens = true
+                                        }
                                     }
                                 }
                                 if (event.error != null) {
