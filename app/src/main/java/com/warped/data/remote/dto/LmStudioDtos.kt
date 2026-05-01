@@ -22,7 +22,8 @@ data class LmStudioChatRequest(
 @Serializable
 data class LmStudioInputItem(
     val type: String,
-    val content: String
+    val content: String = "",
+    @SerialName("data_url") val dataUrl: String? = null
 )
 
 @Serializable

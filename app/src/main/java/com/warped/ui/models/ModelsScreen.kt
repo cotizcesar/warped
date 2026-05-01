@@ -7,9 +7,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -82,35 +85,59 @@ fun ModelsScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddWizard = true }) {
-                Text("+")
+            FloatingActionButton(
+                onClick = { showAddWizard = true },
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(Icons.Filled.Add, "Add", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(28.dp))
             }
         }
     ) { padding ->
         if (showAddWizard) {
             AlertDialog(
                 onDismissRequest = { showAddWizard = false },
-                title = { Text("Add Model") },
+                title = { Text("Add Model", style = MaterialTheme.typography.titleLarge) },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = {
-                            showAddWizard = false
-                            onOpenHuggingFace()
-                        }) { Text("Local native from Hugging Face") }
-                        TextButton(onClick = {
-                            showAddWizard = false
-                            filePickerLauncher.launch(arrayOf("*/*"))
-                        }) { Text("Import local GGUF file") }
-                        TextButton(onClick = {
-                            showAddWizard = false
-                            viewModel.showEndpointForm()
-                        }) { Text("Network/API endpoint") }
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        TextButton(
+                            onClick = { showAddWizard = false; onOpenHuggingFace() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Filled.Search, null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Download from Hugging Face", style = MaterialTheme.typography.bodyLarge)
+                                Text("Browse and download GGUF models", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        HorizontalDivider()
+                        TextButton(
+                            onClick = { showAddWizard = false; filePickerLauncher.launch(arrayOf("*/*")) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Filled.Storage, null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Import GGUF File", style = MaterialTheme.typography.bodyLarge)
+                                Text("Load a .gguf model from your device", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        HorizontalDivider()
+                        TextButton(
+                            onClick = { showAddWizard = false; viewModel.showEndpointForm() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Filled.Dns, null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Connect LM Studio", style = MaterialTheme.typography.bodyLarge)
+                                Text("Add a remote LM Studio server", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
                     }
                 },
                 confirmButton = {},
-                dismissButton = {
-                    TextButton(onClick = { showAddWizard = false }) { Text("Cancel") }
-                }
+                dismissButton = { TextButton(onClick = { showAddWizard = false }) { Text("Cancel") } }
             )
         }
 

@@ -1,8 +1,14 @@
 package com.warped.ui.chat
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -33,6 +39,11 @@ fun ChatScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     var modelDropdownExpanded by remember { mutableStateOf(false) }
+    var attachedImages by remember { mutableStateOf<List<Uri>>(emptyList()) }
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris -> attachedImages = uris }
 
     val selectedModelName = run {
         val local = uiState.localModels.firstOrNull { it.filePath == uiState.selectedModelId }
@@ -138,10 +149,14 @@ fun ChatScreen(
                 isGenerating = uiState.isStreaming,
                 canSend = uiState.selectedModelId != null,
                 onTextChange = { viewModel.updateInput(it) },
-                onSend = { viewModel.sendMessage(uiState.inputText) },
+                onSend = {
+                    viewModel.sendMessage(uiState.inputText, attachedImages)
+                    attachedImages = emptyList()
+                },
                 onStop = { viewModel.stopGeneration() },
                 reasoningEnabled = uiState.reasoningEnabled,
-                onToggleReasoning = { viewModel.toggleReasoning() }
+                onToggleReasoning = { viewModel.toggleReasoning() },
+                onAddImage = { imagePickerLauncher.launch("image/*") }
             )
         }
     ) { padding ->
@@ -151,6 +166,33 @@ fun ChatScreen(
                 .padding(padding)
                 .imePadding()
         ) {
+            // Image previews
+            if (attachedImages.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    attachedImages.forEach { uri ->
+                        val context = androidx.compose.ui.platform.LocalContext.current
+                        val bitmap = remember(uri) {
+                            try {
+                                context.contentResolver.openInputStream(uri)?.use { 
+                                    android.graphics.BitmapFactory.decodeStream(it) 
+                                }
+                            } catch (_: Exception) { null }
+                        }
+                        bitmap?.let { bmp ->
+                            Image(
+                                bitmap = bmp.asImageBitmap(),
+                                contentDescription = "Attached image",
+                                modifier = Modifier.size(60.dp)
+                            )
+                        }
+                    }
+                }
+            }
             if (uiState.isLoadingModel) {
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),

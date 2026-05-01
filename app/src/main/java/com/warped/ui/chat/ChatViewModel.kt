@@ -1,29 +1,24 @@
 package com.warped.ui.chat
 
+import android.content.Context
+import android.net.Uri
+import android.util.Base64
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.warped.data.local.inference.LlamaEngine
 import com.warped.data.remote.provider.ProviderRouter
-import com.warped.domain.model.ActiveModelSelection
-import com.warped.domain.model.ChatMessage
-import com.warped.domain.model.ChatRequest
-import com.warped.domain.model.GenerationParameters
-import com.warped.domain.model.ParameterStore
-import com.warped.domain.model.ProviderType
-import com.warped.domain.model.Role
-import com.warped.domain.model.StreamToken
+import com.warped.domain.model.*
 import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.LocalModelRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 
 @HiltViewModel
@@ -35,7 +30,8 @@ class ChatViewModel @Inject constructor(
     private val providerRouter: ProviderRouter,
     private val savedStateHandle: SavedStateHandle,
     private val parameterStore: ParameterStore,
-    private val llamaEngine: LlamaEngine
+    private val llamaEngine: LlamaEngine,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -90,9 +86,9 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun sendMessage(text: String) {
+    fun sendMessage(text: String, images: List<Uri> = emptyList()) {
         val state = _uiState.value
-        if (text.isBlank()) return
+        if (text.isBlank() && images.isEmpty()) return
         if (state.selectedModelId == null || state.selectedProvider == null) {
             _uiState.update { it.copy(error = ChatError.NoModelSelected) }
             return
@@ -115,7 +111,8 @@ class ChatViewModel @Inject constructor(
                     messages = _uiState.value.messages,
                     parameters = _uiState.value.generationParameters.copy(
                         reasoningEnabled = _uiState.value.reasoningEnabled
-                    )
+                    ),
+                    images = images.mapNotNull { uriToBase64(it) }
                 )
                 val tokenBuffer = mutableListOf<String>()
                 var lastEmitTime = System.currentTimeMillis()
@@ -279,5 +276,17 @@ class ChatViewModel @Inject constructor(
         )
         _uiState.update { it.copy(conversationId = conversationId) }
         return conversationId
+    }
+
+    private fun uriToBase64(uri: Uri): String? {
+        return try {
+            val input = context.contentResolver.openInputStream(uri) ?: return null
+            val bytes = input.use { it.readBytes() }
+            val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+            val mime = context.contentResolver.getType(uri) ?: "image/png"
+            "data:$mime;base64,$base64"
+        } catch (_: Exception) {
+            null
+        }
     }
 }

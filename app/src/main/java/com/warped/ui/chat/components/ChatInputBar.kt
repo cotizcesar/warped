@@ -3,6 +3,7 @@ package com.warped.ui.chat.components
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
@@ -23,7 +24,8 @@ fun ChatInputBar(
     onSend: () -> Unit,
     onStop: () -> Unit,
     reasoningEnabled: Boolean = true,
-    onToggleReasoning: () -> Unit = {}
+    onToggleReasoning: () -> Unit = {},
+    onAddImage: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -31,6 +33,9 @@ fun ChatInputBar(
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.Bottom
     ) {
+        IconButton(onClick = onAddImage) {
+            Icon(Icons.Filled.AddPhotoAlternate, "Add image", modifier = Modifier.size(22.dp))
+        }
         OutlinedTextField(
             value = text,
             onValueChange = onTextChange,

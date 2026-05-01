@@ -47,10 +47,13 @@ class LMStudioProvider(
         val chatMessages = request.messages
             .filter { it.role != Role.SYSTEM }
             .map { LmStudioInputItem(type = "text", content = it.content) }
+        
+        val imageItems = request.images.map { LmStudioInputItem(type = "image", dataUrl = it) }
+        val allInput = imageItems + chatMessages
 
         val body = LmStudioChatRequest(
             model = modelId,
-            input = chatMessages,
+            input = allInput,
             systemPrompt = systemMessage,
             stream = true,
             temperature = request.parameters.temperature,
