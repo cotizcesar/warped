@@ -44,7 +44,7 @@ class LMStudioProvider(
         val systemMessage = request.messages.firstOrNull { it.role == Role.SYSTEM }?.content
         val chatMessages = request.messages
             .filter { it.role != Role.SYSTEM }
-            .map { LmStudioInputItem(type = "message", content = it.content) }
+            .map { LmStudioInputItem(type = "text", content = it.content) }
 
         val body = LmStudioChatRequest(
             model = modelId,

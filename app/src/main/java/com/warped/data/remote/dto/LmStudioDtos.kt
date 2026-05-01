@@ -20,7 +20,7 @@ data class LmStudioChatRequest(
 
 @Serializable
 data class LmStudioInputItem(
-    val type: String = "message",
+    val type: String,
     val content: String
 )
 
