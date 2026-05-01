@@ -66,7 +66,7 @@ fun MarkdownText(
         }
     }
 
-    Text(annotated, modifier = modifier, color = baseColor, style = MaterialTheme.typography.bodyMedium)
+    Text(annotated, modifier = modifier, color = baseColor, style = MaterialTheme.typography.bodyLarge)
 }
 
 private fun androidx.compose.ui.text.AnnotatedString.Builder.parseInlineMarkdown(line: String, baseStyle: SpanStyle) {
