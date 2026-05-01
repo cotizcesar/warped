@@ -77,6 +77,7 @@ fun ChatScreen(
                         selectedModelId = uiState.selectedModelId,
                         selectedProvider = uiState.selectedProvider,
                         localModels = uiState.localModels,
+                        endpoints = uiState.endpoints,
                         onModelSelected = { modelId, provider ->
                             viewModel.setSelectedModel(modelId, provider)
                         }
