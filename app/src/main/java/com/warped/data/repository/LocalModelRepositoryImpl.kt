@@ -1,0 +1,30 @@
+package com.warped.data.repository
+
+import com.warped.data.local.db.dao.LocalModelDao
+import com.warped.data.local.db.entity.toDomain
+import com.warped.data.local.db.entity.toEntity
+import com.warped.domain.model.LocalModel
+import com.warped.domain.repository.LocalModelRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class LocalModelRepositoryImpl @Inject constructor(
+    private val localModelDao: LocalModelDao
+) : LocalModelRepository {
+
+    override fun observeModels(): Flow<List<LocalModel>> =
+        localModelDao.observeAll().map { list -> list.map { it.toDomain() } }
+
+    override suspend fun getById(id: Long): LocalModel? =
+        localModelDao.getById(id)?.toDomain()
+
+    override suspend fun saveModel(model: LocalModel): Long =
+        localModelDao.upsert(model.toEntity())
+
+    override suspend fun deleteModel(id: Long) {
+        localModelDao.deleteById(id)
+    }
+}

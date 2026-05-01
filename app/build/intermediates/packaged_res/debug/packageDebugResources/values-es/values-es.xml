@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Warped</string>
+    <string name="compatible_with_device">Compatible con este celular</string>
+    <string name="download_model_first">Descarga este modelo antes de usarlo en el chat local.</string>
+    <string name="hugging_face_suggestions">Sugerencias GGUF de Hugging Face</string>
+    <string name="may_be_too_large">Puede ser muy grande para este celular</string>
+    <string name="no_model_selected">Selecciona un modelo antes de enviar un mensaje.</string>
+    <string name="no_models_select_model">No hay modelos, selecciona un modelo</string>
+    <string name="search_minimum_length">Ingresa al menos 3 letras</string>
+    <string name="search_models">Buscar modelos</string>
+    <string name="search_models_hint">Escribe al menos 3 letras para buscar</string>
+    <string name="select_model">Selecciona un modelo</string>
+    <string name="type_message">Escribe un mensaje…</string>
+</resources>

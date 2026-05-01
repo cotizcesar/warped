@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Warped</string>
+    <string name="tab_chat">Chat</string>
+    <string name="tab_endpoints">Endpoints</string>
+    <string name="tab_models">Models</string>
+    <string name="settings">Settings</string>
+    <string name="send">Send</string>
+    <string name="stop">Stop</string>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+    <string name="delete">Delete</string>
+    <string name="edit">Edit</string>
+    <string name="test_connection">Test Connection</string>
+    <string name="no_endpoints">No endpoints configured</string>
+    <string name="no_models">No models found</string>
+    <string name="connecting">Connecting…</string>
+    <string name="connected">Connected</string>
+    <string name="disconnected">Disconnected</string>
+    <string name="error_network">Can\'t connect to server. Check the URL and try again.</string>
+    <string name="error_auth">Authentication failed. Check your API key.</string>
+    <string name="connection_lost">Connection lost. Tap to retry.</string>
+    <string name="new_chat">New Chat</string>
+    <string name="type_message">Type a message…</string>
+    <string name="select_model">Select a model</string>
+    <string name="no_models_select_model">No models, select a model</string>
+    <string name="no_model_selected">Select a model before sending a message.</string>
+    <string name="hugging_face_suggestions">Hugging Face GGUF suggestions</string>
+    <string name="download_model_first">Download this model before using it for local chat.</string>
+    <string name="compatible_with_device">Compatible with this device</string>
+    <string name="may_be_too_large">May be too large for this device</string>
+    <string name="search_models">Search models</string>
+    <string name="search_models_hint">Type at least 3 letters to search</string>
+    <string name="search_minimum_length">Enter at least 3 letters</string>
+</resources>

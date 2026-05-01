@@ -34,9 +34,9 @@ class EndpointRepositoryImpl @Inject constructor(
     }
 
     override suspend fun deleteEndpoint(endpointId: Long) {
-        val entity = endpointDao.getById(endpointId) ?: return
+        if (endpointId == 0L) throw IllegalArgumentException("Invalid endpoint ID")
         apiKeyStore.deleteKey(endpointId)
-        endpointDao.deleteById(entity.id)
+        endpointDao.deleteById(endpointId)
     }
 
     override suspend fun activateEndpoint(endpointId: Long) {

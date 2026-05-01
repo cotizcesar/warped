@@ -8,11 +8,13 @@
 
 | # | Phase | Goal | Requirements | Plans | Status |
 |---|-------|------|--------------|-------|--------|
-| 1 | Foundation & Remote Chat | Chat with remote models via OpenAI-compatible endpoints with streaming and persistence | PROV-01..05, CHAT-01..05, PERS-01, PERS-02, SEC-01 | 0/? | ○ Pending |
-| 2 | Local Inference | Run GGUF models on-device via llama.cpp with memory awareness | LOCL-01..05, PERS-03, DEV-01, DEV-02 | 0/? | ○ Pending |
-| 3 | Model Acquisition | Search and download GGUF models from Hugging Face with pause/resume | ACQ-01..05 | 0/? | ○ Pending |
-| 4 | Parameters & Presets | Configure generation parameters and save reusable presets | PARM-01, PARM-02 | 0/? | ○ Pending |
-| 5 | Security Hardening & Polish | Data deletion controls and final security pass | SEC-02, SEC-03 | 0/? | ○ Pending |
+| 1 | Foundation & Remote Chat | Chat with remote models | ✓ Complete |
+| 2 | Local Inference | Run GGUF models on-device | ✓ Complete |
+| 3 | Model Acquisition | Search and download from Hugging Face | ✓ Complete |
+| 4 | Parameters & Presets | Generation parameters and presets | ✓ Complete |
+| 5 | Security Hardening & Polish | Data deletion and security pass | ✓ Complete |
+
+**Milestone v1.0 complete** — [Archived roadmap](milestones/v1.0-ROADMAP.md) | 30/30 requirements covered | 107 Kotlin source files
 
 ## Phase Details
 

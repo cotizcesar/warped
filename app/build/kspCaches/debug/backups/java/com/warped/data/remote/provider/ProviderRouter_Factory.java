@@ -1,0 +1,55 @@
+package com.warped.data.remote.provider;
+
+import com.warped.data.local.inference.LocalLlmProvider;
+import com.warped.data.local.security.ApiKeyStore;
+import dagger.Lazy;
+import dagger.internal.DaggerGenerated;
+import dagger.internal.DoubleCheck;
+import dagger.internal.Factory;
+import dagger.internal.Provider;
+import dagger.internal.QualifierMetadata;
+import dagger.internal.ScopeMetadata;
+import javax.annotation.processing.Generated;
+
+@ScopeMetadata("javax.inject.Singleton")
+@QualifierMetadata
+@DaggerGenerated
+@Generated(
+    value = "dagger.internal.codegen.ComponentProcessor",
+    comments = "https://dagger.dev"
+)
+@SuppressWarnings({
+    "unchecked",
+    "rawtypes",
+    "KotlinInternal",
+    "KotlinInternalInJava",
+    "cast",
+    "deprecation",
+    "nullness:initialization.field.uninitialized"
+})
+public final class ProviderRouter_Factory implements Factory<ProviderRouter> {
+  private final Provider<ApiKeyStore> apiKeyStoreProvider;
+
+  private final Provider<LocalLlmProvider> localLlmProvider;
+
+  private ProviderRouter_Factory(Provider<ApiKeyStore> apiKeyStoreProvider,
+      Provider<LocalLlmProvider> localLlmProvider) {
+    this.apiKeyStoreProvider = apiKeyStoreProvider;
+    this.localLlmProvider = localLlmProvider;
+  }
+
+  @Override
+  public ProviderRouter get() {
+    return newInstance(apiKeyStoreProvider.get(), DoubleCheck.lazy(localLlmProvider));
+  }
+
+  public static ProviderRouter_Factory create(Provider<ApiKeyStore> apiKeyStoreProvider,
+      Provider<LocalLlmProvider> localLlmProvider) {
+    return new ProviderRouter_Factory(apiKeyStoreProvider, localLlmProvider);
+  }
+
+  public static ProviderRouter newInstance(ApiKeyStore apiKeyStore,
+      Lazy<LocalLlmProvider> localLlmProvider) {
+    return new ProviderRouter(apiKeyStore, localLlmProvider);
+  }
+}

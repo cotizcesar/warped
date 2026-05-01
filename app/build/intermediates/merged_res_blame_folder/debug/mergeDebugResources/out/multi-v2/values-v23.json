@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.warped.app-mergeDebugResources-60:/values-v23/values-v23.xml",
+            "map": [
+                {
+                    "source": "/home/cotizcesar/.gradle/caches/8.13/transforms/c224be48310ed198777288447a760bd1/transformed/work-runtime-2.10.0/res/values-v23/values-v23.xml",
+                    "from": {
+                        "startLines": "2,3",
+                        "startColumns": "4,4",
+                        "startOffsets": "55,121",
+                        "endColumns": "65,62",
+                        "endOffsets": "116,179"
+                    }
+                }
+            ]
+        }
+    ]
+}

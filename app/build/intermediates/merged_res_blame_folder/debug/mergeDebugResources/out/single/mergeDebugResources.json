@@ -1,0 +1,14 @@
+[
+    {
+        "merged": "/home/cotizcesar/.gradle/daemon/8.13/com.warped.app-debug-62:/xml_data_extraction_rules.xml.flat",
+        "source": "/home/cotizcesar/.gradle/daemon/8.13/com.warped.app-main-64:/xml/data_extraction_rules.xml"
+    },
+    {
+        "merged": "com.warped.app-debug-62:/xml_network_security_config.xml.flat",
+        "source": "com.warped.app-main-64:/xml/network_security_config.xml"
+    },
+    {
+        "merged": "/home/cotizcesar/.gradle/daemon/8.13/com.warped.app-debug-62:/xml_network_security_config.xml.flat",
+        "source": "/home/cotizcesar/.gradle/daemon/8.13/com.warped.app-main-64:/xml/network_security_config.xml"
+    }
+]
