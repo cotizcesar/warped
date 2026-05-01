@@ -37,9 +37,8 @@ fun MarkdownText(
         var codeBlockContent = StringBuilder()
 
         val baseStyle = SpanStyle(
-            fontSize = fontSize?.sp ?: 14.sp,
             fontStyle = fontStyle ?: androidx.compose.ui.text.font.FontStyle.Normal
-        )
+        ).let { if (fontSize != null) it.copy(fontSize = fontSize.sp) else it }
 
         for (line in lines) {
             if (line.trimStart().startsWith("```")) {
