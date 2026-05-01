@@ -55,9 +55,9 @@ fun ChatInputBar(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 5.dp)
+            .padding(10.dp)
     ) {
-        Column(modifier = Modifier.padding(5.dp)) {
+        Column(modifier = Modifier.padding(10.dp)) {
             // Image previews
             if (attachedImages.isNotEmpty()) {
                 LazyRow(
@@ -117,7 +117,7 @@ fun ChatInputBar(
                 )
             )
 
-            Spacer(Modifier.height(5.dp))
+            Spacer(Modifier.height(10.dp))
 
             // Row 2: Left (image + brain) | Right (model + send/stop)
             Row(
