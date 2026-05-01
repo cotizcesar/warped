@@ -11,11 +11,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.warped.domain.model.ChatMessage
 import com.warped.domain.model.Role
 
@@ -35,7 +33,7 @@ fun MessageBubble(
             color = if (isUser) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.surfaceVariant,
             shape = MaterialTheme.shapes.medium,
-            modifier = Modifier.widthIn(max = 320.dp)
+            modifier = Modifier.widthIn(max = 340.dp)
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 // Reasoning section (only for assistant, when reasoning is present)
@@ -59,10 +57,9 @@ fun MessageBubble(
                                 enter = expandVertically(),
                                 exit = shrinkVertically()
                             ) {
-                                Text(
+                                MarkdownText(
                                     text = message.reasoning,
-                                    style = TextStyle(fontSize = 12.sp, fontStyle = FontStyle.Italic),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    baseColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                     modifier = Modifier.padding(top = 4.dp)
                                 )
                             }
@@ -79,12 +76,19 @@ fun MessageBubble(
                     fontStyle = FontStyle.Italic
                 )
                 Spacer(Modifier.height(4.dp))
-                Text(
-                    text = message.content + if (isStreaming) "▌" else "",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (isUser) MaterialTheme.colorScheme.onPrimary
-                            else MaterialTheme.colorScheme.onSurface
-                )
+                if (!isUser) {
+                    MarkdownText(
+                        text = message.content + if (isStreaming) "▌" else "",
+                        baseColor = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    Text(
+                        text = message.content + if (isStreaming) "▌" else "",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
             }
         }
     }
