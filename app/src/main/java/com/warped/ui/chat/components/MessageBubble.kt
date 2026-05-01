@@ -141,7 +141,7 @@ fun MessageBubble(
                         Text(
                             text = message.content + if (isStreaming) "▌" else "",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimary
+                            color = Color.White
                         )
                     }
                 }

@@ -196,6 +196,9 @@ class ChatViewModel @Inject constructor(
                         error = null
                     )
                 }
+                if (conversation.modelId != null) {
+                    activeModelSelection.select(conversation.modelId, conversation.providerType)
+                }
                 activeModelSelection.saveLastConversation(conversation.id)
             }
         }
