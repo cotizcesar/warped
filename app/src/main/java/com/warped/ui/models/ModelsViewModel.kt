@@ -8,6 +8,7 @@ import com.warped.data.local.download.ModelDownloadManager
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.inference.ModelImportManager
 import com.warped.data.local.security.ApiKeyStore
+import com.warped.data.remote.provider.LMStudioProvider
 import com.warped.data.remote.provider.ProviderRouter
 import com.warped.domain.model.ActiveModelSelection
 import com.warped.domain.model.Endpoint
@@ -205,19 +206,38 @@ class ModelsViewModel @Inject constructor(
         }
     }
 
+    fun fetchEndpointModels() {
+        val state = _uiState.value
+        val url = state.formUrl.ifBlank { return }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isFetchingEndpointModels = true, availableEndpointModels = emptyList()) }
+            try {
+                val provider = LMStudioProvider(baseUrl = url, modelId = "fetch")
+                val result = provider.listModels()
+                result.onSuccess { models ->
+                    _uiState.update { it.copy(availableEndpointModels = models.map { m -> m.id }, isFetchingEndpointModels = false) }
+                }.onFailure { e ->
+                    _uiState.update { it.copy(isFetchingEndpointModels = false, error = "Failed to fetch: ${e.message}") }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isFetchingEndpointModels = false, error = e.message) }
+            }
+        }
+    }
+
     private suspend fun fetchEndpointModels(endpoint: Endpoint) {
         val modelId = endpoint.modelId ?: return
-        _uiState.update { it.copy(isFetchingModels = true) }
+        _uiState.update { it.copy(isFetchingEndpointModels = true) }
         try {
             val provider = providerRouter.resolve(endpoint, modelId)
             val result = provider.listModels()
             result.onSuccess { models ->
-                _uiState.update { it.copy(availableEndpointModels = models, isFetchingModels = false) }
+                _uiState.update { it.copy(availableEndpointModels = models.map { it.id }, isFetchingEndpointModels = false) }
             }.onFailure { e ->
-                _uiState.update { it.copy(isFetchingModels = false, error = "Failed to fetch models: ${e.message}") }
+                _uiState.update { it.copy(isFetchingEndpointModels = false, error = "Failed to fetch models: ${e.message}") }
             }
         } catch (e: Exception) {
-            _uiState.update { it.copy(isFetchingModels = false, error = e.message) }
+            _uiState.update { it.copy(isFetchingEndpointModels = false, error = e.message) }
         }
     }
 

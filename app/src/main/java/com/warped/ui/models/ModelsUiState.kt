@@ -3,8 +3,6 @@ package com.warped.ui.models
 import com.warped.data.local.download.DownloadState
 import com.warped.domain.model.LocalModel
 import com.warped.domain.model.Endpoint
-import com.warped.domain.model.ModelInfo
-
 data class ModelsUiState(
     val models: List<LocalModel> = emptyList(),
     val endpoints: List<Endpoint> = emptyList(),
@@ -21,6 +19,6 @@ data class ModelsUiState(
     val formModelId: String = "",
     val formApiKey: String = "",
     val error: String? = null,
-    val availableEndpointModels: List<ModelInfo> = emptyList(),
-    val isFetchingModels: Boolean = false
+    val availableEndpointModels: List<String> = emptyList(),
+    val isFetchingEndpointModels: Boolean = false
 )

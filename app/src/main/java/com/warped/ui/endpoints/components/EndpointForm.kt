@@ -18,10 +18,14 @@ fun EndpointForm(
     apiKey: String,
     onFieldChange: (String, String) -> Unit,
     onSave: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    availableModels: List<String> = emptyList(),
+    isFetchingModels: Boolean = false,
+    onFetchModels: () -> Unit = {},
 ) {
     var expanded by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
+    var modelDropdownExpanded by remember { mutableStateOf(false) }
     val providerTypes = listOf("LM_STUDIO")
 
     Column(
@@ -49,14 +53,53 @@ fun EndpointForm(
             placeholder = { Text("https://api.openai.com") }
         )
 
-        OutlinedTextField(
-            value = modelId,
-            onValueChange = { onFieldChange("modelId", it) },
-            label = { Text("Model ID") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            placeholder = { Text("gpt-4o-mini, claude-3-5-sonnet, llama3.2") }
-        )
+        val modelOptions = if (availableModels.isNotEmpty()) availableModels else listOf(modelId).filter { it.isNotBlank() }
+
+        ExposedDropdownMenuBox(
+            expanded = modelDropdownExpanded,
+            onExpandedChange = { if (availableModels.isNotEmpty()) modelDropdownExpanded = !modelDropdownExpanded }
+        ) {
+            OutlinedTextField(
+                value = modelId,
+                onValueChange = { onFieldChange("modelId", it) },
+                label = { Text("Model ID") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                singleLine = true,
+                placeholder = { Text("Select or type model ID") },
+                trailingIcon = {
+                    if (isFetchingModels) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else if (availableModels.isEmpty()) {
+                        TextButton(onClick = onFetchModels) { Text("Fetch") }
+                    } else {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = modelDropdownExpanded)
+                    }
+                },
+                enabled = true
+            )
+            if (availableModels.isNotEmpty()) {
+                ExposedDropdownMenu(
+                    expanded = modelDropdownExpanded,
+                    onDismissRequest = { modelDropdownExpanded = false }
+                ) {
+                    availableModels.forEach { model ->
+                        DropdownMenuItem(
+                            text = { Text(model) },
+                            onClick = {
+                                onFieldChange("modelId", model)
+                                modelDropdownExpanded = false
+                            }
+                        )
+                    }
+                    DropdownMenuItem(
+                        text = { Text("Custom (type manually)", color = MaterialTheme.colorScheme.primary) },
+                        onClick = { modelDropdownExpanded = false }
+                    )
+                }
+            }
+        }
 
         ExposedDropdownMenuBox(
             expanded = expanded,

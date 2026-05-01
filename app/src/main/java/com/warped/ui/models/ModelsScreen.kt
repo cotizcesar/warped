@@ -133,7 +133,10 @@ fun ModelsScreen(
                     apiKey = uiState.formApiKey,
                     onFieldChange = { field, value -> viewModel.updateEndpointField(field, value) },
                     onSave = { viewModel.saveEndpoint() },
-                    onDismiss = { viewModel.dismissEndpointForm() }
+                    onDismiss = { viewModel.dismissEndpointForm() },
+                    availableModels = uiState.availableEndpointModels,
+                    isFetchingModels = uiState.isFetchingEndpointModels,
+                    onFetchModels = { viewModel.fetchEndpointModels() },
                 )
             } else if (uiState.isEditingEndpoint) {
                 EndpointForm(
@@ -144,7 +147,10 @@ fun ModelsScreen(
                     apiKey = uiState.formApiKey,
                     onFieldChange = { field, value -> viewModel.updateEndpointField(field, value) },
                     onSave = { viewModel.saveEndpointEdit() },
-                    onDismiss = { viewModel.cancelEndpointEdit() }
+                    onDismiss = { viewModel.cancelEndpointEdit() },
+                    availableModels = uiState.availableEndpointModels,
+                    isFetchingModels = uiState.isFetchingEndpointModels,
+                    onFetchModels = { viewModel.fetchEndpointModels() },
                 )
             } else if (uiState.models.isEmpty() && uiState.endpoints.isEmpty() && !uiState.isImporting) {
                 Box(
