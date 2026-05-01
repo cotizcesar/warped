@@ -88,7 +88,7 @@ fun ChatInputBar(
                     ) {
                         Text(
                             "Thinking",
-                            color = Color.White,
+                            color = if (reasoningEnabled) Color.White else Color.White.copy(alpha = 0.6f),
                             fontSize = MaterialTheme.typography.labelSmall.fontSize
                         )
                     }
