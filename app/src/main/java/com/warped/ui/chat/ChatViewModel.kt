@@ -3,6 +3,7 @@ package com.warped.ui.chat
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.warped.data.local.inference.LlamaEngine
 import com.warped.data.remote.provider.ProviderRouter
 import com.warped.domain.model.ActiveModelSelection
 import com.warped.domain.model.ChatMessage
@@ -16,6 +17,7 @@ import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.LocalModelRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,7 +34,8 @@ class ChatViewModel @Inject constructor(
     private val activeModelSelection: ActiveModelSelection,
     private val providerRouter: ProviderRouter,
     private val savedStateHandle: SavedStateHandle,
-    private val parameterStore: ParameterStore
+    private val parameterStore: ParameterStore,
+    private val llamaEngine: LlamaEngine
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -72,6 +75,10 @@ class ChatViewModel @Inject constructor(
                             selectedProvider = activeModel.providerType,
                             error = null
                         )
+                    }
+                    // Pre-load local models immediately when selected
+                    if (activeModel.providerType == ProviderType.LOCAL) {
+                        preloadLocalModel(activeModel.modelId)
                     }
                 }
             }
@@ -207,6 +214,27 @@ class ChatViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    fun clearModelLoadError() {
+        _uiState.update { it.copy(modelLoadError = null) }
+    }
+
+    private fun preloadLocalModel(filePath: String) {
+        val modelName = filePath.substringAfterLast("/").removeSuffix(".gguf")
+        _uiState.update { it.copy(isLoadingModel = true, loadingModelName = modelName, modelLoadError = null) }
+        viewModelScope.launch(Dispatchers.Default) {
+            try {
+                val loaded = llamaEngine.loadModel(filePath)
+                if (loaded) {
+                    _uiState.update { it.copy(isLoadingModel = false, loadingModelName = "") }
+                } else {
+                    _uiState.update { it.copy(isLoadingModel = false, modelLoadError = "Failed to load model") }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoadingModel = false, modelLoadError = e.message) }
+            }
+        }
     }
 
     private suspend fun ensureConversation(firstMessage: String): Long {

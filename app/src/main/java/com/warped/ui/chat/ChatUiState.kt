@@ -22,7 +22,10 @@ data class ChatUiState(
     val localModels: List<LocalModel> = emptyList(),
     val endpoints: List<Endpoint> = emptyList(),
     val isStreaming: Boolean = false,
-    val generationParameters: GenerationParameters = GenerationParameters()
+    val generationParameters: GenerationParameters = GenerationParameters(),
+    val isLoadingModel: Boolean = false,
+    val loadingModelName: String = "",
+    val modelLoadError: String? = null
 )
 
 sealed class ChatError {

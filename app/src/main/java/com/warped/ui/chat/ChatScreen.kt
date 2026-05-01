@@ -131,6 +131,33 @@ fun ChatScreen(
                     }
                 }
 
+                if (uiState.isLoadingModel) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(12.dp))
+                            Text("Loading ${uiState.loadingModelName}...", style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+
+                if (uiState.modelLoadError != null) {
+                    Snackbar(
+                        modifier = Modifier.padding(16.dp),
+                        action = {
+                            TextButton(onClick = { viewModel.clearModelLoadError() }) {
+                                Text("Dismiss")
+                            }
+                        }
+                    ) { Text(uiState.modelLoadError ?: "") }
+                }
+
                 if (uiState.error != null) {
                     Snackbar(
                         modifier = Modifier.padding(16.dp),
