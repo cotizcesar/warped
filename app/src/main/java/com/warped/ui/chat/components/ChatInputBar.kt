@@ -75,10 +75,19 @@ fun ChatInputBar(
                         Icon(Icons.Filled.AddPhotoAlternate, "Add image",
                             tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(22.dp))
                     }
-                    IconButton(onClick = onToggleReasoning, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Filled.Psychology, "Reasoning",
-                            tint = if (reasoningEnabled) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.3f),
-                            modifier = Modifier.size(22.dp))
+                    // Think toggle
+                    TextButton(
+                        onClick = onToggleReasoning,
+                        colors = ButtonDefaults.textButtonColors(
+                            containerColor = if (reasoningEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent
+                        ),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            "Think",
+                            color = if (reasoningEnabled) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.4f),
+                            fontSize = MaterialTheme.typography.labelSmall.fontSize
+                        )
                     }
                 }
 

@@ -1,5 +1,6 @@
 package com.warped.ui.navigation
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -52,6 +53,7 @@ fun WarpedNavGraph() {
     val currentRoute = navBackStackEntry?.destination?.route
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    var activeConversationId by remember { mutableStateOf<Long?>(null) }
 
     // Get ChatRepository for conversation list
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -80,6 +82,7 @@ fun WarpedNavGraph() {
                         selected = false,
                         colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent),
                         onClick = {
+                            activeConversationId = null
                             navController.navigate(Screen.Chat.route) {
                                 popUpTo(Screen.Chat.route) { inclusive = true }
                             }
@@ -94,6 +97,7 @@ fun WarpedNavGraph() {
                     LazyColumn(modifier = Modifier.weight(1f)) {
                         items(conversations, key = { it.id }) { conv ->
                             var showDeleteConfirm by remember { mutableStateOf(false) }
+                            val isActive = conv.id == activeConversationId
                             if (showDeleteConfirm) {
                                 AlertDialog(
                                     onDismissRequest = { showDeleteConfirm = false },
@@ -111,10 +115,15 @@ fun WarpedNavGraph() {
                                 )
                             }
                             Row(
-                                modifier = Modifier.fillMaxWidth().clickable {
-                                    navController.navigate("${Screen.Chat.route}/${conv.id}") { launchSingleTop = true }
-                                    scope.launch { drawerState.close() }
-                                }.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(if (isActive) Color(0xFF121212) else Color.Transparent)
+                                    .clickable {
+                                        activeConversationId = conv.id
+                                        navController.navigate("${Screen.Chat.route}/${conv.id}") { launchSingleTop = true }
+                                        scope.launch { drawerState.close() }
+                                    }
+                                    .padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.Chat, null,
