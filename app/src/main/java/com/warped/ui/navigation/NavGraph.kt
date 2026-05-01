@@ -42,7 +42,7 @@ private val DrawerBg = Color(0xFF1C1C1C)
 private val DrawerAccent = Color(0xFFD97757)
 private val DrawerTextPrimary = Color(0xFFECECEC)
 private val DrawerTextSecondary = Color(0xFF9CA3AF)
-private val DrawerSelectedBg = Color(0xFF2A2A2A)
+private val DrawerSelectedBg = Color(0xFF121212)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,12 +71,12 @@ fun WarpedNavGraph() {
             ) {
                 Column(modifier = Modifier.fillMaxHeight()) {
                     Spacer(Modifier.height(12.dp))
-                    Text("Warped", color = DrawerTextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                    Text("Warped", color = DrawerTextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
 
                     NavigationDrawerItem(
-                        icon = { Icon(Icons.Filled.Add, null, tint = DrawerAccent) },
-                        label = { Text("New Chat", color = DrawerAccent, fontWeight = FontWeight.SemiBold) },
+                        icon = { Icon(Icons.Filled.Add, null, tint = DrawerAccent, modifier = Modifier.size(24.dp)) },
+                        label = { Text("New Chat", color = DrawerAccent, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) },
                         selected = false,
                         colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent),
                         onClick = {
@@ -88,6 +88,8 @@ fun WarpedNavGraph() {
                         }
                     )
                     HorizontalDivider(color = Color(0xFF333333), thickness = 0.5.dp)
+                    Text("Recents", color = DrawerTextSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
 
                     LazyColumn(modifier = Modifier.weight(1f)) {
                         items(conversations, key = { it.id }) { conv ->
@@ -116,11 +118,11 @@ fun WarpedNavGraph() {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.Chat, null,
-                                    tint = DrawerTextSecondary, modifier = Modifier.size(16.dp))
+                                    tint = DrawerTextPrimary, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(12.dp))
-                                Text(conv.title, color = DrawerTextSecondary,
+                                Text(conv.title, color = DrawerTextPrimary,
                                     maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                    fontSize = 13.sp, modifier = Modifier.weight(1f))
+                                    fontSize = 15.sp, modifier = Modifier.weight(1f))
                                 IconButton(
                                     onClick = { showDeleteConfirm = true },
                                     modifier = Modifier.size(32.dp)
@@ -132,12 +134,12 @@ fun WarpedNavGraph() {
                     }
 
                     HorizontalDivider(color = Color(0xFF333333), thickness = 0.5.dp)
-                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly) {
                         val isModels = currentRoute == Screen.Models.route
                         NavigationDrawerItem(
                             icon = { Icon(Icons.Filled.Memory, null, tint = if (isModels) DrawerAccent else DrawerTextSecondary, modifier = Modifier.size(22.dp)) },
-                            label = { Text("Models", color = if (isModels) DrawerAccent else DrawerTextSecondary, fontSize = 11.sp) },
+                            label = { Text("Models", color = if (isModels) DrawerAccent else DrawerTextSecondary, fontSize = 14.sp) },
                             selected = isModels,
                             colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = DrawerSelectedBg, unselectedContainerColor = Color.Transparent),
                             modifier = Modifier.weight(1f),
@@ -152,7 +154,7 @@ fun WarpedNavGraph() {
                         val isSettings = currentRoute == Screen.Settings.route
                         NavigationDrawerItem(
                             icon = { Icon(Icons.Filled.Settings, null, tint = if (isSettings) DrawerAccent else DrawerTextSecondary, modifier = Modifier.size(22.dp)) },
-                            label = { Text("Settings", color = if (isSettings) DrawerAccent else DrawerTextSecondary, fontSize = 11.sp) },
+                            label = { Text("Settings", color = if (isSettings) DrawerAccent else DrawerTextSecondary, fontSize = 14.sp) },
                             selected = isSettings,
                             colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = DrawerSelectedBg, unselectedContainerColor = Color.Transparent),
                             modifier = Modifier.weight(1f),
