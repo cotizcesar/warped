@@ -86,8 +86,8 @@ fun ChatInputBar(
                         shape = MaterialTheme.shapes.small
                     ) {
                         Text(
-                            "Think",
-                            color = if (reasoningEnabled) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.5f),
+                            "Thinking",
+                            color = Color.White,
                             fontSize = MaterialTheme.typography.labelSmall.fontSize
                         )
                     }

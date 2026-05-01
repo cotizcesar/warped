@@ -11,3 +11,6 @@
 0	2	0	clean	8d4de4047edd21a5
 2	803	1777612939706739709	CMakeFiles/warped_llama.dir/jni_bridge.cpp.o	8bce47a063fa0d1c
 803	880	1777612939791740986	/home/cotizcesar/Documents/warped/app/build/intermediates/cxx/Debug/1e206b5i/obj/arm64-v8a/arm64-v8a/libwarped_llama.so	c3695d7a8618e3a7
+0	2	0	clean	8d4de4047edd21a5
+2	669	1777656307407514430	CMakeFiles/warped_llama.dir/jni_bridge.cpp.o	8bce47a063fa0d1c
+669	733	1777656307478366972	/home/cotizcesar/Documents/warped/app/build/intermediates/cxx/Debug/1e206b5i/obj/arm64-v8a/arm64-v8a/libwarped_llama.so	c3695d7a8618e3a7

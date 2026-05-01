@@ -34,7 +34,7 @@ public class MessageDao_Impl(
     this.__db = __db
     this.__insertAdapterOfMessageEntity = object : EntityInsertAdapter<MessageEntity>() {
       protected override fun createQuery(): String =
-          "INSERT OR REPLACE INTO `messages` (`id`,`conversation_id`,`role`,`content`,`token_count`,`created_at`,`images`,`reasoning`) VALUES (nullif(?, 0),?,?,?,?,?,?,?)"
+          "INSERT OR REPLACE INTO `messages` (`id`,`conversation_id`,`role`,`content`,`token_count`,`created_at`,`images`,`stats`,`reasoning`) VALUES (nullif(?, 0),?,?,?,?,?,?,?,?)"
 
       protected override fun bind(statement: SQLiteStatement, entity: MessageEntity) {
         statement.bindLong(1, entity.id)
@@ -49,17 +49,23 @@ public class MessageDao_Impl(
         } else {
           statement.bindText(7, _tmpImages)
         }
-        val _tmpReasoning: String? = entity.reasoning
-        if (_tmpReasoning == null) {
+        val _tmpStats: String? = entity.stats
+        if (_tmpStats == null) {
           statement.bindNull(8)
         } else {
-          statement.bindText(8, _tmpReasoning)
+          statement.bindText(8, _tmpStats)
+        }
+        val _tmpReasoning: String? = entity.reasoning
+        if (_tmpReasoning == null) {
+          statement.bindNull(9)
+        } else {
+          statement.bindText(9, _tmpReasoning)
         }
       }
     }
     this.__updateAdapterOfMessageEntity = object : EntityDeleteOrUpdateAdapter<MessageEntity>() {
       protected override fun createQuery(): String =
-          "UPDATE OR ABORT `messages` SET `id` = ?,`conversation_id` = ?,`role` = ?,`content` = ?,`token_count` = ?,`created_at` = ?,`images` = ?,`reasoning` = ? WHERE `id` = ?"
+          "UPDATE OR ABORT `messages` SET `id` = ?,`conversation_id` = ?,`role` = ?,`content` = ?,`token_count` = ?,`created_at` = ?,`images` = ?,`stats` = ?,`reasoning` = ? WHERE `id` = ?"
 
       protected override fun bind(statement: SQLiteStatement, entity: MessageEntity) {
         statement.bindLong(1, entity.id)
@@ -74,13 +80,19 @@ public class MessageDao_Impl(
         } else {
           statement.bindText(7, _tmpImages)
         }
-        val _tmpReasoning: String? = entity.reasoning
-        if (_tmpReasoning == null) {
+        val _tmpStats: String? = entity.stats
+        if (_tmpStats == null) {
           statement.bindNull(8)
         } else {
-          statement.bindText(8, _tmpReasoning)
+          statement.bindText(8, _tmpStats)
         }
-        statement.bindLong(9, entity.id)
+        val _tmpReasoning: String? = entity.reasoning
+        if (_tmpReasoning == null) {
+          statement.bindNull(9)
+        } else {
+          statement.bindText(9, _tmpReasoning)
+        }
+        statement.bindLong(10, entity.id)
       }
     }
   }
@@ -110,6 +122,7 @@ public class MessageDao_Impl(
         val _columnIndexOfTokenCount: Int = getColumnIndexOrThrow(_stmt, "token_count")
         val _columnIndexOfCreatedAt: Int = getColumnIndexOrThrow(_stmt, "created_at")
         val _columnIndexOfImages: Int = getColumnIndexOrThrow(_stmt, "images")
+        val _columnIndexOfStats: Int = getColumnIndexOrThrow(_stmt, "stats")
         val _columnIndexOfReasoning: Int = getColumnIndexOrThrow(_stmt, "reasoning")
         val _result: MutableList<MessageEntity> = mutableListOf()
         while (_stmt.step()) {
@@ -132,6 +145,12 @@ public class MessageDao_Impl(
           } else {
             _tmpImages = _stmt.getText(_columnIndexOfImages)
           }
+          val _tmpStats: String?
+          if (_stmt.isNull(_columnIndexOfStats)) {
+            _tmpStats = null
+          } else {
+            _tmpStats = _stmt.getText(_columnIndexOfStats)
+          }
           val _tmpReasoning: String?
           if (_stmt.isNull(_columnIndexOfReasoning)) {
             _tmpReasoning = null
@@ -139,7 +158,7 @@ public class MessageDao_Impl(
             _tmpReasoning = _stmt.getText(_columnIndexOfReasoning)
           }
           _item =
-              MessageEntity(_tmpId,_tmpConversationId,_tmpRole,_tmpContent,_tmpTokenCount,_tmpCreatedAt,_tmpImages,_tmpReasoning)
+              MessageEntity(_tmpId,_tmpConversationId,_tmpRole,_tmpContent,_tmpTokenCount,_tmpCreatedAt,_tmpImages,_tmpStats,_tmpReasoning)
           _result.add(_item)
         }
         _result
@@ -163,6 +182,7 @@ public class MessageDao_Impl(
         val _columnIndexOfTokenCount: Int = getColumnIndexOrThrow(_stmt, "token_count")
         val _columnIndexOfCreatedAt: Int = getColumnIndexOrThrow(_stmt, "created_at")
         val _columnIndexOfImages: Int = getColumnIndexOrThrow(_stmt, "images")
+        val _columnIndexOfStats: Int = getColumnIndexOrThrow(_stmt, "stats")
         val _columnIndexOfReasoning: Int = getColumnIndexOrThrow(_stmt, "reasoning")
         val _result: MutableList<MessageEntity> = mutableListOf()
         while (_stmt.step()) {
@@ -185,6 +205,12 @@ public class MessageDao_Impl(
           } else {
             _tmpImages = _stmt.getText(_columnIndexOfImages)
           }
+          val _tmpStats: String?
+          if (_stmt.isNull(_columnIndexOfStats)) {
+            _tmpStats = null
+          } else {
+            _tmpStats = _stmt.getText(_columnIndexOfStats)
+          }
           val _tmpReasoning: String?
           if (_stmt.isNull(_columnIndexOfReasoning)) {
             _tmpReasoning = null
@@ -192,7 +218,7 @@ public class MessageDao_Impl(
             _tmpReasoning = _stmt.getText(_columnIndexOfReasoning)
           }
           _item =
-              MessageEntity(_tmpId,_tmpConversationId,_tmpRole,_tmpContent,_tmpTokenCount,_tmpCreatedAt,_tmpImages,_tmpReasoning)
+              MessageEntity(_tmpId,_tmpConversationId,_tmpRole,_tmpContent,_tmpTokenCount,_tmpCreatedAt,_tmpImages,_tmpStats,_tmpReasoning)
           _result.add(_item)
         }
         _result
