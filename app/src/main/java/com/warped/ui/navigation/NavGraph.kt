@@ -1,13 +1,16 @@
 package com.warped.ui.navigation
 
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -19,61 +22,70 @@ import com.warped.ui.huggingface.HuggingFaceScreen
 import com.warped.ui.models.ModelsScreen
 import com.warped.ui.presets.PresetsScreen
 import com.warped.ui.settings.SettingsScreen
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WarpedNavGraph() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
 
-    val tabs = listOf(Screen.Chat, Screen.Models, Screen.Presets)
+    val navItems = listOf(
+        Triple("Chat", Screen.Chat.route, Icons.AutoMirrored.Filled.Chat),
+        Triple("Models & Endpoints", Screen.Models.route, Icons.Filled.Memory),
+        Triple("HuggingFace", Screen.HuggingFace.route, Icons.Filled.Search),
+        Triple("Presets", Screen.Presets.route, Icons.Filled.Settings),
+    )
 
-    Scaffold(
-        bottomBar = {
-            NavigationBar {
-                tabs.forEach { screen ->
-                    NavigationBarItem(
-                        icon = { Icon(screen.icon, contentDescription = screen.label) },
-                        label = null,
-                        selected = currentRoute == screen.route,
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet {
+                Spacer(Modifier.height(16.dp))
+                Text("Warped", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp))
+                HorizontalDivider()
+                navItems.forEach { (label, route, icon) ->
+                    NavigationDrawerItem(
+                        icon = { Icon(icon, contentDescription = label) },
+                        label = { Text(label) },
+                        selected = currentRoute == route,
                         onClick = {
-                            navController.navigate(screen.route) {
+                            navController.navigate(route) {
                                 popUpTo(navController.graph.findStartDestination().id) {
                                     saveState = true
                                 }
                                 launchSingleTop = true
                                 restoreState = true
                             }
+                            scope.launch { drawerState.close() }
                         }
                     )
                 }
             }
         }
-    ) { innerPadding ->
+    ) {
         NavHost(
             navController = navController,
-            startDestination = Screen.Chat.route,
-            modifier = Modifier.padding(innerPadding)
+            startDestination = Screen.Chat.route
         ) {
             composable(Screen.Chat.route) {
-                ChatScreen()
-            }
-            composable(Screen.Endpoints.route) {
-                EndpointsScreen()
+                ChatScreen(onOpenDrawer = { scope.launch { drawerState.open() } })
             }
             composable(Screen.Models.route) {
                 ModelsScreen(
                     onUseInChat = { navController.navigate(Screen.Chat.route) },
-                    onOpenHuggingFace = { navController.navigate(Screen.HuggingFace.route) }
+                    onOpenHuggingFace = { navController.navigate(Screen.HuggingFace.route) },
+                    onOpenDrawer = { scope.launch { drawerState.open() } }
                 )
             }
             composable(Screen.HuggingFace.route) {
                 HuggingFaceScreen(
                     onNavigateToModels = {
                         navController.navigate(Screen.Models.route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true
                             restoreState = true
                         }
@@ -82,6 +94,9 @@ fun WarpedNavGraph() {
             }
             composable(Screen.Presets.route) {
                 PresetsScreen()
+            }
+            composable(Screen.Endpoints.route) {
+                EndpointsScreen()
             }
             composable(Screen.Settings.route) {
                 SettingsScreen()

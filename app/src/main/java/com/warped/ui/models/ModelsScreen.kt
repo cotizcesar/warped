@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Storage
@@ -29,7 +30,8 @@ import com.warped.ui.endpoints.components.EndpointForm
 fun ModelsScreen(
     viewModel: ModelsViewModel = hiltViewModel(),
     onUseInChat: () -> Unit = {},
-    onOpenHuggingFace: () -> Unit = {}
+    onOpenHuggingFace: () -> Unit = {},
+    onOpenDrawer: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showMemoryWarning by remember { mutableStateOf<LocalModel?>(null) }
@@ -69,6 +71,16 @@ fun ModelsScreen(
     }
 
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Models & Endpoints") },
+                navigationIcon = {
+                    IconButton(onClick = onOpenDrawer) {
+                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Menu")
+                    }
+                }
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddWizard = true }) {
                 Text("+")
@@ -106,13 +118,7 @@ fun ModelsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .statusBarsPadding()
         ) {
-            Text(
-                "Models & Endpoints",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
             if (uiState.isImporting) {
                 LinearProgressIndicator(
                     progress = { uiState.importProgress },
