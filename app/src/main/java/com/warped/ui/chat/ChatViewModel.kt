@@ -211,13 +211,16 @@ class ChatViewModel @Inject constructor(
         val oldProvider = _uiState.value.selectedProvider
         val oldModelId = _uiState.value.selectedModelId
         val oldInstance = _uiState.value.loadedInstanceId
+        val isSameModel = modelId == oldModelId && providerType == oldProvider
         
         activeModelSelection.select(modelId, providerType)
-        _uiState.update { it.copy(selectedModelId = modelId, selectedProvider = providerType, loadedInstanceId = null) }
+        _uiState.update { it.copy(selectedModelId = modelId, selectedProvider = providerType) }
+        
+        if (isSameModel) return
         
         // Unload old LM Studio model if switching away
         if (oldProvider == ProviderType.LM_STUDIO && oldInstance != null && 
-            (providerType != ProviderType.LM_STUDIO || modelId != oldModelId)) {
+            modelId != oldModelId) {
             viewModelScope.launch {
                 try {
                     val endpoint = endpointRepository.getActive()
@@ -233,6 +236,7 @@ class ChatViewModel @Inject constructor(
         if (providerType == ProviderType.LM_STUDIO) {
             viewModelScope.launch {
                 try {
+                    _uiState.update { it.copy(loadedInstanceId = null) }
                     val endpoint = endpointRepository.getActive()
                     if (endpoint != null) {
                         val provider = com.warped.data.remote.provider.LMStudioProvider(endpoint.url, modelId)
