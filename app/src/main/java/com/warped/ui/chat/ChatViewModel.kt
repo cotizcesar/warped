@@ -60,7 +60,8 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             localModelRepository.observeModels().collect { models ->
                 _uiState.update { state ->
-                    if (state.selectedProvider == ProviderType.LOCAL) {
+                    if (state.selectedProvider == ProviderType.LOCAL ||
+                        state.selectedProvider == ProviderType.LITE_RT_LM) {
                         val selectedExists = models.any { it.filePath == state.selectedModelId }
                         state.copy(
                             localModels = models,
@@ -84,8 +85,9 @@ class ChatViewModel @Inject constructor(
                             error = null
                         )
                     }
-                    // Only preload LOCAL models — LM_STUDIO loads on-demand via chat request
-                    if (activeModel.providerType == ProviderType.LOCAL) {
+                    // Only preload local models — LM_STUDIO loads on-demand via chat request
+                    if (activeModel.providerType == ProviderType.LOCAL ||
+                        activeModel.providerType == ProviderType.LITE_RT_LM) {
                         preloadLocalModel(activeModel.modelId)
                     }
                 }
@@ -206,6 +208,9 @@ class ChatViewModel @Inject constructor(
                 }
                 if (conversation.modelId != null) {
                     activeModelSelection.select(conversation.modelId, conversation.providerType)
+                    if (conversation.providerType == ProviderType.LOCAL || conversation.providerType == ProviderType.LITE_RT_LM) {
+                        preloadLocalModel(conversation.modelId)
+                    }
                 }
                 activeModelSelection.saveLastConversation(conversation.id)
                 refreshActiveBackend()
@@ -254,6 +259,11 @@ class ChatViewModel @Inject constructor(
                     try { llamaEngine.unload() } catch (_: Exception) {}
                 }
             }
+            ProviderType.LITE_RT_LM -> {
+                viewModelScope.launch(Dispatchers.Default) {
+                    try { engineManager.unloadCurrent() } catch (_: Exception) {}
+                }
+            }
             else -> {}
         }
         
@@ -276,6 +286,9 @@ class ChatViewModel @Inject constructor(
                 }
             }
             ProviderType.LOCAL -> {
+                preloadLocalModel(modelId)
+            }
+            ProviderType.LITE_RT_LM -> {
                 preloadLocalModel(modelId)
             }
             else -> {}
@@ -314,17 +327,20 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun preloadLocalModel(filePath: String) {
-        val modelName = filePath.substringAfterLast("/").removeSuffix(".gguf")
+        val model = _uiState.value.localModels.firstOrNull { it.filePath == filePath }
+        val isLitertlm = model?.modelFormat == "LITERTLM"
+        val modelName = filePath.substringAfterLast("/").removeSuffix(".gguf").removeSuffix(".litertlm")
         _uiState.update { it.copy(isLoadingModel = true, loadingModelName = modelName, modelLoadError = null) }
         viewModelScope.launch(Dispatchers.Default) {
             try {
-                val loaded = llamaEngine.loadModel(filePath)
-                if (loaded) {
-                    _uiState.update { it.copy(isLoadingModel = false, loadingModelName = "") }
-                    refreshActiveBackend()
+                if (isLitertlm) {
+                    engineManager.switchToLiteRT(filePath)
                 } else {
-                    _uiState.update { it.copy(isLoadingModel = false, modelLoadError = "Failed to load model") }
+                    val loaded = llamaEngine.loadModel(filePath)
+                    if (!loaded) throw IllegalStateException("Failed to load GGUF model")
                 }
+                _uiState.update { it.copy(isLoadingModel = false, loadingModelName = "") }
+                refreshActiveBackend()
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoadingModel = false, modelLoadError = e.message) }
             }

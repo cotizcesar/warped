@@ -10,10 +10,12 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -122,10 +124,29 @@ fun ChatScreen(
                         ) {
                             if (uiState.localModels.isNotEmpty()) {
                                 uiState.localModels.forEach { model ->
+                                    val providerType = if (model.modelFormat == "LITERTLM") ProviderType.LITE_RT_LM else ProviderType.LOCAL
                                     DropdownMenuItem(
-                                        text = { Text(model.name) },
+                                        text = {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                // Format badge: small colored chip
+                                                val badgeColor = if (model.modelFormat == "LITERTLM") Color(0xFF4CAF50) else Color(0xFF2196F3)
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = badgeColor.copy(alpha = 0.15f)
+                                                ) {
+                                                    Text(
+                                                        text = if (model.modelFormat == "LITERTLM") "LiteRT" else "GGUF",
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = badgeColor
+                                                    )
+                                                }
+                                                Spacer(Modifier.width(8.dp))
+                                                Text(model.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            }
+                                        },
                                         onClick = {
-                                            viewModel.setSelectedModel(model.filePath, ProviderType.LOCAL)
+                                            viewModel.setSelectedModel(model.filePath, providerType)
                                             modelDropdownExpanded = false
                                         }
                                     )
