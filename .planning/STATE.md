@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: LiteRT-LM Integration
 status: executing
-stopped_at: Completed 06-02-PLAN.md (Room Schema Migration, LITE-04) — 1 of 4 plans done
-last_updated: "2026-05-02T16:28:31.803Z"
-last_activity: 2026-05-02 — Roadmap created for v1.1 phases 6-10 (26 requirements mapped)
+stopped_at: Completed 06-01-PLAN.md (Build Integration — LITE-01, LITE-08) — 2 of 4 phase plans done
+last_updated: "2026-05-02T16:30:00Z"
+last_activity: 2026-05-02
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
-  percent: 25
+  completed_plans: 2
+  percent: 50
 ---
 
 # Project State: Warped
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 6 of 10 (Engine Foundation)
-Plan: 02 (completed) / 4 total
+Plan: Plans 01, 02 completed (2 of 4)
 Status: Executing
-Last activity: 2026-05-02 — Plan 06-02 (Room Schema Migration) completed; LITE-04 requirement satisfied
+Last activity: 2026-05-02 — Plan 06-01 (Build Integration) completed; LITE-01, LITE-08 requirements satisfied
 
-Progress: [███░░░░░░░] 25%
+Progress: [█████░░░░░] 50%
 
 ## Completed
 
@@ -57,7 +57,7 @@ Progress: [███░░░░░░░] 25%
 | 3. Model Acquisition | 2 | — | — |
 | 4. Parameters & Presets | 2 | — | — |
 | 5. Security Hardening & Polish | 1 | — | — |
-| 6-10 (v1.1) | 4 | 33s | 33s |
+| 6-10 (v1.1) | 4 | 6min 12s | 3min 06s |
 
 ## Accumulated Context
 
@@ -67,6 +67,9 @@ Progress: [███░░░░░░░] 25%
 - [v1.1]: Per-call Conversation factory pattern to avoid MediaTek SIGSEGV
 - [v1.1]: BackendDetector runtime GPU probing with CPU fallback to prevent Tensor G3 crashes
 - [v1.1]: EngineManager mutual exclusion — only one local engine loaded at a time
+- [06-01]: D-01/D-03 — litertlm-android:0.11.0-rc1 added via version catalog; 0.11.0-beta01 did not exist on Google Maven
+- [06-01]: D-02 — ProGuard keep rule for all com.google.ai.edge.litertlm classes to preserve public API during R8 minification
+- [06-01]: D-04 — libOpenCL.so and libvndksupport.so declared as optional native libraries (required="false") for GPU backend support
 - [06-02]: D-13 — model_format TEXT NOT NULL DEFAULT 'GGUF' column added to local_models via MIGRATION_6_7
 - [06-02]: D-14 — modelFormat field validates against 'GGUF'/'LITERTLM' values, defaults to 'GGUF'
 - [06-02]: engine_type column intentionally excluded — only model_format in this migration per user direction
@@ -84,5 +87,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-05-02
-Stopped at: Completed 06-02-PLAN.md (Room Schema Migration) — 1 of 4 phase plans done
+Stopped at: Completed 06-01-PLAN.md (Build Integration — LITE-01, LITE-08) — 2 of 4 phase plans done
 Resume file: None

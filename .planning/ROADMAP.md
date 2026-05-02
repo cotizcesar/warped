@@ -56,10 +56,10 @@
   3. LiteRTLmEngine initializes with a `.litertlm` model path and closes cleanly without native crashes or memory leaks
   4. EngineManager enforces mutual exclusion — only one local model engine (llama.cpp or LiteRT-LM) loaded at a time, unloading the current engine when switching
   5. User receives a clear warning before loading a `.litertlm` model that exceeds 80% of available device RAM
-**Plans:** 1/4 plans executed
+**Plans:** 2/4 plans executed
 
 Plans:
-- [ ] 06-01-PLAN.md — Build integration: Maven dependency, ProGuard rules, AndroidManifest declarations (LITE-01, LITE-08)
+- [x] 06-01-PLAN.md — Build integration: Maven dependency, ProGuard rules, AndroidManifest declarations (LITE-01, LITE-08)
 - [x] 06-02-PLAN.md — Room schema v6→v7 migration adding model_format column (LITE-04)
 - [ ] 06-03-PLAN.md — BackendDetector GPU probing + LiteRTLmEngine wrapper + Hilt wiring (LITE-02, LITE-03)
 - [ ] 06-04-PLAN.md — EngineManager mutual exclusion + MemoryChecker .litertlm RAM warnings (POL-01, POL-02)
@@ -121,7 +121,7 @@ Plans:
 | 3. Model Acquisition | v1.0 | 2/2 | Complete | 2026-05-01 |
 | 4. Parameters & Presets | v1.0 | 2/2 | Complete | 2026-05-01 |
 | 5. Security Hardening & Polish | v1.0 | 1/1 | Complete | 2026-05-01 |
-| 6. Engine Foundation | v1.1 | 1/4 | In Progress|  |
+| 6. Engine Foundation | v1.1 | 2/4 | In Progress|  |
 | 7. Provider Integration & Chat | v1.1 | 0/0 | Not started | — |
 | 8. Model Acquisition | v1.1 | 0/0 | Not started | — |
 | 9. UI Integration | v1.1 | 0/0 | Not started | — |

@@ -67,14 +67,14 @@ Requirements for LiteRT-LM integration. Each maps to roadmap phases.
 
 ### LiteRT-LM Engine & Chat
 
-- [ ] **LITE-01**: App includes litertlm-android Maven dependency and compiles successfully
+- [x] **LITE-01**: App includes litertlm-android Maven dependency and compiles successfully
 - [ ] **LITE-02**: BackendDetector probes GPU availability and falls back to CPU automatically
 - [ ] **LITE-03**: LiteRTLmEngine wraps Engine lifecycle (initialize, createConversation, close) with thread safety
 - [x] **LITE-04**: Room schema migration adds model_format and engine_type columns to models table
 - [ ] **LITE-05**: LiteRTLmProvider implements LlmProvider with streaming chat via Conversation.sendMessageAsync(Flow)
 - [ ] **LITE-06**: Input sanitization prevents Unicode/LaTeX native crashes before reaching the engine
 - [ ] **LITE-07**: Generation parameters map correctly to LiteRT-LM's SamplerConfig
-- [ ] **LITE-08**: AndroidManifest declares libOpenCL for GPU backend with required="false"
+- [x] **LITE-08**: AndroidManifest declares libOpenCL for GPU backend with required="false"
 
 ### Model Acquisition
 
@@ -185,14 +185,14 @@ Deferred to future release.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LITE-01 | Phase 6 | Pending |
+| LITE-01 | Phase 6 | Complete |
 | LITE-02 | Phase 6 | Pending |
 | LITE-03 | Phase 6 | Pending |
 | LITE-04 | Phase 6 | Complete |
 | LITE-05 | Phase 7 | Pending |
 | LITE-06 | Phase 7 | Pending |
 | LITE-07 | Phase 7 | Pending |
-| LITE-08 | Phase 6 | Pending |
+| LITE-08 | Phase 6 | Complete |
 | ACQ-06 | Phase 8 | Pending |
 | ACQ-07 | Phase 8 | Pending |
 | ACQ-08 | Phase 8 | Pending |
