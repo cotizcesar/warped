@@ -100,8 +100,8 @@ Requirements for LiteRT-LM integration. Each maps to roadmap phases.
 
 ### Polish & Hardening
 
-- [ ] **POL-01**: EngineManager enforces mutual exclusion (only one local engine loaded at a time)
-- [ ] **POL-02**: App warns if available RAM is insufficient for the selected .litertlm model
+- [x] **POL-01**: EngineManager enforces mutual exclusion (only one local engine loaded at a time)
+- [x] **POL-02**: App warns if available RAM is insufficient for the selected .litertlm model
 - [ ] **POL-03**: Cached model loading via cacheDir for faster subsequent loads
 - [ ] **POL-04**: Defensive error recovery reinitializes engine on "Engine not alive" errors
 - [ ] **POL-05**: Memory is released when the app is backgrounded (onTrimMemory handling)
@@ -206,8 +206,8 @@ Deferred to future release.
 | PARM-03 | Phase 10 | Pending |
 | PARM-04 | Phase 10 | Pending |
 | PARM-05 | Phase 10 | Pending |
-| POL-01 | Phase 6 | Pending |
-| POL-02 | Phase 6 | Pending |
+| POL-01 | Phase 6 | Complete |
+| POL-02 | Phase 6 | Complete |
 | POL-03 | Phase 9 | Pending |
 | POL-04 | Phase 7 | Pending |
 | POL-05 | Phase 9 | Pending |

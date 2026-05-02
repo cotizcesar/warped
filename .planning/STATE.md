@@ -4,14 +4,14 @@ milestone: v1.1
 milestone_name: LiteRT-LM Integration
 status: executing
 stopped_at: Completed 06-03-PLAN.md (BackendDetector + LiteRTLmEngine — LITE-02, LITE-03) — 3 of 4 phase plans done
-last_updated: "2026-05-02T16:40:13.496Z"
+last_updated: "2026-05-02T16:46:24.229Z"
 last_activity: 2026-05-02 — Roadmap created for v1.1 phases 6-10 (26 requirements mapped)
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
-  completed_plans: 3
-  percent: 75
+  completed_plans: 4
+  percent: 100
 ---
 
 # Project State: Warped
@@ -34,7 +34,7 @@ Plan: Plans 01, 02, 03 completed (3 of 4)
 Status: Executing
 Last activity: 2026-05-02 — Plan 06-03 (BackendDetector + LiteRTLmEngine) completed; LITE-02, LITE-03 requirements satisfied
 
-Progress: [████████░░] 75%
+Progress: [██████████] 100%
 
 ## Completed
 
@@ -58,6 +58,7 @@ Progress: [████████░░] 75%
 | 4. Parameters & Presets | 2 | — | — |
 | 5. Security Hardening & Polish | 1 | — | — |
 | 6-10 (v1.1) | 4 | 12min 41s | 4min 14s |
+| Phase 06-engine-foundation P04 | 1m 20s | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,10 @@ Progress: [████████░░] 75%
 - [06-02]: engine_type column intentionally excluded — only model_format in this migration per user direction
 - [06-03]: D-09/D-10/D-11/D-12 — BackendDetector lazy GPU probe via EGL14 + OpenCL, @Volatile caching, CPU/GPU only (NPU deferred)
 - [06-03]: D-05/D-06/D-07/D-08 — LiteRTLmEngine @Synchronized lifecycle wrapper, Engine.setNativeMinLogSeverity in companion init, caller-managed dispatching, graceful close with null cleanup
+- [Phase ?]: EngineManager @Singleton managing LlamaEngine + LiteRTLmEngine — only one local engine loaded at a time
+- [Phase ?]: Synchronous engine switch via unloadCurrent() before init — @Synchronized prevents concurrent switches
+- [Phase ?]: ActiveEngine data class tracks type + modelPath + backend for dedup on redundant switch calls
+- [Phase ?]: BackendDetector.probeBackend() called lazily inside switchToLiteRT() — cached result via @Volatile
 
 ### Pending Todos
 
@@ -88,6 +93,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-02T16:40:13.482Z
+Last session: 2026-05-02T16:46:24.219Z
 Stopped at: Completed 06-03-PLAN.md (BackendDetector + LiteRTLmEngine — LITE-02, LITE-03) — 3 of 4 phase plans done
 Resume file: None
