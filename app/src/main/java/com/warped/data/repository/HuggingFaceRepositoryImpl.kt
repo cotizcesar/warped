@@ -32,9 +32,9 @@ class HuggingFaceRepositoryImpl @Inject constructor(
 
     private val api = retrofit.create(HuggingFaceApi::class.java)
 
-    override suspend fun searchModels(query: String, limit: Int): Result<List<HuggingFaceModel>> {
+    override suspend fun searchModels(query: String, format: String, limit: Int): Result<List<HuggingFaceModel>> {
         return try {
-            val response = api.searchModels(query = query, limit = limit)
+            val response = api.searchModels(query = query, filter = format, limit = limit)
             if (response.isSuccessful) {
                 Result.success(response.body() ?: emptyList())
             } else {
