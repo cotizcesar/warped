@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -85,7 +86,7 @@ fun WarpedNavGraph() {
                             modifier = Modifier.size(28.dp)
                         )
                         Spacer(Modifier.width(10.dp))
-                        Text("Warped", color = DrawerTextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        Text("Warped", color = DrawerTextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold, fontStyle = FontStyle.Italic)
                     }
 
                     NavigationDrawerItem(
