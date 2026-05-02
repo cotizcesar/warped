@@ -185,37 +185,37 @@ Deferred to future release.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LITE-01 | — | Pending |
-| LITE-02 | — | Pending |
-| LITE-03 | — | Pending |
-| LITE-04 | — | Pending |
-| LITE-05 | — | Pending |
-| LITE-06 | — | Pending |
-| LITE-07 | — | Pending |
-| LITE-08 | — | Pending |
-| ACQ-06 | — | Pending |
-| ACQ-07 | — | Pending |
-| ACQ-08 | — | Pending |
-| ACQ-09 | — | Pending |
-| ACQ-10 | — | Pending |
-| UI-01 | — | Pending |
-| UI-02 | — | Pending |
-| UI-03 | — | Pending |
-| UI-04 | — | Pending |
-| UI-05 | — | Pending |
-| PARM-03 | — | Pending |
-| PARM-04 | — | Pending |
-| PARM-05 | — | Pending |
-| POL-01 | — | Pending |
-| POL-02 | — | Pending |
-| POL-03 | — | Pending |
-| POL-04 | — | Pending |
-| POL-05 | — | Pending |
+| LITE-01 | Phase 6 | Pending |
+| LITE-02 | Phase 6 | Pending |
+| LITE-03 | Phase 6 | Pending |
+| LITE-04 | Phase 6 | Pending |
+| LITE-05 | Phase 7 | Pending |
+| LITE-06 | Phase 7 | Pending |
+| LITE-07 | Phase 7 | Pending |
+| LITE-08 | Phase 6 | Pending |
+| ACQ-06 | Phase 8 | Pending |
+| ACQ-07 | Phase 8 | Pending |
+| ACQ-08 | Phase 8 | Pending |
+| ACQ-09 | Phase 8 | Pending |
+| ACQ-10 | Phase 8 | Pending |
+| UI-01 | Phase 9 | Pending |
+| UI-02 | Phase 9 | Pending |
+| UI-03 | Phase 9 | Pending |
+| UI-04 | Phase 9 | Pending |
+| UI-05 | Phase 9 | Pending |
+| PARM-03 | Phase 10 | Pending |
+| PARM-04 | Phase 10 | Pending |
+| PARM-05 | Phase 10 | Pending |
+| POL-01 | Phase 6 | Pending |
+| POL-02 | Phase 6 | Pending |
+| POL-03 | Phase 9 | Pending |
+| POL-04 | Phase 7 | Pending |
+| POL-05 | Phase 9 | Pending |
 
 **Coverage:**
 - v1.0 requirements: 30 total, 30 mapped ✓
-- v1.1 requirements: 25 total
-- Mapped to phases: 0 (will be filled by roadmap)
+- v1.1 requirements: 26 total, 26 mapped ✓ (25 claimed in plan, 26 present in requirements)
+- Mapped to phases: 26 mapped to Phases 6-10
 
 ---
 *Requirements defined: 2026-04-30*
