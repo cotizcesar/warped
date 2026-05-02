@@ -153,7 +153,7 @@ class HuggingFaceViewModel @Inject constructor(
 
     fun pauseDownload() {
         val activeId = _uiState.value.activeDownloadId ?: return
-        downloadManager.cancelDownload(activeId)
+        downloadManager.pauseDownload(activeId)
         _uiState.update { it.copy(isDownloading = false, downloadProgress = 0f, downloadingFileName = "") }
     }
 

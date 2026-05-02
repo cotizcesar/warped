@@ -2,10 +2,14 @@ package com.warped.data.local.download
 
 import android.content.Context
 import android.os.StatFs
-import com.warped.data.local.inference.GgufMetadata
-import com.warped.data.local.inference.GgufMetadataParser
-import com.warped.domain.model.LocalModel
-import com.warped.domain.repository.LocalModelRepository
+import androidx.lifecycle.Observer
+import androidx.work.Constraints
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import com.warped.data.local.db.dao.DownloadCheckpointDao
+import com.warped.data.local.db.entity.DownloadCheckpointEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,11 +19,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import java.io.File
-import java.io.RandomAccessFile
-import java.time.Instant
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -37,16 +38,22 @@ data class DownloadState(
 @Singleton
 class ModelDownloadManager @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val okHttpClient: OkHttpClient,
-    private val localModelRepository: LocalModelRepository
+    private val workManager: WorkManager,
+    private val checkpointDao: DownloadCheckpointDao
 ) {
     private val _downloadStates = MutableStateFlow<Map<String, DownloadState>>(emptyMap())
     val downloadStates: Flow<Map<String, DownloadState>> = _downloadStates.asStateFlow()
 
-    private val downloadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val modelsDir: File
         get() = File(context.filesDir, "models").also { it.mkdirs() }
+
+    // Map to store active work IDs keyed by modelId
+    private val activeWorkIds = mutableMapOf<String, UUID>()
+
+    // Map to store LiveData observers for cleanup
+    private val workObservers = mutableMapOf<UUID, Observer<WorkInfo?>>()
 
     fun hasEnoughStorage(requiredBytes: Long): Boolean {
         val stat = StatFs(context.filesDir.absolutePath)
@@ -72,157 +79,121 @@ class ModelDownloadManager @Inject constructor(
             )
         }
 
-        downloadScope.launch {
-            try {
-                if (fileSizeBytes > 0 && !hasEnoughStorage(fileSizeBytes)) {
-                    updateState(modelId) {
-                        it.copy(
-                            isDownloading = false,
-                            error = "Not enough storage. Need ${fileSizeBytes / (1024 * 1024)} MB"
-                        )
-                    }
-                    return@launch
-                }
-
-                val localFileName = fileName.substringAfterLast("/")
-                val destFile = File(modelsDir, localFileName)
-                var resumeOffset = 0L
-
-                if (destFile.exists()) {
-                    resumeOffset = destFile.length()
-                }
-
-                val request = Request.Builder()
-                    .url(fileUrl)
-                    .header("Range", "bytes=$resumeOffset-")
-                    .build()
-
-                val response = okHttpClient.newCall(request).execute()
-                if (!response.isSuccessful && response.code != 206) {
-                    updateState(modelId) {
-                        it.copy(isDownloading = false, error = "Download failed: HTTP ${response.code}")
-                    }
-                    return@launch
-                }
-
-                val body = response.body
-                    ?: run {
-                        updateState(modelId) {
-                            it.copy(isDownloading = false, error = "Empty response")
-                        }
-                        return@launch
-                    }
-                val expectedTotalBytes = if (fileSizeBytes > 0) {
-                    fileSizeBytes
-                } else {
-                    body.contentLength().takeIf { it > 0 }?.plus(resumeOffset) ?: 0L
-                }
-
-                if (expectedTotalBytes > 0 && !hasEnoughStorage(expectedTotalBytes)) {
-                    updateState(modelId) {
-                        it.copy(
-                            isDownloading = false,
-                            error = "Not enough storage. Need ${expectedTotalBytes / (1024 * 1024)} MB"
-                        )
-                    }
-                    return@launch
-                }
-
-                val outputFile = if (resumeOffset > 0) {
-                    RandomAccessFile(destFile, "rw").apply { seek(resumeOffset) }
-                } else {
-                    RandomAccessFile(destFile, "rw")
-                }
-
-                body.byteStream().use { input ->
-                    outputFile.use { output ->
-                        val buffer = ByteArray(8192)
-                        var bytesRead: Int
-                        var totalRead = resumeOffset
-                        val totalSize = expectedTotalBytes.takeIf { it > 0 }
-                            ?: (body.contentLength() + resumeOffset)
-
-                        while (input.read(buffer).also { bytesRead = it } != -1) {
-                            val currentState = _downloadStates.value[modelId]
-                            if (currentState?.isPaused == true) {
-                                updateState(modelId) {
-                                    it.copy(isPaused = true, isDownloading = false)
-                                }
-                                return@launch
-                            }
-
-                            output.write(buffer, 0, bytesRead)
-                            totalRead += bytesRead
-                            val progress =
-                                if (totalSize > 0) totalRead.toFloat() / totalSize.toFloat() else 0f
-                            updateState(modelId) {
-                                it.copy(
-                                    downloadedBytes = totalRead,
-                                    totalBytes = totalSize,
-                                    progress = progress
-                                )
-                            }
-                        }
-                    }
-                }
-
-                updateState(modelId) {
-                    it.copy(
-                        isDownloading = false,
-                        isPaused = false,
-                        progress = 1f,
-                        downloadedBytes = expectedTotalBytes.takeIf { it > 0 }
-                            ?: destFile.length()
-                    )
-                }
-
-                val isLitertlm = localFileName.endsWith(".litertlm", ignoreCase = true)
-
-                val modelMetadata = if (!isLitertlm) {
-                    try {
-                        GgufMetadataParser.parse(destFile).getOrDefault(GgufMetadata())
-                    } catch (e: Exception) {
-                        GgufMetadata()
-                    }
-                } else {
-                    GgufMetadata() // .litertlm files have different binary format — use defaults
-                }
-
-                val localModel = LocalModel(
-                    name = localFileName.removeSuffix(".gguf").removeSuffix(".litertlm"),
-                    filePath = destFile.absolutePath,
-                    sizeBytes = destFile.length().takeIf { it > 0 } ?: fileSizeBytes,
-                    quantization = if (isLitertlm) "N/A" else modelMetadata.quantization,
-                    parameterCount = if (isLitertlm) "Unknown" else modelMetadata.parameterCount,
-                    architecture = if (isLitertlm) "LiteRT-LM" else modelMetadata.architecture,
-                    modelFormat = if (isLitertlm) "LITERTLM" else "GGUF",
-                    importedAt = Instant.now()
+        // Storage check
+        if (fileSizeBytes > 0 && !hasEnoughStorage(fileSizeBytes)) {
+            updateState(modelId) {
+                it.copy(
+                    isDownloading = false,
+                    error = "Not enough storage. Need ${fileSizeBytes / (1024 * 1024)} MB"
                 )
-
-                localModelRepository.saveModel(localModel)
-            } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) throw e
-                updateState(modelId) {
-                    it.copy(error = e.message, isDownloading = false)
-                }
-            } catch (e: OutOfMemoryError) {
-                updateState(modelId) {
-                    it.copy(error = "Out of memory", isDownloading = false)
-                }
             }
+            return
         }
+
+        // Clear any stale checkpoint from a previous completed download
+        ioScope.launch {
+            checkpointDao.deleteCheckpoint(modelId)
+        }
+
+        val inputData = ModelDownloadWorker.createInputData(
+            modelId, fileName, fileUrl, fileSizeBytes
+        )
+        val workRequest = OneTimeWorkRequestBuilder<ModelDownloadWorker>()
+            .setInputData(inputData)
+            .addTag(modelId)
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build()
+            )
+            .build()
+
+        workManager.enqueue(workRequest)
+
+        // Store work request ID for later observation
+        activeWorkIds[modelId] = workRequest.id
+
+        // Observe progress from WorkManager
+        observeWorkProgress(modelId, workRequest.id)
     }
 
     fun pauseDownload(modelId: String) {
-        updateState(modelId) { it.copy(isPaused = true, isDownloading = false) }
+        val workId = activeWorkIds[modelId]
+        if (workId != null) {
+            // Cancel the WorkRequest — this sets isStopped=true in the Worker,
+            // which triggers the checkpoint-save-and-exit path in doWork()'s isStopped check.
+            workManager.cancelWorkById(workId)
+        }
+        updateState(modelId) {
+            it.copy(isPaused = true, isDownloading = false)
+        }
+        // Checkpoint is already saved by the Worker's isStopped handler.
+        // activeWorkIds entry is removed by observeWorkProgress when WorkInfo transitions to CANCELLED.
     }
 
     fun resumeDownload(modelId: String, fileUrl: String) {
-        updateState(modelId) { it.copy(isPaused = false, isDownloading = true) }
-        // Re-trigger the download if needed
+        ioScope.launch {
+            val checkpoint = checkpointDao.getCheckpoint(modelId)
+            if (checkpoint == null) {
+                updateState(modelId) {
+                    it.copy(
+                        error = "Cannot resume — no saved progress found",
+                        isPaused = false
+                    )
+                }
+                return@launch
+            }
+
+            updateState(modelId) {
+                it.copy(
+                    isPaused = false,
+                    isDownloading = true,
+                    totalBytes = checkpoint.totalBytes,
+                    downloadedBytes = checkpoint.downloadedBytes,
+                    progress = if (checkpoint.totalBytes > 0)
+                        checkpoint.downloadedBytes.toFloat() / checkpoint.totalBytes.toFloat()
+                    else 0f
+                )
+            }
+
+            // Enqueue new Worker — Worker reads checkpoint from Room to determine resume offset
+            val inputData = ModelDownloadWorker.createInputData(
+                modelId = modelId,
+                fileName = checkpoint.fileName,
+                fileUrl = checkpoint.fileUrl,
+                fileSizeBytes = checkpoint.totalBytes
+            )
+            val workRequest = OneTimeWorkRequestBuilder<ModelDownloadWorker>()
+                .setInputData(inputData)
+                .addTag(modelId)
+                .setConstraints(
+                    Constraints.Builder()
+                        .setRequiredNetworkType(NetworkType.CONNECTED)
+                        .build()
+                )
+                .build()
+
+            workManager.enqueue(workRequest)
+            activeWorkIds[modelId] = workRequest.id
+            observeWorkProgress(modelId, workRequest.id)
+        }
     }
 
     fun cancelDownload(modelId: String) {
+        val workId = activeWorkIds[modelId]
+        if (workId != null) {
+            workManager.cancelWorkById(workId)
+        }
+        val state = _downloadStates.value[modelId]
+        val fileName = state?.fileName ?: ""
+        ioScope.launch {
+            checkpointDao.deleteCheckpoint(modelId)
+            if (fileName.isNotBlank()) {
+                val localName = fileName.substringAfterLast("/")
+                val file = File(modelsDir, localName)
+                if (file.exists()) file.delete()
+            }
+        }
         updateState(modelId) {
             it.copy(isDownloading = false, isPaused = true, error = "Cancelled")
         }
@@ -237,6 +208,62 @@ class ModelDownloadManager @Inject constructor(
 
     fun getDownloadState(modelId: String): DownloadState {
         return _downloadStates.value[modelId] ?: DownloadState(modelId = modelId)
+    }
+
+    private fun observeWorkProgress(modelId: String, workId: UUID) {
+        val observer = Observer<WorkInfo?> { workInfo ->
+            if (workInfo == null) return@Observer
+
+            when (workInfo.state) {
+                WorkInfo.State.RUNNING -> {
+                    val progress = workInfo.progress.getInt(ModelDownloadWorker.PROGRESS, 0)
+                    updateState(modelId) {
+                        it.copy(
+                            isDownloading = true,
+                            isPaused = false,
+                            progress = progress / 100f
+                        )
+                    }
+                }
+                WorkInfo.State.SUCCEEDED -> {
+                    updateState(modelId) {
+                        it.copy(
+                            isDownloading = false,
+                            isPaused = false,
+                            progress = 1f,
+                            downloadedBytes = it.totalBytes
+                        )
+                    }
+                    activeWorkIds.remove(modelId)
+                    cleanupObserver(workId)
+                }
+                WorkInfo.State.FAILED -> {
+                    updateState(modelId) {
+                        it.copy(
+                            isDownloading = false,
+                            error = "Download failed"
+                        )
+                    }
+                    activeWorkIds.remove(modelId)
+                    cleanupObserver(workId)
+                }
+                WorkInfo.State.CANCELLED -> {
+                    // Cancelled = paused (checkpoint saved by Worker)
+                    // Don't set error — pause is not an error state
+                    activeWorkIds.remove(modelId)
+                    cleanupObserver(workId)
+                }
+                else -> { /* BLOCKED, ENQUEUED — no action */ }
+            }
+        }
+        workObservers[workId] = observer
+        workManager.getWorkInfoByIdLiveData(workId).observeForever(observer)
+    }
+
+    private fun cleanupObserver(workId: UUID) {
+        workObservers.remove(workId)?.let { observer ->
+            workManager.getWorkInfoByIdLiveData(workId).removeObserver(observer)
+        }
     }
 
     private fun updateState(key: String, transform: (DownloadState) -> DownloadState) {
