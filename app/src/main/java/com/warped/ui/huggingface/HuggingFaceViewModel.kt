@@ -70,8 +70,17 @@ class HuggingFaceViewModel @Inject constructor(
                 format = activeFormat
             )
             result.onSuccess { models ->
-                val compatibility = loadCompatibility(models)
-                val sortedModels = models.sortedWith(
+                // Filter out vision/speech models — only show text-capable models
+                val textModels = if (_uiState.value.activeFormat == "litertlm") {
+                    models.filter { model ->
+                        model.pipelineTag.isBlank() || model.pipelineTag !in EXCLUDED_PIPELINE_TAGS
+                    }
+                } else {
+                    models // GGUF search: don't filter (GGUF format implies text model)
+                }
+
+                val compatibility = loadCompatibility(textModels)
+                val sortedModels = textModels.sortedWith(
                     compareByDescending<HuggingFaceModel> { compatibility[it.id] == true }
                         .thenByDescending { it.downloads }
                 )
@@ -208,5 +217,29 @@ class HuggingFaceViewModel @Inject constructor(
 
     private companion object {
         const val MIN_SEARCH_LENGTH = 3
+
+        /**
+         * Pipeline tags for vision/speech models that are not usable in Warped v1.1.
+         * These model types require vision/audio backends deferred to v2.x.
+         * Blacklist approach: exclude known non-text tags; include everything else
+         * (handles models with blank pipelineTag, which is common in litert-community).
+         */
+        private val EXCLUDED_PIPELINE_TAGS = setOf(
+            "image-to-text",
+            "automatic-speech-recognition",
+            "text-to-speech",
+            "image-classification",
+            "object-detection",
+            "image-segmentation",
+            "audio-classification",
+            "image-text-to-text",
+            "visual-question-answering",
+            "text-to-image",
+            "zero-shot-image-classification",
+            "zero-shot-object-detection",
+            "image-feature-extraction",
+            "video-classification",
+            "depth-estimation"
+        )
     }
 }
