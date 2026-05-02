@@ -108,7 +108,12 @@ Plans:
   3. During chat with a LiteRT-LM model, the active backend ("CPU" or "GPU") is displayed on the chat screen
   4. User can view, manage, and delete downloaded LiteRT-LM models from the Models screen
   5. When the app is backgrounded, LiteRT-LM model memory is released, and models reload efficiently from cache on next use
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 09-01-PLAN.md — HuggingFace TabRow with GGUF/LiteRT-LM tabs and format badges on search cards (UI-01, UI-02)
+- [ ] 09-02-PLAN.md — Chat backend status chip and format-aware model selector (UI-03, UI-05)
+- [ ] 09-03-PLAN.md — ModelsScreen format badges, routing, cacheDir caching, and lifecycle memory management (UI-02, UI-04, POL-03, POL-05)
 **UI hint**: yes
 
 #### Phase 10: Parameters & Polish
@@ -135,7 +140,7 @@ Plans:
 | 6. Engine Foundation | v1.1 | 4/4 | Complete   | 2026-05-02 |
 | 7. Provider Integration & Chat | v1.1 | 1/2 | In Progress|  |
 | 8. Model Acquisition | v1.1 | 3/3 + 2 GAP | In Progress|  |
-| 9. UI Integration | v1.1 | 0/0 | Not started | — |
+| 9. UI Integration | v1.1 | 0/3 | Not started | — |
 | 10. Parameters & Polish | v1.1 | 0/0 | Not started | — |
 
 ## Coverage
