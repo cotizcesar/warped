@@ -8,10 +8,11 @@
         android:largeHeap="true"
         android:networkSecurityConfig="@xml/network_security_config"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Warped"
+        android:theme="@style/Theme.Warped.Splash"
         android:dataExtractionRules="@xml/data_extraction_rules">
         <activity
             android:name=".MainActivity"
+            android:theme="@style/Theme.Warped"
             android:exported="true"
             android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
