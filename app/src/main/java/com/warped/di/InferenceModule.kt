@@ -52,8 +52,9 @@ object InferenceModule {
     fun provideEngineManager(
         llamaEngine: LlamaEngine,
         liteRTLmEngine: LiteRTLmEngine,
-        backendDetector: BackendDetector
-    ): EngineManager = EngineManager(llamaEngine, liteRTLmEngine, backendDetector)
+        backendDetector: BackendDetector,
+        @ApplicationContext context: Context
+    ): EngineManager = EngineManager(llamaEngine, liteRTLmEngine, backendDetector, context)
 
     @Provides
     @Singleton

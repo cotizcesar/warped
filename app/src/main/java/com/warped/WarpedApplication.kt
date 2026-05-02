@@ -3,19 +3,22 @@ package com.warped
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.ComponentCallbacks2
 import android.os.Build
 import android.os.StrictMode
 
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.warped.data.local.inference.EngineManager
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
 import javax.inject.Inject
 
 @HiltAndroidApp
-class WarpedApplication : Application(), Configuration.Provider {
+class WarpedApplication : Application(), Configuration.Provider, ComponentCallbacks2 {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
+    @Inject lateinit var engineManager: EngineManager
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -28,6 +31,7 @@ class WarpedApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
+        registerComponentCallbacks(this)
         if (BuildConfig.DEBUG) {
             Timber.plant(RedactingTree())
             StrictMode.setThreadPolicy(
@@ -57,6 +61,21 @@ class WarpedApplication : Application(), Configuration.Provider {
             }
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
+        }
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (::engineManager.isInitialized) {
+            engineManager.handleTrimMemory(level)
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {}
+
+    override fun onLowMemory() {
+        if (::engineManager.isInitialized) {
+            engineManager.handleTrimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL)
         }
     }
 
