@@ -2,22 +2,22 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: LiteRT-LM Integration
-status: executing
-stopped_at: Completed 07-01-PLAN.md (Core provider components — LITE-05, LITE-06, LITE-07, POL-04) — 1 of 2 phase plans done
-last_updated: "2026-05-02T17:43:25.509Z"
-last_activity: 2026-05-02 — Phase 7 Plan 01 completed (Core provider components)
+status: completed
+stopped_at: Completed 07-02-PLAN.md (Hilt + ProviderRouter wiring — LITE-05) — 2 of 2 phase plans done
+last_updated: "2026-05-02T17:48:15.000Z"
+last_activity: 2026-05-02 — Phase 7 Plan 02 completed (Hilt + ProviderRouter wiring)
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
-  percent: 83
+  completed_plans: 6
+  percent: 100
 ---
 
 # Project State: Warped
 
 **Last updated:** 2026-05-02
-**Last activity:** 2026-05-02 — Phase 7 Plan 01 completed (Core provider components)
+**Last activity:** 2026-05-02 — Phase 7 Plan 02 completed (Hilt + ProviderRouter wiring)
 
 See: .planning/PROJECT.md
 
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 7 of 10 (Provider Integration & Chat)
-Plan: Plan 01 completed (1 of 2); Plan 02 pending
-Status: Executing
-Last activity: 2026-05-02 — Plan 07-01 (Core provider components) completed; LITE-05, LITE-06, LITE-07, POL-04 requirements satisfied
+Plan: 2 of 2
+Status: Completed
+Last activity: 2026-05-02 — Plan 07-02 (Hilt + ProviderRouter wiring) completed; LITE-05 requirement satisfied
 
-Progress: [████████░░] 83%
+Progress: [██████████] 100%
 
 ## Completed
 
@@ -57,9 +57,10 @@ Progress: [████████░░] 83%
 | 3. Model Acquisition | 2 | — | — |
 | 4. Parameters & Presets | 2 | — | — |
 | 5. Security Hardening & Polish | 1 | — | — |
-| 6-10 (v1.1) | 4 | 12min 41s | 4min 14s |
+| 6-10 (v1.1) | 6 | 15m 0s | 2m 30s |
 | Phase 06-engine-foundation P04 | 1m 20s | 3 tasks | 3 files |
 | Phase 07-provider-integration-chat P01 | 5m 48s | 3 tasks | 4 files |
+| Phase 07-provider-integration-chat P02 | 2m 19s | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,8 @@ Progress: [████████░░] 83%
 - [07-01]: D-04 — 2-retry error recovery via sendMessageWithRetry with EngineManager.switchToLiteRT() reinitialization
 - [07-01]: D-05 — maxTokens via ConversationConfig.extraContext ("max_output_tokens") — no direct field in v0.11.0-rc1
 - [07-01]: D-06 — Toast notification deferred to Timber.w() — Context not injected in provider layer
+- [07-02]: D-01 — LiteRTLmProvider and InputSanitizer explicitly provided via @Provides (not relying on @Inject auto-discovery), following existing InferenceModule convention
+- [07-02]: D-02 — LiteRTLmProvider injected via dagger.Lazy in ProviderRouter (lazy init, consistent with LocalLlmProvider pattern); no .configure(modelId) call needed — model path comes from EngineManager
 
 ### Pending Todos
 
@@ -100,6 +103,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-02T17:43:25.502Z
+Last session: 2026-05-02T17:50:00.626Z
 Stopped at: Completed 07-01-PLAN.md (Core provider components — LITE-05, LITE-06, LITE-07, POL-04) — 1 of 2 phase plans done
 Resume file: None

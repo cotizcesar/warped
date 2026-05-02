@@ -77,7 +77,7 @@ Plans:
 
 Plans:
 - [x] 07-01-PLAN.md — Core provider components: ProviderType.LITE_RT_LM, InputSanitizer, LiteRTLmProvider (LITE-05, LITE-06, LITE-07, POL-04)
-- [ ] 07-02-PLAN.md — Hilt + ProviderRouter wiring: InferenceModule registration, LITE_RT_LM routing (LITE-05)
+- [x] 07-02-PLAN.md — Hilt + ProviderRouter wiring: InferenceModule registration, LITE_RT_LM routing (LITE-05)
 
 #### Phase 8: Model Acquisition
 **Goal:** Users can discover, download, and import `.litertlm` models from Hugging Face's litert-community — extending the existing download infrastructure.
