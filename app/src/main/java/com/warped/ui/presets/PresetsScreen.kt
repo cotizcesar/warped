@@ -33,8 +33,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -51,6 +53,7 @@ fun PresetsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val params = uiState.parameters
+    val isLiteRTActive = uiState.activeFormat.equals("LITERTLM", ignoreCase = true)
 
     LaunchedEffect(params) {
         onParametersChanged(params)
@@ -126,6 +129,8 @@ fun PresetsScreen(
                     label = "Repeat Penalty",
                     value = params.repeatPenalty,
                     range = 1f..2f,
+                    enabled = !isLiteRTActive,
+                    unsupportedLabel = if (isLiteRTActive) "Unsupported for LiteRT-LM" else null,
                     onValueChange = { viewModel.updateRepeatPenalty(it) }
                 )
             }
@@ -146,6 +151,8 @@ fun PresetsScreen(
                     value = params.contextSize,
                     range = 512..32768,
                     steps = 20,
+                    enabled = !isLiteRTActive,
+                    unsupportedLabel = if (isLiteRTActive) "Unsupported for LiteRT-LM" else null,
                     onValueChange = { viewModel.updateContextSize(it) }
                 )
             }
@@ -163,6 +170,8 @@ fun PresetsScreen(
                     label = "Threads",
                     value = params.threads,
                     range = 1..16,
+                    enabled = !isLiteRTActive,
+                    unsupportedLabel = if (isLiteRTActive) "Unsupported for LiteRT-LM" else null,
                     onValueChange = { viewModel.updateThreads(it) }
                 )
             }
@@ -230,9 +239,11 @@ fun ParameterSlider(
     label: String,
     value: Float,
     range: ClosedFloatingPointRange<Float>,
+    enabled: Boolean = true,
+    unsupportedLabel: String? = null,
     onValueChange: (Float) -> Unit
 ) {
-    Column {
+    Column(modifier = Modifier.alpha(if (enabled) 1f else 0.38f)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -240,7 +251,14 @@ fun ParameterSlider(
             Text(label, style = MaterialTheme.typography.bodyMedium)
             Text("%.2f".format(value), style = MaterialTheme.typography.bodySmall)
         }
-        Slider(value = value, onValueChange = onValueChange, valueRange = range)
+        Slider(value = value, onValueChange = onValueChange, valueRange = range, enabled = enabled)
+        if (unsupportedLabel != null) {
+            Text(
+                unsupportedLabel,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
@@ -250,9 +268,11 @@ fun ParameterIntSlider(
     value: Int,
     range: IntRange,
     steps: Int = 0,
+    enabled: Boolean = true,
+    unsupportedLabel: String? = null,
     onValueChange: (Int) -> Unit
 ) {
-    Column {
+    Column(modifier = Modifier.alpha(if (enabled) 1f else 0.38f)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -264,8 +284,16 @@ fun ParameterIntSlider(
             value = value.toFloat(),
             onValueChange = { onValueChange(it.toInt()) },
             valueRange = range.first.toFloat()..range.last.toFloat(),
-            steps = steps
+            steps = steps,
+            enabled = enabled
         )
+        if (unsupportedLabel != null) {
+            Text(
+                unsupportedLabel,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
