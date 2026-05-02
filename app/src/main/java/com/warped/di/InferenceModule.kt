@@ -4,6 +4,7 @@ import android.content.Context
 import com.warped.data.local.inference.LlamaEngine
 import com.warped.data.local.inference.LocalLlmProvider
 import com.warped.data.local.inference.BackendDetector
+import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.LiteRTLmEngine
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.inference.ModelImportManager
@@ -43,6 +44,14 @@ object InferenceModule {
     @Provides
     @Singleton
     fun provideLiteRTLmEngine(): LiteRTLmEngine = LiteRTLmEngine()
+
+    @Provides
+    @Singleton
+    fun provideEngineManager(
+        llamaEngine: LlamaEngine,
+        liteRTLmEngine: LiteRTLmEngine,
+        backendDetector: BackendDetector
+    ): EngineManager = EngineManager(llamaEngine, liteRTLmEngine, backendDetector)
 }
 
 @Module
