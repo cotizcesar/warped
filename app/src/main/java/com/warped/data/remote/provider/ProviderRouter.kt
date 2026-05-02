@@ -1,5 +1,6 @@
 package com.warped.data.remote.provider
 
+import com.warped.data.local.inference.LiteRTLmProvider
 import com.warped.data.local.inference.LocalLlmProvider
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.domain.model.Endpoint
@@ -12,7 +13,8 @@ import javax.inject.Singleton
 @Singleton
 class ProviderRouter @Inject constructor(
     private val apiKeyStore: ApiKeyStore,
-    private val localLlmProvider: dagger.Lazy<LocalLlmProvider>
+    private val localLlmProvider: dagger.Lazy<LocalLlmProvider>,
+    private val liteRTLmProvider: dagger.Lazy<LiteRTLmProvider>
 ) {
     fun resolve(endpoint: Endpoint, modelId: String): LlmProvider {
         return when (endpoint.apiType) {
@@ -43,7 +45,7 @@ class ProviderRouter @Inject constructor(
                 modelId = modelId
             )
             ProviderType.LOCAL -> localLlmProvider.get().configure(modelId)
-            ProviderType.LITE_RT_LM -> localLlmProvider.get().configure(modelId) // TODO: Route to LiteRTLmProvider in Phase 07-02
+            ProviderType.LITE_RT_LM -> liteRTLmProvider.get()
         }
     }
 }
