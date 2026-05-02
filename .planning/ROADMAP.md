@@ -7,7 +7,7 @@
 ## Milestones
 
 - ✅ **v1.0 MVP** — Phases 1-5 (shipped 2026-05-01)
-- 🚧 **v1.1 LiteRT-LM Integration** — Phases 6-10 (planning)
+- ✅ **v1.1 LiteRT-LM Integration** — Phases 6-10 (shipped 2026-05-02) → [archive](milestones/v1.1-ROADMAP.md)
 - 📋 **v2.0 Advanced Features** — Phases 11+ (planned)
 
 ## Phases
@@ -42,94 +42,19 @@
 
 </details>
 
-### 🚧 v1.1 LiteRT-LM Integration (In Progress)
+<details>
+<summary>✅ v1.1 LiteRT-LM Integration (Phases 6-10) — SHIPPED 2026-05-02</summary>
+
+See [milestone archive](milestones/v1.1-ROADMAP.md) for full phase details.
 
 **Milestone Goal:** Add Google's LiteRT-LM as a second high-performance local inference engine alongside llama.cpp — search, download, import, and chat with `.litertlm` models from Hugging Face's litert-community, with auto-detected GPU/NPU acceleration.
 
-#### Phase 6: Engine Foundation
-**Goal:** Establish the LiteRT-LM engine with backend auto-detection, thread-safe lifecycle management, mutual exclusion with llama.cpp, and Room schema support — the foundation everything else depends on.
-**Depends on:** Phase 5 (v1.0)
-**Requirements:** LITE-01, LITE-02, LITE-03, LITE-04, LITE-08, POL-01, POL-02
-**Success Criteria** (what must be TRUE):
-  1. App compiles with litertlm-android Maven dependency without Gradle errors
-  2. BackendDetector correctly probes GPU availability and falls back to CPU on devices without OpenCL
-  3. LiteRTLmEngine initializes with a `.litertlm` model path and closes cleanly without native crashes or memory leaks
-  4. EngineManager enforces mutual exclusion — only one local model engine (llama.cpp or LiteRT-LM) loaded at a time, unloading the current engine when switching
-  5. User receives a clear warning before loading a `.litertlm` model that exceeds 80% of available device RAM
-**Plans:** 4/4 plans complete
+**Phases:** 6. Engine Foundation (4 plans) → 7. Provider Integration & Chat (2 plans) → 8. Model Acquisition (5 plans) → 9. UI Integration (3 plans) → 10. Parameters & Polish (1 plan)
+**Requirements:** 26/26 satisfied
+**Plans:** 14 completed, 2 gap closure
+**Tech Debt:** 24 items (hardware-dependent testing, DRY violations, stale docs)
 
-Plans:
-- [x] 06-01-PLAN.md — Build integration: Maven dependency, ProGuard rules, AndroidManifest declarations (LITE-01, LITE-08)
-- [x] 06-02-PLAN.md — Room schema v6→v7 migration adding model_format column (LITE-04)
-- [x] 06-03-PLAN.md — BackendDetector GPU probing + LiteRTLmEngine wrapper + Hilt wiring (LITE-02, LITE-03)
-- [x] 06-04-PLAN.md — EngineManager mutual exclusion + MemoryChecker .litertlm RAM warnings (POL-01, POL-02)
-
-#### Phase 7: Provider Integration & Chat
-**Goal:** Wire LiteRT-LM into the existing chat architecture — users can select a `.litertlm` model and chat with streaming responses, with input sanitization, parameter mapping, and graceful error recovery.
-**Depends on:** Phase 6
-**Requirements:** LITE-05, LITE-06, LITE-07, POL-04
-**Success Criteria** (what must be TRUE):
-  1. User can select a LiteRT-LM model from the chat model selector and stream tokens in real-time with latency comparable to GGUF models
-  2. Input containing LaTeX, Unicode math, or special characters is sanitized before reaching the engine and does not crash the app
-  3. Generation parameters (temperature, topK, topP, seed) map correctly to LiteRT-LM's SamplerConfig and visibly affect the output
-   4. If the engine enters an "Engine not alive" state mid-chat, the app automatically reinitializes and recovers without requiring a manual restart
-**Plans:** 1/2 plans executed
-
-Plans:
-- [x] 07-01-PLAN.md — Core provider components: ProviderType.LITE_RT_LM, InputSanitizer, LiteRTLmProvider (LITE-05, LITE-06, LITE-07, POL-04)
-- [x] 07-02-PLAN.md — Hilt + ProviderRouter wiring: InferenceModule registration, LITE_RT_LM routing (LITE-05)
-
-#### Phase 8: Model Acquisition
-**Goal:** Users can discover, download, and import `.litertlm` models from Hugging Face's litert-community — extending the existing download infrastructure.
-**Depends on:** Phase 6 (engine foundation), can partially overlap with Phase 7
-**Requirements:** ACQ-06, ACQ-07, ACQ-08, ACQ-09, ACQ-10
-**Success Criteria** (what must be TRUE):
-  1. User can search for `.litertlm` models from the litert-community and see only text-capable models (filtered from vision/speech)
-  2. User can view model details including file size and format info before downloading
-  3. User sees a foreground progress notification during `.litertlm` downloads, and downloads continue if the app is backgrounded
-  4. User can pause an in-progress `.litertlm` download, close the app, return, and resume without data loss
-  5. User can import a local `.litertlm` file from device storage via the system file picker
-**Plans:** 3/3 executed, 2 gap closure pending
-
-Plans:
-- [x] 08-01-PLAN.md — Domain model: add modelFormat to LocalModel + update mappers (ACQ-06, ACQ-07, ACQ-08, ACQ-09, ACQ-10)
-- [x] 08-02-PLAN.md — HF API: searchByFormat in repository layer for litertlm filtering (ACQ-06, ACQ-07)
-- [x] 08-03-PLAN.md — Pipeline: download format detection, import .litertlm, ViewModel format awareness (ACQ-06, ACQ-07, ACQ-08, ACQ-09, ACQ-10)
-- [x] 08-GAP-01-PLAN.md — Foreground download notifications + persistent pause/resume via WorkManager (ACQ-08, ACQ-09)
-- [x] 08-GAP-02-PLAN.md — Text-only model filtering via pipelineTag exclusion (ACQ-06)
-
-#### Phase 9: UI Integration
-**Goal:** Make LiteRT-LM fully user-facing with separate ecosystem tabs, format badges, backend status indicators, cached loading, and lifecycle-aware memory management.
-**Depends on:** Phase 6, Phase 7, Phase 8
-**Requirements:** UI-01, UI-02, UI-03, UI-04, UI-05, POL-03, POL-05
-**Success Criteria** (what must be TRUE):
-  1. User sees separate "GGUF" and "LiteRT-LM" tabs on the Models screen, each showing only models of that format
-  2. Each model card in the list displays a format badge ("GGUF" or "LiteRT-LM") to visually distinguish ecosystems
-  3. During chat with a LiteRT-LM model, the active backend ("CPU" or "GPU") is displayed on the chat screen
-  4. User can view, manage, and delete downloaded LiteRT-LM models from the Models screen
-  5. When the app is backgrounded, LiteRT-LM model memory is released, and models reload efficiently from cache on next use
-**Plans:** 3 plans
-
-Plans:
-- [x] 09-01-PLAN.md — HuggingFace TabRow with GGUF/LiteRT-LM tabs and format badges on search cards (UI-01, UI-02)
-- [x] 09-02-PLAN.md — Chat backend status chip and format-aware model selector (UI-03, UI-05)
-- [x] 09-03-PLAN.md — ModelsScreen format badges, routing, cacheDir caching, and lifecycle memory management (UI-02, UI-04, POL-03, POL-05)
-**UI hint**: yes
-
-#### Phase 10: Parameters & Polish
-**Goal:** Complete the parameter experience for LiteRT-LM with engine-aware UI controls, preset unification, and unsupported parameter handling.
-**Depends on:** Phase 9
-**Requirements:** PARM-03, PARM-04, PARM-05
-**Success Criteria** (what must be TRUE):
-  1. User can adjust LiteRT-LM specific parameters (temperature, topK, topP, seed) via sliders in the parameters screen
-  2. Parameters unsupported by LiteRT-LM (repeat_penalty, context_size, threads) are visibly greyed out and non-interactive when a LiteRT-LM model is selected
-  3. User can save a preset with LiteRT-LM parameters and load it for reuse across chat sessions
-  4. Presets created for GGUF models show GGUF-specific params, and presets created for LiteRT-LM show LiteRT-LM-specific params — both stored and restored correctly
-**Plans**: 1/1 complete
-
-Plans:
-- [x] 10-01-PLAN.md — modelFormat presets + parameter grey-out + cross-format warnings (PARM-03, PARM-04, PARM-05)
-**UI hint**: yes
+</details>
 
 ## Progress
 
@@ -140,10 +65,10 @@ Plans:
 | 3. Model Acquisition | v1.0 | 2/2 | Complete | 2026-05-01 |
 | 4. Parameters & Presets | v1.0 | 2/2 | Complete | 2026-05-01 |
 | 5. Security Hardening & Polish | v1.0 | 1/1 | Complete | 2026-05-01 |
-| 6. Engine Foundation | v1.1 | 4/4 | Complete   | 2026-05-02 |
-| 7. Provider Integration & Chat | v1.1 | 1/2 | In Progress|  |
-| 8. Model Acquisition | v1.1 | 3/3 + 2 GAP | In Progress|  |
-| 9. UI Integration | v1.1 | 0/3 | Not started | — |
+| 6. Engine Foundation | v1.1 | 4/4 | Complete | 2026-05-02 |
+| 7. Provider Integration & Chat | v1.1 | 2/2 | Complete | 2026-05-02 |
+| 8. Model Acquisition | v1.1 | 5/5 | Complete | 2026-05-02 |
+| 9. UI Integration | v1.1 | 3/3 | Complete | 2026-05-02 |
 | 10. Parameters & Polish | v1.1 | 1/1 | Complete | 2026-05-02 |
 
 ## Coverage
