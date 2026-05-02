@@ -107,7 +107,7 @@ fun ModelsScreen(
                             Spacer(Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("Download from Hugging Face", style = MaterialTheme.typography.bodyLarge)
-                                Text("Browse and download GGUF models", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Browse and download GGUF & LiteRT-LM models", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                         HorizontalDivider()
@@ -118,8 +118,8 @@ fun ModelsScreen(
                             Icon(Icons.Filled.Storage, null, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Import GGUF File", style = MaterialTheme.typography.bodyLarge)
-                                Text("Load a .gguf model from your device", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Import Model File", style = MaterialTheme.typography.bodyLarge)
+                                Text("Load a .gguf or .litertlm model from your device", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                         HorizontalDivider()
@@ -293,6 +293,10 @@ fun ModelCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(model.name, style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        FormatBadge(model.modelFormat)
+                    }
+                    Spacer(Modifier.height(4.dp))
                     Text(
                         "${model.architecture} · ${model.quantization} · ${model.parameterCount} params",
                         style = MaterialTheme.typography.bodySmall,
@@ -328,6 +332,29 @@ fun ModelCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FormatBadge(format: String) {
+    val (color, label) = when {
+        format.equals("GGUF", ignoreCase = true) ->
+            Color(0xFF2196F3) to "GGUF"
+        format.equals("LITERTLM", ignoreCase = true) ->
+            Color(0xFF4CAF50) to "LiteRT-LM"
+        else -> MaterialTheme.colorScheme.outline to format
+    }
+    Surface(
+        shape = MaterialTheme.shapes.extraSmall,
+        color = color.copy(alpha = 0.15f),
+        contentColor = color
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1
+        )
     }
 }
 

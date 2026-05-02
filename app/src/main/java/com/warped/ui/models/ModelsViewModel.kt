@@ -85,7 +85,8 @@ class ModelsViewModel @Inject constructor(
     }
 
     fun useLocalModel(model: LocalModel) {
-        activeModelSelection.select(model.filePath, ProviderType.LOCAL)
+        val providerType = if (model.modelFormat == "LITERTLM") ProviderType.LITE_RT_LM else ProviderType.LOCAL
+        activeModelSelection.select(model.filePath, providerType)
     }
 
     fun showEndpointForm() {
