@@ -2,39 +2,39 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: LiteRT-LM Integration
-status: planning
-stopped_at: Phase 7 plans created (07-01, 07-02) — ProviderType.LITE_RT_LM, InputSanitizer, LiteRTLmProvider, Hilt wiring, ProviderRouter routing
-last_updated: "2026-05-02T16:55:00.000Z"
-last_activity: 2026-05-02 — Phase 7 PLAN.md files created, ROADMAP updated
+status: executing
+stopped_at: Completed 07-01-PLAN.md (Core provider components — LITE-05, LITE-06, LITE-07, POL-04) — 1 of 2 phase plans done
+last_updated: "2026-05-02T17:43:25.509Z"
+last_activity: 2026-05-02 — Phase 7 Plan 01 completed (Core provider components)
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
-  percent: 100
+  total_plans: 6
+  completed_plans: 5
+  percent: 83
 ---
 
 # Project State: Warped
 
 **Last updated:** 2026-05-02
-**Last activity:** 2026-05-02 — Roadmap created for v1.1 phases 6-10 (26 requirements mapped)
+**Last activity:** 2026-05-02 — Phase 7 Plan 01 completed (Core provider components)
 
 See: .planning/PROJECT.md
 
 ## Project Reference
 
 **Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** Phase 6 — Engine Foundation (LiteRT-LM core setup)
+**Current focus:** Phase 7 — Provider Integration & Chat (LiteRT-LM chat pipeline)
 **Milestone:** v1.1 LiteRT-LM Integration
 
 ## Current Position
 
-Phase: 6 of 10 (Engine Foundation)
-Plan: Plans 01, 02, 03 completed (3 of 4)
+Phase: 7 of 10 (Provider Integration & Chat)
+Plan: Plan 01 completed (1 of 2); Plan 02 pending
 Status: Executing
-Last activity: 2026-05-02 — Plan 06-03 (BackendDetector + LiteRTLmEngine) completed; LITE-02, LITE-03 requirements satisfied
+Last activity: 2026-05-02 — Plan 07-01 (Core provider components) completed; LITE-05, LITE-06, LITE-07, POL-04 requirements satisfied
 
-Progress: [██████████] 100%
+Progress: [████████░░] 83%
 
 ## Completed
 
@@ -59,6 +59,7 @@ Progress: [██████████] 100%
 | 5. Security Hardening & Polish | 1 | — | — |
 | 6-10 (v1.1) | 4 | 12min 41s | 4min 14s |
 | Phase 06-engine-foundation P04 | 1m 20s | 3 tasks | 3 files |
+| Phase 07-provider-integration-chat P01 | 5m 48s | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,12 @@ Progress: [██████████] 100%
 - [Phase ?]: Synchronous engine switch via unloadCurrent() before init — @Synchronized prevents concurrent switches
 - [Phase ?]: ActiveEngine data class tracks type + modelPath + backend for dedup on redundant switch calls
 - [Phase ?]: BackendDetector.probeBackend() called lazily inside switchToLiteRT() — cached result via @Volatile
+- [07-01]: D-01 — LITE_RT_LM added as 7th ProviderType enum value for LiteRT-LM routing
+- [07-01]: D-02 — InputSanitizer as standalone utility with 5-category surgical regex (LaTeX, Unicode math, control chars, surrogates, zero-width)
+- [07-01]: D-03 — SamplerConfig mapping inline — temperature→temperature, topK→topK, topP→topP, seed→seed (0 when -1)
+- [07-01]: D-04 — 2-retry error recovery via sendMessageWithRetry with EngineManager.switchToLiteRT() reinitialization
+- [07-01]: D-05 — maxTokens via ConversationConfig.extraContext ("max_output_tokens") — no direct field in v0.11.0-rc1
+- [07-01]: D-06 — Toast notification deferred to Timber.w() — Context not injected in provider layer
 
 ### Pending Todos
 
@@ -89,10 +96,10 @@ None yet.
 
 - **Phase 6 (Research flag):** GPU backend detection across SoCs is hardware-dependent. BackendDetector probe strategy may need device-specific adjustments.
 - **Phase 8 (Research flag):** litert-community HF API filter behavior needs live testing with real API responses for client-side `.litertlm` filtering.
-- **Cross-phase:** LiteRT-LM v0.10.2 Unicode/LaTeX bug status needs verification before Phase 7 input sanitization implementation.
+- ~~Cross-phase: LiteRT-LM v0.10.2 Unicode/LaTeX bug status~~ — Addressed by InputSanitizer in 07-01.
 
 ## Session Continuity
 
-Last session: 2026-05-02T16:46:24.219Z
-Stopped at: Completed 06-03-PLAN.md (BackendDetector + LiteRTLmEngine — LITE-02, LITE-03) — 3 of 4 phase plans done
+Last session: 2026-05-02T17:43:25.502Z
+Stopped at: Completed 07-01-PLAN.md (Core provider components — LITE-05, LITE-06, LITE-07, POL-04) — 1 of 2 phase plans done
 Resume file: None

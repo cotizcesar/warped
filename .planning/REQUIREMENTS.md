@@ -71,9 +71,9 @@ Requirements for LiteRT-LM integration. Each maps to roadmap phases.
 - [x] **LITE-02**: BackendDetector probes GPU availability and falls back to CPU automatically
 - [x] **LITE-03**: LiteRTLmEngine wraps Engine lifecycle (initialize, createConversation, close) with thread safety
 - [x] **LITE-04**: Room schema migration adds model_format and engine_type columns to models table
-- [ ] **LITE-05**: LiteRTLmProvider implements LlmProvider with streaming chat via Conversation.sendMessageAsync(Flow)
-- [ ] **LITE-06**: Input sanitization prevents Unicode/LaTeX native crashes before reaching the engine
-- [ ] **LITE-07**: Generation parameters map correctly to LiteRT-LM's SamplerConfig
+- [x] **LITE-05**: LiteRTLmProvider implements LlmProvider with streaming chat via Conversation.sendMessageAsync(Flow)
+- [x] **LITE-06**: Input sanitization prevents Unicode/LaTeX native crashes before reaching the engine
+- [x] **LITE-07**: Generation parameters map correctly to LiteRT-LM's SamplerConfig
 - [x] **LITE-08**: AndroidManifest declares libOpenCL for GPU backend with required="false"
 
 ### Model Acquisition
@@ -103,7 +103,7 @@ Requirements for LiteRT-LM integration. Each maps to roadmap phases.
 - [x] **POL-01**: EngineManager enforces mutual exclusion (only one local engine loaded at a time)
 - [x] **POL-02**: App warns if available RAM is insufficient for the selected .litertlm model
 - [ ] **POL-03**: Cached model loading via cacheDir for faster subsequent loads
-- [ ] **POL-04**: Defensive error recovery reinitializes engine on "Engine not alive" errors
+- [x] **POL-04**: Defensive error recovery reinitializes engine on "Engine not alive" errors
 - [ ] **POL-05**: Memory is released when the app is backgrounded (onTrimMemory handling)
 
 ## v2 Requirements
@@ -189,9 +189,9 @@ Deferred to future release.
 | LITE-02 | Phase 6 | Complete |
 | LITE-03 | Phase 6 | Complete |
 | LITE-04 | Phase 6 | Complete |
-| LITE-05 | Phase 7 | Pending |
-| LITE-06 | Phase 7 | Pending |
-| LITE-07 | Phase 7 | Pending |
+| LITE-05 | Phase 7 | Complete |
+| LITE-06 | Phase 7 | Complete |
+| LITE-07 | Phase 7 | Complete |
 | LITE-08 | Phase 6 | Complete |
 | ACQ-06 | Phase 8 | Pending |
 | ACQ-07 | Phase 8 | Pending |
@@ -209,7 +209,7 @@ Deferred to future release.
 | POL-01 | Phase 6 | Complete |
 | POL-02 | Phase 6 | Complete |
 | POL-03 | Phase 9 | Pending |
-| POL-04 | Phase 7 | Pending |
+| POL-04 | Phase 7 | Complete |
 | POL-05 | Phase 9 | Pending |
 
 **Coverage:**
