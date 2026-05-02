@@ -1,338 +1,178 @@
-# Android LLM Client — Feature Landscape Research
+# Feature Research: LiteRT-LM Integration for Warped v1.1
 
-> Research date: 2026-04-30
-> Scope: Android LLM client app equivalent to LM Studio for mobile
+**Domain:** Second local LLM inference engine (LiteRT-LM) into existing Android LLM chat app
+**Researched:** 2026-05-02
+**Confidence:** HIGH
 
----
+## Feature Landscape
 
-## 1. Feature Landscape Overview
+### Table Stakes (Users Expect These)
 
-The Android LLM client space is nascent. Existing solutions fall into three categories:
+Features users assume exist when told "this app supports LiteRT-LM." Missing these = the integration feels broken.
 
-| Category | Examples | Gap |
-|----------|----------|-----|
-| **CLI/terminal-based** | Termux + llama.cpp, Ollama CLI via Termux | No GUI; manual setup; not consumer-grade |
-| **Single-provider chat apps** | ChatGPT, Claude, Gemini official apps | No local inference; no multi-provider; vendor lock-in |
-| **Experimental local inference** | Maid (mobile-hacker), ChatterUI, PocketPal AI | Rough UI; limited remote support; early-stage |
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| **Search/filter `.litertlm` models from Hugging Face** | User discovers models to download. Without search, there's no model acquisition path. | MEDIUM | Requires extending `HuggingFaceApi` with `filter=litert-lm&author=litert-community` query mode. The HF Hub API returns `library_name:"litert-lm"` and tag `litert-lm` on community models. Existing search endpoint can be parameterized — add a `SearchMode` enum (GGUF vs LITERT). litert-community org has ~93 models (includes non-LLM like ASR/vision). Need additional filter for `pipeline_tag:text-generation` to surface only chat models. |
+| **Download `.litertlm` models with progress and pause/resume** | Users expect large-model downloads (2–15 GB) to show progress, survive network interruptions, and not block the UI. | MEDIUM | `.litertlm` files are single blobs (not sharded like GGUF). Existing `ModelDownloadManager` already handles OkHttp streaming, `Range` header resume, and progress tracking. **Reuse entire pipeline** — only change: detect `.litertlm` extension, skip GGUF metadata parsing (no GGML magic bytes), store in same `models/` directory or separate `models/litertlm/` subdirectory. No architecture change needed. |
+| **Import local `.litertlm` files from device storage** | Users may have downloaded `.litertlm` files on desktop or from other sources. Import is the alternative acquisition path. | LOW | Reuses existing `ActivityResultContracts.OpenDocument` file picker. Same `ModelImportManager` pattern: validate file extension (`.litertlm`) and size, copy to app-private storage. No GGUF metadata parsing needed — LiteRT-LM validates file via `Capabilities` class (JNI). Existing import flow is format-agnostic at the import level; only validation logic differs. |
+| **Load `.litertlm` model and chat with streaming** | Core value proposition. Must produce tokens streaming to UI within seconds of sending a message. | HIGH | **Biggest implementation item.** Requires a new `LiteRtLmProvider` implementing `LlmProvider` (same `chat(): Flow<StreamToken>` contract). Wraps `Engine(EngineConfig(...))` → `engine.initialize()` (blocking, ~2-15 seconds, must be on `Dispatchers.Default`) → `engine.createConversation(config)` → `conversation.sendMessageAsync(text).collect { message -> emit(StreamToken.Delta(message.text)) }`. LiteRT-LM's `sendMessageAsync` returns `Flow<Message>` natively — no callbackFlow wrapper needed (unlike llama.cpp JNI). Conversation handles chat template automatically (no manual `<|system|>` prompt construction). |
+| **Generation parameters for LiteRT-LM** | Users expect to configure temperature, top_k, top_p for any LLM. Missing params = feels unpolished. | MEDIUM | LiteRT-LM uses `SamplerConfig(topK: Int, topP: Double, temperature: Double, seed: Int)`. This is a **different parameter surface** than llama.cpp's `GenerationParameters` (which has `repeatPenalty`, `threads`, `contextSize`, `reasoningEnabled` — params LiteRT-LM doesn't expose). Need a **separate parameter model** (`LiteRtParameters`) with mapping to `SamplerConfig`. The existing `GenerationParameters` class is llama.cpp-specific — do not force-fit. Presets infrastructure needs extending to handle dual parameter models. |
+| **Model management: view, delete LiteRT-LM models** | Users need to see what's downloaded, how large it is, and free up space. | LOW | Existing `LocalModel` entity and `LocalModelRepository` already handle list/view/delete. Need a `format` field (e.g., `ModelFormat.GGUF` vs `ModelFormat.LITERT`) to distinguish types. Delete is identical (delete file + Room row). View details: LiteRT-LM models don't expose quantization/architecture metadata via simple header parsing like GGUF — use `Capabilities` class for model inspection. |
+| **Backend selection with auto-detection** | User expects best performance automatically. Explicit selection is power-user feature. | MEDIUM | LiteRT-LM backends: `Backend.CPU()`, `Backend.GPU()`, `Backend.NPU(nativeLibraryDir)`. Auto-detection sequence: try `Backend.GPU()` first → catch initialization failure → fall back to `Backend.CPU()`. GPU requires `<uses-native-library>` entries in manifest for `libvndksupport.so` and `libOpenCL.so` (both `required="false"` to allow CPU fallback). NPU is chip-specific (Qualcomm Snapdragon) — **defer NPU auto-detection** to a later phase; expose as explicit power-user option. |
+| **Separate UI tabs for GGUF vs LiteRT-LM models** | Users must not confuse which format a model is. Mixing them in one list = "which one do I download?" confusion. | LOW | Add `ModelFormatTab` enum in `ModelsScreen`: `GGUF` / `LITERT_LM`. Each tab filters `LocalModel` by format. `HuggingFaceScreen` already has search — add format selector (GGUF / LiteRT-LM) that switches the HF API query filter and target directory. Low complexity: Compose `TabRow` + filtered lists. |
 
-**No Android app today** combines local GGUF inference, multi-provider remote connectivity, Hugging Face model discovery, and a polished LM Studio-grade UX in a single package. This is the gap Warped targets.
+### Differentiators (Competitive Advantage)
 
-Desktop LM Studio is the primary analog, but mobile imposes unique constraints: RAM ceiling (8-16GB on flagships, 3-8GB on midrange), battery/thermal limits, smaller screen real estate, and user expectation of instant-on experiences.
+Features that set Warped apart from other Android LLM apps. Not required for basic functionality, but drive the "best local LLM Android app" positioning.
 
----
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| **Dual-engine local inference (llama.cpp + LiteRT-LM)** | No other Android app offers both GGUF and `.litertlm` inference in one interface. User has maximum model choice: GGUF's massive ecosystem (50K+ models) + LiteRT-LM's Google-optimized performance for Gemma, Llama, Phi, Qwen. | Already inherent in architecture | This is the architectural differentiator. LiteRT-LM models run faster on Android (Google's production engine powers Chrome/Chromebook/Pixel). GGUF models offer wider selection and community tuning. Each engine has its own `LlmProvider` implementation — provider interface was designed for this. |
+| **GPU acceleration with automatic CPU fallback** | llama.cpp on Android is CPU-only (Vulkan support is experimental/device-dependent). LiteRT-LM's GPU backend (`Backend.GPU()`) provides **significantly** faster inference on devices with Adreno/Mali GPUs. Automatic fallback means users don't need to understand backends. | MEDIUM | Implement `BackendDetector` utility that attempts `Engine(EngineConfig(backend = Backend.GPU()))` initialization. On `LiteRtLmJniException`, retry with `Backend.CPU()`. Surface detected backend in UI (e.g., "Running on GPU" badge). GPU requires OpenCL — most Android devices with API 28+ have it, but some budget devices don't. |
+| **Auto-handled chat templates** | llama.cpp requires manual prompt formatting (the app currently builds `<\|system\|>/<\|user\|>/<\|assistant\|>` tags manually). LiteRT-LM's `Conversation` API applies the model's Jinja chat template **automatically** based on the `.litertlm` file's embedded template. No prompt engineering needed — the app sends structured `Message` objects and the engine renders them correctly. | Already provided by LiteRT-LM API | This is a UX differentiator: Gemma models use different prompt formats than Llama models. With LiteRT-LM, the app doesn't need to know. With llama.cpp, the app currently uses a hardcoded ChatML-style format that may not match all GGUF models. |
+| **Cached model loading** | Second launch of the same `.litertlm` model is significantly faster (seconds vs 10+ seconds) when `cacheDir` is configured. llama.cpp always loads from scratch. | Already in `EngineConfig.cacheDir` | Set `cacheDir = context.cacheDir.path` in `EngineConfig`. LiteRT-LM compiles/caches the model graph to this directory on first load. This is an automatic performance win — no extra implementation needed beyond passing the parameter. |
 
-## 2. Table Stakes (Must-Haves)
+### Anti-Features (Commonly Requested, Often Problematic)
 
-These are non-negotiable. Without them, users will abandon the app immediately.
+Features that seem good but create problems. Documenting these prevents scope creep.
 
-### 2.1 Chat Interface with Streaming
+| Anti-Feature | Why Requested | Why Problematic | Alternative |
+|--------------|---------------|-----------------|-------------|
+| **Multi-modality (vision/audio) in v1.1** | "LiteRT-LM supports images and audio, why not add it?" | `EngineConfig` requires separate `visionBackend` and `audioBackend` configurations. Multi-modal models (Gemma3n, Qwen-VL) are larger and have different memory profiles. Mixing text chat + vision in the same v1.1 milestone explodes scope. The existing app supports text-only chat — adding multi-modality requires UI changes (image attachment, camera capture), new permission handling, and audio recording. | **Defer to v1.2+**. Ship text chat with LiteRT-LM first. Vision/audio can be a separate milestone with its own research phase. |
+| **Tool use / function calling** | "LiteRT-LM supports tools, let's add agent capabilities." | LiteRT-LM's `ToolSet` API (annotated Kotlin functions, OpenAPI spec tools) is impressive but adds a completely new interaction paradigm. Tool calling requires: tool registration UI, execution sandboxing, error handling for tool failures, and a different conversation flow (tool_call → tool_response loops). This is an agent feature, not a chat feature. | **Defer to v2.0**. Focus v1.1 on chat parity with existing llama.cpp remote providers. |
+| **NPU auto-detection in v1.1** | "Snapdragon 8 Gen 3+ has Hexagon NPU, let's auto-detect it." | NPU support requires chip-specific `.litertlm` files (e.g., `_qualcomm_sm8750.litertlm`), bundling NPU native libraries, and device-SoC detection. The NPU ecosystem is fragmented: Qualcomm, MediaTek, and Samsung each have different NPU stacks. Auto-detection would be unreliable without per-SoC testing. | **Expose NPU as manual power-user option**. Add a "Use NPU" toggle (off by default) with device compatibility notes. Auto-detection comes in v1.3+ after real-world NPU testing. |
+| **Converting GGUF → .litertlm on-device** | "I have GGUF models, can I convert them to get LiteRT-LM performance?" | GGUF and `.litertlm` are fundamentally different formats. GGUF uses llama.cpp's custom serialization; `.litertlm` is a TFLite-based format. On-device conversion would require running a full model conversion pipeline (PyTorch → TFLite → .litertlm) on a phone. Computationally infeasible and not supported by LiteRT-LM tooling. | **User downloads `.litertlm` models from Hugging Face**. The litert-community hosts pre-converted models for all major architectures. |
+| **Running both engines simultaneously** | "Load a GGUF model and a LiteRT-LM model at the same time so I can switch faster." | Android phones have 8–16 GB RAM. A single 7B model uses 4-5 GB. Loading two models simultaneously would consume 8-10 GB, causing OOM kills and system instability. | **Unload current model when switching engines**. The existing `LocalLlmProvider` already calls `llamaEngine.unload()` — add symmetric `engine.close()` for LiteRT-LM. |
+| **Session API (raw token control) for chat** | "The Session API gives more control over token generation." | LiteRT-LM's `Session` API provides `runPrefill`/`runDecode`/`generateContentStream` at a lower level than `Conversation`. It bypasses chat templates, tool calling, and message formatting. For chat, this requires reimplementing all the template logic that `Conversation` provides for free. | **Use `Conversation` API exclusively for chat**. The `Session` API is for advanced use cases (benchmarking, constrained generation) that aren't in scope. |
+| **Auto-switching engine based on model format** | "Just pick the right engine automatically — the user shouldn't have to choose." | Users need to make informed decisions: GGUF models often have different quantization levels (Q4_K_M vs Q8_0), different parameter counts, and different prompt formats than LiteRT-LM equivalents. Auto-switching hides this complexity and leads to "why is this slower?" confusion. | **Explicit user choice via separate tabs and a clear engine indicator**. This is what LM Studio does on desktop (separate sections for local vs remote). |
 
-| Attribute | Value |
-|-----------|-------|
-| **What** | Real-time token-by-token display as the model generates. No "spinner then full response" UX. |
-| **Why** | Every major LLM client streams. Perceived latency is the critical UX metric. |
-| **Complexity** | **Medium** — SSE parsing, Compose `Flow` integration, scroll-to-bottom mechanics, cancel-on-scroll-up. |
-| **Dependencies** | Remote provider layer, local inference engine, chat data model |
-
-### 2.2 Remote Provider Connectivity (OpenAI-compatible API)
-
-| Attribute | Value |
-|-----------|-------|
-| **What** | Connect to any server speaking the OpenAI `/v1/chat/completions` and `/v1/models` protocol with streaming. |
-| **Why** | The lingua franca of LLM serving. Covers OpenAI, Ollama, LM Studio, llama.cpp server, vLLM, Groq, localhost proxies, and most self-hosted setups. |
-| **Complexity** | **Medium** — OkHttp + SSE stream parser, DTO mapping, error handling, timeout/retry logic. |
-| **Dependencies** | Endpoint configuration, API key storage |
-
-### 2.3 Local Model Inference via llama.cpp/GGUF
-
-| Attribute | Value |
-|-----------|-------|
-| **What** | Load GGUF model files on-device and run inference through llama.cpp JNI bindings with streaming token output. |
-| **Why** | Core differentiator from cloud-only apps. Works offline. Privacy-preserving. No API costs. |
-| **Complexity** | **High** — NDK/JNI integration, model loading/unloading lifecycle, memory management, thread configuration, context window sizing, quantization awareness, graceful OOM handling. |
-| **Dependencies** | GGUF file on disk, device capability detection |
-
-### 2.4 Model Download from Hugging Face
-
-| Attribute | Value |
-|-----------|-------|
-| **What** | Search Hugging Face for GGUF models, display metadata (size, quantization, author, downloads), and download with progress. |
-| **Why** | GGUF ecosystem lives on Hugging Face. Users need an in-app path from discovery to inference. |
-| **Complexity** | **High** — HF API integration, model search/filter UX, download manager with pause/resume via WorkManager, storage alerts for large files (1-30+ GB), download progress notification. |
-| **Dependencies** | Network layer, file storage management |
-
-### 2.5 Model Management
-
-| Attribute | Value |
-|-----------|-------|
-| **What** | List downloaded models with metadata, delete models, view file size and location. |
-| **Why** | Models are large (1-30 GB). Users must manage limited device storage. |
-| **Complexity** | **Medium** — File system operations, Room persistence for metadata, confirmation dialogs for destructive actions, storage space calculation. |
-| **Dependencies** | Room database, file I/O |
-
-### 2.6 API Key Management (Encrypted)
-
-| Attribute | Value |
-|-----------|-------|
-| **What** | Store user-provided API keys encrypted via Android Keystore, with add/edit/delete UX. |
-| **Why** | Security table stakes. Plaintext secrets are unacceptable. Users bring their own keys. |
-| **Complexity** | **Medium** — Android Keystore + EncryptedSharedPreferences or Tink, masked display in UI, per-endpoint key association. |
-| **Dependencies** | Endpoint configuration |
-
-### 2.7 Chat History Persistence
-
-| Attribute | Value |
-|-----------|-------|
-| **What** | Conversations and messages survive app restarts. Users can browse, resume, and delete past chats. |
-| **Why** | Users expect chat apps to remember conversations. |
-| **Complexity** | **Low-Medium** — Room `@Entity` for conversations and messages, migration strategy, scroll-to-last-message on resume. |
-| **Dependencies** | Room database |
-
-### 2.8 Basic Generation Parameters
-
-| Attribute | Value |
-|-----------|-------|
-| **What** | Configurable temperature, top_p, top_k, repeat_penalty, max_tokens, context_size, seed. UI controls for each. |
-| **Why** | Necessary for any serious LLM use. Different tasks need different sampling parameters. |
-| **Complexity** | **Low** — Slider/field UI widgets, parameter validation (ranges), serialization to request payload / llama.cpp context params. |
-| **Dependencies** | None (leaf feature) |
-
----
-
-## 3. Differentiators (Competitive Advantage)
-
-These are features that set Warped apart from existing Android LLM apps and make it the definitive mobile LLM client.
-
-### 3.1 Unified Local + Remote Experience
-
-| Attribute | Value |
-|-----------|-------|
-| **What** | Same chat UI, same parameter controls, same conversation model — regardless of whether the model runs locally or remotely. Users pick a model from a unified list and chat. |
-| **Why** | No other Android app does this. LM Studio itself is local-only. The seamlessness is the product. |
-| **Complexity** | **Medium-High** — Polymorphic `Model` abstraction unifying local GGUF and remote API models, shared `InferenceEngine` interface, per-message metadata tracking which backend was used, graceful fallback messaging. |
-| **Dependencies** | Local inference engine, remote provider layer |
-
-### 3.2 Hugging Face Model Search & Discovery
-
-| Attribute | Value |
-|-----------|-------|
-| **What** | In-app HF search with GGUF filter. Browse trending models, search by name, see download counts and quantization options. Curated "recommended models for Android" list. |
-| **Why** | Most users don't know which GGUF models run well on mobile. Discovery reduces friction. |
-| **Complexity** | **Medium-High** — HF Hub API client, pagination, debounced search, filter by `gguf` tag, quantization label parsing, download-now CTA. "Recommended" list can be a static curated JSON. |
-| **Dependencies** | Model download, Hugging Face API |
-
-### 2.3 Download with Pause/Resume
-
-| Attribute | Value |
-|-----------|-------|
-| **What** | Pause active downloads, resume later (even after app restart), progress notifications, bandwidth-aware (WiFi-only toggle). |
-| **Why** | GGUF models are 1-30+ GB. Mobile connections drop. Users don't want to restart multi-GB downloads. |
-| **Complexity** | **Medium-High** — WorkManager with `ListenableWorker`, range-request resume on HTTP, persistence of download state in Room, foreground service notification, storage space pre-check. |
-| **Dependencies** | WorkManager, Room, network layer |
-
-### 2.4 Import Local GGUF Files
-
-| Attribute | Value |
-|-----------|-------|
-| **What** | Pick a `.gguf` file from device storage via system file picker and register it as a loadable model. |
-| **Why** | Power users may obtain GGUF files from other sources (manual download, file transfer, own fine-tunes). |
-| **Complexity** | **Low-Medium** — SAF file picker, copy-to-app-storage-or-reference, GGUF metadata header parsing (extract model name, quant, params from file header), Room registration. |
-| **Dependencies** | File storage, model management |
-
-### 2.5 Generation Presets (Saved Parameter Profiles)
-
-| Attribute | Value |
-|-----------|-------|
-| **What** | Save named parameter configurations (e.g., "Creative Writing", "Precise Coding", "Concise Chat") and quickly switch between them. |
-| **Why** | Advanced users tune parameters per task. Switching manually every time is friction. |
-| **Complexity** | **Low** — Room entity for presets, CRUD UI, apply-to-current-chat action. Pure data layer feature. |
-| **Dependencies** | Room database, generation parameters |
-
-### 2.6 Custom Endpoint Configuration & Testing
-
-| Attribute | Value |
-|-----------|-------|
-| **What** | Add arbitrary OpenAI-compatible endpoints with custom base URL, API key, model name override. Built-in templates for Ollama, LM Studio, llama.cpp server. "Test Connection" button that calls `/v1/models` and reports success/failure/latency. |
-| **Why** | Most apps lock users to a known list of providers. LM Studio's power is connecting to anything. |
-| **Complexity** | **Medium** — Form validation (URL format, required fields), template presets, test connection coroutine, timeout handling, error message display. |
-| **Dependencies** | Remote provider layer, API key storage |
-
-### 2.7 Device-Aware Model Recommendations
-
-| Attribute | Value |
-|-----------|-------|
-| **What** | Detect device RAM and recommend quantizations/sizes likely to fit. Warn before downloading models that exceed available RAM + headroom. Display "probably won't fit" or "tight fit" badges alongside models in search. |
-| **Why** | Reduces user frustration from downloading a 14GB model only to find it OOMs on their 8GB phone. |
-| **Complexity** | **Medium** — `ActivityManager.getMemoryInfo()`, heuristic: model_file_size * 1.2 ≈ RAM needed, UX badges and warnings, allow override (user knows their device best). |
-| **Dependencies** | Hugging Face search, model download, Android system APIs |
-
-### 2.8 Offline Chat Continuity
-
-| Attribute | Value |
-|-----------|-------|
-| **What** | Local models work fully offline. Remote models fail gracefully with clear "no connection" messaging. Downloaded models are always available. |
-| **Why** | LM Studio-equivalent on mobile means the app should work on an airplane. |
-| **Complexity** | **Low** — `ConnectivityManager` checks, offline model list always visible, remote models disabled in UI when offline. |
-| **Dependencies** | Local inference, remote provider layer |
-
-### 2.9 Inference Performance Controls
-
-| Attribute | Value |
-|-----------|-------|
-| **What** | User-configurable thread count for local inference, context size slider with RAM warning, GPU acceleration toggle (if available via device SoC). |
-| **Why** | Mobile SoCs vary wildly. Users can tune for their specific device (Qualcomm vs MediaTek vs Tensor vs Exynos). |
-| **Complexity** | **Medium-High** — Thread count exposed from llama.cpp, context size validation against available RAM, SoC detection for GPU offload capability, graceful degradation when GPU not available. |
-| **Dependencies** | llama.cpp JNI, device capability detection |
-
----
-
-## 4. Anti-Features (Deliberately Avoided)
-
-These are explicitly out of scope for the initial milestone(s). Some may return later; others are permanently excluded.
-
-### 4.1 Deferred (Maybe Later)
-
-| Feature | Reason for Deferral |
-|---------|---------------------|
-| Voice input/output | Added complexity (ASR + TTS engines). Core text chat value must ship first. |
-| Image/multimodal support (vision models) | Requires image handling UI, different model loading paths, larger complexity surface. GGUF vision support is still maturing. |
-| AI agents / tool use / function calling | Massive scope creep. Chat is the MVP. Agents require a whole execution framework, sandboxing, permission model. |
-| Multi-device sync (chat history) | Requires backend infrastructure or peer-to-peer sync protocol. Premature for v1. |
-| Document upload / RAG (retrieval-augmented generation) | Requires chunking pipeline, embedding models, vector store. Separate product tier. |
-| Plugin/extension system | Premature abstraction. Define the core before extending it. |
-| Web search integration | Requires search API keys, result parsing, prompt injection. Not core to LLM execution. |
-| Character/persona system (like ChatterUI/SillyTavern) | Niche use case. Conflicts with general-purpose positioning. |
-| Batch inference / evaluation harness | Research tooling, not consumer feature. |
-
-### 4.2 Permanently Excluded
-
-| Feature | Reason |
-|---------|--------|
-| Built-in paid subscriptions / in-app purchases for model access | User brings own API keys and models. Warped is a client, not a service. |
-| Social features (sharing chats, community feeds) | Not a social app. Privacy-focused positioning. |
-| Analytics, telemetry, or tracking | Privacy-first. Zero data collection by default. |
-| Model training / fine-tuning / LoRA | Separate product entirely. Requires training infrastructure. |
-| Cloud-hosted inference (our servers) | Warped is a client app. Not an inference service. |
-| Multi-user / account system | Local-first app. No accounts needed. |
-| Advertisements or data monetization | Conflicts with premium, privacy-focused positioning. |
-| Push notifications for model updates | Requires backend polling infrastructure. Users can check HF manually. |
-
----
-
-## 5. Complexity Assessment per Feature
-
-| # | Feature | Complexity | Rationale |
-|---|---------|------------|-----------|
-| 1 | Chat interface with streaming | **Medium** | SSE parsing is well-understood; Compose `Flow` integration is idiomatic. Scroll behavior is the trickiest part. |
-| 2 | Remote provider connectivity | **Medium** | OpenAI-compatible protocol is well-documented. OkHttp + SSE is straightforward. Edge cases in error handling. |
-| 3 | Local inference (llama.cpp JNI) | **High** | NDK/JNI is the hardest part of Android development. Memory management across native/Java boundary. Model lifecycle. Thermal throttling. |
-| 4 | Hugging Face model download | **High** | Download manager complexity: pause/resume, range requests, foreground service notifications, storage space, large file handling, WorkManager constraints. |
-| 5 | Model management | **Medium** | Standard CRUD. File system ops are well-understood. The model metadata parsing (GGUF header) adds some complexity. |
-| 6 | API key management (encrypted) | **Medium** | Android Keystore has well-known patterns. Tink or EncryptedSharedPreferences reduce risk. Key association with endpoints is clean. |
-| 7 | Chat history persistence | **Low-Medium** | Room is mature. Conversation/Message schema is straightforward. Migration strategy is the only nuanced part. |
-| 8 | Basic generation parameters | **Low** | Pure UI + serialization. No architectural complexity. |
-| 9 | Unified local + remote interface | **Medium-High** | Requires careful abstraction design. The polymorphic Model concept and shared InferenceEngine interface must be designed early to avoid refactoring later. |
-| 10 | HF model search & discovery | **Medium-High** | HF API is well-documented but pagination, debounced search, and GGUF filtering require careful state management. UX for browsing is iterative. |
-| 11 | Download pause/resume | **Medium-High** | Range request semantics, WorkManager lifecycle, persistence of download state, notification UX. |
-| 12 | Import local GGUF | **Low-Medium** | SAF file picker is trivial. GGUF header parsing is moderate complexity. |
-| 13 | Generation presets | **Low** | Simple Room entity + CRUD. No architectural dependencies beyond Room. |
-| 14 | Custom endpoint config & testing | **Medium** | Form validation and test connection are standard. Template presets reduce user error. |
-| 15 | Device-aware model recommendations | **Medium** | Heuristic-based (not ML). RAM detection + file size comparison. Simple UX badges. |
-| 16 | Offline chat continuity | **Low** | ConnectivityManager checks. UI state toggling. Well-understood pattern. |
-| 17 | Inference performance controls | **Medium-High** | Thread config is easy. Context size validation is moderate. GPU offload detection varies by SoC — may need per-vendor code paths or fallback to CPU-only. |
-
----
-
-## 6. Feature Dependencies Map
+## Feature Dependencies
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        FOUNDATIONAL LAYER                        │
-│                                                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────────┐ │
-│  │ Room Database │  │ Android      │  │ Network Layer         │ │
-│  │ (persistence) │  │ Keystore     │  │ (OkHttp + SSE parser) │ │
-│  └──────┬───────┘  └──────┬───────┘  └───────────┬───────────┘ │
-│         │                 │                      │              │
-├─────────┼─────────────────┼──────────────────────┼──────────────┤
-│         ▼                 ▼                      ▼              │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────────┐ │
-│  │ Chat History │  │ API Key Mgmt │  │ Remote Provider Layer  │ │
-│  │ Persistence  │  │ (encrypted)  │  │ (OpenAI-compatible)    │ │
-│  └──────┬───────┘  └──────┬───────┘  └───────────┬───────────┘ │
-│         │                 │                      │              │
-├─────────┼─────────────────┼──────────────────────┼──────────────┤
-│         │                 │                      │              │
-│  ┌──────┴───────┐  ┌──────┴───────┐  ┌──────────┴───────────┐ │
-│  │ Endpoint     │  │ Custom       │  │ Generation Params     │ │
-│  │ Config/Test  │  │ Endpoints    │  │ (Settings)            │ │
-│  └──────────────┘  └──────────────┘  └──────────┬───────────┘ │
-│                                                  │              │
-├──────────────────────────────────────────────────┼──────────────┤
-│                                                  ▼              │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────────┐ │
-│  │ Model        │  │ Generation   │  │ UNIFIED CHAT           │ │
-│  │ Management   │  │ Presets      │  │ (local + remote)       │ │
-│  └──────┬───────┘  └──────────────┘  └───────────────────────┘ │
-│         │                                                       │
-├─────────┼───────────────────────────────────────────────────────┤
-│         │                                                       │
-│  ┌──────┴───────────────────────────────────────────────────┐  │
-│  │              LOCAL INFERENCE ENGINE                       │  │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌────────────────┐  │  │
-│  │  │ llama.cpp    │  │ Device       │  │ Performance    │  │  │
-│  │  │ JNI/NDK      │  │ Capabilities │  │ Controls       │  │  │
-│  │  └──────────────┘  └──────────────┘  └────────────────┘  │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                                                                  │
-├──────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │              MODEL ACQUISITION PIPELINE                    │   │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌────────────────┐  │   │
-│  │  │ HF Search &  │  │ Download     │  │ Import Local   │  │   │
-│  │  │ Discovery    │  │ w/ Resume    │  │ GGUF Files     │  │   │
-│  │  └──────────────┘  └──────────────┘  └────────────────┘  │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │              UX ENHANCEMENTS                                │   │
-│  │  ┌──────────────┐  ┌──────────────┐                       │   │
-│  │  │ Device-Aware │  │ Offline Mode │                       │   │
-│  │  │ Warnings     │  │ Continuity   │                       │   │
-│  │  └──────────────┘  └──────────────┘                       │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                  │
-└──────────────────────────────────────────────────────────────────┘
+[LiteRT-LM Search/Filters on HF]
+    └──requires──> [HuggingFaceApi mode parameter (GGUF/LITERT)]
+
+[LiteRT-LM Download with Progress/Pause]
+    └──requires──> [LiteRT-LM Search/Filters on HF]
+    └──requires──> [ModelDownloadManager .litertlm extension support]
+
+[LiteRT-LM Import from Storage]
+    └──enhances──> [LiteRT-LM Download]  (alternative acquisition path)
+    └──requires──> [LocalModel format field (GGUF/LITERT)]
+
+[LiteRT-LM Chat with Streaming]
+    └──requires──> [LiteRT-LM Download OR Import]  (model must exist locally)
+    └──requires──> [LiteRtLmProvider implementing LlmProvider]
+    └──requires──> [Backend auto-detection logic]
+    └──requires──> [SamplerConfig parameter model]
+    └──requires──> [Gradle dependency: litertlm-android]
+
+[Separate UI Tabs GGUF vs LiteRT-LM]
+    └──requires──> [LocalModel format field (GGUF/LITERT)]
+    └──enhances──> [LiteRT-LM Search/Filters on HF]  (tab switches search mode)
+
+[LiteRT-LM Generation Parameters]
+    └──requires──> [LiteRtParameters data class]
+    └──enhances──> [LiteRT-LM Chat with Streaming]
+    └──enhances──> [Presets infrastructure]  (dual parameter models)
+
+[Backend Auto-Detection (GPU → CPU)]
+    └──requires──> [LiteRT-LM Chat with Streaming]
+    └──requires──> [AndroidManifest native library entries]
+    └──conflicts──> [NPU auto-detection in v1.1]  (defer NPU)
+
+[Model Management (view/delete LiteRT-LM)]
+    └──requires──> [LiteRT-LM Download OR Import]  (models must exist to manage)
+    └──requires──> [LocalModel format field (GGUF/LITERT)]
 ```
 
-### Key Architectural Dependencies
+### Dependency Notes
 
-| Feature | Depends On | Depended On By |
-|---------|-----------|----------------|
-| Room Database | — (leaf) | Chat history, model management, presets, endpoint config, download state |
-| Network Layer (OkHttp) | — (leaf) | Remote provider, HF API, model download |
-| Android Keystore | — (leaf) | API key management |
-| Remote Provider Layer | Network layer, Android Keystore | Unified chat, endpoint testing |
-| llama.cpp JNI | GGUF file on disk | Unified chat (local path) |
-| Model Management | Room, file I/O | Unified chat, local inference |
-| Unified Chat Interface | Remote provider, local inference, chat history, gen params | — (top-level feature) |
-| HF Search & Discovery | Network layer | Model download |
-| Model Download | Network layer, WorkManager, file I/O | Model management, local inference |
-| Device-Aware Warnings | Android system APIs | HF search, model download |
+- **LiteRT-LM Chat requires Engine to be initialized:** `Engine.initialize()` is blocking and takes 2-15 seconds. Must be called on `Dispatchers.Default` with loading UI state. Engine is single-threaded — only one `Conversation` active per engine at a time.
+- **Conversation is single-turn:** Each `conversation.sendMessageAsync()` call handles one assistant response. For multi-turn chat, the same `Conversation` instance persists across turns (it maintains history internally via the engine). Do NOT create a new Conversation per message — this loses context.
+- **SamplerConfig is per-conversation-creation, not per-message:** Defined in `ConversationConfig` when calling `engine.createConversation(config)`. To change params mid-session, close the conversation and create a new one.
+- **GPU backend needs manifest changes:** Without `<uses-native-library android:name="libOpenCL.so" android:required="false"/>`, GPU backend fails silently or crashes. This is a build-time requirement, not runtime.
+- **Separate tabs require `ModelFormat` enum on `LocalModel`:** This is a database schema change. Requires a Room migration adding a `format` column with default `GGUF` for existing models.
+- **Backend detection is try/catch based:** There is no `Backend.isAvailable()` API. Detection requires attempting `Engine.initialize()` with the desired backend and catching failures.
 
-### Build Order Recommendation
+## MVP Definition
 
-Based on the dependency graph, the recommended milestone build order is:
+### Launch With (v1.1)
 
-1. **Foundation**: Room database schema, network layer (OkHttp + SSE), Android Keystore integration, basic navigation shell
-2. **Remote chat first**: Remote provider layer → endpoint config → API key management → chat interface with streaming → chat history
-3. **Local inference**: llama.cpp JNI integration → GGUF model loading → local chat path → generation parameters → performance controls
-4. **Model acquisition**: HF search → model download w/ resume → model management → import local GGUF
-5. **Polish & differentiators**: Unified local/remote model list → device-aware warnings → generation presets → offline continuity → production hardening
+Minimum viable LiteRT-LM integration — what validates that users want this second engine.
 
-This order ensures a working chat app exists at milestone 2 (remote only), then gains local inference at milestone 3, completing the core value proposition. Milestones 4-5 add the differentiators that make it a true LM Studio equivalent.
+- [ ] **Search `.litertlm` models on Hugging Face** — User types a model name, sees litert-community models with `.litertlm` files. Requires `HuggingFaceApi` mode parameter.
+- [ ] **Download `.litertlm` models** — Progress bar, pause/resume, survives app backgrounding. Reuses existing `ModelDownloadManager` with `.litertlm` extension handling.
+- [ ] **Load and chat with streaming** — User selects a downloaded `.litertlm` model, types a message, sees tokens streaming in real time. Core value proposition.
+- [ ] **Auto-detect GPU with CPU fallback** — No user configuration needed. App tries GPU, falls back to CPU. Shows which backend is active.
+- [ ] **Separate GGUF / LiteRT-LM tabs in Models screen** — User clearly sees two ecosystems. Cannot accidentally load a GGUF model with LiteRT-LM or vice versa.
+
+### Add After Validation (v1.1.x)
+
+Features to add once core chat flow works and is stable.
+
+- [ ] **Import local `.litertlm` files** — Trigger: users asking "I have a .litertlm file on my phone, how do I use it?" Low risk, simple addition.
+- [ ] **LiteRT-LM generation parameters UI** — Trigger: users wanting to adjust temperature/top_k/top_p for LiteRT-LM models. Separate parameter model; sliders/pickers in chat screen.
+- [ ] **Delete LiteRT-LM models** — Trigger: users running out of storage. Reuses existing delete flow.
+- [ ] **Cached model loading** — Trigger: users complaining about slow model load times. Already supported by `EngineConfig.cacheDir`, just needs to be enabled.
+
+### Future Consideration (v2.0+)
+
+Features to defer until the dual-engine chat experience is battle-tested.
+
+- [ ] **LiteRT-LM presets** — Separate preset model for `SamplerConfig`. Requires preset infrastructure redesign to handle heterogeneous parameter types.
+- [ ] **NPU acceleration** — Manual toggle first, auto-detection later. Requires per-SoC testing.
+- [ ] **Multi-modality (vision/audio)** — Requires UI changes (image attachment), new models, permission handling.
+- [ ] **Tool use / function calling** — Different interaction paradigm. Requires agent architecture.
+- [ ] **LiteRT-LM Session API for advanced users** — Raw token control for power users.
+- [ ] **Structured output / constrained generation** — JSON mode, grammar constraints.
+
+## Feature Prioritization Matrix
+
+| Feature | User Value | Implementation Cost | Priority |
+|---------|------------|---------------------|----------|
+| Load and chat with .litertlm (streaming) | HIGH | HIGH | P1 |
+| Search .litertlm models on HF | HIGH | MEDIUM | P1 |
+| Download .litertlm with progress | HIGH | MEDIUM | P1 |
+| Auto-detect GPU + CPU fallback | HIGH | MEDIUM | P1 |
+| Separate GGUF/LiteRT-LM UI tabs | HIGH | LOW | P1 |
+| Generation parameters for LiteRT-LM | MEDIUM | MEDIUM | P2 |
+| Import local .litertlm files | MEDIUM | LOW | P2 |
+| Model management (view/delete) | MEDIUM | LOW | P2 |
+| Cached model loading | MEDIUM | LOW (free with API) | P2 |
+| NPU backend support | LOW | HIGH | P3 |
+| Multi-modality support | MEDIUM | HIGH | P3 |
+| Tool use / function calling | MEDIUM | HIGH | P3 |
+| LiteRT-LM presets | LOW | MEDIUM | P3 |
+
+**Priority key:**
+- P1: Must have for v1.1 launch — validates the second engine
+- P2: Should have in v1.1.x — polish without delaying launch
+- P3: Nice to have, v2.0+ consideration
+
+## Competitor Feature Analysis
+
+| Feature | Google AI Edge Gallery | LM Studio (Desktop) | Other Android LLM Apps (ChatterUI, Maid) | Our Approach (Warped) |
+|---------|------------------------|---------------------|------------------------------------------|----------------------|
+| Local inference engine | LiteRT-LM only | llama.cpp only | Usually one engine (llama.cpp or MLC) | **Both** llama.cpp + LiteRT-LM |
+| Model format | .litertlm only | GGUF only | GGUF (or MLX on iOS) | **Both** GGUF + .litertlm |
+| GPU acceleration | Yes (LiteRT-LM native) | Yes (Metal/CUDA/Vulkan) | Varies (CPU mostly) | GPU + CPU fallback for LiteRT-LM |
+| Model download UX | Built-in (Google Play app) | Built-in (HF integration) | Manual import or limited HF browsing | HF search + download + import for both formats |
+| Remote providers | None (local only) | OpenAI-compatible + Ollama | Varies | OpenAI, Anthropic, Ollama, LM Studio, custom |
+| Chat templates | Automatic (Conversation API) | Automatic (Jinja) | Manual or hardcoded | Automatic for LiteRT-LM, hardcoded for llama.cpp |
+| Streaming UX | Yes (Flow-based) | Yes (SSE-style) | Varies | Yes (Flow-based for both engines) |
+| Backend detection | ? (likely auto) | Manual | N/A | Auto GPU → CPU fallback |
+| Separate engine tabs | Single engine | Single source (local vs remote tabs, not format tabs) | Single engine | Per-format tabs (GGUF / LiteRT-LM) |
+
+## Sources
+
+- **LiteRT-LM GitHub Repository (google-ai-edge/LiteRT-LM):** Official source. README, Kotlin API docs (`docs/api/kotlin/getting_started.md`), source files (`Engine.kt`, `Config.kt`, `Conversation.kt`, `Session.kt`, `Capabilities.kt`). 4.6k stars, v0.10.2 (Apr 2026). **HIGH confidence.**
+- **Hugging Face litert-community Org:** https://huggingface.co/litert-community — 93 models, 6,277 followers. Official model distribution hub. HF Hub API response tested directly. **HIGH confidence.**
+- **Google AI Edge Gallery App:** Production reference for Android LiteRT-LM integration. Available on Google Play. **HIGH confidence.**
+- **Existing Warped Codebase:** `LlmProvider`, `LocalModel`, `ModelDownloadManager`, `HuggingFaceApi`, `ModelsScreen`, `HuggingFaceViewModel` — mapped integration points directly from source. **HIGH confidence.**
+- **Maven dependency:** `com.google.ai.edge.litertlm:litertlm-android` on Google Maven. **HIGH confidence.**
 
 ---
 
-*Generated from analysis of: LM Studio (desktop), Ollama, ChatterUI, PocketPal, Maid, official ChatGPT/Claude/Gemini apps, llama.cpp ecosystem, Hugging Face Hub API.*
+*Feature research for: LiteRT-LM integration (second local inference engine)*
+*Researched: 2026-05-02*

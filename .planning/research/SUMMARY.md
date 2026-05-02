@@ -1,241 +1,193 @@
-# Research Summary — Warped (Android LLM Client)
+# Project Research Summary
 
-**Date**: 2026-04-30
-**Status**: Synthesis complete — feeds into requirements and roadmap
+**Project:** Warped v1.1 — LiteRT-LM Integration
+**Domain:** Android LLM client — second local inference engine addition
+**Researched:** 2026-05-02
+**Confidence:** HIGH
 
----
+## Executive Summary
 
-## 1. Executive Summary
+Warped is an Android app equivalent to LM Studio for mobile, already shipping with llama.cpp/GGUF local inference and remote provider support. This v1.1 milestone adds **LiteRT-LM** (Google's on-device LLM runtime) as a second local inference engine, giving users access to Google-optimized `.litertlm` models from the litert-community organization on Hugging Face. The integration is a **parallel provider pattern** — not a replacement or refactor of the existing llama.cpp path — with both engines coexisting under a unified `LlmProvider` interface.
 
-Warped is an Android equivalent to LM Studio, combining local GGUF inference via llama.cpp with multi-provider remote connectivity in a single polished Compose app. The project targets flagship and midrange Android devices (minSdk 28, ~95% reach), using Kotlin 2.1.10 with Clean Architecture, Hilt DI, and a custom JNI bridge for native inference. The build order is sequenced for fast feedback: remote chat ships first (validating the `LLMProvider` interface and streaming pipeline), then local inference, then model acquisition and polish. The primary risk vector is native stability (SIGSEGV crashes, OOM, thread safety) — mitigated by running inference in a separate process and enforcing strict JNI safety patterns.
+The recommended approach is to integrate LiteRT-LM via a single Maven dependency (`com.google.ai.edge.litertlm:litertlm-android:0.10.2`) — no NDK/CMake build required, unlike llama.cpp. LiteRT-LM ships pre-built `.so` libraries inside the AAR with a pure Kotlin API surface (`Engine`, `Conversation`, `SamplerConfig`). The key architectural adaptation is mapping LiteRT-LM's **stateful** Engine→Conversation lifecycle onto the existing **stateless** `LlmProvider.chat()` contract by creating a fresh `Conversation` per chat call while keeping the `Engine` singleton alive.
 
----
+**Critical risks** center on device-specific SoC issues: (1) GPU backend silently crashes on Tensor G3/Pixel 8 due to missing OpenCL — must use runtime backend probing with CPU fallback, (2) Conversation reuse causes SIGSEGV on MediaTek Dimensity — architect for fresh-per-message conversations, (3) Unicode/LaTeX input triggers ICU `RegexMatcher` native crash — input sanitization or engine fallback routing required, and (4) dual-engine memory exhaustion if both llama.cpp and LiteRT-LM load simultaneously — enforce mutual exclusion via an `EngineManager`. Every one of these is preventable with upfront architecture decisions, not runtime patches.
 
-## 2. Recommended Stack
+## Key Findings
 
-| Layer | Choice | Version | Rationale |
-|-------|--------|---------|-----------|
-| Language | Kotlin | 2.1.10 | K2 compiler default, widest tooling support; required by Hilt 2.59.x |
-| UI | Jetpack Compose + Material 3 | BOM 2025.04.00 | Declarative, first-class Android, Compose compiler bundled in Kotlin 2.0+ |
-| DI | Hilt (Dagger) | 2.59.2 | Compile-time validation, ViewModel/WorkManager/Navigation integration |
-| Local DB | Room | 2.7.x | Official Android ORM, Flow-based observation, KSP annotation processing |
-| Prefs | DataStore (Preferences) | 1.1.x | Coroutine-based, type-safe; replaces deprecated SharedPreferences |
-| HTTP Client | OkHttp + Retrofit | 4.12.0 / 2.11.1 | SSE streaming, interceptors, connection pooling; Retrofit for type-safe REST |
-| JSON | Kotlinx Serialization | 1.7.x | Kotlin-native, no reflection, KSP-based code generation |
-| Background Work | WorkManager | 2.10.x | Survives process death, constraints (WiFi-only, battery), expedited work |
-| Concurrency | Kotlin Coroutines + Flow | 1.9.x | Structured concurrency, `StateFlow` for UI state, `callbackFlow` for JNI |
-| Inference Engine | llama.cpp | latest release | Reference GGUF implementation, Android arm64 builds, 108k GitHub stars |
-| Native Build | NDK 27+ + CMake | 3.22+ | Cross-compile llama.cpp for arm64-v8a; build from source for ABI match |
-| Security | EncryptedSharedPreferences | 1.1.0 (security-crypto) | AES-256 backed by Android Keystore (TEE/StrongBox) |
-| Testing | JUnit 5 + MockK + Turbine + Truth | 5.11.x / 1.13.x / 1.1.x / 1.4.x | Kotlin-first mocking, Flow testing, fluent assertions |
-| Build | AGP 9.0.x + Gradle 8.13+ + KSP | 2.1.10-1.0.x | Version catalog (`libs.versions.toml`), Kotlin DSL, kapt replaced by KSP |
-| Linting | Detekt + ktlint | 1.23.x / 1.5.x | Static analysis + formatting for Kotlin |
+### Recommended Stack Additions
 
-**Key anti-choices**: NO Flutter/React Native (JNI friction), NO Koin (runtime DI), NO Ktor (Android-specific OkHttp is better), NO MLC-LLM/ExecuTorch (llama.cpp is the reference), NO KAPT (use KSP), NO LiveData (use Flow/StateFlow).
+The existing v1.0 stack (Kotlin 2.1.10, Jetpack Compose BOM 2025.04.00, Hilt 2.59.2, Room 2.7.x, OkHttp 4.12.0, Retrofit 2.11.1, llama.cpp via JNI) remains unchanged. LiteRT-LM adds exactly **one dependency**:
 
----
+**New core technologies:**
+- **`com.google.ai.edge.litertlm:litertlm-android:0.10.2`**: Pre-built AAR from Google Maven containing the full LiteRT runtime with native `.so` libraries. Provides `Engine` (model lifecycle), `Conversation` (stateful chat with auto-templating), `SamplerConfig` (temperature/topP/topK/seed), and backends (CPU/GPU/NPU). Zero CMake/NDK setup — `implementation()` dependency only.
+- **`<uses-native-library android:name="libOpenCL.so" android:required="false"/>`**: AndroidManifest additions required for GPU backend. Marked `required="false"` so devices without OpenCL (Tensor G3, some Exynos) can still install and fall back to CPU.
+- **Hugging Face `litert-community` org**: 93+ pre-converted `.litertlm` models (Gemma, Llama, Phi, Qwen). Same HF Hub REST API as GGUF — no new HTTP client needed. Filter by `author=litert-community` plus client-side `.litertlm` extension filtering.
+- **Room schema migration**: Add `model_format TEXT NOT NULL DEFAULT 'GGUF'` and `engine_type` columns. Make `quantization` nullable (meaningless for `.litertlm`). New `:library:litertlm` module for engine wrapper + backend detection.
 
-## 3. v1 Feature Set
+### Expected Features
 
-### Table Stakes (must ship for M1)
+**Must have (table stakes for v1.1 launch):**
+- **Search `.litertlm` models on Hugging Face** — Extends `HuggingFaceApi` with litert-community search mode. Client-side `.litertlm` extension filtering to exclude vision/speech models.
+- **Download `.litertlm` models with progress and pause/resume** — Reuses existing `ModelDownloadManager` with `.litertlm` extension handling. Same OkHttp `Range` header resume pattern.
+- **Load and chat with streaming** — Core value proposition. New `LiteRTLmProvider` implementing `LlmProvider`. Wraps `Engine` → `Conversation` → `sendMessageAsync()` which returns `Flow<Message>` natively (no callbackFlow wrapper needed unlike llama.cpp).
+- **Auto-detect GPU with CPU fallback** — Runtime backend probing via `BackendDetector`. Try GPU first, catch `LiteRtLmJniException`, fall back to CPU. Surface active backend in UI.
+- **Separate GGUF / LiteRT-LM UI tabs in Models screen** — Compose `TabRow` with `ModelFormat` filter. Prevents user confusion between the two ecosystems.
 
-| # | Feature | Complexity | Dependencies |
-|---|---------|------------|--------------|
-| 1 | Chat interface with real-time token streaming | Medium | SSE parser, Compose Flow integration |
-| 2 | Remote provider connectivity (OpenAI-compatible + Ollama + LM Studio + custom) | Medium | OkHttp, SSE, endpoint config |
-| 3 | Local model inference via llama.cpp/GGUF | **High** | JNI/NDK, GGUF files on disk |
-| 4 | Hugging Face model search and download with pause/resume | **High** | HF API, WorkManager, file I/O |
-| 5 | Model management (list, view metadata, delete) | Medium | Room, file system |
-| 6 | API key management (encrypted Keystore storage) | Medium | Android Keystore, EncryptedSharedPreferences |
-| 7 | Chat history persistence (conversations + messages survive restarts) | Low-Medium | Room |
-| 8 | Basic generation parameters (temperature, top_p, top_k, repeat_penalty, max_tokens, context_size, seed) | Low | UI widgets, serialization |
+**Should have (v1.1.x polish):**
+- Import local `.litertlm` files — Reuses `ActivityResultContracts.OpenDocument` file picker.
+- LiteRT-LM generation parameters UI — Separate `LiteRtParameters` model, sliders for temperature/topK/topP.
+- Model management (view/delete) — Reuses existing list/view/delete flow with `ModelFormat` discriminator.
+- Cached model loading — Set `EngineConfig.cacheDir` for ~10x faster subsequent loads.
 
-### Differentiators (shipped in v1 to establish competitive position)
+**Defer to v2.0+:**
+- Multi-modality (vision/audio) — Requires separate backends, new UI, larger scope.
+- Tool use / function calling — Different interaction paradigm, requires agent architecture.
+- NPU auto-detection — SoC-fragmented, needs per-device testing. Expose as manual toggle in v1.1.
+- Converting GGUF → `.litertlm` on-device — Computationally infeasible on mobile.
+- Running both engines simultaneously — Memory exhaustion on typical 8GB devices.
 
-| # | Feature | Complexity |
-|---|---------|------------|
-| 9 | Unified local + remote model list (same UI regardless of backend) | Medium-High |
-| 10 | Hugging Face in-app search with GGUF filter and curated recommendations | Medium-High |
-| 11 | Model download pause/resume with foreground notification | Medium-High |
-| 12 | Import local GGUF files via system file picker | Low-Medium |
-| 13 | Generation presets (saved named parameter profiles) | Low |
-| 14 | Custom endpoint configuration with "Test Connection" button | Medium |
-| 15 | Device-aware model size warnings (RAM-based heuristics) | Medium |
-| 16 | Offline chat continuity (local models work; remote shows connectivity errors) | Low |
-| 17 | Inference performance controls (thread count, context size, GPU toggle) | Medium-High |
+### Architecture Approach
 
-### Build Order
+LiteRT-LM integrates as a **second `LlmProvider` implementation** under the existing provider polymorphism pattern. The domain layer gets exactly one new enum value (`ProviderType.LITERT_LM`). The UI layer is completely decoupled — `ChatScreen` and `ChatViewModel` never know which engine is running. The key adaptation is mapping LiteRT-LM's stateful `Engine → Conversation` lifecycle onto the existing stateless `chat(ChatRequest): Flow<StreamToken>` contract by creating a **fresh `Conversation` per `chat()` call** with `ConversationConfig.initialMessages` seeded from `ChatRequest.messages`.
 
-1. **Foundation**: Room + DataStore + Keystore + navigation shell + domain models
-2. **Remote chat**: OkHttp + SSE + OpenAI/Ollama/LMStudio providers + chat UI + streaming + chat history
-3. **Model acquisition**: HF search + HF download w/ resume + import local GGUF + model management
-4. **Local inference**: llama.cpp JNI + GGUF loading + local chat path + performance controls
-5. **Polish**: Unified model list + presets + device warnings + offline continuity + hardening
+**Major components (new or modified):**
+1. **`:library:litertlm` module** — `LiteRTLmEngine` (Engine lifecycle wrapper with Mutex-serialized init/close), `BackendDetector` (GPU/NPU capability probing with CPU fallback chain), `LiteRTLmEngineConfig` (engine-scoped params: maxTokens, threads, cacheDir).
+2. **`LiteRTLmProvider`** — Implements `LlmProvider`, wraps `LiteRTLmEngine`. Per-call Conversation factory pattern. Maps `GenerationParameters → SamplerConfig`. Runs chat on `Dispatchers.Default`.
+3. **`ProviderRouter`** — Add `ProviderType.LITERT_LM → liteRTLmProvider` case. Same routing mechanism as all other providers.
+4. **`HuggingFaceApi`** — Add `searchLiteRTLmModels()` method targeting `author=litert-community` with client-side `.litertlm` extension filtering.
+5. **`ModelsScreen`** — Add Compose `TabRow`: "GGUF" | "LiteRT-LM", each filtering `LocalModel` by `ModelFormat`.
+6. **Room schema** — Migration adding `model_format` and `engine_type` columns, nullable `quantization`.
 
----
+### Critical Pitfalls
 
-## 4. Architecture Blueprint
+1. **GPU backend silently crashes on Tensor G3/Pixel 8** — `Backend.GPU()` constructs without error but inference crashes with "Can not find OpenCL library" at message-send time. **Prevent by:** Building a `BackendDetector` that probes `System.loadLibrary("OpenCL")` and attempts a minimal GPU init with try/catch + 5-second timeout before ever exposing GPU to the user. Cache result per session.
 
-### Layer Diagram
+2. **Conversation SIGSEGV on second `sendMessage()` (MediaTek Dimensity)** — Native conversation state invalidates after first use on Dimensity SoCs. Second `sendMessageAsync` crashes with `SIGSEGV (SEGV_MAPERR)` at `nativeSendMessage`. **Prevent by:** Always creating a fresh `Conversation` per message exchange. Never reuse. This also happens to match the official `.use {}` block pattern from the getting-started guide.
 
-```
-┌─────────────────────────────────────────────────┐
-│  UI LAYER (Compose screens + ViewModels)         │
-│  ChatScreen, ModelsScreen, EndpointsScreen,      │
-│  SettingsScreen, shared :core:ui components      │
-├─────────────────────────────────────────────────┤
-│  DOMAIN LAYER (pure Kotlin, no Android deps)     │
-│  UseCases, LLMProvider interface, StreamToken,   │
-│  domain models, repository interfaces            │
-├─────────────────────┬───────────────────────────┤
-│  DATA LAYER         │  NATIVE LAYER (C++ via JNI)│
-│  Room, DataStore,   │  llama.cpp, GGUF loader,   │
-│  Retrofit/OkHttp,   │  tokenizer, Vulkan delegate │
-│  Keystore           │  (separate :inference proc) │
-└─────────────────────┴───────────────────────────┘
-```
+3. **Unicode/LaTeX input crashes via ICU `RegexMatcher`** — Input containing LaTeX (`$x^2$`), Unicode math (`∫`, `∑`), or non-Latin scripts triggers SIGSEGV in `libicui18n.so` at `RegexMatcher::find()`. 100% reproducible on all API surfaces. **Prevent by:** Input sanitization layer (strip/escape regex metacharacters) OR route LaTeX-heavy conversations to llama.cpp which handles arbitrary Unicode.
 
-### Central Abstraction: LLMProvider
+4. **Dual-engine memory contention** — Loading a 7B GGUF (~4.3GB) + Gemma 4 E4B `.litertlm` (~4GB) simultaneously exceeds ~8GB available on typical 12GB devices. LowMemoryKiller kills the process silently. **Prevent by:** `EngineManager` enforcing mutual exclusion — only one local model loaded at a time. Unload current engine before loading a different one. Pre-load memory check: `availMem < model_size × 1.5` shows warning.
 
-All chat providers implement the same interface, decoupling the UI from backend specifics:
+5. **Parameter mapping mismatch** — `GenerationParameters` has fields LiteRT-LM doesn't support (`repeatPenalty`, `contextSize`, `threads` at per-request level). Blindly passing all params silently drops unsupported ones. **Prevent by:** Explicit `GenerationParameters.toLiteRTSamplerConfig()` extension with documented mapping table. Grey out unsupported params in UI when LiteRT-LM model is selected.
 
-```kotlin
-interface LLMProvider {
-    val type: ProviderType
-    suspend fun chat(messages: List<Message>, params: GenerationParams): Flow<StreamToken>
-    suspend fun listModels(): Result<List<ModelInfo>>
-    suspend fun testConnection(): Result<ConnectionStatus>
-}
-```
+## Implications for Roadmap
 
-Five implementations: `OpenAIProvider`, `OllamaProvider`, `LMStudioProvider`, `CustomProvider`, `LlamaInferenceProvider`.
+Based on combined research, the LiteRT-LM integration naturally breaks into **5 sequential phases**, with Phase 1 being the foundation everything else depends on and Phase 5 being polish that can ship post-launch.
 
-### Key Data Flow: Streaming Chat
+### Phase 1: Engine Foundation (deepest dependency, zero UI)
 
-```
-User types → ChatScreen → ChatViewModel → SendMessageUseCase
-  → ChatRepository → ProviderRouter.resolve(endpoint)
-    → LLMProvider.chat() → SSE/Llama tokens
-      → Flow<StreamToken> back up
-        → ViewModel updates StateFlow<ChatUiState>
-          → Compose recomposes with new token appended
-```
+**Rationale:** Everything depends on being able to load a `.litertlm` model and produce tokens. This phase establishes the `:library:litertlm` module, the `LiteRTLmEngine` lifecycle wrapper, backend auto-detection with CPU fallback, and the Gradle dependency. No UI changes — testable with a tiny model (Gemma-3N-1B, ~500MB) via unit tests. Must address pitfalls #1 (GPU probe), #4 (memory mutual exclusion via EngineManager design), #7 (engine lifecycle strategy), and #10 (background dispatch for `initialize()`).
 
-Local inference uses the same pipeline — only the provider implementation differs.
+**Delivers:** Unit test proving `LiteRTLmEngine.initialize(path)` → `createConversation().sendMessageAsync()` returns tokens. BackendDetector correctly identifies GPU availability and falls back to CPU. Room schema migration passes on DB with 10+ existing GGUF records.
 
-### Module Structure (Gradle)
+**Features from FEATURES.md:** Infrastructure for "Load and chat with streaming" and "Auto-detect GPU with CPU fallback" (no user-facing UI yet).
 
-```
-:core:common          → domain models, LLMProvider interface (zero Android deps)
-:core:network         → OkHttp, SSE parser, interceptor chain
-:core:database        → Room DB, DAOs, entities, migrations
-:core:security        → Keystore encryption, API key storage
-:core:ui              → shared Compose components, theme
-:feature:chat         → chat screen, message list, streaming display
-:feature:models       → model management, HF search, downloads, import
-:feature:endpoints    → endpoint CRUD, testing, model listing
-:feature:settings     → params, presets, app settings
-:library:llama-native → JNI bridge, .so packaging, inference service
-```
+**Avoids:** Pitfall #1 (GPU silent failure — probe built day one), Pitfall #4 (memory contention — EngineManager designed before both engines coexist), Pitfall #9 (Room migration — tested on real data), Pitfall #10 (init blocking — `withContext(Dispatchers.Default)` enforced).
 
-Boundary rules: `:core:common` has zero Android deps. Features never depend on each other. `llama-native` only depends on domain interfaces — swappable to ExecuTorch/MLC later.
+### Phase 2: Provider Integration + Chat Streaming (domain → data wiring)
 
----
+**Rationale:** Wires the engine into the existing architecture. Maps the stateful Conversation API to the stateless `LlmProvider.chat()` contract via per-call Conversation factory. Adds `ProviderType.LITERT_LM` to domain layer. Implements `LiteRTLmProvider` with parameter mapping from `GenerationParameters → SamplerConfig`. This is where Pitfall #2 (single-use Conversation), #5 (thread safety via Mutex), and #3 (unicode/LaTeX fallback routing) must be addressed.
 
-## 5. Critical Pitfalls (Top 5)
+**Delivers:** Integration test proving end-to-end chat pipeline works (Endpoint with LITERT_LM type → chat → tokens stream back). Parameter mapping table tested for all edge values. Input sanitization layer intercepting LaTeX/Unicode before reaching the engine.
 
-### P1 | Native crash kills entire process (Severity: CRITICAL)
+**Features from FEATURES.md:** "Load and chat with streaming" (complete). Foundation for "Generation parameters for LiteRT-LM."
 
-Native SIGSEGV in llama.cpp (bad model, OOM, corrupted context) kills the JVM with zero Kotlin-level recovery.
+**Uses from STACK.md:** `litertlm-android:0.10.2` via version catalog. `Engine.initialize()` on `Dispatchers.Default`. `Conversation.sendMessageAsync()` → `Flow<Message>` integration.
 
-**Prevention**: Run inference in a **separate process** (`android:process=":inference"`) communicating via AIDL/Messenger. Wrap JNI calls with SIGSEGV handler and `longjmp` recovery path. Expose `llama_free_all()` for graceful restart.
+**Avoids:** Pitfall #2 (Conversation reuse SIGSEGV — architect per-call Conversation), Pitfall #3 (Unicode crash — sanitization before sendMessageAsync), Pitfall #5 (thread safety — Mutex on Engine, sequential Conversation access), Pitfall #6 (parameter mapping — explicit extension function).
 
-### P2 | SSE parser breaks on mobile network jitter (Severity: HIGH)
+### Phase 3: Model Acquisition (download + management)
 
-SSE payloads arrive fragmented across TCP packets. Naive per-line parsing misses tokens that span chunk boundaries.
+**Rationale:** Users need models on device to use the engine. Reuses existing download infrastructure (WorkManager + OkHttp + foreground notifications) with different HF endpoint and file extension. This phase requires Pitfall #8 (HF API divergence — litert-community search filter) and the client-side `.litertlm` extension filtering.
 
-**Prevention**: Use a line accumulator buffer. Parse on `\n\n` double-newline boundaries only. Test with network-condition throttling (400ms latency, 2% packet loss).
+**Delivers:** User can search litert-community, see only LLM-capable `.litertlm` models (excludes vision/speech), download with progress and pause/resume, and see downloaded models in their library with format badges.
 
-### P3 | Download resets on interruption waste gigabytes (Severity: HIGH)
+**Features from FEATURES.md:** "Search .litertlm models on HF" and "Download .litertlm with progress."
 
-GGUF models are 1-30GB. Without HTTP Range headers, any disruption restarts from byte 0. Mobile connections drop constantly.
+**Implements:** `HuggingFaceApi.searchLiteRTLmModels()`, `ModelDownloadManager` `.litertlm` extension handling, `ModelRepository` format-aware queries.
 
-**Prevention**: Always use `Range: bytes=<existing_size>-` headers. Persist download progress to Room. Use foreground service with WorkManager to survive Doze. Validate SHA256 after every resume.
+**Avoids:** Pitfall #8 (HF API divergence — separate search endpoint, client-side file extension filtering), Pitfall #9 (Room queries filtering by GGUF-specific fields without format check).
 
-### P4 | Thread safety around llama_context (Severity: HIGH)
+### Phase 4: UI Integration (tabs, settings, user-facing UX)
 
-llama.cpp's `llama_context` is not thread-safe. Concurrent coroutines calling `llama_eval` cause silent token corruption or hard crash.
+**Rationale:** UI is the thin layer on top. By this point, the engine works, the provider works, models can be acquired. This phase makes it user-facing with separate GGUF/LiteRT-LM tabs, backend preference settings, and format badges. The `ChatScreen` needs zero changes — it's provider-agnostic by design.
 
-**Prevention**: Use a `Mutex` or single-threaded `Channel` actor per model context. Document: one context = one coroutine actor. Disable regenerate button during cancellation.
+**Delivers:** Full user flow: discover model in LiteRT-LM tab → download → select → chat → with visible backend badge ("GPU" / "CPU"). Settings screen with backend preference (Auto/GPU/CPU). Greyed-out unsupported parameters for LiteRT-LM models.
 
-### P5 | Plaintext API key storage (Severity: CRITICAL)
+**Features from FEATURES.md:** "Separate GGUF/LiteRT-LM UI tabs" and "Backend selection with auto-detection" (completed UI). "Generation parameters for LiteRT-LM" (parameter UI adapts to engine).
 
-SharedPreferences/DataStore keys are readable via ADB backup, rooted devices, or malware with file permissions.
+**Avoids:** All UX pitfalls — mixed model lists without format indicators, showing unsupported parameters as active, no engine type badge in model selector.
 
-**Prevention**: Android Keystore with AES-GCM. Store only ciphertext in DataStore. Redact keys from logs via custom Timber tree. Use `CharArray` + zero-fill for in-memory key handling.
+### Phase 5: Polish & Edge Cases (ship-quality hardening)
 
-### Full Top-8 Project Killers
+**Rationale:** Ship after core path works end-to-end. Covers backend fallback UX (toasts), error recovery (retry with different backend on init failure), memory management (unload on app background, `onTrimMemory` handling), thermal throttling integration, and import local `.litertlm` files. This phase can ship as v1.1.x after launch.
 
-| Rank | Pitfall | Impact | Phase |
-|------|---------|--------|-------|
-| 1 | Running inference on UI thread | ANR, 1-star reviews | Local inference |
-| 2 | SSE parser breaks on mobile network jitter | Silent data loss | Remote connectivity |
-| 3 | Download reset on interruption | Wasted GBs, uninstall | Model management |
-| 4 | Native crash kills whole process | Hard crash, no recovery | Local inference |
-| 5 | Plaintext API key storage | Data breach, Play rejection | Security |
-| 6 | No stop/cancel mechanism | Battery drain, ANR | Chat UI / streaming |
-| 7 | Thread safety around llama_context | Corrupted output, crashes | Local inference |
-| 8 | Process death loses everything | Terrible UX after app switch | All |
+**Delivers:** Cached model loading (set `cacheDir` in EngineConfig). Import local files via SAF file picker. Defensive error recovery — if `createConversation()` fails with "Engine not alive," close and re-initialize. Thermal monitoring pauses inference on severe status.
 
----
+**Features from FEATURES.md:** "Import local .litertlm files," "Cached model loading," "Model management (view/delete)."
 
-## 6. Risk Assessment Matrix
+**Avoids:** Pitfall #7 (conversation lifecycle mismanagement — defensive recreate on "Engine not alive" errors), performance traps (engine creation on every chat message — keep engine alive; large downloads without storage check).
 
-| Risk | Severity | Probability | Impact | Mitigation |
-|------|----------|-------------|--------|------------|
-| Native crash (SIGSEGV/OOM) in llama.cpp | Critical | Medium | App hard-crash, no recovery UI | Separate process, JNI safety wrapper, signal handler |
-| API key leakage via logs or plaintext storage | Critical | Low | Data breach, Play Store rejection | Keystore + EncryptedSharedPreferences, redacted logging, CharArray zero-fill |
-| Download reset on mobile interruptions | High | High | User frustration, wasted data, uninstalls | Range headers, foreground service, Room progress persistence |
-| SSE streaming corruption on unreliable networks | High | Medium | Truncated/missing tokens, broken UX | Line accumulator buffer, network-condition testing |
-| Thread safety bugs in llama_context | High | Medium | Corrupted output, mysterious crashes | Single-thread Channel actor per context, Mutex gating |
-| Thermal throttling during sustained inference | Medium | High | Dramatic token/s drop >3min in, hot device | Thermal status monitoring, auto-pause on SEVERE, reduced thread count |
-| Process death during inference | Medium | High | Loss of in-progress message, model reload | SavedStateHandle, Room persistence every N tokens, foreground service |
-| Doze blocking long downloads | Medium | High | Hours-long stalls, user confusion | Foreground service exemption, battery optimization request, expedited work |
-| GGUF model too large for device RAM | Medium | High | OOM crash, wasted download | Pre-load RAM estimation, device-aware warnings, context size slider |
-| Hugging Face API rate limiting | Low-Medium | Medium | 429 bans, broken model search | Token-bucket rate limiter (5 req/s), Room cache with 15min TTL, Retry-After handling |
-| GPU delegate fragmentation (Vulkan driver variance) | Medium | Low (deferred) | GPU-feature broken on some SoCs | Start CPU-only; later GPU as opt-in with vendor blocklist and CPU fallback |
-| Self-signed cert rejection on local endpoints | Low | Medium | Can't connect to Ollama/LM Studio on LAN | Per-endpoint "trust self-signed" toggle with cert fingerprint pinning; cleartext allowed only for LAN IPs |
+### Phase Ordering Rationale
 
----
+- **Phase 1 must come first** — the engine library, backend detection, and Room schema are prerequisites for everything else. Testable in isolation.
+- **Phase 2 must come before Phase 4** — the provider needs to work before UI can be wired to it. Chat streaming is the value proposition; everything else supports it.
+- **Phase 3 can partially overlap with Phase 2** — model acquisition (download/search) is independent of chat once the engine exists, but needs the `ModelFormat` concept established in Phase 2.
+- **Phase 4 is intentionally last for significant work** — it's the thinnest layer but depends on all three prior phases being complete.
+- **Phase 5 is polish** — can ship after initial v1.1 launch without blocking anything.
 
-## 7. Confidence Levels
+### Research Flags
+
+**Phases likely needing `/gsd-research-phase` during planning:**
+- **Phase 1 (Engine Foundation):** GPU backend detection across SoCs is hardware-dependent. The `BackendDetector` probe strategy may need device-specific adjustments. The `.litertlm` file format is new — confirm header parsing for metadata extraction.
+- **Phase 3 (Model Acquisition):** litert-community HF API filter behavior needs live testing. The `author=litert-community` query may return models without `.litertlm` files — client-side filtering logic needs validation with real API responses.
+
+**Phases with well-documented patterns (skip research-phase):**
+- **Phase 2 (Provider Integration):** Standard provider pattern already established for llama.cpp and remote providers. Parameter mapping is a straightforward extension function.
+- **Phase 4 (UI Integration):** Standard Compose TabRow + filtered lists. Well-established Material 3 patterns.
+- **Phase 5 (Polish):** Error handling, thermal monitoring, memory management are Android platform patterns with official documentation.
+
+## Confidence Assessment
 
 | Area | Confidence | Notes |
-|------|-----------|-------|
-| Core Platform (Kotlin, Compose, SDK) | **HIGH** | Kotlin 2.1.10 confirmed via Dagger 2.59 release notes. Compose BOM verified against Google Maven release cadence. |
-| DI & Architecture (Hilt, Clean Architecture) | **HIGH** | Dagger 2.59.2 confirmed via GitHub releases (Feb 2026). MVVM + Repository pattern is Android industry standard. |
-| Local Storage (Room, DataStore) | **HIGH** | Stable AndroidX libraries. Exact patch versions resolve via BOM or latest stable. |
-| Networking (OkHttp, Retrofit, SSE) | **HIGH** | OkHttp 4.12.0 long-term stable. SSE streaming pattern proven in Android chat apps. |
-| Background Work (WorkManager, Coroutines) | **HIGH** | WorkManager mature; Coroutines 1.9.x confirmed via Kotlin release cycle. |
-| Local LLM Inference (llama.cpp, JNI) | **HIGH** | llama.cpp Android arm64 builds confirmed. JNI bridge pattern proven (community ChatGPT Android apps). Build-from-source with CMake is standard. |
-| Hugging Face Integration | **HIGH** | HF Hub API is stable REST. Custom Retrofit client is straightforward. |
-| Security (Keystore, EncryptedSharedPreferences) | **HIGH** | security-crypto 1.1.0 stable. Keystore is platform API. |
-| Testing (JUnit 5, MockK, Turbine, Truth) | **HIGH** | All mature, actively maintained libraries. |
-| Build Tooling (AGP 9, Gradle, version catalog) | **MEDIUM** | AGP 9 required by Hilt 2.59.x. Gradle 9.1+ inferred — verify against AGP compatibility table before freezing. |
-| KSP version | **MEDIUM** | Version `2.1.10-1.0.31` inferred from Dagger 2.56 notes. Verify against KSP releases. |
-| Material 3 / Compose BOM | **MEDIUM** | BOM version estimated. Verify latest stable at Compose BOM mapping page. |
-| Feature scope completeness | **MEDIUM** | 17 features identified. Edge cases may emerge during implementation. 4 open architecture questions need benchmarking spikes. |
-| Device compatibility breadth | **MEDIUM** | Tested conceptually on arm64-v8a. Real-world GPU/SoC variance may surface issues during QA. |
+|------|------------|-------|
+| Stack | **HIGH** | LiteRT-LM v0.10.2 confirmed via Google Maven metadata XML. API surface verified against official source code (Engine.kt, Conversation.kt, Config.kt). Maven dependency coordinates confirmed. |
+| Features | **HIGH** | Feature set validated against existing Warped codebase (LlmProvider, LocalModel, ModelDownloadManager, HuggingFaceApi). litert-community org verified with 93+ models. Competitor analysis confirms dual-engine approach is unique among Android LLM apps. |
+| Architecture | **HIGH** | Integration pattern verified against existing Warped architecture and LiteRT-LM source code. Per-call Conversation factory pattern tested conceptually. ProviderRouter extension is trivial. Build order derived from component dependencies. |
+| Pitfalls | **HIGH** | All 10 critical pitfalls backed by confirmed GitHub issues with reproduction steps. GPU crash (#1860), Conversation SIGSEGV (#1849), Unicode crash (#1616), and others verified on specific devices/SoCs. Prevention strategies validated against official docs. |
+| GPT/Roadmap Fit | **MEDIUM** | Phase structure is well-derived from dependencies, but exact phase boundaries (how many waves per phase, whether acquisition and chat belong together) should be refined during planning based on team velocity and testing hardware availability. |
+
+**Overall confidence:** **HIGH** — All major areas verified against official sources (Google Maven, LiteRT-LM GitHub, Hugging Face API, existing Warped codebase). Remaining MEDIUM-confidence items are execution details that require live device testing (GPU probe on Tensor G3, MediaTek stability, APK size measurement) rather than architecture questions.
+
+### Gaps to Address
+
+- **LiteRT-LM v0.10.2 Unicode/LaTeX bug status:** The ICU crash was confirmed in v0.9.0-alpha06 through v0.10.0. Need to verify whether v0.10.2 (Apr 14, 2026 release) fixes it. If not, input sanitization is mandatory from Phase 2. Test with `$x^2$` input against v0.10.2 before freezing the dependency.
+- **`.litertlm` file header metadata extraction:** Can we extract parameter count, quantization, and architecture from the file header before full load? Similar to GGUF header parsing. LiteRT-LM's `Capabilities` class may provide this but API surface needs verification. If not available, metadata must come from Hugging Face model cards.
+- **MediaTek Dimensity testing hardware:** Pitfalls #2, #5, #7 are all MediaTek-specific. Without a physical Dimensity device (OnePlus CPH2609, iQOO I2407, OPPO CPH2717), these must be tested via Firebase Test Lab or assumed from GitHub issue reports.
+- **NPU driver bundling strategy:** To use `Backend.NPU()`, the app must bundle NPU native libraries or download them. Is the NPU driver available on Google Play Services, or must it be bundled? This decision affects APK size (potentially +50-100MB for multiple NPU drivers) and should be resolved before v1.3 NPU planning.
+- **APK size impact measurement:** `litertlm-android` AAR adds ~10-20 MB per ABI. Combined with existing llama.cpp `.so` files, total APK impact needs measurement before release to avoid Play Store size limit issues (200MB APK, 2GB AAB with Play Asset Delivery).
+- **Open questions from Architecture Appendix B** (10 items): Context window mapping (`maxNumTokens` = input+output vs our output-only `maxTokens`), repeat penalty availability, multi-turn performance with per-call Conversation, NPU library bundling, offline model auth requirements, and model metadata extraction. These are planning-phase decisions, not research gaps.
+
+## Sources
+
+### Primary (HIGH confidence)
+- **LiteRT-LM GitHub (google-ai-edge/LiteRT-LM):** Official source code (`Engine.kt`, `Config.kt`, `Conversation.kt`, `Session.kt`, `Capabilities.kt`) — v0.10.2 API surface verified. 4.6k stars.
+- **Google Maven metadata:** `https://dl.google.com/dl/android/maven2/com/google/ai/edge/litertlm/litertlm-android/maven-metadata.xml` — confirmed v0.10.2 as latest stable, v0.11.0-rc1 as pre-release.
+- **LiteRT-LM Kotlin Getting Started Guide:** Official Android integration docs — confirmed `Engine`, `Conversation`, `sendMessageAsync()` patterns.
+- **Hugging Face litert-community org:** `https://huggingface.co/litert-community` — 93 models, 6,277 followers. Verified Gemma 4 E2B/E4B, Llama 3.2, Phi-4, Qwen 2.5 availability.
+- **Existing Warped codebase:** `LlmProvider`, `LocalModel`, `ModelDownloadManager`, `HuggingFaceApi`, `ProviderRouter`, `ModelsScreen` — mapped all integration points from source.
+- **Context7 LiteRT-LM library:** `/google-ai-edge/litert-lm` — official docs cross-reference.
+
+### Secondary (MEDIUM confidence)
+- **GitHub Issues (google-ai-edge/LiteRT-LM):** 97 open issues as of 2026-05-02. Key issues: #1860 (GPU silent failure), #1849 (Conversation SIGSEGV on MediaTek), #1616 (ICU Unicode crash), #2028 (SIGSEGV on second createConversation), #1859 (FunctionGemma SIGSEGV), #1681 (GPU misidentification), #1864 (Exynos 2600 init failure).
+- **Google AI Edge Gallery App:** Production reference for Android LiteRT-LM integration on Google Play. HIGH confidence for UX patterns but app internals not inspectable.
+
+### Tertiary (LOW confidence)
+- **`.litertlm` format specifications:** Internal flatbuffer structure not publicly documented in detail. Memory footprint estimates derived from model descriptions and GitHub issue reports, not benchmarked.
+- **NPU backend availability:** Per-SoC NPU driver distribution is fragmented. Decision to defer NPU auto-detection based on community difficulty reports, not exhaustive testing.
 
 ---
 
-## Appendix: Open Architecture Questions
-
-1. **GPU delegate**: Vulkan vs. NNAPI vs. CPU-only on Snapdragon 8 Gen 2/3 — needs benchmarking spike
-2. **Quantization floor**: Should app enforce minimum Q4_K_M for 7B on 8GB RAM, or just warn?
-3. **Model cache eviction**: Auto-delete stale models on low storage or leave to user?
-4. **Android 15+ 16KB page size**: llama.cpp must build with `-DLLAMA_NO_ALIGNMENT` — confirm JNI build flags
-
----
-
-*Summary feeds into: requirements specification, ROADMAP.md milestone planning, and phase-level PLAN.md documents.*
+*Research completed: 2026-05-02*
+*Ready for roadmap: yes — phase structure derived from dependencies, pitfalls mapped to phases, research flags identified for deeper investigation.*
