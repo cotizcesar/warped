@@ -224,6 +224,7 @@ fun HuggingFaceScreen(
                             ModelSearchResultCard(
                                 model = model,
                                 isCompatible = uiState.compatibilityByModelId[model.id] == true,
+                                activeFormat = uiState.activeFormat,
                                 onClick = { viewModel.selectModel(model) }
                             )
                         }
@@ -259,6 +260,7 @@ fun HuggingFaceScreen(
 private fun ModelSearchResultCard(
     model: com.warped.data.remote.dto.HuggingFaceModel,
     isCompatible: Boolean,
+    activeFormat: String,
     onClick: () -> Unit
 ) {
     val cardColors = if (isCompatible) {
@@ -313,6 +315,7 @@ private fun ModelSearchResultCard(
             )
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FormatBadge(activeFormat)
                 if (isCompatible) {
                     AssistInfoChip(text = stringResource(R.string.compatible_with_device))
                 }
@@ -323,6 +326,29 @@ private fun ModelSearchResultCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FormatBadge(format: String) {
+    val (color, label) = when {
+        format.equals("gguf", ignoreCase = true) || format.equals("GGUF", ignoreCase = true) ->
+            Color(0xFF2196F3) to "GGUF"
+        format.equals("litertlm", ignoreCase = true) || format.equals("LITERTLM", ignoreCase = true) ->
+            Color(0xFF4CAF50) to "LiteRT-LM"
+        else -> MaterialTheme.colorScheme.outline to format
+    }
+    Surface(
+        shape = MaterialTheme.shapes.extraSmall,
+        color = color.copy(alpha = 0.15f),
+        contentColor = color
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1
+        )
     }
 }
 
