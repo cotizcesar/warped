@@ -94,9 +94,9 @@ Requirements for LiteRT-LM integration. Each maps to roadmap phases.
 
 ### Generation Parameters
 
-- [ ] **PARM-03**: User can configure LiteRT-LM specific parameters (temperature, topK, topP, seed)
-- [ ] **PARM-04**: Unsupported parameters (repeat_penalty, context_size, threads) are greyed out for LiteRT-LM
-- [ ] **PARM-05**: Presets support both GGUF and LiteRT-LM parameter models
+- [x] **PARM-03**: User can configure LiteRT-LM specific parameters (temperature, topK, topP, seed)
+- [x] **PARM-04**: Unsupported parameters (repeat_penalty, context_size, threads) are greyed out for LiteRT-LM
+- [x] **PARM-05**: Presets support both GGUF and LiteRT-LM parameter models
 
 ### Polish & Hardening
 
@@ -203,9 +203,9 @@ Deferred to future release.
 | UI-03 | Phase 9 | Complete |
 | UI-04 | Phase 9 | Complete |
 | UI-05 | Phase 9 | Complete |
-| PARM-03 | Phase 10 | Pending |
-| PARM-04 | Phase 10 | Pending |
-| PARM-05 | Phase 10 | Pending |
+| PARM-03 | Phase 10 | Verified |
+| PARM-04 | Phase 10 | Verified |
+| PARM-05 | Phase 10 | Verified |
 | POL-01 | Phase 6 | Complete |
 | POL-02 | Phase 6 | Complete |
 | POL-03 | Phase 9 | Complete |

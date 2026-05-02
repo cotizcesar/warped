@@ -125,7 +125,10 @@ Plans:
   2. Parameters unsupported by LiteRT-LM (repeat_penalty, context_size, threads) are visibly greyed out and non-interactive when a LiteRT-LM model is selected
   3. User can save a preset with LiteRT-LM parameters and load it for reuse across chat sessions
   4. Presets created for GGUF models show GGUF-specific params, and presets created for LiteRT-LM show LiteRT-LM-specific params — both stored and restored correctly
-**Plans**: TBD
+**Plans**: 1/1 complete
+
+Plans:
+- [x] 10-01-PLAN.md — modelFormat presets + parameter grey-out + cross-format warnings (PARM-03, PARM-04, PARM-05)
 **UI hint**: yes
 
 ## Progress
@@ -141,7 +144,7 @@ Plans:
 | 7. Provider Integration & Chat | v1.1 | 1/2 | In Progress|  |
 | 8. Model Acquisition | v1.1 | 3/3 + 2 GAP | In Progress|  |
 | 9. UI Integration | v1.1 | 0/3 | Not started | — |
-| 10. Parameters & Polish | v1.1 | 0/0 | Not started | — |
+| 10. Parameters & Polish | v1.1 | 1/1 | Complete | 2026-05-02 |
 
 ## Coverage
 

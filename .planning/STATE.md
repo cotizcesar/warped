@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: LiteRT-LM Integration
 status: verifying
-stopped_at: Completed 08-GAP-01 and 08-GAP-02 gap closure plans — WorkManager foreground downloads + pause/resume + pipelineTag filtering
-last_updated: "2026-05-02T19:52:45.885Z"
+stopped_at: Completed 10-01-PLAN.md — modelFormat presets + parameter grey-out + cross-format warnings (PARM-03, PARM-04, PARM-05)
+last_updated: "2026-05-02T20:15:00Z"
 last_activity: 2026-05-02
 progress:
   total_phases: 5
-  completed_phases: 4
-  total_plans: 14
-  completed_plans: 14
+  completed_phases: 5
+  total_plans: 15
+  completed_plans: 15
   percent: 100
 ---
 
@@ -24,13 +24,13 @@ See: .planning/PROJECT.md
 ## Project Reference
 
 **Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** Phase 7 — Provider Integration & Chat (LiteRT-LM chat pipeline)
+**Current focus:** Phase 10 — Parameters & Polish (v1.1 final phase)
 **Milestone:** v1.1 LiteRT-LM Integration
 
 ## Current Position
 
-Phase: 7 of 10 (Provider Integration & Chat)
-Plan: 2 of 2
+Phase: 10 of 10 (Parameters & Polish)
+Plan: 1 of 1
 Status: Phase complete — ready for verification
 Last activity: 2026-05-02
 
@@ -65,6 +65,7 @@ Progress: [██████████] 100%
 | Phase 08 P02 | 131s | 2 tasks | 2 files |
 | Phase 08 P03 | 301s | 3 tasks | 4 files |
 | Phase 08 PGAP-01+GAP-02 | 576s | 4 tasks | 10 files |
+| Phase 10 P01 | 385s | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -102,6 +103,11 @@ Progress: [██████████] 100%
 - [08-03]: D-08-03d — setActiveFormat() clears search results and selected model, auto-re-searches for Phase 9 TabRow integration
 - [Phase 08]: D-GAP-01: WorkManager replaces CoroutineScope for download execution with foreground notifications and Room-persisted checkpoints (survives process death, supports pause/resume)
 - [Phase 08]: D-GAP-02: Blacklist pipelineTag filtering for litertlm search results — exclude vision/speech models, include everything else (gated on activeFormat)
+- [10-01]: D-10-01a — model_format on presets uses same DEFAULT 'GGUF' pattern as local_models
+- [10-01]: D-10-01b — Cross-format warning only triggers when local engine loaded; remote providers format-agnostic
+- [10-01]: D-10-01c — Grey-out uses Material3 enabled=false + alpha 0.38f modifier with onSurfaceVariant label
+- [10-01]: D-10-01d — FormatBadge composable reused from Phase 9 ModelsScreen (GGUF=blue, LiteRT-LM=green)
+- [10-01]: D-10-01e — activeFormat derived from EngineManager.getActiveEngine()?.type, defaults to "GGUF"
 
 ### Pending Todos
 
@@ -115,6 +121,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-02T19:52:45.877Z
-Stopped at: Completed 08-GAP-01 and 08-GAP-02 gap closure plans — WorkManager foreground downloads + pause/resume + pipelineTag filtering
+Last session: 2026-05-02T20:15:00Z
+Stopped at: Completed 10-01-PLAN.md — modelFormat presets + parameter grey-out + cross-format warnings
 Resume file: None
