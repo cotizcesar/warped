@@ -43,6 +43,7 @@ class ProviderRouter @Inject constructor(
                 modelId = modelId
             )
             ProviderType.LOCAL -> localLlmProvider.get().configure(modelId)
+            ProviderType.LITE_RT_LM -> localLlmProvider.get().configure(modelId) // TODO: Route to LiteRTLmProvider in Phase 07-02
         }
     }
 }
