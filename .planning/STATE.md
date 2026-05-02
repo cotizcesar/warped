@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: LiteRT-LM Integration
 status: executing
-stopped_at: Completed 06-01-PLAN.md (Build Integration — LITE-01, LITE-08) — 2 of 4 phase plans done
-last_updated: "2026-05-02T16:30:00Z"
-last_activity: 2026-05-02
+stopped_at: Completed 06-03-PLAN.md (BackendDetector + LiteRTLmEngine — LITE-02, LITE-03) — 3 of 4 phase plans done
+last_updated: "2026-05-02T16:40:13.496Z"
+last_activity: 2026-05-02 — Roadmap created for v1.1 phases 6-10 (26 requirements mapped)
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
-  percent: 50
+  completed_plans: 3
+  percent: 75
 ---
 
 # Project State: Warped
@@ -30,11 +30,11 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 6 of 10 (Engine Foundation)
-Plan: Plans 01, 02 completed (2 of 4)
+Plan: Plans 01, 02, 03 completed (3 of 4)
 Status: Executing
-Last activity: 2026-05-02 — Plan 06-01 (Build Integration) completed; LITE-01, LITE-08 requirements satisfied
+Last activity: 2026-05-02 — Plan 06-03 (BackendDetector + LiteRTLmEngine) completed; LITE-02, LITE-03 requirements satisfied
 
-Progress: [█████░░░░░] 50%
+Progress: [████████░░] 75%
 
 ## Completed
 
@@ -57,7 +57,7 @@ Progress: [█████░░░░░] 50%
 | 3. Model Acquisition | 2 | — | — |
 | 4. Parameters & Presets | 2 | — | — |
 | 5. Security Hardening & Polish | 1 | — | — |
-| 6-10 (v1.1) | 4 | 6min 12s | 3min 06s |
+| 6-10 (v1.1) | 4 | 12min 41s | 4min 14s |
 
 ## Accumulated Context
 
@@ -73,6 +73,8 @@ Progress: [█████░░░░░] 50%
 - [06-02]: D-13 — model_format TEXT NOT NULL DEFAULT 'GGUF' column added to local_models via MIGRATION_6_7
 - [06-02]: D-14 — modelFormat field validates against 'GGUF'/'LITERTLM' values, defaults to 'GGUF'
 - [06-02]: engine_type column intentionally excluded — only model_format in this migration per user direction
+- [06-03]: D-09/D-10/D-11/D-12 — BackendDetector lazy GPU probe via EGL14 + OpenCL, @Volatile caching, CPU/GPU only (NPU deferred)
+- [06-03]: D-05/D-06/D-07/D-08 — LiteRTLmEngine @Synchronized lifecycle wrapper, Engine.setNativeMinLogSeverity in companion init, caller-managed dispatching, graceful close with null cleanup
 
 ### Pending Todos
 
@@ -86,6 +88,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-02
-Stopped at: Completed 06-01-PLAN.md (Build Integration — LITE-01, LITE-08) — 2 of 4 phase plans done
+Last session: 2026-05-02T16:40:13.482Z
+Stopped at: Completed 06-03-PLAN.md (BackendDetector + LiteRTLmEngine — LITE-02, LITE-03) — 3 of 4 phase plans done
 Resume file: None
