@@ -43,16 +43,25 @@ class ModelImportManager @Inject constructor(
                     }
                 }
 
-                val metadata = GgufMetadataParser.parse(destFile)
+                val isLitertlm = fileName.endsWith(".litertlm", ignoreCase = true)
+
+                val metadata = if (!isLitertlm) {
+                    GgufMetadataParser.parse(destFile)
+                } else {
+                    Result.success(GgufMetadata()) // .litertlm has different binary header
+                }
                 val modelMetadata = metadata.getOrDefault(GgufMetadata())
 
                 val localModel = LocalModel(
-                    name = modelMetadata.name,
+                    name = modelMetadata.name.ifEmpty {
+                        fileName.removeSuffix(".gguf").removeSuffix(".litertlm")
+                    },
                     filePath = destFile.absolutePath,
                     sizeBytes = destFile.length(),
-                    quantization = modelMetadata.quantization,
-                    parameterCount = modelMetadata.parameterCount,
-                    architecture = modelMetadata.architecture,
+                    quantization = if (isLitertlm) "N/A" else modelMetadata.quantization,
+                    parameterCount = if (isLitertlm) "Unknown" else modelMetadata.parameterCount,
+                    architecture = if (isLitertlm) "LiteRT-LM" else modelMetadata.architecture,
+                    modelFormat = if (isLitertlm) "LITERTLM" else "GGUF",
                     importedAt = Instant.now()
                 )
 
