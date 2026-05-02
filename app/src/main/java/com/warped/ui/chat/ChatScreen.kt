@@ -26,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -208,7 +209,30 @@ fun ChatScreen(
                 }
             }
 
-            LazyColumn(
+            if (uiState.messages.isEmpty() && uiState.streamingContent.isEmpty()) {
+                // Empty state
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Image(
+                            painter = painterResource(id = com.warped.R.drawable.logo),
+                            contentDescription = "Warped",
+                            modifier = Modifier.size(64.dp)
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            "Selecciona el modelo y empieza a escribir...",
+                            color = Color(0xFF545450),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
@@ -249,6 +273,7 @@ fun ChatScreen(
                             }
                         }
                     }
+            }
             }
 
             if (uiState.modelLoadError != null) {
