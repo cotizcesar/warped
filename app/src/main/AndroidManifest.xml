@@ -10,6 +10,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Warped.Splash"
         android:dataExtractionRules="@xml/data_extraction_rules">
+
+        <!-- LiteRT-LM GPU backend support (LITE-08) -->
+        <uses-native-library android:name="libvndksupport.so" android:required="false" />
+        <uses-native-library android:name="libOpenCL.so" android:required="false" />
+
         <activity
             android:name=".MainActivity"
             android:theme="@style/Theme.Warped"

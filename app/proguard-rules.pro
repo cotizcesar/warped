@@ -10,3 +10,6 @@
 # Room
 -keep class * extends androidx.room.RoomDatabase
 -dontwarn androidx.room.paging.**
+
+# LiteRT-LM
+-keep class com.google.ai.edge.litertlm.** { *; }
