@@ -23,7 +23,8 @@ class ModelImportManager @Inject constructor(
     suspend fun importFromUri(uri: Uri, onProgress: (Float) -> Unit = {}): Result<LocalModel> =
         withContext(Dispatchers.IO) {
             try {
-                val fileName = getFileName(uri) ?: "model.gguf"
+                val fileName = getFileName(uri)?.takeIf { it.isNotBlank() }
+                    ?: "model.gguf" // keep backward-compatible default
                 val destFile = File(modelsDir, fileName)
 
                 context.contentResolver.openInputStream(uri)?.use { input ->

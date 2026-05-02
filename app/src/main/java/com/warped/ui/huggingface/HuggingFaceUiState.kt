@@ -20,5 +20,6 @@ data class HuggingFaceUiState(
     val downloadError: String? = null,
     val downloadSuccess: Boolean = false,
     val activeDownloadId: String? = null,
-    val error: String? = null
+    val error: String? = null,
+    val activeFormat: String = "gguf"
 )

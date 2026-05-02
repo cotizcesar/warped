@@ -64,7 +64,11 @@ class HuggingFaceViewModel @Inject constructor(
         searchJob?.cancel()
         _uiState.update { it.copy(searchQuery = trimmedQuery, isLoading = true, error = null) }
         searchJob = viewModelScope.launch {
-            val result = huggingFaceRepository.searchModels(trimmedQuery)
+            val activeFormat = _uiState.value.activeFormat
+            val result = huggingFaceRepository.searchModels(
+                query = trimmedQuery,
+                format = activeFormat
+            )
             result.onSuccess { models ->
                 val compatibility = loadCompatibility(models)
                 val sortedModels = models.sortedWith(
@@ -89,9 +93,10 @@ class HuggingFaceViewModel @Inject constructor(
         viewModelScope.launch {
             val result = huggingFaceRepository.getModelDetail(model.id)
             result.onSuccess { detail ->
-                val ggufFiles = detail.siblings
-                    .filter { it.rfilename.endsWith(".gguf", ignoreCase = true) }
-                val compatibility = ggufFiles.associate {
+                val extension = ".${_uiState.value.activeFormat}" // ".gguf" or ".litertlm"
+                val formatFiles = detail.siblings
+                    .filter { it.rfilename.endsWith(extension, ignoreCase = true) }
+                val compatibility = formatFiles.associate {
                     val effSize = it.size.takeIf { s -> s > 0 } ?: it.lfs?.size ?: 0L
                     val level = when {
                         memoryChecker.canLoadModel(effSize) -> 2
@@ -100,7 +105,7 @@ class HuggingFaceViewModel @Inject constructor(
                     }
                     it.rfilename to level
                 }
-                val sortedFiles = ggufFiles.sortedBy { sibling ->
+                val sortedFiles = formatFiles.sortedBy { sibling ->
                     sibling.size.takeIf { it > 0 } ?: sibling.lfs?.size ?: 0L
                 }
                 _uiState.update {
@@ -151,6 +156,17 @@ class HuggingFaceViewModel @Inject constructor(
         _uiState.update { it.copy(searchQuery = "", searchResults = emptyList(), error = null) }
     }
 
+    fun setActiveFormat(format: String) {
+        _uiState.update {
+            it.copy(
+                activeFormat = format,
+                searchResults = emptyList(),
+                selectedModel = null
+            )
+        }
+        search(_uiState.value.searchQuery) // re-search with new format
+    }
+
     fun clearDetail() {
         _uiState.update {
             it.copy(
@@ -174,15 +190,16 @@ class HuggingFaceViewModel @Inject constructor(
     }
 
     private suspend fun loadCompatibility(models: List<HuggingFaceModel>): Map<String, Boolean> {
+        val extension = ".${_uiState.value.activeFormat}"
         return models.map { model ->
             viewModelScope.async {
-                val ggufFiles = model.siblings.ifEmpty {
+                val formatFiles = model.siblings.ifEmpty {
                     huggingFaceRepository.getModelDetail(model.id)
                         .getOrNull()?.siblings ?: emptyList()
                 }
-                val isCompatible = ggufFiles
+                val isCompatible = formatFiles
                     .asSequence()
-                    .filter { it.rfilename.endsWith(".gguf", ignoreCase = true) }
+                    .filter { it.rfilename.endsWith(extension, ignoreCase = true) }
                     .any { memoryChecker.canLoadModel(it.size.takeIf { s -> s > 0 } ?: it.lfs?.size ?: 0L) }
                 model.id to isCompatible
             }
