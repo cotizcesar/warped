@@ -28,6 +28,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -143,6 +145,21 @@ fun HuggingFaceScreen(
             )
 
             Spacer(Modifier.height(8.dp))
+
+            // Format TabRow: GGUF / LiteRT-LM
+            val formats = listOf("gguf" to "GGUF", "litertlm" to "LiteRT-LM")
+            val selectedTabIndex = formats.indexOfFirst { it.first == uiState.activeFormat }.coerceAtLeast(0)
+            TabRow(selectedTabIndex = selectedTabIndex) {
+                formats.forEachIndexed { index, (formatValue, label) ->
+                    Tab(
+                        selected = selectedTabIndex == index,
+                        onClick = { viewModel.setActiveFormat(formatValue) },
+                        text = { Text(label) }
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(4.dp))
 
             if (uiState.isLoading) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
