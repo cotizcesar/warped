@@ -13,6 +13,7 @@ data class Preset(
     val contextSize: Int = 4096,
     val seed: Int = -1,
     val threads: Int = 4,
+    val modelFormat: String = "GGUF",
     val createdAt: Instant = Instant.now()
 ) {
     fun toGenerationParameters(): GenerationParameters = GenerationParameters(

@@ -14,6 +14,7 @@ fun PresetEntity.toDomain(): Preset = Preset(
     contextSize = contextSize,
     seed = seed,
     threads = threads,
+    modelFormat = modelFormat,
     createdAt = Instant.ofEpochMilli(createdAt)
 )
 
@@ -28,5 +29,6 @@ fun Preset.toEntity(): PresetEntity = PresetEntity(
     contextSize = contextSize,
     seed = seed,
     threads = threads,
+    modelFormat = modelFormat,
     createdAt = createdAt.toEpochMilli()
 )

@@ -24,7 +24,7 @@ import com.warped.data.local.db.entity.RemoteEndpointEntity
         PresetEntity::class,
         DownloadCheckpointEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

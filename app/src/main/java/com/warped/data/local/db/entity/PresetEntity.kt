@@ -16,5 +16,6 @@ data class PresetEntity(
     @ColumnInfo(name = "context_size") val contextSize: Int,
     @ColumnInfo(name = "seed") val seed: Int,
     @ColumnInfo(name = "threads") val threads: Int,
+    @ColumnInfo(name = "model_format") val modelFormat: String = "GGUF",
     @ColumnInfo(name = "created_at") val createdAt: Long
 )
