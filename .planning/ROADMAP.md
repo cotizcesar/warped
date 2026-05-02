@@ -89,11 +89,11 @@ Plans:
   3. User sees a foreground progress notification during `.litertlm` downloads, and downloads continue if the app is backgrounded
   4. User can pause an in-progress `.litertlm` download, close the app, return, and resume without data loss
   5. User can import a local `.litertlm` file from device storage via the system file picker
-**Plans:** 3/3 plans ready
+**Plans:** 2/3 plans executed
 
 Plans:
-- [ ] 08-01-PLAN.md — Domain model: add modelFormat to LocalModel + update mappers (ACQ-06, ACQ-07, ACQ-08, ACQ-09, ACQ-10)
-- [ ] 08-02-PLAN.md — HF API: searchByFormat in repository layer for litertlm filtering (ACQ-06, ACQ-07)
+- [x] 08-01-PLAN.md — Domain model: add modelFormat to LocalModel + update mappers (ACQ-06, ACQ-07, ACQ-08, ACQ-09, ACQ-10)
+- [x] 08-02-PLAN.md — HF API: searchByFormat in repository layer for litertlm filtering (ACQ-06, ACQ-07)
 - [ ] 08-03-PLAN.md — Pipeline: download format detection, import .litertlm, ViewModel format awareness (ACQ-06, ACQ-07, ACQ-08, ACQ-09, ACQ-10)
 
 #### Phase 9: UI Integration
@@ -132,7 +132,7 @@ Plans:
 | 5. Security Hardening & Polish | v1.0 | 1/1 | Complete | 2026-05-01 |
 | 6. Engine Foundation | v1.1 | 4/4 | Complete   | 2026-05-02 |
 | 7. Provider Integration & Chat | v1.1 | 1/2 | In Progress|  |
-| 8. Model Acquisition | v1.1 | 0/3 | Planned   | 2026-05-02 |
+| 8. Model Acquisition | v1.1 | 2/3 | In Progress|  |
 | 9. UI Integration | v1.1 | 0/0 | Not started | — |
 | 10. Parameters & Polish | v1.1 | 0/0 | Not started | — |
 

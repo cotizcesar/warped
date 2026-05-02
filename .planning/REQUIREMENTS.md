@@ -78,11 +78,11 @@ Requirements for LiteRT-LM integration. Each maps to roadmap phases.
 
 ### Model Acquisition
 
-- [ ] **ACQ-06**: User can search Hugging Face for .litertlm models filtered by litert-community org
-- [ ] **ACQ-07**: User can view .litertlm model details including file size and format info
-- [ ] **ACQ-08**: User can download .litertlm model files with foreground progress notification
-- [ ] **ACQ-09**: User can pause and resume .litertlm model downloads
-- [ ] **ACQ-10**: User can import local .litertlm files from device storage
+- [x] **ACQ-06**: User can search Hugging Face for .litertlm models filtered by litert-community org
+- [x] **ACQ-07**: User can view .litertlm model details including file size and format info
+- [x] **ACQ-08**: User can download .litertlm model files with foreground progress notification
+- [x] **ACQ-09**: User can pause and resume .litertlm model downloads
+- [x] **ACQ-10**: User can import local .litertlm files from device storage
 
 ### UI Integration
 
@@ -193,11 +193,11 @@ Deferred to future release.
 | LITE-06 | Phase 7 | Complete |
 | LITE-07 | Phase 7 | Complete |
 | LITE-08 | Phase 6 | Complete |
-| ACQ-06 | Phase 8 | Pending |
-| ACQ-07 | Phase 8 | Pending |
-| ACQ-08 | Phase 8 | Pending |
-| ACQ-09 | Phase 8 | Pending |
-| ACQ-10 | Phase 8 | Pending |
+| ACQ-06 | Phase 8 | Complete |
+| ACQ-07 | Phase 8 | Complete |
+| ACQ-08 | Phase 8 | Complete |
+| ACQ-09 | Phase 8 | Complete |
+| ACQ-10 | Phase 8 | Complete |
 | UI-01 | Phase 9 | Pending |
 | UI-02 | Phase 9 | Pending |
 | UI-03 | Phase 9 | Pending |
