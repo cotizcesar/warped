@@ -20,3 +20,17 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
         db.execSQL("ALTER TABLE local_models ADD COLUMN model_format TEXT NOT NULL DEFAULT 'GGUF'")
     }
 }
+
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS download_checkpoints (
+                model_id TEXT NOT NULL PRIMARY KEY,
+                file_name TEXT NOT NULL,
+                file_url TEXT NOT NULL,
+                total_bytes INTEGER NOT NULL DEFAULT 0,
+                downloaded_bytes INTEGER NOT NULL DEFAULT 0
+            )
+        """.trimIndent())
+    }
+}
