@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: LiteRT-LM Integration
 status: verifying
-stopped_at: Completed 08-03-PLAN.md (Download/Import/ViewModel format awareness — ACQ-06 through ACQ-10) — all 3 phase 08 plans done, phase complete
-last_updated: "2026-05-02T18:27:04.775Z"
+stopped_at: Completed 08-GAP-01 and 08-GAP-02 gap closure plans — WorkManager foreground downloads + pause/resume + pipelineTag filtering
+last_updated: "2026-05-02T19:07:45.730Z"
 last_activity: 2026-05-02
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 11
+  completed_plans: 11
   percent: 100
 ---
 
@@ -64,6 +64,7 @@ Progress: [██████████] 100%
 | Phase 08 P01 | 131s | 1 tasks | 2 files |
 | Phase 08 P02 | 131s | 2 tasks | 2 files |
 | Phase 08 P03 | 301s | 3 tasks | 4 files |
+| Phase 08 PGAP-01+GAP-02 | 576s | 4 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -99,6 +100,8 @@ Progress: [██████████] 100%
 - [08-03]: D-08-03b — .litertlm metadata defaults: quantization='N/A', architecture='LiteRT-LM', parameterCount='Unknown' — deferred to Phase 10
 - [08-03]: D-08-03c — formatFiles replaces ggufFiles throughout ViewModel; default activeFormat='gguf' preserves existing behavior
 - [08-03]: D-08-03d — setActiveFormat() clears search results and selected model, auto-re-searches for Phase 9 TabRow integration
+- [Phase 08]: D-GAP-01: WorkManager replaces CoroutineScope for download execution with foreground notifications and Room-persisted checkpoints (survives process death, supports pause/resume)
+- [Phase 08]: D-GAP-02: Blacklist pipelineTag filtering for litertlm search results — exclude vision/speech models, include everything else (gated on activeFormat)
 
 ### Pending Todos
 
@@ -112,6 +115,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-02T18:27:04.767Z
-Stopped at: Completed 07-01-PLAN.md (Core provider components — LITE-05, LITE-06, LITE-07, POL-04) — 1 of 2 phase plans done
+Last session: 2026-05-02T19:07:45.723Z
+Stopped at: Completed 08-GAP-01 and 08-GAP-02 gap closure plans — WorkManager foreground downloads + pause/resume + pipelineTag filtering
 Resume file: None

@@ -95,8 +95,8 @@ Plans:
 - [x] 08-01-PLAN.md — Domain model: add modelFormat to LocalModel + update mappers (ACQ-06, ACQ-07, ACQ-08, ACQ-09, ACQ-10)
 - [x] 08-02-PLAN.md — HF API: searchByFormat in repository layer for litertlm filtering (ACQ-06, ACQ-07)
 - [x] 08-03-PLAN.md — Pipeline: download format detection, import .litertlm, ViewModel format awareness (ACQ-06, ACQ-07, ACQ-08, ACQ-09, ACQ-10)
-- [ ] 08-GAP-01-PLAN.md — Foreground download notifications + persistent pause/resume via WorkManager (ACQ-08, ACQ-09)
-- [ ] 08-GAP-02-PLAN.md — Text-only model filtering via pipelineTag exclusion (ACQ-06)
+- [x] 08-GAP-01-PLAN.md — Foreground download notifications + persistent pause/resume via WorkManager (ACQ-08, ACQ-09)
+- [x] 08-GAP-02-PLAN.md — Text-only model filtering via pipelineTag exclusion (ACQ-06)
 
 #### Phase 9: UI Integration
 **Goal:** Make LiteRT-LM fully user-facing with separate ecosystem tabs, format badges, backend status indicators, cached loading, and lifecycle-aware memory management.
