@@ -2,6 +2,8 @@ package com.warped.ui.presets
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.warped.data.local.inference.EngineManager
+import com.warped.data.local.inference.EngineType
 import com.warped.domain.model.GenerationParameters
 import com.warped.domain.model.ParameterStore
 import com.warped.domain.model.Preset
@@ -12,12 +14,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
 class PresetsViewModel @Inject constructor(
     private val presetRepository: PresetRepository,
-    private val parameterStore: ParameterStore
+    private val parameterStore: ParameterStore,
+    private val engineManager: EngineManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PresetsUiState())
@@ -29,6 +33,18 @@ class PresetsViewModel @Inject constructor(
                 _uiState.update { it.copy(presets = presets) }
             }
         }
+        refreshActiveFormat()
+    }
+
+    /** Derive the currently active format string from the loaded engine. */
+    private fun refreshActiveFormat() {
+        val format = when (engineManager.getActiveEngine()?.type) {
+            EngineType.LITE_RT_LM -> "LITERTLM"
+            EngineType.LLAMA_CPP -> "GGUF"
+            null -> "GGUF" // default to GGUF when no engine loaded
+        }
+        _uiState.update { it.copy(activeFormat = format) }
+        Timber.d("PresetsViewModel: activeFormat=$format")
     }
 
     fun updateTemperature(value: Float) {
@@ -72,6 +88,36 @@ class PresetsViewModel @Inject constructor(
     }
 
     fun loadPreset(preset: Preset) {
+        refreshActiveFormat()
+        val currentFormat = _uiState.value.activeFormat
+        val engineLoaded = engineManager.isEngineLoaded()
+
+        // Cross-format detection: only relevant when a local engine is loaded
+        if (engineLoaded && preset.modelFormat != currentFormat) {
+            Timber.d("PresetsViewModel: cross-format load — preset=${preset.modelFormat} active=$currentFormat")
+            _uiState.update {
+                it.copy(showFormatWarning = true, formatWarningPreset = preset)
+            }
+            return
+        }
+
+        applyPresetParameters(preset)
+    }
+
+    /** User confirmed loading a cross-format preset — apply only compatible params. */
+    fun confirmLoadPreset() {
+        val preset = _uiState.value.formatWarningPreset ?: return
+        applyPresetParameters(preset)
+        _uiState.update { it.copy(showFormatWarning = false, formatWarningPreset = null) }
+    }
+
+    /** User dismissed the cross-format warning — cancel load. */
+    fun dismissFormatWarning() {
+        _uiState.update { it.copy(showFormatWarning = false, formatWarningPreset = null) }
+    }
+
+    /** Apply preset parameters to current state and parameter store. */
+    private fun applyPresetParameters(preset: Preset) {
         val params = preset.toGenerationParameters()
         parameterStore.update(params)
         _uiState.update {
@@ -102,6 +148,7 @@ class PresetsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val params = state.parameters
+                refreshActiveFormat()
                 val preset = Preset(
                     id = state.selectedPresetId ?: 0,
                     name = state.presetNameInput,
@@ -112,7 +159,8 @@ class PresetsViewModel @Inject constructor(
                     maxTokens = params.maxTokens,
                     contextSize = params.contextSize,
                     seed = params.seed,
-                    threads = params.threads
+                    threads = params.threads,
+                    modelFormat = state.activeFormat
                 )
                 val id = presetRepository.save(preset)
                 _uiState.update {

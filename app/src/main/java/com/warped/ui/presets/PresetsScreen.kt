@@ -4,9 +4,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
@@ -21,6 +23,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Snackbar
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -32,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -186,6 +190,31 @@ fun PresetsScreen(
         )
     }
 
+    if (uiState.showFormatWarning && uiState.formatWarningPreset != null) {
+        val preset = uiState.formatWarningPreset!!
+        val formatLabel = if (preset.modelFormat.equals("LITERTLM", ignoreCase = true)) "LiteRT-LM" else preset.modelFormat
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissFormatWarning() },
+            title = { Text("Format Mismatch") },
+            text = {
+                Text(
+                    "This preset was created for $formatLabel. " +
+                    "Only compatible parameters will be applied."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.confirmLoadPreset() }) {
+                    Text("Apply Compatible")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissFormatWarning() }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     if (uiState.error != null) {
         Snackbar(
             modifier = Modifier.padding(16.dp),
@@ -281,9 +310,13 @@ fun PresetItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(preset.name, style = MaterialTheme.typography.titleSmall)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(preset.name, style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.width(8.dp))
+                    FormatBadge(preset.modelFormat)
+                }
                 Text(
-                    "T:${preset.temperature} P:${preset.topP} K:${preset.topK}",
+                    "T:${"%.1f".format(preset.temperature)} P:${"%.1f".format(preset.topP)} K:${preset.topK}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -294,5 +327,28 @@ fun PresetItem(
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
             ) { Text("Del") }
         }
+    }
+}
+
+@Composable
+private fun FormatBadge(format: String) {
+    val (color, label) = when {
+        format.equals("GGUF", ignoreCase = true) ->
+            Color(0xFF2196F3) to "GGUF"
+        format.equals("LITERTLM", ignoreCase = true) ->
+            Color(0xFF4CAF50) to "LiteRT-LM"
+        else -> MaterialTheme.colorScheme.outline to format
+    }
+    Surface(
+        shape = MaterialTheme.shapes.extraSmall,
+        color = color.copy(alpha = 0.15f),
+        contentColor = color
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1
+        )
     }
 }
