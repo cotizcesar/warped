@@ -1,8 +1,5 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
@@ -45,12 +42,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlin {
-        compilerOptions {
-            jvmTarget = JvmTarget.JVM_17
-        }
-    }
-
     buildFeatures {
         compose = true
         buildConfig = true
@@ -67,6 +58,12 @@ android {
         jniLibs {
             useLegacyPackaging = false
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
@@ -124,8 +121,12 @@ dependencies {
     // Security
     implementation(libs.security.crypto)
 
+    // LiteRT-LM (per LITE-01)
+    implementation(libs.litertlm)
+
     // Logging
     implementation(libs.timber)
+    implementation(libs.errorprone.annotations)
 
     // Testing
     testImplementation(libs.junit5)
