@@ -2,11 +2,23 @@
 
 ## What This Is
 
-An Android application equivalent to LM Studio for mobile, enabling users to run large language models (LLMs) locally and connect to remote LLM providers. The app downloads GGUF models from Hugging Face, executes them on-device via llama.cpp, and connects to OpenAI-compatible APIs, Ollama, LM Studio, and custom servers over local network or the public internet. Built with Kotlin + Jetpack Compose, targeting production quality with clean modular architecture.
+An Android application equivalent to LM Studio for mobile, enabling users to run large language models (LLMs) locally and connect to remote LLM providers. The app downloads GGUF models from Hugging Face, executes them on-device via llama.cpp, runs `.litertlm` models via LiteRT-LM, and connects to OpenAI-compatible APIs, Ollama, LM Studio, and custom servers. Built with Kotlin + Jetpack Compose, targeting production quality with clean modular architecture.
 
 ## Core Value
 
 Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
+
+## Current Milestone: v1.1 LiteRT-LM Integration
+
+**Goal:** Add Google's LiteRT-LM as a second high-performance local inference engine alongside llama.cpp — search, download, import, and chat with `.litertlm` models from Hugging Face's litert-community, with auto-detected GPU/NPU acceleration.
+
+**Target features:**
+- User can search and filter `.litertlm` models from the litert-community on Hugging Face
+- User can download `.litertlm` model files with progress, pause/resume
+- User can import local `.litertlm` files from device storage
+- User can load `.litertlm` models and chat with streaming via LiteRT-LM Kotlin API
+- User can switch between GGUF and LiteRT-LM model ecosystems (separate tabs)
+- App auto-detects best backend (GPU → CPU fallback)
 
 ## Requirements
 
@@ -44,11 +56,13 @@ The Android ecosystem lacks a polished, production-grade app that combines local
 
 The user is an experienced Android developer with deep knowledge of Kotlin, Compose, and LLM inference. They want all the artifacts needed to build this app: architecture documents, data models, domain interfaces, initial implementations, and a phased roadmap.
 
+v1.1 adds LiteRT-LM as a second local inference engine. LiteRT-LM is Google's production framework that powers on-device GenAI in Chrome, Chromebook Plus, and Pixel Watch. Its Kotlin API provides `Engine → Conversation → sendMessageAsync(Flow)` with native GPU/NPU backends and `.litertlm` model format.
+
 ## Constraints
 
 - **Platform**: Android only (no iOS, no desktop)
 - **Tech stack**: Kotlin, Jetpack Compose, Hilt DI, Room, DataStore, WorkManager
-- **Local inference**: llama.cpp via JNI/NDK, GGUF format exclusively
+- **Local inference**: llama.cpp via JNI/NDK (GGUF) + LiteRT-LM via Maven dependency (.litertlm)
 - **Remote providers**: OpenAI-compatible API protocol, OkHttp, SSE streaming
 - **Language**: Kotlin (no Java)
 - **Architecture**: Clean architecture (domain/data/ui layers), MVVM, repository pattern
@@ -65,6 +79,7 @@ The user is an experienced Android developer with deep knowledge of Kotlin, Comp
 | Clean Architecture with Hilt | Testability, separation of concerns, industry standard for Android | — Pending |
 | Room for structured data | Official Android recommendation, Compose integration, type-safe queries | — Pending |
 | Coarse granularity (3-5 phases) | Build fast, validate early, iterate | — Pending |
+| LiteRT-LM as second local engine | Better performance than llama.cpp on Android, native GPU/NPU, Google's production framework for Chrome/Chromebook/Pixel | — Pending |
 
 ## Evolution
 
@@ -84,4 +99,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-30 after initialization*
+*Last updated: 2026-05-02 after milestone v1.1 initialization*
