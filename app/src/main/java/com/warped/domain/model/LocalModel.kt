@@ -10,5 +10,6 @@ data class LocalModel(
     val quantization: String,
     val parameterCount: String,
     val architecture: String,
+    val modelFormat: String = "GGUF",
     val importedAt: Instant
 )

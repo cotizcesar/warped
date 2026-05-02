@@ -11,6 +11,7 @@ fun LocalModelEntity.toDomain(): LocalModel = LocalModel(
     quantization = quantization,
     parameterCount = parameterCount,
     architecture = architecture,
+    modelFormat = modelFormat,
     importedAt = Instant.ofEpochMilli(importedAt)
 )
 
@@ -22,5 +23,6 @@ fun LocalModel.toEntity(): LocalModelEntity = LocalModelEntity(
     quantization = quantization,
     parameterCount = parameterCount,
     architecture = architecture,
+    modelFormat = modelFormat,
     importedAt = importedAt.toEpochMilli()
 )
