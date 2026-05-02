@@ -2,8 +2,8 @@
 <resources>
     <style name="Theme.Warped.Splash" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@drawable/splash_bg</item>
-        <item name="android:statusBarColor">@android:color/white</item>
-        <item name="android:navigationBarColor">@android:color/white</item>
+        <item name="android:statusBarColor">#FF1F1F1E</item>
+        <item name="android:navigationBarColor">#FF1F1F1E</item>
     </style>
 
     <style name="Theme.Warped" parent="android:Theme.Material.Light.NoActionBar">
