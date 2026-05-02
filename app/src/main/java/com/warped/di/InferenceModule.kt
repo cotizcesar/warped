@@ -3,6 +3,8 @@ package com.warped.di
 import android.content.Context
 import com.warped.data.local.inference.LlamaEngine
 import com.warped.data.local.inference.LocalLlmProvider
+import com.warped.data.local.inference.BackendDetector
+import com.warped.data.local.inference.LiteRTLmEngine
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.inference.ModelImportManager
 import com.warped.data.repository.LocalModelRepositoryImpl
@@ -33,6 +35,14 @@ object InferenceModule {
     fun provideMemoryChecker(
         @ApplicationContext context: Context
     ): MemoryChecker = MemoryChecker(context)
+
+    @Provides
+    @Singleton
+    fun provideBackendDetector(): BackendDetector = BackendDetector()
+
+    @Provides
+    @Singleton
+    fun provideLiteRTLmEngine(): LiteRTLmEngine = LiteRTLmEngine()
 }
 
 @Module
