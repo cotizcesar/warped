@@ -221,13 +221,13 @@ fun ChatScreen(
                         Image(
                             painter = painterResource(id = com.warped.R.drawable.logo),
                             contentDescription = "Warped",
-                            modifier = Modifier.size(64.dp)
+                            modifier = Modifier.size(128.dp)
                         )
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(24.dp))
                         Text(
                             "Selecciona el modelo y empieza a escribir...",
                             color = Color(0xFF545450),
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.titleMedium
                         )
                     }
                 }
