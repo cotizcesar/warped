@@ -86,11 +86,11 @@ Requirements for LiteRT-LM integration. Each maps to roadmap phases.
 
 ### UI Integration
 
-- [ ] **UI-01**: Models screen has separate GGUF and LiteRT-LM tabs via TabRow
-- [ ] **UI-02**: Model list shows format badge (GGUF/LiteRT-LM) on each model card
-- [ ] **UI-03**: Active backend (CPU/GPU) is displayed during chat for LiteRT-LM models
-- [ ] **UI-04**: User can view and delete downloaded LiteRT-LM models
-- [ ] **UI-05**: LiteRT-LM models appear in the model selector for chat sessions
+- [x] **UI-01**: Models screen has separate GGUF and LiteRT-LM tabs via TabRow
+- [x] **UI-02**: Model list shows format badge (GGUF/LiteRT-LM) on each model card
+- [x] **UI-03**: Active backend (CPU/GPU) is displayed during chat for LiteRT-LM models
+- [x] **UI-04**: User can view and delete downloaded LiteRT-LM models
+- [x] **UI-05**: LiteRT-LM models appear in the model selector for chat sessions
 
 ### Generation Parameters
 
@@ -102,9 +102,9 @@ Requirements for LiteRT-LM integration. Each maps to roadmap phases.
 
 - [x] **POL-01**: EngineManager enforces mutual exclusion (only one local engine loaded at a time)
 - [x] **POL-02**: App warns if available RAM is insufficient for the selected .litertlm model
-- [ ] **POL-03**: Cached model loading via cacheDir for faster subsequent loads
+- [x] **POL-03**: Cached model loading via cacheDir for faster subsequent loads
 - [x] **POL-04**: Defensive error recovery reinitializes engine on "Engine not alive" errors
-- [ ] **POL-05**: Memory is released when the app is backgrounded (onTrimMemory handling)
+- [x] **POL-05**: Memory is released when the app is backgrounded (onTrimMemory handling)
 
 ## v2 Requirements
 
@@ -198,19 +198,19 @@ Deferred to future release.
 | ACQ-08 | Phase 8 | Complete |
 | ACQ-09 | Phase 8 | Complete |
 | ACQ-10 | Phase 8 | Complete |
-| UI-01 | Phase 9 | Pending |
-| UI-02 | Phase 9 | Pending |
-| UI-03 | Phase 9 | Pending |
-| UI-04 | Phase 9 | Pending |
-| UI-05 | Phase 9 | Pending |
+| UI-01 | Phase 9 | Complete |
+| UI-02 | Phase 9 | Complete |
+| UI-03 | Phase 9 | Complete |
+| UI-04 | Phase 9 | Complete |
+| UI-05 | Phase 9 | Complete |
 | PARM-03 | Phase 10 | Pending |
 | PARM-04 | Phase 10 | Pending |
 | PARM-05 | Phase 10 | Pending |
 | POL-01 | Phase 6 | Complete |
 | POL-02 | Phase 6 | Complete |
-| POL-03 | Phase 9 | Pending |
+| POL-03 | Phase 9 | Complete |
 | POL-04 | Phase 7 | Complete |
-| POL-05 | Phase 9 | Pending |
+| POL-05 | Phase 9 | Complete |
 
 **Coverage:**
 - v1.0 requirements: 30 total, 30 mapped ✓

@@ -111,9 +111,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 09-01-PLAN.md — HuggingFace TabRow with GGUF/LiteRT-LM tabs and format badges on search cards (UI-01, UI-02)
-- [ ] 09-02-PLAN.md — Chat backend status chip and format-aware model selector (UI-03, UI-05)
-- [ ] 09-03-PLAN.md — ModelsScreen format badges, routing, cacheDir caching, and lifecycle memory management (UI-02, UI-04, POL-03, POL-05)
+- [x] 09-01-PLAN.md — HuggingFace TabRow with GGUF/LiteRT-LM tabs and format badges on search cards (UI-01, UI-02)
+- [x] 09-02-PLAN.md — Chat backend status chip and format-aware model selector (UI-03, UI-05)
+- [x] 09-03-PLAN.md — ModelsScreen format badges, routing, cacheDir caching, and lifecycle memory management (UI-02, UI-04, POL-03, POL-05)
 **UI hint**: yes
 
 #### Phase 10: Parameters & Polish
