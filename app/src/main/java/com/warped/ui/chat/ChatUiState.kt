@@ -1,5 +1,6 @@
 package com.warped.ui.chat
 
+import com.warped.data.local.inference.BackendType
 import com.warped.domain.model.ChatMessage
 import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.Conversation
@@ -27,7 +28,8 @@ data class ChatUiState(
     val loadingModelName: String = "",
     val modelLoadError: String? = null,
     val loadedInstanceId: String? = null,
-    val reasoningEnabled: Boolean = true
+    val reasoningEnabled: Boolean = true,
+    val activeBackend: BackendType? = null  // null unless LITE_RT_LM is loaded
 )
 
 sealed class ChatError {

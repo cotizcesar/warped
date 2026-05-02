@@ -6,6 +6,8 @@ import android.util.Base64
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.warped.data.local.inference.BackendType
+import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.LlamaEngine
 import com.warped.data.remote.provider.ProviderRouter
 import com.warped.domain.model.*
@@ -31,6 +33,7 @@ class ChatViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
     private val parameterStore: ParameterStore,
     private val llamaEngine: LlamaEngine,
+    private val engineManager: EngineManager,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -205,6 +208,7 @@ class ChatViewModel @Inject constructor(
                     activeModelSelection.select(conversation.modelId, conversation.providerType)
                 }
                 activeModelSelection.saveLastConversation(conversation.id)
+                refreshActiveBackend()
             }
         }
     }
@@ -276,6 +280,7 @@ class ChatViewModel @Inject constructor(
             }
             else -> {}
         }
+        refreshActiveBackend()
     }
 
     fun updateParameters(params: GenerationParameters) {
@@ -301,6 +306,13 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(modelLoadError = null) }
     }
 
+    private fun refreshActiveBackend() {
+        val backend = if (_uiState.value.selectedProvider == ProviderType.LITE_RT_LM) {
+            engineManager.getActiveEngine()?.backend
+        } else null
+        _uiState.update { it.copy(activeBackend = backend) }
+    }
+
     private fun preloadLocalModel(filePath: String) {
         val modelName = filePath.substringAfterLast("/").removeSuffix(".gguf")
         _uiState.update { it.copy(isLoadingModel = true, loadingModelName = modelName, modelLoadError = null) }
@@ -309,6 +321,7 @@ class ChatViewModel @Inject constructor(
                 val loaded = llamaEngine.loadModel(filePath)
                 if (loaded) {
                     _uiState.update { it.copy(isLoadingModel = false, loadingModelName = "") }
+                    refreshActiveBackend()
                 } else {
                     _uiState.update { it.copy(isLoadingModel = false, modelLoadError = "Failed to load model") }
                 }

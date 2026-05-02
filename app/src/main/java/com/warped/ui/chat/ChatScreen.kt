@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.R
+import com.warped.data.local.inference.BackendType
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.Role
 import com.warped.ui.chat.components.ChatInputBar
@@ -193,6 +194,23 @@ fun ChatScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // Backend status chip — visible when LiteRT-LM is loaded
+            if (uiState.selectedProvider == ProviderType.LITE_RT_LM && uiState.activeBackend != null) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(
+                        "LiteRT-LM · ${uiState.activeBackend!!.name}",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+            }
+
             if (uiState.isLoadingModel) {
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
