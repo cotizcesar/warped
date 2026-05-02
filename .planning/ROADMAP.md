@@ -72,8 +72,12 @@ Plans:
   1. User can select a LiteRT-LM model from the chat model selector and stream tokens in real-time with latency comparable to GGUF models
   2. Input containing LaTeX, Unicode math, or special characters is sanitized before reaching the engine and does not crash the app
   3. Generation parameters (temperature, topK, topP, seed) map correctly to LiteRT-LM's SamplerConfig and visibly affect the output
-  4. If the engine enters an "Engine not alive" state mid-chat, the app automatically reinitializes and recovers without requiring a manual restart
-**Plans**: TBD
+   4. If the engine enters an "Engine not alive" state mid-chat, the app automatically reinitializes and recovers without requiring a manual restart
+**Plans:** 2 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — Core provider components: ProviderType.LITE_RT_LM, InputSanitizer, LiteRTLmProvider (LITE-05, LITE-06, LITE-07, POL-04)
+- [ ] 07-02-PLAN.md — Hilt + ProviderRouter wiring: InferenceModule registration, LITE_RT_LM routing (LITE-05)
 
 #### Phase 8: Model Acquisition
 **Goal:** Users can discover, download, and import `.litertlm` models from Hugging Face's litert-community — extending the existing download infrastructure.
@@ -122,7 +126,7 @@ Plans:
 | 4. Parameters & Presets | v1.0 | 2/2 | Complete | 2026-05-01 |
 | 5. Security Hardening & Polish | v1.0 | 1/1 | Complete | 2026-05-01 |
 | 6. Engine Foundation | v1.1 | 4/4 | Complete   | 2026-05-02 |
-| 7. Provider Integration & Chat | v1.1 | 0/0 | Not started | — |
+| 7. Provider Integration & Chat | v1.1 | 0/2 | Planned | — |
 | 8. Model Acquisition | v1.1 | 0/0 | Not started | — |
 | 9. UI Integration | v1.1 | 0/0 | Not started | — |
 | 10. Parameters & Polish | v1.1 | 0/0 | Not started | — |
