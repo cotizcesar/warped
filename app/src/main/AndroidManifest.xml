@@ -31,6 +31,12 @@
             </intent-filter>
         </activity>
 
+        <!-- WorkManager foreground service type for downloads (API 34+) -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
+
         <!-- Disable default WorkManager initializer (HiltWorkerFactory replaces it) -->
         <provider
             android:name="androidx.startup.InitializationProvider"

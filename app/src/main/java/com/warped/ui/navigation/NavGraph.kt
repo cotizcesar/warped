@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -56,7 +57,28 @@ fun WarpedNavGraph() {
     val currentRoute = navBackStackEntry?.destination?.route
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    var activeConversationId by remember { mutableStateOf<Long?>(null) }
+    var activeConversationId by rememberSaveable { mutableStateOf<Long?>(null) }
+
+    // Persist current route across process death
+    var savedRoute by rememberSaveable { mutableStateOf<String?>(null) }
+    var savedConvId by rememberSaveable { mutableStateOf<Long?>(null) }
+
+    // Update saved state whenever navigation changes
+    LaunchedEffect(currentRoute, activeConversationId) {
+        savedRoute = currentRoute
+        savedConvId = activeConversationId
+    }
+
+    // Restore navigation state after process death
+    LaunchedEffect(Unit) {
+        val route = savedRoute
+        if (route != null && route != Screen.Chat.route) {
+            activeConversationId = savedConvId
+            navController.navigate(route) {
+                popUpTo(Screen.Chat.route)
+            }
+        }
+    }
 
     // Get ChatRepository for conversation list
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -201,7 +223,12 @@ fun WarpedNavGraph() {
             }
             composable(Screen.Models.route) {
                 ModelsScreen(
-                    onUseInChat = { navController.navigate(Screen.Chat.route) },
+                    onUseInChat = {
+                        navController.navigate(Screen.Chat.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true; restoreState = true
+                        }
+                    },
                     onOpenHuggingFace = { navController.navigate(Screen.HuggingFace.route) },
                     onOpenDrawer = { scope.launch { drawerState.open() } }
                 )
@@ -213,8 +240,7 @@ fun WarpedNavGraph() {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true; restoreState = true
                         }
-                    },
-                    onOpenDrawer = { scope.launch { drawerState.open() } }
+                    }
                 )
             }
             composable(Screen.Presets.route) { PresetsScreen() }

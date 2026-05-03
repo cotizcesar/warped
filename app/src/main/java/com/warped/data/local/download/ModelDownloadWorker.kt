@@ -3,6 +3,8 @@ package com.warped.data.local.download
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
@@ -22,6 +24,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import timber.log.Timber
 import java.io.File
 import java.io.RandomAccessFile
 import java.time.Instant
@@ -41,7 +44,12 @@ class ModelDownloadWorker @AssistedInject constructor(
         const val KEY_FILE_URL = "file_url"
         const val KEY_FILE_SIZE = "file_size_bytes"
         const val PROGRESS = "progress"
+        const val DOWNLOADED_BYTES = "downloaded_bytes"
+        const val TOTAL_BYTES = "total_bytes"
+        const val SPEED_BYTES_PER_SECOND = "speed_bytes_per_second"
         const val NOTIFICATION_ID_BASE = 1000
+        private const val PROGRESS_UPDATE_INTERVAL_MS = 500L
+        private const val NOTIFICATION_UPDATE_INTERVAL_MS = 2_000L
 
         fun createInputData(
             modelId: String,
@@ -62,6 +70,8 @@ class ModelDownloadWorker @AssistedInject constructor(
         val fileUrl = inputData.getString(KEY_FILE_URL) ?: return Result.failure()
         val fileSizeBytes = inputData.getLong(KEY_FILE_SIZE, 0)
 
+        Timber.d("ModelDownloadWorker: starting download — modelId=$modelId url=$fileUrl")
+
         val localFileName = fileName.substringAfterLast("/")
         val modelsDir =
             File(applicationContext.filesDir, "models").also { it.mkdirs() }
@@ -76,10 +86,17 @@ class ModelDownloadWorker @AssistedInject constructor(
             else -> 0L
         }
 
-        // Show foreground notification BEFORE HTTP call
-        setForeground(
-            createForegroundInfo(modelId, localFileName, 0, resumeOffset, fileSizeBytes)
-        )
+        var foregroundUpdatesAllowed = true
+
+        // Show foreground notification before the HTTP call when Android allows it.
+        try {
+            setForeground(
+                createForegroundInfo(modelId, localFileName, 0, resumeOffset, fileSizeBytes)
+            )
+        } catch (e: Exception) {
+            foregroundUpdatesAllowed = false
+            Timber.w(e, "ModelDownloadWorker: foreground notification unavailable; continuing download")
+        }
 
         return try {
             val request = Request.Builder()
@@ -88,8 +105,15 @@ class ModelDownloadWorker @AssistedInject constructor(
                 .build()
 
             val response = okHttpClient.newCall(request).execute()
+            Timber.d("ModelDownloadWorker: HTTP ${response.code} for $fileUrl")
             if (!response.isSuccessful && response.code != 206) {
-                return Result.failure()
+                val errorMsg = when (response.code) {
+                    401, 403 -> "Model requires authentication (gated). Add a HuggingFace token."
+                    404 -> "File not found on HuggingFace."
+                    else -> "HTTP ${response.code}: ${response.message}"
+                }
+                Timber.e("ModelDownloadWorker: download failed — $errorMsg")
+                return Result.failure(workDataOf("error" to errorMsg))
             }
 
             val body = response.body ?: return Result.failure()
@@ -112,6 +136,12 @@ class ModelDownloadWorker @AssistedInject constructor(
                     var bytesRead: Int
                     var totalRead = resumeOffset
                     var lastCheckpointUpdate = 0L
+                    var lastProgressUpdateTime = 0L
+                    var lastNotificationUpdateTime = 0L
+                    var lastSpeedSampleTime = System.currentTimeMillis()
+                    var lastSpeedSampleBytes = totalRead
+                    var speedBytesPerSecond = 0L
+                    var lastProgress = -1
 
                     while (input.read(buffer).also { bytesRead = it } != -1) {
                         // Check for cancellation (pause/cancel from Manager)
@@ -136,13 +166,45 @@ class ModelDownloadWorker @AssistedInject constructor(
                         val progress = if (totalSize > 0) {
                             (totalRead * 100 / totalSize).toInt().coerceIn(0, 100)
                         } else 0
-                        setProgress(workDataOf(PROGRESS to progress))
+                        val now = System.currentTimeMillis()
+                        val speedElapsedMs = now - lastSpeedSampleTime
+                        if (speedElapsedMs >= PROGRESS_UPDATE_INTERVAL_MS) {
+                            speedBytesPerSecond = ((totalRead - lastSpeedSampleBytes) * 1000 / speedElapsedMs)
+                                .coerceAtLeast(0L)
+                            lastSpeedSampleBytes = totalRead
+                            lastSpeedSampleTime = now
+                        }
 
-                        // Update foreground notification progress periodically
-                        val notification = createForegroundInfo(
-                            modelId, localFileName, progress, totalRead, totalSize
-                        )
-                        setForeground(notification)
+                        if (now - lastProgressUpdateTime >= PROGRESS_UPDATE_INTERVAL_MS || progress != lastProgress) {
+                            setProgress(
+                                workDataOf(
+                                    PROGRESS to progress,
+                                    DOWNLOADED_BYTES to totalRead,
+                                    TOTAL_BYTES to totalSize,
+                                    SPEED_BYTES_PER_SECOND to speedBytesPerSecond
+                                )
+                            )
+                            lastProgress = progress
+                            lastProgressUpdateTime = now
+                        }
+
+                        if (foregroundUpdatesAllowed && now - lastNotificationUpdateTime >= NOTIFICATION_UPDATE_INTERVAL_MS) {
+                            try {
+                                val notification = createForegroundInfo(
+                                    modelId,
+                                    localFileName,
+                                    progress,
+                                    totalRead,
+                                    totalSize,
+                                    speedBytesPerSecond
+                                )
+                                setForeground(notification)
+                                lastNotificationUpdateTime = now
+                            } catch (e: Exception) {
+                                foregroundUpdatesAllowed = false
+                                Timber.w(e, "ModelDownloadWorker: disabling foreground notification updates")
+                            }
+                        }
 
                         // Persist checkpoint every ~1MB to minimize DB writes
                         if (totalRead - lastCheckpointUpdate > 1_048_576) {
@@ -196,16 +258,24 @@ class ModelDownloadWorker @AssistedInject constructor(
             )
             localModelRepository.saveModel(localModel)
 
+            Timber.d("ModelDownloadWorker: download complete — $localFileName (${destFile.length()} bytes)")
+
             // Delete checkpoint on clean completion
             checkpointDao.deleteCheckpoint(modelId)
 
-            // Final notification — 100% complete
-            setForeground(
-                createForegroundInfo(modelId, localFileName, 100, totalSize, totalSize)
-            )
+            if (foregroundUpdatesAllowed) {
+                try {
+                    setForeground(
+                        createForegroundInfo(modelId, localFileName, 100, totalSize, totalSize)
+                    )
+                } catch (e: Exception) {
+                    Timber.w(e, "ModelDownloadWorker: final notification update failed")
+                }
+            }
 
             Result.success()
         } catch (e: Exception) {
+            Timber.e(e, "ModelDownloadWorker: download exception — modelId=$modelId")
             // Save checkpoint on error so user can retry/resume
             checkpointDao.upsertCheckpoint(
                 DownloadCheckpointEntity(
@@ -225,7 +295,8 @@ class ModelDownloadWorker @AssistedInject constructor(
         fileName: String,
         progressPercent: Int,
         downloadedBytes: Long,
-        totalBytes: Long
+        totalBytes: Long,
+        speedBytesPerSecond: Long = 0L
     ): ForegroundInfo {
         val cancelIntent = WorkManager.getInstance(applicationContext)
             .createCancelPendingIntent(id)
@@ -241,21 +312,52 @@ class ModelDownloadWorker @AssistedInject constructor(
             applicationContext,
             WarpedApplication.CHANNEL_DOWNLOADS
         )
-            .setContentTitle("Downloading $fileName")
-            .setContentText(
-                if (totalBytes > 0) {
-                    "${downloadedBytes / (1024 * 1024)} MB / ${totalBytes / (1024 * 1024)} MB"
-                } else {
-                    "${downloadedBytes / (1024 * 1024)} MB downloaded"
-                }
-            )
+            .setContentTitle("Downloading model")
+            .setContentText(fileName)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(downloadStatusText(fileName, progressPercent, downloadedBytes, totalBytes, speedBytesPerSecond)))
             .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOnlyAlertOnce(true)
             .setOngoing(true)
             .setProgress(100, progressPercent, totalBytes <= 0)
             .setContentIntent(tapIntent)
             .addAction(android.R.drawable.ic_media_pause, "Cancel", cancelIntent)
             .build()
 
-        return ForegroundInfo(NOTIFICATION_ID_BASE + modelId.hashCode(), notification)
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            ForegroundInfo(
+                NOTIFICATION_ID_BASE + modelId.hashCode(),
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        } else {
+            ForegroundInfo(NOTIFICATION_ID_BASE + modelId.hashCode(), notification)
+        }
+    }
+
+    private fun downloadStatusText(
+        fileName: String,
+        progressPercent: Int,
+        downloadedBytes: Long,
+        totalBytes: Long,
+        speedBytesPerSecond: Long
+    ): String {
+        val amount = if (totalBytes > 0) {
+            "${formatFileSize(downloadedBytes)} / ${formatFileSize(totalBytes)} ($progressPercent%)"
+        } else {
+            "${formatFileSize(downloadedBytes)} downloaded"
+        }
+        val speed = if (speedBytesPerSecond > 0) " · ${formatFileSize(speedBytesPerSecond)}/s" else ""
+        return "$fileName\n$amount$speed"
+    }
+
+    private fun formatFileSize(bytes: Long): String {
+        return when {
+            bytes >= 1024L * 1024 * 1024 -> "%.2f GB".format(bytes.toDouble() / (1024L * 1024 * 1024))
+            bytes >= 1024L * 1024 -> "%.1f MB".format(bytes.toDouble() / (1024L * 1024))
+            bytes >= 1024L -> "%.1f KB".format(bytes.toDouble() / 1024L)
+            else -> "$bytes B"
+        }
     }
 }

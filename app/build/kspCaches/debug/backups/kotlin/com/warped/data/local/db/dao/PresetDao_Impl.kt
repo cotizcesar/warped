@@ -31,7 +31,7 @@ public class PresetDao_Impl(
     this.__db = __db
     this.__insertAdapterOfPresetEntity = object : EntityInsertAdapter<PresetEntity>() {
       protected override fun createQuery(): String =
-          "INSERT OR REPLACE INTO `presets` (`id`,`name`,`temperature`,`top_p`,`top_k`,`repeat_penalty`,`max_tokens`,`context_size`,`seed`,`threads`,`created_at`) VALUES (nullif(?, 0),?,?,?,?,?,?,?,?,?,?)"
+          "INSERT OR REPLACE INTO `presets` (`id`,`name`,`temperature`,`top_p`,`top_k`,`repeat_penalty`,`max_tokens`,`context_size`,`seed`,`threads`,`model_format`,`created_at`) VALUES (nullif(?, 0),?,?,?,?,?,?,?,?,?,?,?)"
 
       protected override fun bind(statement: SQLiteStatement, entity: PresetEntity) {
         statement.bindLong(1, entity.id)
@@ -44,7 +44,8 @@ public class PresetDao_Impl(
         statement.bindLong(8, entity.contextSize.toLong())
         statement.bindLong(9, entity.seed.toLong())
         statement.bindLong(10, entity.threads.toLong())
-        statement.bindLong(11, entity.createdAt)
+        statement.bindText(11, entity.modelFormat)
+        statement.bindLong(12, entity.createdAt)
       }
     }
   }
@@ -70,6 +71,7 @@ public class PresetDao_Impl(
         val _columnIndexOfContextSize: Int = getColumnIndexOrThrow(_stmt, "context_size")
         val _columnIndexOfSeed: Int = getColumnIndexOrThrow(_stmt, "seed")
         val _columnIndexOfThreads: Int = getColumnIndexOrThrow(_stmt, "threads")
+        val _columnIndexOfModelFormat: Int = getColumnIndexOrThrow(_stmt, "model_format")
         val _columnIndexOfCreatedAt: Int = getColumnIndexOrThrow(_stmt, "created_at")
         val _result: MutableList<PresetEntity> = mutableListOf()
         while (_stmt.step()) {
@@ -94,10 +96,12 @@ public class PresetDao_Impl(
           _tmpSeed = _stmt.getLong(_columnIndexOfSeed).toInt()
           val _tmpThreads: Int
           _tmpThreads = _stmt.getLong(_columnIndexOfThreads).toInt()
+          val _tmpModelFormat: String
+          _tmpModelFormat = _stmt.getText(_columnIndexOfModelFormat)
           val _tmpCreatedAt: Long
           _tmpCreatedAt = _stmt.getLong(_columnIndexOfCreatedAt)
           _item =
-              PresetEntity(_tmpId,_tmpName,_tmpTemperature,_tmpTopP,_tmpTopK,_tmpRepeatPenalty,_tmpMaxTokens,_tmpContextSize,_tmpSeed,_tmpThreads,_tmpCreatedAt)
+              PresetEntity(_tmpId,_tmpName,_tmpTemperature,_tmpTopP,_tmpTopK,_tmpRepeatPenalty,_tmpMaxTokens,_tmpContextSize,_tmpSeed,_tmpThreads,_tmpModelFormat,_tmpCreatedAt)
           _result.add(_item)
         }
         _result
@@ -124,6 +128,7 @@ public class PresetDao_Impl(
         val _columnIndexOfContextSize: Int = getColumnIndexOrThrow(_stmt, "context_size")
         val _columnIndexOfSeed: Int = getColumnIndexOrThrow(_stmt, "seed")
         val _columnIndexOfThreads: Int = getColumnIndexOrThrow(_stmt, "threads")
+        val _columnIndexOfModelFormat: Int = getColumnIndexOrThrow(_stmt, "model_format")
         val _columnIndexOfCreatedAt: Int = getColumnIndexOrThrow(_stmt, "created_at")
         val _result: PresetEntity?
         if (_stmt.step()) {
@@ -147,10 +152,12 @@ public class PresetDao_Impl(
           _tmpSeed = _stmt.getLong(_columnIndexOfSeed).toInt()
           val _tmpThreads: Int
           _tmpThreads = _stmt.getLong(_columnIndexOfThreads).toInt()
+          val _tmpModelFormat: String
+          _tmpModelFormat = _stmt.getText(_columnIndexOfModelFormat)
           val _tmpCreatedAt: Long
           _tmpCreatedAt = _stmt.getLong(_columnIndexOfCreatedAt)
           _result =
-              PresetEntity(_tmpId,_tmpName,_tmpTemperature,_tmpTopP,_tmpTopK,_tmpRepeatPenalty,_tmpMaxTokens,_tmpContextSize,_tmpSeed,_tmpThreads,_tmpCreatedAt)
+              PresetEntity(_tmpId,_tmpName,_tmpTemperature,_tmpTopP,_tmpTopK,_tmpRepeatPenalty,_tmpMaxTokens,_tmpContextSize,_tmpSeed,_tmpThreads,_tmpModelFormat,_tmpCreatedAt)
         } else {
           _result = null
         }

@@ -14,7 +14,7 @@ data class MemoryInfo(
 
 @Singleton
 class MemoryChecker @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) {
     fun getMemoryInfo(): MemoryInfo {
         val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager

@@ -10,11 +10,13 @@ import retrofit2.http.Query
 interface HuggingFaceApi {
     @GET("api/models")
     suspend fun searchModels(
-        @Query("search") query: String,
-        @Query("filter") filter: String = "gguf",
+        @Query("search") query: String? = null,
+        @Query("library") library: String = "gguf",
+        @Query("author") author: String? = null,
         @Query("sort") sort: String = "downloads",
         @Query("direction") direction: String = "-1",
-        @Query("limit") limit: Int = 20
+        @Query("limit") limit: Int = 20,
+        @Query("full") full: Boolean = true
     ): Response<List<HuggingFaceModel>>
 
     @GET("api/models/{modelId}")

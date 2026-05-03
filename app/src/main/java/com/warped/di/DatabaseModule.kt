@@ -2,6 +2,7 @@ package com.warped.di
 
 import android.content.Context
 import androidx.room.Room
+import androidx.work.WorkManager
 import com.warped.data.local.db.AppDatabase
 import com.warped.data.local.db.MIGRATION_4_5
 import com.warped.data.local.db.MIGRATION_5_6
@@ -30,7 +31,7 @@ object DatabaseModule {
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "warped.db")
             .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
-            .fallbackToDestructiveMigration()
+            .fallbackToDestructiveMigration(true)
             .build()
 
     @Provides
@@ -50,4 +51,9 @@ object DatabaseModule {
 
     @Provides
     fun provideDownloadCheckpointDao(db: AppDatabase): DownloadCheckpointDao = db.downloadCheckpointDao()
+
+    @Provides
+    @Singleton
+    fun provideWorkManager(@ApplicationContext context: Context): WorkManager =
+        WorkManager.getInstance(context)
 }

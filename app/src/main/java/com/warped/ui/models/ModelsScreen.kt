@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Delete
@@ -39,6 +40,7 @@ fun ModelsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showMemoryWarning by remember { mutableStateOf<LocalModel?>(null) }
     var showAddWizard by remember { mutableStateOf(false) }
+    val isEndpointFormOpen = uiState.isEndpointFormVisible || uiState.isEditingEndpoint
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -76,20 +78,36 @@ fun ModelsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Models & Endpoints") },
+                title = { Text(if (isEndpointFormOpen) "Connect LM Studio" else "Models & Endpoints") },
                 navigationIcon = {
-                    IconButton(onClick = onOpenDrawer) {
-                        Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                    if (isEndpointFormOpen) {
+                        IconButton(
+                            onClick = {
+                                if (uiState.isEditingEndpoint) {
+                                    viewModel.cancelEndpointEdit()
+                                } else {
+                                    viewModel.dismissEndpointForm()
+                                }
+                            }
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to models")
+                        }
+                    } else {
+                        IconButton(onClick = onOpenDrawer) {
+                            Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                        }
                     }
                 }
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddWizard = true },
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(Icons.Filled.Add, "Add", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(28.dp))
+            if (!isEndpointFormOpen) {
+                FloatingActionButton(
+                    onClick = { showAddWizard = true },
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(Icons.Filled.Add, "Add", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(28.dp))
+                }
             }
         }
     ) { padding ->
@@ -290,31 +308,40 @@ fun ModelCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(model.name, style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        FormatBadge(model.modelFormat)
+                Text(
+                    model.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(8.dp))
+                FormatBadge(model.modelFormat)
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Storage,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    formatFileSize(model.sizeBytes),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (model.capabilities.vision || model.capabilities.reasoning || model.capabilities.tools) {
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (model.capabilities.vision) {
+                        CapabilityBadge("Vision", Color(0xFF9C27B0))
                     }
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "${model.architecture} · ${model.quantization} · ${model.parameterCount} params",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Filled.Storage,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            formatFileSize(model.sizeBytes),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    if (model.capabilities.reasoning) {
+                        CapabilityBadge("Thinking", Color(0xFFFF9800))
+                    }
+                    if (model.capabilities.tools) {
+                        CapabilityBadge("Tools", Color(0xFF2196F3))
                     }
                 }
             }
@@ -332,6 +359,21 @@ fun ModelCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CapabilityBadge(label: String, color: Color) {
+    Surface(
+        shape = RoundedCornerShape(4.dp),
+        color = color.copy(alpha = 0.12f)
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = color
+        )
     }
 }
 
@@ -375,7 +417,8 @@ private fun DownloadCard(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "${(download.progress * 100).toInt()}% · ${formatFileSize(download.downloadedBytes)} / ${formatFileSize(download.totalBytes)}",
+                    "${(download.progress * 100).toInt()}% · ${formatFileSize(download.downloadedBytes)} / " +
+                        "${formatFileSize(download.totalBytes)} · ${formatDownloadSpeed(download.speedBytesPerSecond)}",
                     style = MaterialTheme.typography.bodySmall
                 )
                 Spacer(Modifier.height(8.dp))
@@ -410,13 +453,20 @@ private fun DownloadCard(
     }
 }
 
-@Composable
 private fun formatFileSize(bytes: Long): String {
     return when {
         bytes >= 1024L * 1024 * 1024 -> "%.2f GB".format(bytes.toDouble() / (1024L * 1024 * 1024))
         bytes >= 1024 * 1024 -> "%.1f MB".format(bytes.toDouble() / (1024 * 1024))
         bytes >= 1024 -> "%.1f KB".format(bytes.toDouble() / 1024)
         else -> "$bytes B"
+    }
+}
+
+private fun formatDownloadSpeed(bytesPerSecond: Long): String {
+    return if (bytesPerSecond > 0) {
+        "${formatFileSize(bytesPerSecond)}/s"
+    } else {
+        "--/s"
     }
 }
 

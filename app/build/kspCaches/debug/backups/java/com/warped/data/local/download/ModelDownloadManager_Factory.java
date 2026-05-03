@@ -1,14 +1,14 @@
 package com.warped.data.local.download;
 
 import android.content.Context;
-import com.warped.domain.repository.LocalModelRepository;
+import androidx.work.WorkManager;
+import com.warped.data.local.db.dao.DownloadCheckpointDao;
 import dagger.internal.DaggerGenerated;
 import dagger.internal.Factory;
 import dagger.internal.Provider;
 import dagger.internal.QualifierMetadata;
 import dagger.internal.ScopeMetadata;
 import javax.annotation.processing.Generated;
-import okhttp3.OkHttpClient;
 
 @ScopeMetadata("javax.inject.Singleton")
 @QualifierMetadata("dagger.hilt.android.qualifiers.ApplicationContext")
@@ -29,31 +29,31 @@ import okhttp3.OkHttpClient;
 public final class ModelDownloadManager_Factory implements Factory<ModelDownloadManager> {
   private final Provider<Context> contextProvider;
 
-  private final Provider<OkHttpClient> okHttpClientProvider;
+  private final Provider<WorkManager> workManagerProvider;
 
-  private final Provider<LocalModelRepository> localModelRepositoryProvider;
+  private final Provider<DownloadCheckpointDao> checkpointDaoProvider;
 
   private ModelDownloadManager_Factory(Provider<Context> contextProvider,
-      Provider<OkHttpClient> okHttpClientProvider,
-      Provider<LocalModelRepository> localModelRepositoryProvider) {
+      Provider<WorkManager> workManagerProvider,
+      Provider<DownloadCheckpointDao> checkpointDaoProvider) {
     this.contextProvider = contextProvider;
-    this.okHttpClientProvider = okHttpClientProvider;
-    this.localModelRepositoryProvider = localModelRepositoryProvider;
+    this.workManagerProvider = workManagerProvider;
+    this.checkpointDaoProvider = checkpointDaoProvider;
   }
 
   @Override
   public ModelDownloadManager get() {
-    return newInstance(contextProvider.get(), okHttpClientProvider.get(), localModelRepositoryProvider.get());
+    return newInstance(contextProvider.get(), workManagerProvider.get(), checkpointDaoProvider.get());
   }
 
   public static ModelDownloadManager_Factory create(Provider<Context> contextProvider,
-      Provider<OkHttpClient> okHttpClientProvider,
-      Provider<LocalModelRepository> localModelRepositoryProvider) {
-    return new ModelDownloadManager_Factory(contextProvider, okHttpClientProvider, localModelRepositoryProvider);
+      Provider<WorkManager> workManagerProvider,
+      Provider<DownloadCheckpointDao> checkpointDaoProvider) {
+    return new ModelDownloadManager_Factory(contextProvider, workManagerProvider, checkpointDaoProvider);
   }
 
-  public static ModelDownloadManager newInstance(Context context, OkHttpClient okHttpClient,
-      LocalModelRepository localModelRepository) {
-    return new ModelDownloadManager(context, okHttpClient, localModelRepository);
+  public static ModelDownloadManager newInstance(Context context, WorkManager workManager,
+      DownloadCheckpointDao checkpointDao) {
+    return new ModelDownloadManager(context, workManager, checkpointDao);
   }
 }

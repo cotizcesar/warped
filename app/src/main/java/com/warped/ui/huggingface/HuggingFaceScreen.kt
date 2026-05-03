@@ -1,6 +1,5 @@
 package com.warped.ui.huggingface
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,27 +13,22 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -58,8 +52,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun HuggingFaceScreen(
     viewModel: HuggingFaceViewModel = hiltViewModel(),
-    onNavigateToModels: () -> Unit = {},
-    onOpenDrawer: () -> Unit = {}
+    onNavigateToModels: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var searchText by remember { mutableStateOf(uiState.searchQuery) }
@@ -84,15 +77,19 @@ fun HuggingFaceScreen(
         ModelDetailScreen(
             model = uiState.selectedModel!!,
             siblings = uiState.modelSiblings,
-            compatibilityByFileName = uiState.compatibilityByFileName,
             isDownloading = uiState.isDownloading,
+            isDownloadPaused = uiState.isDownloadPaused,
             downloadProgress = uiState.downloadProgress,
+            downloadedBytes = uiState.downloadedBytes,
+            totalDownloadBytes = uiState.totalDownloadBytes,
+            downloadSpeedBytesPerSecond = uiState.downloadSpeedBytesPerSecond,
             downloadingFileName = uiState.downloadingFileName,
             downloadError = uiState.downloadError,
             onDownload = { fileName, size ->
                 viewModel.downloadFile(uiState.selectedModel!!.id, fileName, size)
             },
-            onCancelDownload = { viewModel.pauseDownload() },
+            onPauseDownload = { viewModel.pauseDownload() },
+            onResumeDownload = { viewModel.resumeDownload() },
             onBack = { viewModel.clearDetail() }
         )
         return
@@ -103,8 +100,8 @@ fun HuggingFaceScreen(
             TopAppBar(
                 title = { Text("Hugging Face") },
                 navigationIcon = {
-                    IconButton(onClick = onOpenDrawer) {
-                        Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                    IconButton(onClick = onNavigateToModels) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to models")
                     }
                 }
             )
@@ -146,10 +143,9 @@ fun HuggingFaceScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            // Format TabRow: GGUF / LiteRT-LM
-            val formats = listOf("gguf" to "GGUF", "litertlm" to "LiteRT-LM")
+            val formats = listOf("litertlm" to "LiteRT-LM", "gguf" to "GGUF")
             val selectedTabIndex = formats.indexOfFirst { it.first == uiState.activeFormat }.coerceAtLeast(0)
-            TabRow(selectedTabIndex = selectedTabIndex) {
+            PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
                 formats.forEachIndexed { index, (formatValue, label) ->
                     Tab(
                         selected = selectedTabIndex == index,
@@ -166,68 +162,13 @@ fun HuggingFaceScreen(
             }
 
             if (uiState.searchResults.isNotEmpty()) {
-                val compatibleCount = uiState.searchResults.count { uiState.compatibilityByModelId[it.id] == true }
-                val filteredModels = if (uiState.showCompatibleOnly) {
-                    uiState.searchResults.filter { uiState.compatibilityByModelId[it.id] == true }
-                } else {
-                    uiState.searchResults
-                }
-
-                Text(
-                    text = "RAM: ${formatFileSize(uiState.availableMemoryBytes)} available · limit ${formatFileSize((uiState.availableMemoryBytes * 0.8).toLong())}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    FilterChip(
-                        selected = !uiState.showCompatibleOnly,
-                        onClick = { viewModel.toggleCompatibleFilter() },
-                        label = { Text("All (${uiState.searchResults.size})") }
-                    )
-                    FilterChip(
-                        selected = uiState.showCompatibleOnly,
-                        onClick = { viewModel.toggleCompatibleFilter() },
-                        label = {
-                            Text("Compatible (${compatibleCount})")
-                        },
-                        colors = if (compatibleCount > 0) {
-                            FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        } else {
-                            FilterChipDefaults.filterChipColors()
-                        }
-                    )
-                }
-                Spacer(Modifier.height(4.dp))
-
-                if (filteredModels.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "No compatible models found. Try a different search.",
-                            style = MaterialTheme.typography.bodyLarge
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(uiState.searchResults) { model ->
+                        ModelSearchResultCard(
+                            model = model,
+                            activeFormat = uiState.activeFormat,
+                            onClick = { viewModel.selectModel(model) }
                         )
-                    }
-                } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(filteredModels) { model ->
-                            ModelSearchResultCard(
-                                model = model,
-                                isCompatible = uiState.compatibilityByModelId[model.id] == true,
-                                activeFormat = uiState.activeFormat,
-                                onClick = { viewModel.selectModel(model) }
-                            )
-                        }
                     }
                 }
             } else if (!uiState.isLoading) {
@@ -235,10 +176,20 @@ fun HuggingFaceScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        "Search Hugging Face for GGUF models",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        if (uiState.error != null) {
+                            Text(
+                                uiState.error ?: "",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Spacer(Modifier.height(8.dp))
+                        }
+                        Text(
+                            if (uiState.searchQuery.isNotBlank()) "No results found" else "Loading models...",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
                 }
             }
 
@@ -259,25 +210,14 @@ fun HuggingFaceScreen(
 @Composable
 private fun ModelSearchResultCard(
     model: com.warped.data.remote.dto.HuggingFaceModel,
-    isCompatible: Boolean,
     activeFormat: String,
     onClick: () -> Unit
 ) {
-    val cardColors = if (isCompatible) {
-        CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-        )
-    } else {
-        CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-        )
-    }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = cardColors,
-        border = if (isCompatible) {
-            BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
-        } else null,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        ),
         onClick = onClick
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -298,13 +238,6 @@ private fun ModelSearchResultCard(
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 2
                 )
-                if (isCompatible) {
-                    Icon(
-                        imageVector = Icons.Filled.CheckCircle,
-                        contentDescription = stringResource(R.string.compatible_with_device),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
             }
             Spacer(Modifier.height(4.dp))
             Text(
@@ -316,9 +249,6 @@ private fun ModelSearchResultCard(
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FormatBadge(activeFormat)
-                if (isCompatible) {
-                    AssistInfoChip(text = stringResource(R.string.compatible_with_device))
-                }
                 AssistInfoChip(text = "${model.downloads} downloads")
                 AssistInfoChip(text = "${model.likes} likes")
                 model.tags.firstOrNull()?.let { tag ->
@@ -332,10 +262,8 @@ private fun ModelSearchResultCard(
 @Composable
 private fun FormatBadge(format: String) {
     val (color, label) = when {
-        format.equals("gguf", ignoreCase = true) || format.equals("GGUF", ignoreCase = true) ->
-            Color(0xFF2196F3) to "GGUF"
-        format.equals("litertlm", ignoreCase = true) || format.equals("LITERTLM", ignoreCase = true) ->
-            Color(0xFF4CAF50) to "LiteRT-LM"
+        format.equals("gguf", ignoreCase = true) -> Color(0xFF2196F3) to "GGUF"
+        format.equals("litertlm", ignoreCase = true) -> Color(0xFF4CAF50) to "LiteRT-LM"
         else -> MaterialTheme.colorScheme.outline to format
     }
     Surface(
@@ -371,38 +299,17 @@ private fun AssistInfoChip(text: String) {
 @Composable
 private fun SiblingFileCard(
     sibling: com.warped.data.remote.dto.HuggingFaceSibling,
-    compatibilityLevel: Int,
     modelDownloads: Int,
     isDownloading: Boolean,
     onDownload: () -> Unit
 ) {
     val effectiveSize = sibling.size.takeIf { it > 0 } ?: sibling.lfs?.size ?: 0L
-    val compatColor = when (compatibilityLevel) {
-        2 -> MaterialTheme.colorScheme.primary
-        1 -> Color(0xFFFF9800)
-        else -> MaterialTheme.colorScheme.error
-    }
-    val sizeLabel = when (compatibilityLevel) {
-        2 -> stringResource(R.string.compatible_with_device)
-        else -> stringResource(R.string.may_be_too_large)
-    }
-
-    val cardColors = if (compatibilityLevel >= 1) {
-        CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-        )
-    } else {
-        CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-        )
-    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = cardColors,
-        border = if (compatibilityLevel >= 1) {
-            BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
-        } else null
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -422,26 +329,16 @@ private fun SiblingFileCard(
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 2
                 )
-                if (compatibilityLevel >= 1) {
-                    Icon(
-                        imageVector = Icons.Filled.CheckCircle,
-                        contentDescription = stringResource(R.string.compatible_with_device),
-                        tint = compatColor
-                    )
-                }
             }
             Spacer(Modifier.height(4.dp))
             Text(
-                "${formatFileSize(effectiveSize)} · $sizeLabel",
+                formatFileSize(effectiveSize),
                 style = MaterialTheme.typography.bodySmall,
-                color = compatColor,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (compatibilityLevel >= 1) {
-                    AssistInfoChip(text = stringResource(R.string.compatible_with_device))
-                }
                 AssistInfoChip(text = formatFileSize(effectiveSize))
                 AssistInfoChip(text = "$modelDownloads downloads")
             }
@@ -462,13 +359,17 @@ private fun SiblingFileCard(
 private fun ModelDetailScreen(
     model: com.warped.data.remote.dto.HuggingFaceModelDetail,
     siblings: List<com.warped.data.remote.dto.HuggingFaceSibling>,
-    compatibilityByFileName: Map<String, Int>,
     isDownloading: Boolean,
+    isDownloadPaused: Boolean,
     downloadProgress: Float,
+    downloadedBytes: Long,
+    totalDownloadBytes: Long,
+    downloadSpeedBytesPerSecond: Long,
     downloadingFileName: String,
     downloadError: String?,
     onDownload: (fileName: String, size: Long) -> Unit,
-    onCancelDownload: () -> Unit,
+    onPauseDownload: () -> Unit,
+    onResumeDownload: () -> Unit,
     onBack: () -> Unit
 ) {
     Scaffold(
@@ -476,7 +377,9 @@ private fun ModelDetailScreen(
             TopAppBar(
                 title = { Text(model.id.substringAfterLast("/")) },
                 navigationIcon = {
-                    TextButton(onClick = onBack) { Text("\u2190 Back") }
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to models")
+                    }
                 }
             )
         }
@@ -538,7 +441,7 @@ private fun ModelDetailScreen(
                     Text("Available Models", style = MaterialTheme.typography.titleLarge)
                 }
 
-                if (isDownloading) {
+                if (isDownloading || isDownloadPaused) {
                     item {
                         Column {
                             LinearProgressIndicator(
@@ -551,13 +454,25 @@ private fun ModelDetailScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    "Downloading: $downloadingFileName (${(downloadProgress * 100).toInt()}%)",
+                                    "${if (isDownloadPaused) "Paused" else "Downloading"}: $downloadingFileName (${(downloadProgress * 100).toInt()}%)",
                                     modifier = Modifier.weight(1f)
                                 )
-                                TextButton(onClick = onCancelDownload) {
-                                    Text("Cancel")
+                                if (isDownloadPaused) {
+                                    TextButton(onClick = onResumeDownload) {
+                                        Text("Resume")
+                                    }
+                                } else {
+                                    TextButton(onClick = onPauseDownload) {
+                                        Text("Pause")
+                                    }
                                 }
                             }
+                            Text(
+                                "${formatFileSize(downloadedBytes)} / ${formatFileSize(totalDownloadBytes)}" +
+                                    if (isDownloading) " · ${formatDownloadSpeed(downloadSpeedBytesPerSecond)}" else "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
@@ -569,13 +484,11 @@ private fun ModelDetailScreen(
                 }
 
                 items(siblings) { sibling ->
-                    val compatLevel = compatibilityByFileName[sibling.rfilename] ?: 0
                     val effectiveSize = sibling.size.takeIf { it > 0 } ?: sibling.lfs?.size ?: 0L
                     SiblingFileCard(
                         sibling = sibling,
-                        compatibilityLevel = compatLevel,
                         modelDownloads = model.downloads,
-                        isDownloading = isDownloading,
+                        isDownloading = isDownloading || isDownloadPaused,
                         onDownload = { onDownload(sibling.rfilename, effectiveSize) }
                     )
                 }
@@ -590,5 +503,13 @@ private fun formatFileSize(bytes: Long): String {
         bytes >= 1024 * 1024 -> "%.1f MB".format(bytes.toDouble() / (1024 * 1024))
         bytes >= 1024 -> "%.1f KB".format(bytes.toDouble() / 1024)
         else -> "$bytes B"
+    }
+}
+
+private fun formatDownloadSpeed(bytesPerSecond: Long): String {
+    return if (bytesPerSecond > 0) {
+        "${formatFileSize(bytesPerSecond)}/s"
+    } else {
+        "--/s"
     }
 }

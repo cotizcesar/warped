@@ -34,7 +34,7 @@ class ChatViewModel @Inject constructor(
     private val parameterStore: ParameterStore,
     private val llamaEngine: LlamaEngine,
     private val engineManager: EngineManager,
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())

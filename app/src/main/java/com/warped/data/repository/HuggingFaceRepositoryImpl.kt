@@ -9,6 +9,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import timber.log.Timber
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,15 +33,19 @@ class HuggingFaceRepositoryImpl @Inject constructor(
 
     private val api = retrofit.create(HuggingFaceApi::class.java)
 
-    override suspend fun searchModels(query: String, format: String, limit: Int): Result<List<HuggingFaceModel>> {
+    override suspend fun searchModels(query: String?, format: String, author: String?, limit: Int): Result<List<HuggingFaceModel>> {
         return try {
-            val response = api.searchModels(query = query, filter = format, limit = limit)
+            val response = api.searchModels(query = query, library = format, author = author, limit = limit)
             if (response.isSuccessful) {
-                Result.success(response.body() ?: emptyList())
+                val body = response.body() ?: emptyList()
+                Result.success(body)
             } else {
+                val errorBody = response.errorBody()?.string() ?: "unknown error"
+                Timber.e("HF API error: HTTP ${response.code()} — $errorBody")
                 Result.failure(Exception("Search failed: HTTP ${response.code()}"))
             }
         } catch (e: Exception) {
+            Timber.e(e, "HF API search failed: query=$query format=$format author=$author")
             Result.failure(e)
         }
     }
@@ -54,6 +59,7 @@ class HuggingFaceRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to get model: HTTP ${response.code()}"))
             }
         } catch (e: Exception) {
+            Timber.e(e, "HF API detail failed: $modelId")
             Result.failure(e)
         }
     }

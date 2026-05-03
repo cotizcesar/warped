@@ -24,10 +24,11 @@ fun MarkdownText(
     modifier: Modifier = Modifier,
     baseColor: Color = Color.Unspecified,
     fontSize: Float? = null,
-    fontStyle: FontStyle? = null
+    fontStyle: FontStyle? = null,
+    maxLines: Int = Int.MAX_VALUE
 ) {
     if (text.isBlank()) {
-        Text(text, modifier = modifier, color = baseColor)
+        Text(text, modifier = modifier, color = baseColor, maxLines = maxLines)
         return
     }
 
@@ -66,7 +67,7 @@ fun MarkdownText(
         }
     }
 
-    Text(annotated, modifier = modifier, color = baseColor, style = MaterialTheme.typography.bodyLarge)
+    Text(annotated, modifier = modifier, color = baseColor, style = MaterialTheme.typography.bodyLarge, maxLines = maxLines)
 }
 
 private fun androidx.compose.ui.text.AnnotatedString.Builder.parseInlineMarkdown(line: String, baseStyle: SpanStyle) {

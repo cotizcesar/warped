@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
@@ -27,8 +28,10 @@ import javax.inject.Singleton
 data class DownloadState(
     val modelId: String = "",
     val fileName: String = "",
+    val fileUrl: String = "",
     val totalBytes: Long = 0,
     val downloadedBytes: Long = 0,
+    val speedBytesPerSecond: Long = 0,
     val isDownloading: Boolean = false,
     val isPaused: Boolean = false,
     val error: String? = null,
@@ -37,7 +40,7 @@ data class DownloadState(
 
 @Singleton
 class ModelDownloadManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val workManager: WorkManager,
     private val checkpointDao: DownloadCheckpointDao
 ) {
@@ -71,7 +74,10 @@ class ModelDownloadManager @Inject constructor(
             it.copy(
                 modelId = modelId,
                 fileName = fileName,
+                fileUrl = fileUrl,
                 totalBytes = fileSizeBytes,
+                downloadedBytes = 0,
+                speedBytesPerSecond = 0,
                 isDownloading = true,
                 isPaused = false,
                 error = null,
@@ -109,6 +115,7 @@ class ModelDownloadManager @Inject constructor(
             .build()
 
         workManager.enqueue(workRequest)
+        Timber.d("ModelDownloadManager: download enqueued — modelId=$modelId workId=${workRequest.id}")
 
         // Store work request ID for later observation
         activeWorkIds[modelId] = workRequest.id
@@ -119,19 +126,29 @@ class ModelDownloadManager @Inject constructor(
 
     fun pauseDownload(modelId: String) {
         val workId = activeWorkIds[modelId]
+        val state = _downloadStates.value[modelId]
         if (workId != null) {
-            // Cancel the WorkRequest — this sets isStopped=true in the Worker,
-            // which triggers the checkpoint-save-and-exit path in doWork()'s isStopped check.
             workManager.cancelWorkById(workId)
+        }
+        if (state != null && state.fileName.isNotBlank() && state.fileUrl.isNotBlank()) {
+            ioScope.launch {
+                checkpointDao.upsertCheckpoint(
+                    DownloadCheckpointEntity(
+                        modelId = modelId,
+                        fileName = state.fileName,
+                        fileUrl = state.fileUrl,
+                        totalBytes = state.totalBytes,
+                        downloadedBytes = state.downloadedBytes
+                    )
+                )
+            }
         }
         updateState(modelId) {
             it.copy(isPaused = true, isDownloading = false)
         }
-        // Checkpoint is already saved by the Worker's isStopped handler.
-        // activeWorkIds entry is removed by observeWorkProgress when WorkInfo transitions to CANCELLED.
     }
 
-    fun resumeDownload(modelId: String, fileUrl: String) {
+    fun resumeDownload(modelId: String) {
         ioScope.launch {
             val checkpoint = checkpointDao.getCheckpoint(modelId)
             if (checkpoint == null) {
@@ -148,8 +165,11 @@ class ModelDownloadManager @Inject constructor(
                 it.copy(
                     isPaused = false,
                     isDownloading = true,
+                    fileName = checkpoint.fileName,
+                    fileUrl = checkpoint.fileUrl,
                     totalBytes = checkpoint.totalBytes,
                     downloadedBytes = checkpoint.downloadedBytes,
+                    speedBytesPerSecond = 0,
                     progress = if (checkpoint.totalBytes > 0)
                         checkpoint.downloadedBytes.toFloat() / checkpoint.totalBytes.toFloat()
                     else 0f
@@ -217,11 +237,20 @@ class ModelDownloadManager @Inject constructor(
             when (workInfo.state) {
                 WorkInfo.State.RUNNING -> {
                     val progress = workInfo.progress.getInt(ModelDownloadWorker.PROGRESS, 0)
+                    val downloadedBytes = workInfo.progress.getLong(ModelDownloadWorker.DOWNLOADED_BYTES, 0L)
+                    val totalBytes = workInfo.progress.getLong(ModelDownloadWorker.TOTAL_BYTES, 0L)
+                    val speedBytesPerSecond = workInfo.progress.getLong(
+                        ModelDownloadWorker.SPEED_BYTES_PER_SECOND,
+                        0L
+                    )
                     updateState(modelId) {
                         it.copy(
                             isDownloading = true,
                             isPaused = false,
-                            progress = progress / 100f
+                            progress = progress / 100f,
+                            downloadedBytes = downloadedBytes.takeIf { bytes -> bytes > 0 } ?: it.downloadedBytes,
+                            totalBytes = totalBytes.takeIf { bytes -> bytes > 0 } ?: it.totalBytes,
+                            speedBytesPerSecond = speedBytesPerSecond
                         )
                     }
                 }
@@ -231,25 +260,29 @@ class ModelDownloadManager @Inject constructor(
                             isDownloading = false,
                             isPaused = false,
                             progress = 1f,
-                            downloadedBytes = it.totalBytes
+                            downloadedBytes = it.totalBytes,
+                            speedBytesPerSecond = 0
                         )
                     }
                     activeWorkIds.remove(modelId)
                     cleanupObserver(workId)
                 }
                 WorkInfo.State.FAILED -> {
+                    val errorMsg = workInfo.outputData.getString("error") ?: "Download failed"
                     updateState(modelId) {
                         it.copy(
                             isDownloading = false,
-                            error = "Download failed"
+                            speedBytesPerSecond = 0,
+                            error = errorMsg
                         )
                     }
                     activeWorkIds.remove(modelId)
                     cleanupObserver(workId)
                 }
                 WorkInfo.State.CANCELLED -> {
-                    // Cancelled = paused (checkpoint saved by Worker)
-                    // Don't set error — pause is not an error state
+                    updateState(modelId) {
+                        it.copy(isDownloading = false, isPaused = true, speedBytesPerSecond = 0)
+                    }
                     activeWorkIds.remove(modelId)
                     cleanupObserver(workId)
                 }

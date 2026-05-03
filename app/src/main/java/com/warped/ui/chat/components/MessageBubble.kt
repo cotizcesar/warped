@@ -8,6 +8,8 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -33,6 +35,9 @@ fun MessageBubble(
 ) {
     val isUser = message.role == Role.USER
     var showReasoning by remember { mutableStateOf(false) }
+    if (isStreaming && !message.reasoning.isNullOrBlank()) {
+        showReasoning = true
+    }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -73,14 +78,29 @@ fun MessageBubble(
                         enter = expandVertically(),
                         exit = shrinkVertically()
                     ) {
+                        val scrollState = rememberScrollState()
+                        if (isStreaming) {
+                            LaunchedEffect(message.reasoning) {
+                                scrollState.animateScrollTo(scrollState.maxValue)
+                            }
+                        }
+                        val modifier = if (isStreaming) {
+                            Modifier
+                                .padding(start = 16.dp)
+                                .heightIn(max = 72.dp)
+                                .verticalScroll(scrollState)
+                        } else {
+                            Modifier.padding(start = 16.dp)
+                        }
                         Surface(
                             color = Color.Transparent,
-                            modifier = Modifier.padding(start = 16.dp)
+                            modifier = modifier
                         ) {
                             MarkdownText(
                                 text = message.reasoning,
                                 baseColor = Color(0xFF545450),
-                                modifier = Modifier.padding(vertical = 4.dp),
+                                modifier = Modifier
+                                    .padding(vertical = 4.dp),
                                 fontStyle = FontStyle.Italic
                             )
                         }

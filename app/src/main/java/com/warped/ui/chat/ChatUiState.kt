@@ -15,6 +15,7 @@ data class ChatUiState(
     val inputText: String = "",
     val isGenerating: Boolean = false,
     val streamingContent: String = "",
+    val streamingReasoning: String = "",
     val selectedProvider: ProviderType? = null,
     val selectedModelId: String? = null,
     val connectionStatus: ConnectionStatus = ConnectionStatus.Unknown,

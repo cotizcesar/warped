@@ -1,6 +1,8 @@
 package com.warped.data.local.inference
 
+import android.util.Base64
 import com.google.ai.edge.litertlm.Content
+import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Message
@@ -19,6 +21,7 @@ import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import timber.log.Timber
+import java.text.Normalizer
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -29,6 +32,9 @@ class LiteRTLmProvider @Inject constructor(
 ) : LlmProvider {
 
     override val type = ProviderType.LITE_RT_LM
+
+    @Volatile
+    private var activeConversation: Conversation? = null
 
     override fun chat(request: ChatRequest): Flow<StreamToken> = flow {
         // Step 1: Sanitize all messages
@@ -43,20 +49,31 @@ class LiteRTLmProvider @Inject constructor(
             return@flow
         }
 
-        // Step 3: Build LiteRT-LM Messages from sanitized Warped ChatMessages
-        val litertlmMessages = sanitizedMessages.map { msg ->
+        // Step 3: Build history messages (text-only, no images)
+        val hasImages = request.images.isNotEmpty()
+        val historyMessages = sanitizedMessages.map { msg ->
             when (msg.role) {
                 Role.SYSTEM -> Message.system(msg.content)
                 Role.USER -> Message.user(msg.content)
                 Role.ASSISTANT -> Message.model(msg.content)
             }
+        }.dropLast(1) // exclude current message from history
+
+        // Step 4: Build current message contents (text + images)
+        val currentUserText = sanitizedMessages.lastOrNull { it.role == Role.USER }?.content ?: ""
+        val currentContents = if (hasImages) {
+            val contentList = mutableListOf<Content>()
+            request.images.forEach { dataUrl ->
+                decodeImage(dataUrl)?.let { contentList.add(Content.ImageBytes(it)) }
+            }
+            contentList.add(Content.Text(currentUserText))
+            Timber.d("LiteRTLmProvider: sending ${request.images.size} image(s) with text")
+            Contents.of(contentList)
+        } else {
+            Contents.of(currentUserText)
         }
 
-        // Last message is the current user message; previous are history
-        val currentMessage = litertlmMessages.last()
-        val historyMessages = litertlmMessages.dropLast(1)
-
-        // Step 4: Map GenerationParameters → SamplerConfig
+        // Step 5: Map GenerationParameters → SamplerConfig
         val params = request.parameters
         val samplerConfig = SamplerConfig(
             topK = clamp(params.topK, 1, 100, "topK"),
@@ -64,21 +81,19 @@ class LiteRTLmProvider @Inject constructor(
             temperature = clamp(params.temperature.toDouble(), 0.0, 2.0, "temperature"),
             seed = if (params.seed != -1) params.seed else 0
         )
-
-        // Map maxTokens via extraContext
         val extraContext = mapOf<String, Any>(
             "max_output_tokens" to params.maxTokens
         )
 
-        // Step 5: Create conversation config
+        // Step 6: Create conversation config with history
         val conversationConfig = ConversationConfig(
             initialMessages = historyMessages,
             samplerConfig = samplerConfig,
             extraContext = extraContext
         )
 
-        // Step 6: Send message with retry loop
-        sendMessageWithRetry(currentMessage, conversationConfig, 0)
+        // Step 7: Send content with retry loop
+        sendContentsWithRetry(currentContents, conversationConfig, 0)
     }.flowOn(Dispatchers.Default)
 
     override suspend fun listModels(): Result<List<ModelInfo>> {
@@ -114,32 +129,34 @@ class LiteRTLmProvider @Inject constructor(
 
     // --- Private helpers ---
 
-    private suspend fun FlowCollector<StreamToken>.sendMessageWithRetry(
-        message: Message,
+    private suspend fun FlowCollector<StreamToken>.sendContentsWithRetry(
+        contents: Contents,
         conversationConfig: ConversationConfig,
         attempt: Int
     ) {
-        val maxRetries = 2 // 3 total attempts
+        val maxRetries = 2
 
         try {
-            // Pre-condition: engine is initialized
             val engine = engineManager.getLiteRTLmEngine()
             if (!engine.isInitialized()) {
                 throw IllegalStateException("Engine not initialized")
             }
 
-            // Create conversation for this request
-            val conversation = engineManager.createLiteRTConversation(conversationConfig)
+            activeConversation?.let { prev ->
+                try { prev.close() } catch (_: Exception) {}
+                activeConversation = null
+            }
 
-            // Stream tokens via sendMessageAsync(Message): Flow<Message>
-            conversation.sendMessageAsync(message).collect { responseMsg ->
+            val conversation = engineManager.createLiteRTConversation(conversationConfig)
+            activeConversation = conversation
+
+            conversation.sendMessageAsync(contents).collect { responseMsg ->
                 val content = extractTextContent(responseMsg)
                 if (content.isNotEmpty()) {
                     emit(StreamToken.Delta(content))
                 }
             }
 
-            // Post-condition: conversation should still be alive
             if (!conversation.isAlive) {
                 throw IllegalStateException("Conversation not alive after streaming")
             }
@@ -153,20 +170,13 @@ class LiteRTLmProvider @Inject constructor(
 
             if (isEngineError && attempt < maxRetries) {
                 Timber.w(e, "LiteRTLmProvider: engine error (attempt ${attempt + 1}/3), recovering...")
-
-                // Reinitialize engine with same model path
                 recoverEngine()
-
                 Timber.w("LiteRTLmProvider: Engine recovered, retrying... (attempt ${attempt + 1})")
-
-                // Retry
-                sendMessageWithRetry(message, conversationConfig, attempt + 1)
+                sendContentsWithRetry(contents, conversationConfig, attempt + 1)
             } else if (isEngineError) {
-                // Exhausted retries
                 Timber.e(e, "LiteRTLmProvider: engine failed to recover after $maxRetries retries")
                 emit(StreamToken.Error("Engine failed to recover. Please reload the model manually."))
             } else {
-                // Non-engine error — don't retry
                 Timber.e(e, "LiteRTLmProvider: unexpected error")
                 emit(StreamToken.Error("Chat error: ${e.message ?: "Unknown error"}"))
             }
@@ -187,8 +197,18 @@ class LiteRTLmProvider @Inject constructor(
         }
     }
 
-    private fun extractTextContent(message: Message): String {
+    private fun decodeImage(dataUrl: String): ByteArray? {
         return try {
+            val base64 = dataUrl.substringAfter("base64,")
+            Base64.decode(base64, Base64.DEFAULT)
+        } catch (e: Exception) {
+            Timber.w(e, "LiteRTLmProvider: failed to decode image")
+            null
+        }
+    }
+
+    private fun extractTextContent(message: Message): String {
+        val raw = try {
             message.contents.contents
                 .filterIsInstance<Content.Text>()
                 .joinToString("") { it.text }
@@ -196,6 +216,7 @@ class LiteRTLmProvider @Inject constructor(
             Timber.w(e, "LiteRTLmProvider: failed to extract text from message")
             ""
         }
+        return Normalizer.normalize(raw, Normalizer.Form.NFC)
     }
 
     private fun clamp(value: Int, min: Int, max: Int, paramName: String): Int {

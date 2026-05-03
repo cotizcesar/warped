@@ -23,7 +23,7 @@ class EngineManager @Inject constructor(
     private val llamaEngine: LlamaEngine,
     private val liteRTLmEngine: LiteRTLmEngine,
     private val backendDetector: BackendDetector,
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) {
     private var activeEngine: ActiveEngine? = null
 
@@ -133,6 +133,7 @@ class EngineManager @Inject constructor(
      * Releases engine resources on critical memory pressure.
      */
     fun handleTrimMemory(level: Int) {
+        @Suppress("DEPRECATION")
         if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
             Timber.d("EngineManager: TRIM_MEMORY_RUNNING_CRITICAL — unloading engine")
             try {

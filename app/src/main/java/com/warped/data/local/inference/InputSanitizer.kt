@@ -1,12 +1,16 @@
 package com.warped.data.local.inference
 
 import timber.log.Timber
+import java.text.Normalizer
 import javax.inject.Inject
 
 class InputSanitizer @Inject constructor() {
 
     fun sanitize(input: String): String {
         var result = input
+
+        // 0. NFC normalization: ensure composed Unicode (á not a + combining ´)
+        result = Normalizer.normalize(result, Normalizer.Form.NFC)
 
         // 1. LaTeX delimiters
         result = result.replace(Regex("""\$\$|\\[\(\)\[\]]"""), "")

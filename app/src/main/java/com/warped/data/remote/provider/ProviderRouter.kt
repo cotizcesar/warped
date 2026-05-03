@@ -48,4 +48,12 @@ class ProviderRouter @Inject constructor(
             ProviderType.LITE_RT_LM -> liteRTLmProvider.get()
         }
     }
+
+    fun resolveLocal(providerType: ProviderType, modelId: String): LlmProvider {
+        return when (providerType) {
+            ProviderType.LOCAL -> localLlmProvider.get().configure(modelId)
+            ProviderType.LITE_RT_LM -> liteRTLmProvider.get()
+            else -> error("Provider $providerType is not local")
+        }
+    }
 }

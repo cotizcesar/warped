@@ -83,9 +83,11 @@ fun ChatScreen(
 
     LaunchedEffect(uiState.streamingContent.length, uiState.messages.size) {
         if (uiState.messages.isNotEmpty() || uiState.streamingContent.isNotEmpty()) {
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
             val totalItems = listState.layoutInfo.totalItemsCount
-            if (lastVisible >= totalItems - 3 || totalItems == 0) {
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val isNearBottom = lastVisible >= totalItems - 3 || totalItems == 0
+            val isActivelyStreaming = uiState.streamingContent.isNotEmpty()
+            if (isNearBottom || isActivelyStreaming) {
                 listState.animateScrollToItem(maxOf(0, totalItems - 1))
             }
         }
@@ -124,18 +126,20 @@ fun ChatScreen(
                         ) {
                             if (uiState.localModels.isNotEmpty()) {
                                 uiState.localModels.forEach { model ->
-                                    val providerType = if (model.modelFormat == "LITERTLM") ProviderType.LITE_RT_LM else ProviderType.LOCAL
+                                    val isLiteRtLm = model.modelFormat.equals("LITERTLM", ignoreCase = true) ||
+                                        model.filePath.endsWith(".litertlm", ignoreCase = true)
+                                    val providerType = if (isLiteRtLm) ProviderType.LITE_RT_LM else ProviderType.LOCAL
                                     DropdownMenuItem(
                                         text = {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 // Format badge: small colored chip
-                                                val badgeColor = if (model.modelFormat == "LITERTLM") Color(0xFF4CAF50) else Color(0xFF2196F3)
+                                                val badgeColor = if (isLiteRtLm) Color(0xFF4CAF50) else Color(0xFF2196F3)
                                                 Surface(
                                                     shape = RoundedCornerShape(4.dp),
                                                     color = badgeColor.copy(alpha = 0.15f)
                                                 ) {
                                                     Text(
-                                                        text = if (model.modelFormat == "LITERTLM") "LiteRT" else "GGUF",
+                                                        text = if (isLiteRtLm) "LiteRT" else "GGUF",
                                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                                         style = MaterialTheme.typography.labelSmall,
                                                         color = badgeColor
@@ -282,12 +286,13 @@ fun ChatScreen(
                 items(uiState.messages, key = { it.id }) { message ->
                     MessageBubble(message = message)
                 }
-                if (uiState.streamingContent.isNotEmpty()) {
+                if (uiState.streamingContent.isNotEmpty() || uiState.streamingReasoning.isNotEmpty()) {
                         item(key = "streaming") {
                             MessageBubble(
                                 message = com.warped.domain.model.ChatMessage(
                                     role = Role.ASSISTANT,
-                                    content = uiState.streamingContent
+                                    content = uiState.streamingContent,
+                                    reasoning = uiState.streamingReasoning.ifEmpty { null }
                                 ),
                                 isStreaming = true
                             )

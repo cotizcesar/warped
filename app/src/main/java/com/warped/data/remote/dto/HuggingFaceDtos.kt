@@ -14,7 +14,7 @@ data class HuggingFaceModel(
     val likes: Int = 0,
     @SerialName("pipeline_tag") val pipelineTag: String = "",
     @SerialName("private") val isPrivate: Boolean = false,
-    val gated: Boolean = false,
+    @SerialName("gated") val gated: String = "false",
     val lastModified: String = "",
     val siblings: List<HuggingFaceSibling> = emptyList()
 )
@@ -32,7 +32,7 @@ data class HuggingFaceModelDetail(
     val cardData: HuggingFaceCardData? = null,
     val config: Map<String, JsonElement>? = null,
     @SerialName("safetensors") val safeTensors: HuggingFaceSafeTensors? = null,
-    val gated: Boolean = false,
+    @SerialName("gated") val gated: String = "false",
     val lastModified: String = ""
 )
 

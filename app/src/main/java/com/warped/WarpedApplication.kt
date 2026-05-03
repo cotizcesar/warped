@@ -9,13 +9,14 @@ import android.os.StrictMode
 
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.warped.BuildConfig
 import com.warped.data.local.inference.EngineManager
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
 import javax.inject.Inject
 
 @HiltAndroidApp
-class WarpedApplication : Application(), Configuration.Provider, ComponentCallbacks2 {
+class WarpedApplication : Application(), Configuration.Provider {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var engineManager: EngineManager
@@ -31,18 +32,21 @@ class WarpedApplication : Application(), Configuration.Provider, ComponentCallba
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
-        registerComponentCallbacks(this)
         if (BuildConfig.DEBUG) {
             Timber.plant(RedactingTree())
             StrictMode.setThreadPolicy(
                 StrictMode.ThreadPolicy.Builder()
-                    .detectAll()
+                    .detectNetwork()
+                    .detectCustomSlowCalls()
                     .penaltyLog()
                     .build()
             )
             StrictMode.setVmPolicy(
                 StrictMode.VmPolicy.Builder()
-                    .detectAll()
+                    .detectActivityLeaks()
+                    .detectLeakedClosableObjects()
+                    .detectLeakedRegistrationObjects()
+                    .detectLeakedSqlLiteObjects()
                     .penaltyLog()
                     .build()
             )
@@ -65,7 +69,6 @@ class WarpedApplication : Application(), Configuration.Provider, ComponentCallba
     }
 
     override fun onTrimMemory(level: Int) {
-        super.onTrimMemory(level)
         if (::engineManager.isInitialized) {
             engineManager.handleTrimMemory(level)
         }
@@ -75,6 +78,7 @@ class WarpedApplication : Application(), Configuration.Provider, ComponentCallba
 
     override fun onLowMemory() {
         if (::engineManager.isInitialized) {
+            @Suppress("DEPRECATION")
             engineManager.handleTrimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL)
         }
     }

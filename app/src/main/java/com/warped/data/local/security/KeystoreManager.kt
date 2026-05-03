@@ -12,7 +12,7 @@ import javax.inject.Singleton
 
 @Singleton
 class KeystoreManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) {
     private val masterKeyAlias = "_warped_master_key_"
 
