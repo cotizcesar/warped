@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:ns1="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="active_downloads">Descargas activas</string>
+    <string name="add_model">Agregar modelo</string>
     <string msgid="8719607706653693137" name="androidx_compose_foundation_autofill">"Autocompletar"</string>
     <string msgid="1150566100598813236" name="androidx_compose_ui_autofill">"Autocompletar"</string>
+    <string name="api_key">API Key</string>
     <string name="app_name">Warped</string>
+    <string name="available_models">Modelos disponibles</string>
     <string msgid="881409763997275156" name="call_notification_answer_action">"Responder"</string>
     <string msgid="8793775615905189152" name="call_notification_answer_video_action">"Vídeo"</string>
     <string msgid="3229508546291798546" name="call_notification_decline_action">"Rechazar"</string>
@@ -10,16 +14,52 @@
     <string msgid="6107532579223922871" name="call_notification_incoming_text">"Llamada entrante"</string>
     <string msgid="8623827134497363134" name="call_notification_ongoing_text">"Llamada en curso"</string>
     <string msgid="59049573811482460" name="call_notification_screening_text">"Filtrando una llamada entrante"</string>
+    <string name="cancel">Cancelar</string>
+    <string name="cancel_download">Cancelar</string>
     <string msgid="406453423630273620" name="close_drawer">"Cerrar menú de navegación"</string>
     <string msgid="7573152094250666567" name="close_sheet">"Cerrar hoja"</string>
-    <string name="compatible_with_device">Compatible con este celular</string>
+    <string name="compatible_with_device">Compatible con este dispositivo</string>
+    <string name="connect_lm_studio">Conectar LM Studio</string>
+    <string name="connect_lm_studio_desc">Agregar un servidor LM Studio remoto</string>
+    <string name="connected">Conectado</string>
+    <string name="connecting">Conectando…</string>
+    <string name="connection_lost">Conexión perdida. Toca para reintentar.</string>
+    <string name="continue_text">Continuar</string>
+    <string name="custom_manual">Personalizado (escribir manualmente)</string>
     <string msgid="8038256446254964252" name="default_error_message">"Entrada no válida"</string>
     <string msgid="6312721426453364202" name="default_popup_window_title">"Ventana emergente"</string>
-    <string name="download_model_first">Descarga este modelo antes de usarlo en el chat local.</string>
+    <string name="delete">Eliminar</string>
+    <string name="delete_chat_message">Eliminar \"%1$s\"? No se puede deshacer.</string>
+    <string name="delete_chat_title">Eliminar chat</string>
+    <string name="delete_endpoint_message">Eliminar %1$s (%2$s)? No se puede deshacer.</string>
+    <string name="delete_endpoint_title">Eliminar endpoint</string>
+    <string name="delete_model_message">Eliminar %1$s (%2$s) del dispositivo?</string>
+    <string name="delete_model_title">Eliminar modelo</string>
+    <string name="delete_partial_file">Eliminar archivo parcial</string>
+    <string name="disconnected">Desconectado</string>
+    <string name="dismiss">Descartar</string>
+    <string name="download">Descargar</string>
+    <string name="download_from_hf">Descargar desde Hugging Face</string>
+    <string name="download_from_hf_desc">Explorar y descargar modelos GGUF</string>
+    <string name="download_model_first">Descarga este modelo antes de usarlo en chat local.</string>
     <string msgid="1890207353314751437" name="dropdown_menu">"Menú desplegable"</string>
+    <string name="edit">Editar</string>
+    <string name="empty_state_message">Selecciona el modelo y empieza a escribir…</string>
+    <string name="endpoint_configuration">Configuración de Endpoint</string>
+    <string name="error_auth">Autenticación fallida. Verifica tu API key.</string>
+    <string name="error_network">No se puede conectar al servidor. Verifica la URL e inténtalo de nuevo.</string>
+    <string name="failed_to_fetch_models">Error al obtener modelos: %1$s</string>
+    <string name="failed_to_load_model">Error al cargar el modelo</string>
+    <string name="fetch">Obtener</string>
+    <string name="generating">Generando…</string>
+    <string name="hide">Ocultar</string>
     <string name="hugging_face_suggestions">Sugerencias GGUF de Hugging Face</string>
+    <string name="import_gguf">Importar archivo GGUF</string>
+    <string name="import_gguf_desc">Cargar un modelo .gguf desde tu dispositivo</string>
     <string msgid="6827826412747255547" name="in_progress">"En curso"</string>
     <string msgid="7933458017204019916" name="indeterminate">"Marcado parcialmente"</string>
+    <string name="loading_model">Cargando %1$s…</string>
+    <string name="local_models">Modelos locales</string>
     <string msgid="2988463736136100848" name="m3c_bottom_sheet_collapse_description">"Contrae la hoja inferior"</string>
     <string msgid="1555567894577437024" name="m3c_bottom_sheet_dismiss_description">"Cierra la hoja inferior"</string>
     <string msgid="8403354765404029791" name="m3c_bottom_sheet_drag_handle_description">"Controlador de arrastre"</string>
@@ -86,27 +126,53 @@
     <string msgid="5460405025248574620" name="m3c_tooltip_pane_description">"Descripción emergente"</string>
     <string msgid="6564222473543418073" name="m3c_wide_navigation_rail_close_rail">"Cerrar barra"</string>
     <string msgid="8350283435461615411" name="m3c_wide_navigation_rail_pane_title">"Barra de navegación"</string>
-    <string name="may_be_too_large">Puede ser muy grande para este celular</string>
+    <string name="may_be_too_large">Puede ser muy grande para este dispositivo</string>
+    <string name="memory_warning_message">Este modelo requiere %1$d MB. Tu dispositivo tiene %2$d MB disponibles. Cargarlo puede causar inestabilidad. ¿Continuar?</string>
+    <string name="memory_warning_title">Advertencia de memoria</string>
+    <string name="model_id">Model ID</string>
+    <string name="name">Nombre</string>
     <string msgid="542007171693138492" name="navigation_menu">"Menú de navegación"</string>
+    <string name="network_endpoints">Endpoints de red</string>
+    <string name="new_chat">Nuevo Chat</string>
+    <string name="no_endpoints">Sin endpoints configurados</string>
     <string name="no_model_selected">Selecciona un modelo antes de enviar un mensaje.</string>
-    <string name="no_models_select_model">No hay modelos, selecciona un modelo</string>
+    <string name="no_models">No se encontraron modelos</string>
+    <string name="no_models_endpoints_yet">Sin modelos ni endpoints aún</string>
+    <string name="no_models_select_model">Sin modelos, selecciona uno</string>
     <string msgid="6610465462668679431" name="not_selected">"No seleccionado"</string>
+    <string name="provider_type">Tipo de Provider</string>
     <string msgid="5941395253238309765" name="range_end">"Fin del intervalo"</string>
     <string msgid="7097486360902471446" name="range_start">"Inicio del intervalo"</string>
+    <string name="recents">Recientes</string>
+    <string name="remove">Quitar</string>
+    <string name="save">Guardar</string>
     <string name="search_minimum_length">Ingresa al menos 3 letras</string>
     <string name="search_models">Buscar modelos</string>
     <string name="search_models_hint">Escribe al menos 3 letras para buscar</string>
+    <string name="select_image">Seleccionar imagen</string>
     <string name="select_model">Selecciona un modelo</string>
+    <string name="select_or_type_model">Selecciona o escribe el Model ID</string>
     <string msgid="6043586758067023" name="selected">"Seleccionado"</string>
+    <string name="send">Enviar</string>
+    <string name="settings">Ajustes</string>
+    <string name="show">Mostrar</string>
     <string msgid="2792228137354697160" name="snackbar_pane_title">"Alerta"</string>
     <string msgid="4139871816613051306" name="state_empty">"Vacío"</string>
     <string msgid="5834637030682409883" name="state_off">"Desactivado"</string>
     <string msgid="1490883874751719580" name="state_on">"Activado"</string>
     <string msgid="6277540029070332960" name="status_bar_notification_info_overflow">"999+"</string>
+    <string name="stop">Detener</string>
     <string msgid="2561197295334830845" name="switch_role">"Interruptor"</string>
     <string msgid="1672349317127674378" name="tab">"Pestaña"</string>
+    <string name="tab_chat">Chat</string>
+    <string name="tab_endpoints">Endpoints</string>
+    <string name="tab_models">Modelos</string>
     <string msgid="5946805113151406391" name="template_percent">"<ns1:g id="PERCENTAGE">%1$d</ns1:g> por cien."</string>
+    <string name="test_connection">Probar conexión</string>
+    <string name="thinking">Thinking</string>
     <string msgid="3765533235322692011" name="tooltip_description">"descripción emergente"</string>
     <string msgid="3124740595719787496" name="tooltip_label">"mostrar descripción emergente"</string>
     <string name="type_message">Escribe un mensaje…</string>
+    <string name="url">URL</string>
+    <string name="use_in_chat">Usar en chat</string>
 </resources>

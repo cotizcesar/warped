@@ -1,4 +1,0 @@
-/home/cotizcesar/Android/Sdk/cmake/3.22.1/bin/ninja \
-  -C \
-  /home/cotizcesar/Documents/warped/app/.cxx/Debug/1e206b5i/x86_64 \
-  warped_llama

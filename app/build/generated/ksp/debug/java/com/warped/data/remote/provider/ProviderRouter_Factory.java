@@ -1,5 +1,6 @@
 package com.warped.data.remote.provider;
 
+import com.warped.data.local.inference.LiteRTLmProvider;
 import com.warped.data.local.inference.LocalLlmProvider;
 import com.warped.data.local.security.ApiKeyStore;
 import dagger.Lazy;
@@ -32,24 +33,27 @@ public final class ProviderRouter_Factory implements Factory<ProviderRouter> {
 
   private final Provider<LocalLlmProvider> localLlmProvider;
 
+  private final Provider<LiteRTLmProvider> liteRTLmProvider;
+
   private ProviderRouter_Factory(Provider<ApiKeyStore> apiKeyStoreProvider,
-      Provider<LocalLlmProvider> localLlmProvider) {
+      Provider<LocalLlmProvider> localLlmProvider, Provider<LiteRTLmProvider> liteRTLmProvider) {
     this.apiKeyStoreProvider = apiKeyStoreProvider;
     this.localLlmProvider = localLlmProvider;
+    this.liteRTLmProvider = liteRTLmProvider;
   }
 
   @Override
   public ProviderRouter get() {
-    return newInstance(apiKeyStoreProvider.get(), DoubleCheck.lazy(localLlmProvider));
+    return newInstance(apiKeyStoreProvider.get(), DoubleCheck.lazy(localLlmProvider), DoubleCheck.lazy(liteRTLmProvider));
   }
 
   public static ProviderRouter_Factory create(Provider<ApiKeyStore> apiKeyStoreProvider,
-      Provider<LocalLlmProvider> localLlmProvider) {
-    return new ProviderRouter_Factory(apiKeyStoreProvider, localLlmProvider);
+      Provider<LocalLlmProvider> localLlmProvider, Provider<LiteRTLmProvider> liteRTLmProvider) {
+    return new ProviderRouter_Factory(apiKeyStoreProvider, localLlmProvider, liteRTLmProvider);
   }
 
   public static ProviderRouter newInstance(ApiKeyStore apiKeyStore,
-      Lazy<LocalLlmProvider> localLlmProvider) {
-    return new ProviderRouter(apiKeyStore, localLlmProvider);
+      Lazy<LocalLlmProvider> localLlmProvider, Lazy<LiteRTLmProvider> liteRTLmProvider) {
+    return new ProviderRouter(apiKeyStore, localLlmProvider, liteRTLmProvider);
   }
 }

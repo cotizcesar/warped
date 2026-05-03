@@ -11,6 +11,8 @@ import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.execSQL
 import com.warped.`data`.local.db.dao.ConversationDao
 import com.warped.`data`.local.db.dao.ConversationDao_Impl
+import com.warped.`data`.local.db.dao.DownloadCheckpointDao
+import com.warped.`data`.local.db.dao.DownloadCheckpointDao_Impl
 import com.warped.`data`.local.db.dao.LocalModelDao
 import com.warped.`data`.local.db.dao.LocalModelDao_Impl
 import com.warped.`data`.local.db.dao.MessageDao
@@ -57,18 +59,23 @@ public class AppDatabase_Impl : AppDatabase() {
     PresetDao_Impl(this)
   }
 
+  private val _downloadCheckpointDao: Lazy<DownloadCheckpointDao> = lazy {
+    DownloadCheckpointDao_Impl(this)
+  }
+
   protected override fun createOpenDelegate(): RoomOpenDelegate {
-    val _openDelegate: RoomOpenDelegate = object : RoomOpenDelegate(6,
-        "43c0f57d0a9153f3df0ea3369d0cc7be", "2eb91d874b0677ea7a5f0895490a27aa") {
+    val _openDelegate: RoomOpenDelegate = object : RoomOpenDelegate(9,
+        "e41312ed320aba476c8587f8f66fc984", "8f5d39badb5575739c837ef1dffe0e26") {
       public override fun createAllTables(connection: SQLiteConnection) {
         connection.execSQL("CREATE TABLE IF NOT EXISTS `conversations` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `provider_type` TEXT NOT NULL, `endpoint_id` INTEGER NOT NULL, `model_id` TEXT, `system_prompt` TEXT)")
         connection.execSQL("CREATE TABLE IF NOT EXISTS `messages` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `conversation_id` INTEGER NOT NULL, `role` TEXT NOT NULL, `content` TEXT NOT NULL, `token_count` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, `images` TEXT, `stats` TEXT, FOREIGN KEY(`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
         connection.execSQL("CREATE INDEX IF NOT EXISTS `index_messages_conversation_id` ON `messages` (`conversation_id`)")
         connection.execSQL("CREATE TABLE IF NOT EXISTS `endpoints` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `url` TEXT NOT NULL, `api_type` TEXT NOT NULL, `model_id` TEXT, `encrypted_api_key_ref` TEXT, `created_at` INTEGER NOT NULL, `is_active` INTEGER NOT NULL)")
-        connection.execSQL("CREATE TABLE IF NOT EXISTS `local_models` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `file_path` TEXT NOT NULL, `size_bytes` INTEGER NOT NULL, `quantization` TEXT NOT NULL, `parameter_count` TEXT NOT NULL, `architecture` TEXT NOT NULL, `imported_at` INTEGER NOT NULL)")
-        connection.execSQL("CREATE TABLE IF NOT EXISTS `presets` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `temperature` REAL NOT NULL, `top_p` REAL NOT NULL, `top_k` INTEGER NOT NULL, `repeat_penalty` REAL NOT NULL, `max_tokens` INTEGER NOT NULL, `context_size` INTEGER NOT NULL, `seed` INTEGER NOT NULL, `threads` INTEGER NOT NULL, `created_at` INTEGER NOT NULL)")
+        connection.execSQL("CREATE TABLE IF NOT EXISTS `local_models` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `file_path` TEXT NOT NULL, `size_bytes` INTEGER NOT NULL, `quantization` TEXT NOT NULL, `parameter_count` TEXT NOT NULL, `architecture` TEXT NOT NULL, `imported_at` INTEGER NOT NULL, `model_format` TEXT NOT NULL DEFAULT 'GGUF')")
+        connection.execSQL("CREATE TABLE IF NOT EXISTS `presets` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `temperature` REAL NOT NULL, `top_p` REAL NOT NULL, `top_k` INTEGER NOT NULL, `repeat_penalty` REAL NOT NULL, `max_tokens` INTEGER NOT NULL, `context_size` INTEGER NOT NULL, `seed` INTEGER NOT NULL, `threads` INTEGER NOT NULL, `model_format` TEXT NOT NULL, `created_at` INTEGER NOT NULL)")
+        connection.execSQL("CREATE TABLE IF NOT EXISTS `download_checkpoints` (`model_id` TEXT NOT NULL, `file_name` TEXT NOT NULL, `file_url` TEXT NOT NULL, `total_bytes` INTEGER NOT NULL, `downloaded_bytes` INTEGER NOT NULL, PRIMARY KEY(`model_id`))")
         connection.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)")
-        connection.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '43c0f57d0a9153f3df0ea3369d0cc7be')")
+        connection.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e41312ed320aba476c8587f8f66fc984')")
       }
 
       public override fun dropAllTables(connection: SQLiteConnection) {
@@ -77,6 +84,7 @@ public class AppDatabase_Impl : AppDatabase() {
         connection.execSQL("DROP TABLE IF EXISTS `endpoints`")
         connection.execSQL("DROP TABLE IF EXISTS `local_models`")
         connection.execSQL("DROP TABLE IF EXISTS `presets`")
+        connection.execSQL("DROP TABLE IF EXISTS `download_checkpoints`")
       }
 
       public override fun onCreate(connection: SQLiteConnection) {
@@ -210,6 +218,8 @@ public class AppDatabase_Impl : AppDatabase() {
             null, TableInfo.CREATED_FROM_ENTITY))
         _columnsLocalModels.put("imported_at", TableInfo.Column("imported_at", "INTEGER", true, 0,
             null, TableInfo.CREATED_FROM_ENTITY))
+        _columnsLocalModels.put("model_format", TableInfo.Column("model_format", "TEXT", true, 0,
+            "'GGUF'", TableInfo.CREATED_FROM_ENTITY))
         val _foreignKeysLocalModels: MutableSet<TableInfo.ForeignKey> = mutableSetOf()
         val _indicesLocalModels: MutableSet<TableInfo.Index> = mutableSetOf()
         val _infoLocalModels: TableInfo = TableInfo("local_models", _columnsLocalModels,
@@ -245,6 +255,8 @@ public class AppDatabase_Impl : AppDatabase() {
             TableInfo.CREATED_FROM_ENTITY))
         _columnsPresets.put("threads", TableInfo.Column("threads", "INTEGER", true, 0, null,
             TableInfo.CREATED_FROM_ENTITY))
+        _columnsPresets.put("model_format", TableInfo.Column("model_format", "TEXT", true, 0, null,
+            TableInfo.CREATED_FROM_ENTITY))
         _columnsPresets.put("created_at", TableInfo.Column("created_at", "INTEGER", true, 0, null,
             TableInfo.CREATED_FROM_ENTITY))
         val _foreignKeysPresets: MutableSet<TableInfo.ForeignKey> = mutableSetOf()
@@ -261,6 +273,32 @@ public class AppDatabase_Impl : AppDatabase() {
               | Found:
               |""".trimMargin() + _existingPresets)
         }
+        val _columnsDownloadCheckpoints: MutableMap<String, TableInfo.Column> = mutableMapOf()
+        _columnsDownloadCheckpoints.put("model_id", TableInfo.Column("model_id", "TEXT", true, 1,
+            null, TableInfo.CREATED_FROM_ENTITY))
+        _columnsDownloadCheckpoints.put("file_name", TableInfo.Column("file_name", "TEXT", true, 0,
+            null, TableInfo.CREATED_FROM_ENTITY))
+        _columnsDownloadCheckpoints.put("file_url", TableInfo.Column("file_url", "TEXT", true, 0,
+            null, TableInfo.CREATED_FROM_ENTITY))
+        _columnsDownloadCheckpoints.put("total_bytes", TableInfo.Column("total_bytes", "INTEGER",
+            true, 0, null, TableInfo.CREATED_FROM_ENTITY))
+        _columnsDownloadCheckpoints.put("downloaded_bytes", TableInfo.Column("downloaded_bytes",
+            "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY))
+        val _foreignKeysDownloadCheckpoints: MutableSet<TableInfo.ForeignKey> = mutableSetOf()
+        val _indicesDownloadCheckpoints: MutableSet<TableInfo.Index> = mutableSetOf()
+        val _infoDownloadCheckpoints: TableInfo = TableInfo("download_checkpoints",
+            _columnsDownloadCheckpoints, _foreignKeysDownloadCheckpoints,
+            _indicesDownloadCheckpoints)
+        val _existingDownloadCheckpoints: TableInfo = read(connection, "download_checkpoints")
+        if (!_infoDownloadCheckpoints.equals(_existingDownloadCheckpoints)) {
+          return RoomOpenDelegate.ValidationResult(false, """
+              |download_checkpoints(com.warped.data.local.db.entity.DownloadCheckpointEntity).
+              | Expected:
+              |""".trimMargin() + _infoDownloadCheckpoints + """
+              |
+              | Found:
+              |""".trimMargin() + _existingDownloadCheckpoints)
+        }
         return RoomOpenDelegate.ValidationResult(true, null)
       }
     }
@@ -271,11 +309,12 @@ public class AppDatabase_Impl : AppDatabase() {
     val _shadowTablesMap: MutableMap<String, String> = mutableMapOf()
     val _viewTables: MutableMap<String, Set<String>> = mutableMapOf()
     return InvalidationTracker(this, _shadowTablesMap, _viewTables, "conversations", "messages",
-        "endpoints", "local_models", "presets")
+        "endpoints", "local_models", "presets", "download_checkpoints")
   }
 
   public override fun clearAllTables() {
-    super.performClear(true, "conversations", "messages", "endpoints", "local_models", "presets")
+    super.performClear(true, "conversations", "messages", "endpoints", "local_models", "presets",
+        "download_checkpoints")
   }
 
   protected override fun getRequiredTypeConverterClasses(): Map<KClass<*>, List<KClass<*>>> {
@@ -285,6 +324,8 @@ public class AppDatabase_Impl : AppDatabase() {
     _typeConvertersMap.put(RemoteEndpointDao::class, RemoteEndpointDao_Impl.getRequiredConverters())
     _typeConvertersMap.put(LocalModelDao::class, LocalModelDao_Impl.getRequiredConverters())
     _typeConvertersMap.put(PresetDao::class, PresetDao_Impl.getRequiredConverters())
+    _typeConvertersMap.put(DownloadCheckpointDao::class,
+        DownloadCheckpointDao_Impl.getRequiredConverters())
     return _typeConvertersMap
   }
 
@@ -309,4 +350,6 @@ public class AppDatabase_Impl : AppDatabase() {
   public override fun localModelDao(): LocalModelDao = _localModelDao.value
 
   public override fun presetDao(): PresetDao = _presetDao.value
+
+  public override fun downloadCheckpointDao(): DownloadCheckpointDao = _downloadCheckpointDao.value
 }

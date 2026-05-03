@@ -1,3 +1,0 @@
-/home/cotizcesar/Documents/warped/app/.cxx/Debug/1e206b5i/arm64-v8a/CMakeFiles/warped_llama.dir
-/home/cotizcesar/Documents/warped/app/.cxx/Debug/1e206b5i/arm64-v8a/CMakeFiles/edit_cache.dir
-/home/cotizcesar/Documents/warped/app/.cxx/Debug/1e206b5i/arm64-v8a/CMakeFiles/rebuild_cache.dir

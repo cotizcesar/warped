@@ -1,7 +1,6 @@
 package com.warped.ui.huggingface;
 
 import com.warped.data.local.download.ModelDownloadManager;
-import com.warped.data.local.inference.MemoryChecker;
 import com.warped.domain.repository.HuggingFaceRepository;
 import dagger.internal.DaggerGenerated;
 import dagger.internal.Factory;
@@ -31,31 +30,26 @@ public final class HuggingFaceViewModel_Factory implements Factory<HuggingFaceVi
 
   private final Provider<ModelDownloadManager> downloadManagerProvider;
 
-  private final Provider<MemoryChecker> memoryCheckerProvider;
-
   private HuggingFaceViewModel_Factory(
       Provider<HuggingFaceRepository> huggingFaceRepositoryProvider,
-      Provider<ModelDownloadManager> downloadManagerProvider,
-      Provider<MemoryChecker> memoryCheckerProvider) {
+      Provider<ModelDownloadManager> downloadManagerProvider) {
     this.huggingFaceRepositoryProvider = huggingFaceRepositoryProvider;
     this.downloadManagerProvider = downloadManagerProvider;
-    this.memoryCheckerProvider = memoryCheckerProvider;
   }
 
   @Override
   public HuggingFaceViewModel get() {
-    return newInstance(huggingFaceRepositoryProvider.get(), downloadManagerProvider.get(), memoryCheckerProvider.get());
+    return newInstance(huggingFaceRepositoryProvider.get(), downloadManagerProvider.get());
   }
 
   public static HuggingFaceViewModel_Factory create(
       Provider<HuggingFaceRepository> huggingFaceRepositoryProvider,
-      Provider<ModelDownloadManager> downloadManagerProvider,
-      Provider<MemoryChecker> memoryCheckerProvider) {
-    return new HuggingFaceViewModel_Factory(huggingFaceRepositoryProvider, downloadManagerProvider, memoryCheckerProvider);
+      Provider<ModelDownloadManager> downloadManagerProvider) {
+    return new HuggingFaceViewModel_Factory(huggingFaceRepositoryProvider, downloadManagerProvider);
   }
 
   public static HuggingFaceViewModel newInstance(HuggingFaceRepository huggingFaceRepository,
-      ModelDownloadManager downloadManager, MemoryChecker memoryChecker) {
-    return new HuggingFaceViewModel(huggingFaceRepository, downloadManager, memoryChecker);
+      ModelDownloadManager downloadManager) {
+    return new HuggingFaceViewModel(huggingFaceRepository, downloadManager);
   }
 }

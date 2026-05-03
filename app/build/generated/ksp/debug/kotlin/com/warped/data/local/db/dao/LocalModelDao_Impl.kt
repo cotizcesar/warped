@@ -30,7 +30,7 @@ public class LocalModelDao_Impl(
     this.__db = __db
     this.__insertAdapterOfLocalModelEntity = object : EntityInsertAdapter<LocalModelEntity>() {
       protected override fun createQuery(): String =
-          "INSERT OR REPLACE INTO `local_models` (`id`,`name`,`file_path`,`size_bytes`,`quantization`,`parameter_count`,`architecture`,`imported_at`) VALUES (nullif(?, 0),?,?,?,?,?,?,?)"
+          "INSERT OR REPLACE INTO `local_models` (`id`,`name`,`file_path`,`size_bytes`,`quantization`,`parameter_count`,`architecture`,`imported_at`,`model_format`) VALUES (nullif(?, 0),?,?,?,?,?,?,?,?)"
 
       protected override fun bind(statement: SQLiteStatement, entity: LocalModelEntity) {
         statement.bindLong(1, entity.id)
@@ -41,6 +41,7 @@ public class LocalModelDao_Impl(
         statement.bindText(6, entity.parameterCount)
         statement.bindText(7, entity.architecture)
         statement.bindLong(8, entity.importedAt)
+        statement.bindText(9, entity.modelFormat)
       }
     }
   }
@@ -64,6 +65,7 @@ public class LocalModelDao_Impl(
         val _columnIndexOfParameterCount: Int = getColumnIndexOrThrow(_stmt, "parameter_count")
         val _columnIndexOfArchitecture: Int = getColumnIndexOrThrow(_stmt, "architecture")
         val _columnIndexOfImportedAt: Int = getColumnIndexOrThrow(_stmt, "imported_at")
+        val _columnIndexOfModelFormat: Int = getColumnIndexOrThrow(_stmt, "model_format")
         val _result: MutableList<LocalModelEntity> = mutableListOf()
         while (_stmt.step()) {
           val _item: LocalModelEntity
@@ -83,8 +85,10 @@ public class LocalModelDao_Impl(
           _tmpArchitecture = _stmt.getText(_columnIndexOfArchitecture)
           val _tmpImportedAt: Long
           _tmpImportedAt = _stmt.getLong(_columnIndexOfImportedAt)
+          val _tmpModelFormat: String
+          _tmpModelFormat = _stmt.getText(_columnIndexOfModelFormat)
           _item =
-              LocalModelEntity(_tmpId,_tmpName,_tmpFilePath,_tmpSizeBytes,_tmpQuantization,_tmpParameterCount,_tmpArchitecture,_tmpImportedAt)
+              LocalModelEntity(_tmpId,_tmpName,_tmpFilePath,_tmpSizeBytes,_tmpQuantization,_tmpParameterCount,_tmpArchitecture,_tmpImportedAt,_tmpModelFormat)
           _result.add(_item)
         }
         _result
@@ -109,6 +113,7 @@ public class LocalModelDao_Impl(
         val _columnIndexOfParameterCount: Int = getColumnIndexOrThrow(_stmt, "parameter_count")
         val _columnIndexOfArchitecture: Int = getColumnIndexOrThrow(_stmt, "architecture")
         val _columnIndexOfImportedAt: Int = getColumnIndexOrThrow(_stmt, "imported_at")
+        val _columnIndexOfModelFormat: Int = getColumnIndexOrThrow(_stmt, "model_format")
         val _result: LocalModelEntity?
         if (_stmt.step()) {
           val _tmpId: Long
@@ -127,8 +132,10 @@ public class LocalModelDao_Impl(
           _tmpArchitecture = _stmt.getText(_columnIndexOfArchitecture)
           val _tmpImportedAt: Long
           _tmpImportedAt = _stmt.getLong(_columnIndexOfImportedAt)
+          val _tmpModelFormat: String
+          _tmpModelFormat = _stmt.getText(_columnIndexOfModelFormat)
           _result =
-              LocalModelEntity(_tmpId,_tmpName,_tmpFilePath,_tmpSizeBytes,_tmpQuantization,_tmpParameterCount,_tmpArchitecture,_tmpImportedAt)
+              LocalModelEntity(_tmpId,_tmpName,_tmpFilePath,_tmpSizeBytes,_tmpQuantization,_tmpParameterCount,_tmpArchitecture,_tmpImportedAt,_tmpModelFormat)
         } else {
           _result = null
         }

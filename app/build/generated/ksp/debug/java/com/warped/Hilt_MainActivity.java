@@ -9,7 +9,6 @@ import androidx.annotation.Nullable;
 import androidx.lifecycle.ViewModelProvider;
 import dagger.hilt.android.internal.lifecycle.DefaultViewModelFactories;
 import dagger.hilt.android.internal.managers.ActivityComponentManager;
-import dagger.hilt.android.internal.managers.SavedStateHandleHolder;
 import dagger.hilt.internal.GeneratedComponentManagerHolder;
 import dagger.hilt.internal.UnsafeCasts;
 import java.lang.Object;
@@ -21,8 +20,6 @@ import javax.annotation.processing.Generated;
  */
 @Generated("dagger.hilt.android.processor.internal.androidentrypoint.ActivityGenerator")
 public abstract class Hilt_MainActivity extends ComponentActivity implements GeneratedComponentManagerHolder {
-  private SavedStateHandleHolder savedStateHandleHolder;
-
   private volatile ActivityComponentManager componentManager;
 
   private final Object componentManagerLock = new Object();
@@ -48,26 +45,21 @@ public abstract class Hilt_MainActivity extends ComponentActivity implements Gen
     });
   }
 
-  private void initSavedStateHandleHolder() {
-    savedStateHandleHolder = componentManager().getSavedStateHandleHolder();
-    if (savedStateHandleHolder.isInvalid()) {
-      savedStateHandleHolder.setExtras(getDefaultViewModelCreationExtras());
-    }
+  private void initSavedStateHandleHolders() {
+    componentManager().initSavedStateHandleHolders();
   }
 
   @CallSuper
   @Override
   protected void onCreate(@Nullable Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
-    initSavedStateHandleHolder();
+    initSavedStateHandleHolders();
   }
 
   @Override
   protected void onDestroy() {
     super.onDestroy();
-    if (savedStateHandleHolder != null) {
-      savedStateHandleHolder.clear();
-    }
+    componentManager().clearSavedStateHandleHolders();
   }
 
   @Override
