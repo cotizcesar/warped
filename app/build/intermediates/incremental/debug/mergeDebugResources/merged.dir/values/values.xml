@@ -79,8 +79,10 @@
     <color name="androidx_core_secondary_text_default_material_light">#8a000000</color>
     <color name="call_notification_answer_color">#1d873b</color>
     <color name="call_notification_decline_color">#d93025</color>
+    <color name="ic_launcher_background">#FF1F1F1E</color>
     <color name="notification_action_color_filter">#ffffffff</color>
     <color name="notification_icon_bg_color">#ff9e9e9e</color>
+    <color name="window_background">#FF1F1F1E</color>
     <dimen name="compat_button_inset_horizontal_material">4dp</dimen>
     <dimen name="compat_button_inset_vertical_material">6dp</dimen>
     <dimen name="compat_button_padding_horizontal_material">8dp</dimen>
@@ -204,6 +206,7 @@
     <string name="api_key">API Key</string>
     <string name="app_name">Warped</string>
     <string name="available_models">Available Models</string>
+    <string name="back">Back</string>
     <string name="call_notification_answer_action">Answer</string>
     <string name="call_notification_answer_video_action">Video</string>
     <string name="call_notification_decline_action">Decline</string>
@@ -237,8 +240,9 @@
     <string name="dismiss">Dismiss</string>
     <string name="download">Download</string>
     <string name="download_from_hf">Download from Hugging Face</string>
-    <string name="download_from_hf_desc">Browse and download GGUF models</string>
+    <string name="download_from_hf_desc">Browse and download GGUF &amp; LiteRT-LM models</string>
     <string name="download_model_first">Download this model before using it for local chat.</string>
+    <string name="downloading">Downloading</string>
     <string name="dropdown_menu">"Dropdown menu"</string>
     <string name="edit">Edit</string>
     <string name="empty_state_message">Select a model and start typing…</string>
@@ -250,12 +254,14 @@
     <string name="fetch">Fetch</string>
     <string name="generating">Generating…</string>
     <string name="hide">Hide</string>
+    <string name="hugging_face">Hugging Face</string>
     <string name="hugging_face_suggestions">Hugging Face GGUF suggestions</string>
-    <string name="import_gguf">Import GGUF File</string>
-    <string name="import_gguf_desc">Load a .gguf model from your device</string>
+    <string name="import_gguf">Import Model File</string>
+    <string name="import_gguf_desc">Load a .gguf or .litertlm model from your device</string>
     <string name="in_progress">In progress</string>
     <string name="indeterminate">Partially checked</string>
     <string name="loading_model">Loading %1$s…</string>
+    <string name="loading_models">Loading models…</string>
     <string name="local_models">Local Models</string>
     <string name="m3c_bottom_sheet_collapse_description">Collapse bottom sheet</string>
     <string name="m3c_bottom_sheet_dismiss_description">Dismiss bottom sheet</string>
@@ -340,12 +346,16 @@
     <string name="no_models">No models found</string>
     <string name="no_models_endpoints_yet">No models or endpoints yet</string>
     <string name="no_models_select_model">No models, select a model</string>
+    <string name="no_results_found">No results found</string>
     <string name="not_selected">Not selected</string>
+    <string name="pause">Pause</string>
+    <string name="paused">Paused</string>
     <string name="provider_type">Provider Type</string>
     <string name="range_end">"Range end"</string>
     <string name="range_start">"Range start"</string>
     <string name="recents">Recents</string>
     <string name="remove">Remove</string>
+    <string name="resume">Resume</string>
     <string name="save">Save</string>
     <string name="search_minimum_length">Enter at least 3 letters</string>
     <string name="search_models">Search models</string>
@@ -374,6 +384,7 @@
     <string name="tooltip_description">tooltip</string>
     <string name="tooltip_label">show tooltip</string>
     <string name="type_message">Type a message…</string>
+    <string name="unload_model">Unload model from memory</string>
     <string name="url">URL</string>
     <string name="use_in_chat">Use in chat</string>
     <style name="DialogWindowTheme">
@@ -409,13 +420,14 @@
     </style>
     <style name="TextAppearance.Compat.Notification.Title" parent="@android:style/TextAppearance.StatusBar.EventContent.Title"/>
     <style name="Theme.Warped" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
     <style name="Theme.Warped.Splash" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@drawable/splash_bg</item>
-        <item name="android:statusBarColor">#FF1F1F1E</item>
-        <item name="android:navigationBarColor">#FF1F1F1E</item>
+        <item name="android:statusBarColor">@color/window_background</item>
+        <item name="android:navigationBarColor">@color/window_background</item>
     </style>
     <style name="Widget.Compat.NotificationActionContainer" parent=""/>
     <style name="Widget.Compat.NotificationActionText" parent=""/>
@@ -456,9 +468,9 @@
     <declare-styleable name="DividerAttributes">
         
         <attr format="enum" name="embeddingDividerType">
-            <!-- Fixed divider type. -->
+            
             <enum name="fixed" value="0"/>
-            <!-- Draggable divider type. -->
+            
             <enum name="draggable" value="1"/>
         </attr>
         
@@ -485,23 +497,14 @@
         <attr format="reference" name="fontProviderCerts"/>
         
         <attr name="fontProviderFetchStrategy">
-            <!-- The blocking font fetch works as follows.
-              First, check the local cache, then if the requested font is not cached, request the
-              font from the provider and wait until it is finished.  You can change the length of
-              the timeout by modifying fontProviderFetchTimeout.  If the timeout happens, the
-              default typeface will be used instead. -->
+            
             <enum name="blocking" value="0"/>
-            <!-- The async font fetch works as follows.
-              First, check the local cache, then if the requested font is not cached, trigger a
-              request the font and continue with layout inflation. Once the font fetch succeeds, the
-              target text view will be refreshed with the downloaded font data. The
-              fontProviderFetchTimeout will be ignored if async loading is specified. -->
+            
             <enum name="async" value="1"/>
         </attr>
         
         <attr format="integer" name="fontProviderFetchTimeout">
-            <!-- A special value for the timeout. In this case, the blocking font fetching will not
-              timeout and wait until a reply is received from the font provider. -->
+            
             <enum name="forever" value="-1"/>
         </attr>
         

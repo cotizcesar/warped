@@ -13,7 +13,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,9 +26,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.warped.R
-import com.warped.domain.model.Endpoint
-import com.warped.domain.model.LocalModel
-import com.warped.domain.model.ProviderType
 
 @Composable
 fun ChatInputBar(
@@ -42,12 +38,8 @@ fun ChatInputBar(
     reasoningEnabled: Boolean = true,
     onToggleReasoning: () -> Unit = {},
     onAddImage: () -> Unit = {},
-    localModels: List<LocalModel> = emptyList(),
-    endpoints: List<Endpoint> = emptyList(),
-    selectedModelId: String? = null,
     attachedImages: List<Uri> = emptyList(),
-    onRemoveImage: (Int) -> Unit = {},
-    onModelSelected: (String, ProviderType) -> Unit = { _, _ -> }
+    onRemoveImage: (Int) -> Unit = {}
 ) {
     Surface(
         color = Color(0xFF2B2B29),
@@ -55,7 +47,7 @@ fun ChatInputBar(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(10.dp)
+            .padding(start = 10.dp, end = 10.dp, top = 5.dp, bottom = 0.dp)
     ) {
         Column(modifier = Modifier.padding(10.dp)) {
             // Image previews
@@ -142,7 +134,7 @@ fun ChatInputBar(
                         modifier = Modifier.height(28.dp)
                     ) {
                         Text(
-                            "Thinking",
+                            stringResource(R.string.thinking),
                             color = if (reasoningEnabled) Color.White else Color.White.copy(alpha = 0.6f),
                             fontSize = MaterialTheme.typography.labelSmall.fontSize
                         )
@@ -150,49 +142,6 @@ fun ChatInputBar(
                 }
 
                 Spacer(Modifier.weight(1f))
-
-                // Right group: Model dropdown + send/stop
-                var modelExpanded by remember { mutableStateOf(false) }
-                Box {
-                    TextButton(onClick = { modelExpanded = true }) {
-                        Text(
-                            selectedModelId?.substringAfterLast("/") ?: "Model",
-                            color = Color.White.copy(alpha = 0.6f),
-                            maxLines = 1
-                        )
-                        Icon(Icons.Filled.KeyboardArrowDown, null,
-                            tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
-                    }
-                    DropdownMenu(
-                        expanded = modelExpanded,
-                        onDismissRequest = { modelExpanded = false }
-                    ) {
-                        localModels.forEach { model ->
-                            DropdownMenuItem(
-                                text = { Text(model.name) },
-                                onClick = {
-                                    onModelSelected(model.filePath, ProviderType.LOCAL)
-                                    modelExpanded = false
-                                }
-                            )
-                        }
-                        if (localModels.isNotEmpty() && endpoints.isNotEmpty()) {
-                            HorizontalDivider()
-                        }
-                        endpoints.forEach { ep ->
-                            val mid = ep.modelId
-                            if (mid != null) {
-                                DropdownMenuItem(
-                                    text = { Text("${ep.name} · ${mid.substringAfterLast("/")}") },
-                                    onClick = {
-                                        onModelSelected(mid, ep.apiType)
-                                        modelExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
 
                 if (isGenerating) {
                     IconButton(onClick = onStop, modifier = Modifier.size(40.dp)) {

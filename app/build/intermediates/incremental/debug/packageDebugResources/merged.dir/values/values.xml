@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="ic_launcher_background">#FF1F1F1E</color>
+    <color name="window_background">#FF1F1F1E</color>
     <string name="active_downloads">Active Downloads</string>
     <string name="add_model">Add Model</string>
     <string name="api_key">API Key</string>
     <string name="app_name">Warped</string>
     <string name="available_models">Available Models</string>
+    <string name="back">Back</string>
     <string name="cancel">Cancel</string>
     <string name="cancel_download">Cancel</string>
     <string name="compatible_with_device">Compatible with this device</string>
@@ -27,8 +30,9 @@
     <string name="dismiss">Dismiss</string>
     <string name="download">Download</string>
     <string name="download_from_hf">Download from Hugging Face</string>
-    <string name="download_from_hf_desc">Browse and download GGUF models</string>
+    <string name="download_from_hf_desc">Browse and download GGUF &amp; LiteRT-LM models</string>
     <string name="download_model_first">Download this model before using it for local chat.</string>
+    <string name="downloading">Downloading</string>
     <string name="edit">Edit</string>
     <string name="empty_state_message">Select a model and start typing…</string>
     <string name="endpoint_configuration">Endpoint Configuration</string>
@@ -39,10 +43,12 @@
     <string name="fetch">Fetch</string>
     <string name="generating">Generating…</string>
     <string name="hide">Hide</string>
+    <string name="hugging_face">Hugging Face</string>
     <string name="hugging_face_suggestions">Hugging Face GGUF suggestions</string>
-    <string name="import_gguf">Import GGUF File</string>
-    <string name="import_gguf_desc">Load a .gguf model from your device</string>
+    <string name="import_gguf">Import Model File</string>
+    <string name="import_gguf_desc">Load a .gguf or .litertlm model from your device</string>
     <string name="loading_model">Loading %1$s…</string>
+    <string name="loading_models">Loading models…</string>
     <string name="local_models">Local Models</string>
     <string name="may_be_too_large">May be too large for this device</string>
     <string name="memory_warning_message">This model requires %1$d MB. Your device has %2$d MB available. Loading may cause instability. Continue?</string>
@@ -56,9 +62,13 @@
     <string name="no_models">No models found</string>
     <string name="no_models_endpoints_yet">No models or endpoints yet</string>
     <string name="no_models_select_model">No models, select a model</string>
+    <string name="no_results_found">No results found</string>
+    <string name="pause">Pause</string>
+    <string name="paused">Paused</string>
     <string name="provider_type">Provider Type</string>
     <string name="recents">Recents</string>
     <string name="remove">Remove</string>
+    <string name="resume">Resume</string>
     <string name="save">Save</string>
     <string name="search_minimum_length">Enter at least 3 letters</string>
     <string name="search_models">Search models</string>
@@ -76,15 +86,17 @@
     <string name="test_connection">Test Connection</string>
     <string name="thinking">Thinking</string>
     <string name="type_message">Type a message…</string>
+    <string name="unload_model">Unload model from memory</string>
     <string name="url">URL</string>
     <string name="use_in_chat">Use in chat</string>
     <style name="Theme.Warped" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
     <style name="Theme.Warped.Splash" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@drawable/splash_bg</item>
-        <item name="android:statusBarColor">#FF1F1F1E</item>
-        <item name="android:navigationBarColor">#FF1F1F1E</item>
+        <item name="android:statusBarColor">@color/window_background</item>
+        <item name="android:navigationBarColor">@color/window_background</item>
     </style>
 </resources>

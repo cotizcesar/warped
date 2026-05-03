@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.imePadding
@@ -17,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
@@ -25,6 +27,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -46,6 +49,7 @@ import com.warped.ui.chat.components.MessageBubble
 fun ChatScreen(
     viewModel: ChatViewModel = hiltViewModel(),
     onOpenDrawer: () -> Unit = {},
+    onNavigateToModels: () -> Unit = {},
     conversationId: Long = 0L
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -62,6 +66,32 @@ fun ChatScreen(
         }
     }
 
+    // Memory warning dialog
+    if (uiState.memoryWarningModel != null) {
+        val model = uiState.memoryWarningModel!!
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val info = com.warped.data.local.inference.MemoryChecker(context).getMemoryInfo()
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissMemoryWarning() },
+            title = { Text(stringResource(R.string.memory_warning_title)) },
+            text = {
+                Text(stringResource(R.string.memory_warning_message,
+                    model.sizeBytes / (1024 * 1024),
+                    info.availableBytes / (1024 * 1024)))
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.confirmLoadMemoryWarning() }) {
+                    Text(stringResource(R.string.continue_text))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissMemoryWarning() }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris -> attachedImages = uris }
@@ -72,24 +102,23 @@ fun ChatScreen(
             it.modelId == uiState.selectedModelId && it.apiType == uiState.selectedProvider
         }
         when {
-            local != null -> local.name
-            endpoint != null -> {
-                val shortId = uiState.selectedModelId?.substringAfterLast("/") ?: uiState.selectedModelId
-                "${endpoint.name} ($shortId)"
-            }
+            local != null -> local.filePath.substringAfterLast("/")
+            endpoint != null -> uiState.selectedModelId?.substringAfterLast("/") ?: uiState.selectedModelId
             else -> null
         }
     }
 
     LaunchedEffect(uiState.streamingContent.length, uiState.messages.size) {
-        if (uiState.messages.isNotEmpty() || uiState.streamingContent.isNotEmpty()) {
-            val totalItems = listState.layoutInfo.totalItemsCount
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            val isNearBottom = lastVisible >= totalItems - 3 || totalItems == 0
-            val isActivelyStreaming = uiState.streamingContent.isNotEmpty()
-            if (isNearBottom || isActivelyStreaming) {
-                listState.animateScrollToItem(maxOf(0, totalItems - 1))
-            }
+        val totalItems = listState.layoutInfo.totalItemsCount
+        if (totalItems == 0) return@LaunchedEffect
+        val lastIndex = totalItems - 1
+        val isStreaming = uiState.streamingContent.isNotEmpty()
+        if (isStreaming) {
+            // During active streaming, always snap to bottom
+            listState.scrollToItem(lastIndex)
+        } else if (uiState.messages.isNotEmpty()) {
+            // After streaming done, smooth scroll to bottom
+            listState.animateScrollToItem(lastIndex)
         }
     }
 
@@ -100,7 +129,8 @@ fun ChatScreen(
                 title = {
                     ExposedDropdownMenuBox(
                         expanded = modelDropdownExpanded,
-                        onExpandedChange = { modelDropdownExpanded = it }
+                        onExpandedChange = { modelDropdownExpanded = it },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
                             modifier = Modifier
@@ -108,11 +138,30 @@ fun ChatScreen(
                                 .clickable { modelDropdownExpanded = true },
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            if (uiState.selectedProvider != null && selectedModelName != null) {
+                                val isLocal = uiState.selectedProvider == ProviderType.LOCAL ||
+                                    uiState.selectedProvider == ProviderType.LITE_RT_LM
+                                val pillColor = if (isLocal) Color(0xFF4CAF50) else Color(0xFF2196F3)
+                                val pillText = if (isLocal) "Local" else "Net"
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = pillColor.copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        text = pillText,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = pillColor
+                                    )
+                                }
+                                Spacer(Modifier.width(6.dp))
+                            }
                             Text(
                                 text = selectedModelName ?: stringResource(R.string.select_model),
                                 style = MaterialTheme.typography.titleMedium,
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
                             )
                             Icon(
                                 Icons.Filled.KeyboardArrowDown,
@@ -132,26 +181,25 @@ fun ChatScreen(
                                     DropdownMenuItem(
                                         text = {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                                // Format badge: small colored chip
-                                                val badgeColor = if (isLiteRtLm) Color(0xFF4CAF50) else Color(0xFF2196F3)
                                                 Surface(
                                                     shape = RoundedCornerShape(4.dp),
-                                                    color = badgeColor.copy(alpha = 0.15f)
+                                                    color = Color(0xFF4CAF50).copy(alpha = 0.15f)
                                                 ) {
                                                     Text(
-                                                        text = if (isLiteRtLm) "LiteRT" else "GGUF",
+                                                        text = "Local",
                                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                                         style = MaterialTheme.typography.labelSmall,
-                                                        color = badgeColor
+                                                        color = Color(0xFF4CAF50)
                                                     )
                                                 }
                                                 Spacer(Modifier.width(8.dp))
-                                                Text(model.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                Text(model.filePath.substringAfterLast("/"), maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             }
                                         },
                                         onClick = {
-                                            viewModel.setSelectedModel(model.filePath, providerType)
                                             modelDropdownExpanded = false
+                                            // Defer model loading to avoid blocking UI during state updates
+                                            viewModel.launchModelSelection(model.filePath, providerType)
                                         }
                                     )
                                 }
@@ -162,21 +210,39 @@ fun ChatScreen(
                             uiState.endpoints.forEach { endpoint ->
                                 val modelId = endpoint.modelId
                                 if (modelId != null) {
-                                    val label = "${endpoint.name} · ${modelId.substringAfterLast("/")}"
+                                    val label = modelId.substringAfterLast("/")
                                     DropdownMenuItem(
-                                        text = { Text(label) },
+                                        text = {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = Color(0xFF2196F3).copy(alpha = 0.15f)
+                                                ) {
+                                                    Text(
+                                                        text = "Net",
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = Color(0xFF2196F3)
+                                                    )
+                                                }
+                                                Spacer(Modifier.width(8.dp))
+                                                Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            }
+                                        },
                                         onClick = {
-                                            viewModel.setSelectedModel(modelId, endpoint.apiType)
                                             modelDropdownExpanded = false
+                                            viewModel.launchModelSelection(modelId, endpoint.apiType)
                                         }
                                     )
                                 }
                             }
                             if (uiState.localModels.isEmpty() && uiState.endpoints.isEmpty()) {
                                 DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.no_models_select_model)) },
-                                    onClick = { modelDropdownExpanded = false },
-                                    enabled = false
+                                    text = { Text("Download a Model", color = MaterialTheme.colorScheme.primary) },
+                                    onClick = {
+                                        modelDropdownExpanded = false
+                                        onNavigateToModels()
+                                    }
                                 )
                             }
                         }
@@ -185,6 +251,21 @@ fun ChatScreen(
                 navigationIcon = {
                     IconButton(onClick = onOpenDrawer) {
                         Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                    }
+                },
+                actions = {
+                    val isLocal = uiState.selectedProvider == ProviderType.LOCAL ||
+                        uiState.selectedProvider == ProviderType.LITE_RT_LM
+                    if (isLocal) {
+                        val brushColor = if (uiState.isLocalModelLoaded)
+                            Color(0xFFFF9800) else Color(0xFF666666)
+                        IconButton(onClick = { viewModel.unloadLocalModels() }) {
+                            Icon(
+                                Icons.Filled.Brush,
+                                contentDescription = "Unload model from memory",
+                                tint = brushColor
+                            )
+                        }
                     }
                 }
             )
@@ -204,13 +285,7 @@ fun ChatScreen(
                 onToggleReasoning = { viewModel.toggleReasoning() },
                 onAddImage = { imagePickerLauncher.launch("image/*") },
                 attachedImages = attachedImages,
-                onRemoveImage = { i -> attachedImages = attachedImages.filterIndexed { idx, _ -> idx != i } },
-                localModels = uiState.localModels,
-                endpoints = uiState.endpoints,
-                selectedModelId = uiState.selectedModelId,
-                onModelSelected = { modelId, provider ->
-                    viewModel.setSelectedModel(modelId, provider)
-                }
+                onRemoveImage = { i -> attachedImages = attachedImages.filterIndexed { idx, _ -> idx != i } }
             )
         }
     ) { padding ->
@@ -268,56 +343,86 @@ fun ChatScreen(
                         )
                         Spacer(Modifier.height(24.dp))
                         Text(
-                            "Selecciona el modelo y empieza a escribir...",
-                            color = Color(0xFF545450),
+                            stringResource(R.string.empty_state_message),
+                            color = Color(0xFF9CA3AF),
                             style = MaterialTheme.typography.titleMedium
                         )
                     }
                 }
             } else {
-                LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                state = listState,
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                items(uiState.messages, key = { it.id }) { message ->
-                    MessageBubble(message = message)
-                }
-                if (uiState.streamingContent.isNotEmpty() || uiState.streamingReasoning.isNotEmpty()) {
-                        item(key = "streaming") {
-                            MessageBubble(
-                                message = com.warped.domain.model.ChatMessage(
-                                    role = Role.ASSISTANT,
-                                    content = uiState.streamingContent,
-                                    reasoning = uiState.streamingReasoning.ifEmpty { null }
-                                ),
-                                isStreaming = true
-                            )
+                Box(modifier = Modifier.weight(1f)) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        state = listState,
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        items(uiState.messages, key = { it.id }) { message ->
+                            MessageBubble(message = message)
                         }
-                    } else if (uiState.isStreaming) {
-                        item(key = "generating") {
-                            Row(
-                                modifier = Modifier.padding(vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(14.dp),
-                                    strokeWidth = 2.dp,
-                                    color = Color(0xFF545450)
+                        if (uiState.streamingContent.isNotEmpty() || uiState.streamingReasoning.isNotEmpty()) {
+                            item(key = "streaming") {
+                                MessageBubble(
+                                    message = com.warped.domain.model.ChatMessage(
+                                        role = Role.ASSISTANT,
+                                        content = uiState.streamingContent,
+                                        reasoning = uiState.streamingReasoning.ifEmpty { null }
+                                    ),
+                                    isStreaming = true
                                 )
-                                Spacer(Modifier.width(10.dp))
-                                Text(
-                                    "Generating...",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color(0xFF545450)
-                                )
+                            }
+                        } else if (uiState.isStreaming) {
+                            item(key = "generating") {
+                                Row(
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        strokeWidth = 2.dp,
+                                        color = Color(0xFF545450)
+                                    )
+                                    Spacer(Modifier.width(10.dp))
+                                    Text(
+                                        "Generating...",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFF545450)
+                                    )
+                                }
                             }
                         }
                     }
-            }
+                    // Top fade gradient overlay
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(24.dp)
+                            .align(Alignment.TopCenter)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color(0xFF1F1F1E),
+                                        Color.Transparent
+                                    )
+                                )
+                            )
+                    )
+                    // Bottom fade gradient overlay
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(24.dp)
+                            .align(Alignment.BottomCenter)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        Color(0xFF1F1F1E)
+                                    )
+                                )
+                            )
+                    )
+                }
             }
 
             if (uiState.modelLoadError != null) {

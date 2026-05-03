@@ -125,10 +125,12 @@ class ModelDownloadManager @Inject constructor(
     }
 
     fun pauseDownload(modelId: String) {
-        val workId = activeWorkIds[modelId]
+        val workId = activeWorkIds.remove(modelId)
         val state = _downloadStates.value[modelId]
         if (workId != null) {
             workManager.cancelWorkById(workId)
+            // Clean up observer immediately to prevent stale updates
+            cleanupObserver(workId)
         }
         if (state != null && state.fileName.isNotBlank() && state.fileUrl.isNotBlank()) {
             ioScope.launch {
@@ -149,6 +151,11 @@ class ModelDownloadManager @Inject constructor(
     }
 
     fun resumeDownload(modelId: String) {
+        // Clean up any stale observer from a previous download
+        val oldWorkId = activeWorkIds.remove(modelId)
+        if (oldWorkId != null) {
+            cleanupObserver(oldWorkId)
+        }
         ioScope.launch {
             val checkpoint = checkpointDao.getCheckpoint(modelId)
             if (checkpoint == null) {

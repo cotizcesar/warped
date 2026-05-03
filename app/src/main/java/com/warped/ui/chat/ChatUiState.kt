@@ -30,7 +30,9 @@ data class ChatUiState(
     val modelLoadError: String? = null,
     val loadedInstanceId: String? = null,
     val reasoningEnabled: Boolean = true,
-    val activeBackend: BackendType? = null  // null unless LITE_RT_LM is loaded
+    val activeBackend: BackendType? = null,  // null unless LITE_RT_LM is loaded
+    val isLocalModelLoaded: Boolean = false,
+    val memoryWarningModel: com.warped.domain.model.LocalModel? = null
 )
 
 sealed class ChatError {

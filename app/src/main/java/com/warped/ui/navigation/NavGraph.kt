@@ -43,7 +43,7 @@ import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
-private val DrawerBg = Color(0xFF1C1C1C)
+private val DrawerBg = Color(0xFF1F1F1E)
 private val DrawerAccent = Color(0xFFD97757)
 private val DrawerTextPrimary = Color(0xFFECECEC)
 private val DrawerTextSecondary = Color(0xFF9CA3AF)
@@ -121,7 +121,6 @@ fun WarpedNavGraph() {
                             navController.navigate(Screen.Chat.route) {
                                 popUpTo(Screen.Chat.route) { inclusive = true }
                             }
-                            navController.navigate(Screen.Chat.route)
                             scope.launch { drawerState.close() }
                         }
                     )
@@ -142,6 +141,12 @@ fun WarpedNavGraph() {
                                         TextButton(onClick = {
                                             scope.launch {
                                                 chatRepository.deleteConversation(conv.id)
+                                                if (conv.id == activeConversationId) {
+                                                    activeConversationId = null
+                                                    navController.navigate(Screen.Chat.route) {
+                                                        popUpTo(Screen.Chat.route) { inclusive = true }
+                                                    }
+                                                }
                                                 showDeleteConfirm = false
                                             }
                                         }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
@@ -189,8 +194,8 @@ fun WarpedNavGraph() {
                             modifier = Modifier.weight(1f),
                             onClick = {
                                 navController.navigate(Screen.Models.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                    launchSingleTop = true; restoreState = true
+                                    popUpTo(Screen.Chat.route) { inclusive = false }
+                                    launchSingleTop = true
                                 }
                                 scope.launch { drawerState.close() }
                             }
@@ -203,7 +208,10 @@ fun WarpedNavGraph() {
                             colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = DrawerSelectedBg, unselectedContainerColor = Color.Transparent),
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                navController.navigate(Screen.Settings.route) { launchSingleTop = true }
+                                navController.navigate(Screen.Settings.route) {
+                                    popUpTo(Screen.Chat.route) { inclusive = false }
+                                    launchSingleTop = true
+                                }
                                 scope.launch { drawerState.close() }
                             }
                         )
@@ -213,13 +221,32 @@ fun WarpedNavGraph() {
         }
     ) {
         NavHost(navController, startDestination = Screen.Chat.route) {
-            composable(Screen.Chat.route) { ChatScreen(onOpenDrawer = { scope.launch { drawerState.open() } }) }
+            composable(Screen.Chat.route) {
+                ChatScreen(
+                    onOpenDrawer = { scope.launch { drawerState.open() } },
+                    onNavigateToModels = {
+                        navController.navigate(Screen.Models.route) {
+                            popUpTo(Screen.Chat.route) { inclusive = false }
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
             composable(
                 route = "${Screen.Chat.route}/{conversationId}",
                 arguments = listOf(navArgument("conversationId") { type = NavType.LongType })
             ) { backStackEntry ->
                 val convId = backStackEntry.arguments?.getLong("conversationId") ?: 0L
-                ChatScreen(conversationId = convId, onOpenDrawer = { scope.launch { drawerState.open() } })
+                ChatScreen(
+                    conversationId = convId,
+                    onOpenDrawer = { scope.launch { drawerState.open() } },
+                    onNavigateToModels = {
+                        navController.navigate(Screen.Models.route) {
+                            popUpTo(Screen.Chat.route) { inclusive = false }
+                            launchSingleTop = true
+                        }
+                    }
+                )
             }
             composable(Screen.Models.route) {
                 ModelsScreen(
@@ -236,10 +263,7 @@ fun WarpedNavGraph() {
             composable(Screen.HuggingFace.route) {
                 HuggingFaceScreen(
                     onNavigateToModels = {
-                        navController.navigate(Screen.Models.route) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true; restoreState = true
-                        }
+                        navController.popBackStack()
                     }
                 )
             }

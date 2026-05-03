@@ -330,17 +330,16 @@ private fun SiblingFileCard(
                     maxLines = 2
                 )
             }
-            Spacer(Modifier.height(4.dp))
-            Text(
-                formatFileSize(effectiveSize),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
-            )
             Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistInfoChip(text = formatFileSize(effectiveSize))
-                AssistInfoChip(text = "$modelDownloads downloads")
+            if (effectiveSize > 0) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AssistInfoChip(text = formatFileSize(effectiveSize))
+                    AssistInfoChip(text = "$modelDownloads downloads")
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AssistInfoChip(text = "$modelDownloads downloads")
+                }
             }
             Spacer(Modifier.height(8.dp))
             OutlinedButton(
@@ -399,36 +398,9 @@ private fun ModelDetailScreen(
                                 style = MaterialTheme.typography.headlineSmall
                             )
                             Spacer(Modifier.height(4.dp))
-                            Text(
-                                model.id,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(Modifier.height(12.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                AssistInfoChip(text = "${model.downloads} downloads")
-                                AssistInfoChip(text = "${model.likes} likes")
-                            }
-                            Spacer(Modifier.height(8.dp))
-                            Text("Author: ${model.author.ifBlank { "Unknown" }}")
-                            model.cardData?.license?.let { license ->
-                                Text(
-                                    "License: $license",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            model.cardData?.language?.takeIf { it.isNotEmpty() }?.let { languages ->
-                                Text(
-                                    "Language: ${languages.joinToString()}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
                             if (model.tags.isNotEmpty()) {
-                                Spacer(Modifier.height(8.dp))
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    model.tags.take(3).forEach { tag ->
+                                    model.tags.take(5).forEach { tag ->
                                         AssistInfoChip(text = tag)
                                     }
                                 }

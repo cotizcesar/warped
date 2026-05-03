@@ -1,12 +1,17 @@
 R_DEF: Internal format may change without notice
 local
+color ic_launcher_background
+color window_background
 drawable logo
 drawable splash_bg
+mipmap ic_launcher
+mipmap ic_launcher_round
 string active_downloads
 string add_model
 string api_key
 string app_name
 string available_models
+string back
 string cancel
 string cancel_download
 string compatible_with_device
@@ -31,6 +36,7 @@ string download
 string download_from_hf
 string download_from_hf_desc
 string download_model_first
+string downloading
 string edit
 string empty_state_message
 string endpoint_configuration
@@ -41,10 +47,12 @@ string failed_to_load_model
 string fetch
 string generating
 string hide
+string hugging_face
 string hugging_face_suggestions
 string import_gguf
 string import_gguf_desc
 string loading_model
+string loading_models
 string local_models
 string may_be_too_large
 string memory_warning_message
@@ -58,9 +66,13 @@ string no_model_selected
 string no_models
 string no_models_endpoints_yet
 string no_models_select_model
+string no_results_found
+string pause
+string paused
 string provider_type
 string recents
 string remove
+string resume
 string save
 string search_minimum_length
 string search_models
@@ -78,6 +90,7 @@ string tab_models
 string test_connection
 string thinking
 string type_message
+string unload_model
 string url
 string use_in_chat
 style Theme.Warped

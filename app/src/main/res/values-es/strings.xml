@@ -32,7 +32,7 @@
     <string name="search_models">Buscar modelos</string>
     <string name="search_models_hint">Escribe al menos 3 letras para buscar</string>
     <string name="search_minimum_length">Ingresa al menos 3 letras</string>
-    <string name="thinking">Thinking</string>
+    <string name="thinking">Pensando</string>
     <string name="generating">Generando…</string>
     <string name="select_image">Seleccionar imagen</string>
     <string name="remove">Quitar</string>
@@ -61,9 +61,9 @@
     <string name="recents">Recientes</string>
     <string name="empty_state_message">Selecciona el modelo y empieza a escribir…</string>
     <string name="download_from_hf">Descargar desde Hugging Face</string>
-    <string name="download_from_hf_desc">Explorar y descargar modelos GGUF</string>
-    <string name="import_gguf">Importar archivo GGUF</string>
-    <string name="import_gguf_desc">Cargar un modelo .gguf desde tu dispositivo</string>
+    <string name="download_from_hf_desc">Explorar y descargar modelos GGUF y LiteRT-LM</string>
+    <string name="import_gguf">Importar archivo de modelo</string>
+    <string name="import_gguf_desc">Cargar un modelo .gguf o .litertlm desde tu dispositivo</string>
     <string name="connect_lm_studio">Conectar LM Studio</string>
     <string name="connect_lm_studio_desc">Agregar un servidor LM Studio remoto</string>
     <string name="no_models_endpoints_yet">Sin modelos ni endpoints aún</string>
@@ -78,4 +78,13 @@
     <string name="hide">Ocultar</string>
     <string name="fetch">Obtener</string>
     <string name="select_or_type_model">Selecciona o escribe el Model ID</string>
+    <string name="pause">Pausar</string>
+    <string name="resume">Reanudar</string>
+    <string name="back">Volver</string>
+    <string name="unload_model">Descargar modelo de memoria</string>
+    <string name="paused">Pausado</string>
+    <string name="downloading">Descargando</string>
+    <string name="no_results_found">Sin resultados</string>
+    <string name="loading_models">Cargando modelos…</string>
+    <string name="hugging_face">Hugging Face</string>
 </resources>

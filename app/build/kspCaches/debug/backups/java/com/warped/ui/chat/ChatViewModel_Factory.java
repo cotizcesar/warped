@@ -4,6 +4,7 @@ import android.content.Context;
 import androidx.lifecycle.SavedStateHandle;
 import com.warped.data.local.inference.EngineManager;
 import com.warped.data.local.inference.LlamaEngine;
+import com.warped.data.local.inference.MemoryChecker;
 import com.warped.data.remote.provider.ProviderRouter;
 import com.warped.domain.model.ActiveModelSelection;
 import com.warped.domain.model.ParameterStore;
@@ -52,6 +53,8 @@ public final class ChatViewModel_Factory implements Factory<ChatViewModel> {
 
   private final Provider<EngineManager> engineManagerProvider;
 
+  private final Provider<MemoryChecker> memoryCheckerProvider;
+
   private final Provider<Context> contextProvider;
 
   private ChatViewModel_Factory(Provider<ChatRepository> chatRepositoryProvider,
@@ -61,7 +64,8 @@ public final class ChatViewModel_Factory implements Factory<ChatViewModel> {
       Provider<ProviderRouter> providerRouterProvider,
       Provider<SavedStateHandle> savedStateHandleProvider,
       Provider<ParameterStore> parameterStoreProvider, Provider<LlamaEngine> llamaEngineProvider,
-      Provider<EngineManager> engineManagerProvider, Provider<Context> contextProvider) {
+      Provider<EngineManager> engineManagerProvider, Provider<MemoryChecker> memoryCheckerProvider,
+      Provider<Context> contextProvider) {
     this.chatRepositoryProvider = chatRepositoryProvider;
     this.endpointRepositoryProvider = endpointRepositoryProvider;
     this.localModelRepositoryProvider = localModelRepositoryProvider;
@@ -71,12 +75,13 @@ public final class ChatViewModel_Factory implements Factory<ChatViewModel> {
     this.parameterStoreProvider = parameterStoreProvider;
     this.llamaEngineProvider = llamaEngineProvider;
     this.engineManagerProvider = engineManagerProvider;
+    this.memoryCheckerProvider = memoryCheckerProvider;
     this.contextProvider = contextProvider;
   }
 
   @Override
   public ChatViewModel get() {
-    return newInstance(chatRepositoryProvider.get(), endpointRepositoryProvider.get(), localModelRepositoryProvider.get(), activeModelSelectionProvider.get(), providerRouterProvider.get(), savedStateHandleProvider.get(), parameterStoreProvider.get(), llamaEngineProvider.get(), engineManagerProvider.get(), contextProvider.get());
+    return newInstance(chatRepositoryProvider.get(), endpointRepositoryProvider.get(), localModelRepositoryProvider.get(), activeModelSelectionProvider.get(), providerRouterProvider.get(), savedStateHandleProvider.get(), parameterStoreProvider.get(), llamaEngineProvider.get(), engineManagerProvider.get(), memoryCheckerProvider.get(), contextProvider.get());
   }
 
   public static ChatViewModel_Factory create(Provider<ChatRepository> chatRepositoryProvider,
@@ -86,15 +91,16 @@ public final class ChatViewModel_Factory implements Factory<ChatViewModel> {
       Provider<ProviderRouter> providerRouterProvider,
       Provider<SavedStateHandle> savedStateHandleProvider,
       Provider<ParameterStore> parameterStoreProvider, Provider<LlamaEngine> llamaEngineProvider,
-      Provider<EngineManager> engineManagerProvider, Provider<Context> contextProvider) {
-    return new ChatViewModel_Factory(chatRepositoryProvider, endpointRepositoryProvider, localModelRepositoryProvider, activeModelSelectionProvider, providerRouterProvider, savedStateHandleProvider, parameterStoreProvider, llamaEngineProvider, engineManagerProvider, contextProvider);
+      Provider<EngineManager> engineManagerProvider, Provider<MemoryChecker> memoryCheckerProvider,
+      Provider<Context> contextProvider) {
+    return new ChatViewModel_Factory(chatRepositoryProvider, endpointRepositoryProvider, localModelRepositoryProvider, activeModelSelectionProvider, providerRouterProvider, savedStateHandleProvider, parameterStoreProvider, llamaEngineProvider, engineManagerProvider, memoryCheckerProvider, contextProvider);
   }
 
   public static ChatViewModel newInstance(ChatRepository chatRepository,
       EndpointRepository endpointRepository, LocalModelRepository localModelRepository,
       ActiveModelSelection activeModelSelection, ProviderRouter providerRouter,
       SavedStateHandle savedStateHandle, ParameterStore parameterStore, LlamaEngine llamaEngine,
-      EngineManager engineManager, Context context) {
-    return new ChatViewModel(chatRepository, endpointRepository, localModelRepository, activeModelSelection, providerRouter, savedStateHandle, parameterStore, llamaEngine, engineManager, context);
+      EngineManager engineManager, MemoryChecker memoryChecker, Context context) {
+    return new ChatViewModel(chatRepository, endpointRepository, localModelRepository, activeModelSelection, providerRouter, savedStateHandle, parameterStore, llamaEngine, engineManager, memoryChecker, context);
   }
 }

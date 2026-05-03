@@ -5,6 +5,7 @@
     <string name="api_key">API Key</string>
     <string name="app_name">Warped</string>
     <string name="available_models">Modelos disponibles</string>
+    <string name="back">Volver</string>
     <string name="cancel">Cancelar</string>
     <string name="cancel_download">Cancelar</string>
     <string name="compatible_with_device">Compatible con este dispositivo</string>
@@ -27,8 +28,9 @@
     <string name="dismiss">Descartar</string>
     <string name="download">Descargar</string>
     <string name="download_from_hf">Descargar desde Hugging Face</string>
-    <string name="download_from_hf_desc">Explorar y descargar modelos GGUF</string>
+    <string name="download_from_hf_desc">Explorar y descargar modelos GGUF y LiteRT-LM</string>
     <string name="download_model_first">Descarga este modelo antes de usarlo en chat local.</string>
+    <string name="downloading">Descargando</string>
     <string name="edit">Editar</string>
     <string name="empty_state_message">Selecciona el modelo y empieza a escribir…</string>
     <string name="endpoint_configuration">Configuración de Endpoint</string>
@@ -39,10 +41,12 @@
     <string name="fetch">Obtener</string>
     <string name="generating">Generando…</string>
     <string name="hide">Ocultar</string>
+    <string name="hugging_face">Hugging Face</string>
     <string name="hugging_face_suggestions">Sugerencias GGUF de Hugging Face</string>
-    <string name="import_gguf">Importar archivo GGUF</string>
-    <string name="import_gguf_desc">Cargar un modelo .gguf desde tu dispositivo</string>
+    <string name="import_gguf">Importar archivo de modelo</string>
+    <string name="import_gguf_desc">Cargar un modelo .gguf o .litertlm desde tu dispositivo</string>
     <string name="loading_model">Cargando %1$s…</string>
+    <string name="loading_models">Cargando modelos…</string>
     <string name="local_models">Modelos locales</string>
     <string name="may_be_too_large">Puede ser muy grande para este dispositivo</string>
     <string name="memory_warning_message">Este modelo requiere %1$d MB. Tu dispositivo tiene %2$d MB disponibles. Cargarlo puede causar inestabilidad. ¿Continuar?</string>
@@ -56,9 +60,13 @@
     <string name="no_models">No se encontraron modelos</string>
     <string name="no_models_endpoints_yet">Sin modelos ni endpoints aún</string>
     <string name="no_models_select_model">Sin modelos, selecciona uno</string>
+    <string name="no_results_found">Sin resultados</string>
+    <string name="pause">Pausar</string>
+    <string name="paused">Pausado</string>
     <string name="provider_type">Tipo de Provider</string>
     <string name="recents">Recientes</string>
     <string name="remove">Quitar</string>
+    <string name="resume">Reanudar</string>
     <string name="save">Guardar</string>
     <string name="search_minimum_length">Ingresa al menos 3 letras</string>
     <string name="search_models">Buscar modelos</string>
@@ -74,8 +82,9 @@
     <string name="tab_endpoints">Endpoints</string>
     <string name="tab_models">Modelos</string>
     <string name="test_connection">Probar conexión</string>
-    <string name="thinking">Thinking</string>
+    <string name="thinking">Pensando</string>
     <string name="type_message">Escribe un mensaje…</string>
+    <string name="unload_model">Descargar modelo de memoria</string>
     <string name="url">URL</string>
     <string name="use_in_chat">Usar en chat</string>
 </resources>
