@@ -143,13 +143,16 @@ class LiteRTLmProvider @Inject constructor(
                 throw IllegalStateException("Engine not initialized")
             }
 
-            activeConversation?.let { prev ->
-                try { prev.close() } catch (_: Exception) {}
-                activeConversation = null
+            val conversation = if (activeConversation?.isAlive == true) {
+                activeConversation!!
+            } else {
+                activeConversation?.let { prev ->
+                    try { prev.close() } catch (_: Exception) {}
+                }
+                val conv = engineManager.createLiteRTConversation(conversationConfig)
+                activeConversation = conv
+                conv
             }
-
-            val conversation = engineManager.createLiteRTConversation(conversationConfig)
-            activeConversation = conversation
 
             conversation.sendMessageAsync(contents).collect { responseMsg ->
                 val content = extractTextContent(responseMsg)
