@@ -82,7 +82,8 @@ class LiteRTLmProvider @Inject constructor(
             seed = if (params.seed != -1) params.seed else 0
         )
         val extraContext = mapOf<String, Any>(
-            "max_output_tokens" to params.maxTokens
+            "max_output_tokens" to params.maxTokens,
+            "reasoning_enabled" to params.reasoningEnabled
         )
 
         // Step 6: Create conversation config with history
@@ -153,6 +154,7 @@ class LiteRTLmProvider @Inject constructor(
             conversation.sendMessageAsync(contents).collect { responseMsg ->
                 val content = extractTextContent(responseMsg)
                 if (content.isNotEmpty()) {
+                    Timber.d("LiteRTLmProvider: delta (${content.length} chars): %s", content.takeLast(100))
                     emit(StreamToken.Delta(content))
                 }
             }
@@ -170,6 +172,8 @@ class LiteRTLmProvider @Inject constructor(
 
             if (isEngineError && attempt < maxRetries) {
                 Timber.w(e, "LiteRTLmProvider: engine error (attempt ${attempt + 1}/3), recovering...")
+                // Null out the conversation — its native handle may be invalid after the error
+                activeConversation = null
                 recoverEngine()
                 Timber.w("LiteRTLmProvider: Engine recovered, retrying... (attempt ${attempt + 1})")
                 sendContentsWithRetry(contents, conversationConfig, attempt + 1)

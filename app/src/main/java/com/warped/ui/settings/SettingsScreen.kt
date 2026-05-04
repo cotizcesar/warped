@@ -9,12 +9,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
@@ -235,6 +237,54 @@ fun SettingsScreen(
                                 style = MaterialTheme.typography.bodyLarge
                             )
                             Text("${uiState.presetCount} presets")
+                        }
+                    }
+                }
+            }
+
+            item {
+                Text("Hugging Face", style = MaterialTheme.typography.titleMedium)
+            }
+
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Access Token", style = MaterialTheme.typography.bodyLarge)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            if (uiState.hasHfToken) "Token configured" else "Required for gated/private models",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (uiState.hasHfToken) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = uiState.hfToken,
+                                onValueChange = { viewModel.updateHfToken(it) },
+                                label = { Text("Token") },
+                                placeholder = { Text("hf_...") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            TextButton(onClick = { viewModel.saveHfToken() }) {
+                                Text("Save")
+                            }
+                        }
+                        if (uiState.hasHfToken) {
+                            Spacer(Modifier.height(4.dp))
+                            TextButton(
+                                onClick = { viewModel.deleteHfToken() },
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                )
+                            ) {
+                                Text("Remove token")
+                            }
                         }
                     }
                 }

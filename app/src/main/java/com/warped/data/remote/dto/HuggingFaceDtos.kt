@@ -73,3 +73,21 @@ data class HuggingFaceSearchResult(
     val downloads: Int = 0,
     val likes: Int = 0
 )
+
+@Serializable
+data class HuggingFaceCollection(
+    val slug: String = "",
+    val title: String = "",
+    val items: List<HuggingFaceCollectionItem> = emptyList()
+)
+
+@Serializable
+data class HuggingFaceCollectionItem(
+    val id: String = "",
+    val author: String = "",
+    val downloads: Int = 0,
+    val likes: Int = 0,
+    @SerialName("gated") val gated: String = "false",
+    @SerialName("pipeline_tag") val pipelineTag: String = "",
+    @SerialName("lastModified") val lastModified: String = ""
+)

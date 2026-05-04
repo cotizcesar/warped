@@ -283,6 +283,7 @@ fun ChatScreen(
                 onStop = { viewModel.stopGeneration() },
                 reasoningEnabled = uiState.reasoningEnabled,
                 onToggleReasoning = { viewModel.toggleReasoning() },
+                modelHasReasoning = uiState.localModels.firstOrNull { it.filePath == uiState.selectedModelId }?.capabilities?.reasoning != false,
                 onAddImage = { imagePickerLauncher.launch("image/*") },
                 attachedImages = attachedImages,
                 onRemoveImage = { i -> attachedImages = attachedImages.filterIndexed { idx, _ -> idx != i } }

@@ -9,11 +9,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -143,7 +145,7 @@ fun HuggingFaceScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            val formats = listOf("litertlm" to "LiteRT-LM", "gguf" to "GGUF")
+            val formats = listOf("staffpicks" to "Staff Picks", "litertlm" to "LiteRT-LM", "gguf" to "GGUF")
             val selectedTabIndex = formats.indexOfFirst { it.first == uiState.activeFormat }.coerceAtLeast(0)
             PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
                 formats.forEachIndexed { index, (formatValue, label) ->
@@ -263,7 +265,7 @@ private fun ModelSearchResultCard(
 private fun FormatBadge(format: String) {
     val (color, label) = when {
         format.equals("gguf", ignoreCase = true) -> Color(0xFF2196F3) to "GGUF"
-        format.equals("litertlm", ignoreCase = true) -> Color(0xFF4CAF50) to "LiteRT-LM"
+        format.equals("litertlm", ignoreCase = true) || format.equals("staffpicks", ignoreCase = true) -> Color(0xFF4CAF50) to "LiteRT-LM"
         else -> MaterialTheme.colorScheme.outline to format
     }
     Surface(
@@ -398,6 +400,28 @@ private fun ModelDetailScreen(
                                 style = MaterialTheme.typography.headlineSmall
                             )
                             Spacer(Modifier.height(4.dp))
+                            val isGated = model.gated != "false"
+                            if (isGated) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Lock,
+                                        contentDescription = null,
+                                        tint = Color(0xFFFF9800),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        "Gated model — requires Access Token in Settings",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFFFF9800)
+                                    )
+                                }
+                            }
                             if (model.tags.isNotEmpty()) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     model.tags.take(5).forEach { tag ->

@@ -1,6 +1,7 @@
 package com.warped.data.repository
 
 import com.warped.data.remote.api.HuggingFaceApi
+import com.warped.data.remote.dto.HuggingFaceCollectionItem
 import com.warped.data.remote.dto.HuggingFaceModel
 import com.warped.data.remote.dto.HuggingFaceModelDetail
 import com.warped.domain.repository.HuggingFaceRepository
@@ -60,6 +61,21 @@ class HuggingFaceRepositoryImpl @Inject constructor(
             }
         } catch (e: Exception) {
             Timber.e(e, "HF API detail failed: $modelId")
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun getCollectionModels(owner: String, collection: String): Result<List<HuggingFaceCollectionItem>> {
+        return try {
+            val response = api.getCollection(owner, collection)
+            if (response.isSuccessful) {
+                val body = response.body() ?: throw Exception("Empty response")
+                Result.success(body.items)
+            } else {
+                Result.failure(Exception("Collection fetch failed: HTTP ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "HF API collection failed: $owner/$collection")
             Result.failure(e)
         }
     }

@@ -15,6 +15,9 @@ class LiteRTLmEngine @Inject constructor() {
 
     companion object {
         init {
+            try {
+                System.loadLibrary("litertlm_jni")
+            } catch (_: UnsatisfiedLinkError) {}
             Engine.setNativeMinLogSeverity(LogSeverity.ERROR)
         }
     }

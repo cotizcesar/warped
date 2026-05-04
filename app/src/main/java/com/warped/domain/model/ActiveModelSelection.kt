@@ -76,4 +76,8 @@ class ActiveModelSelection @Inject constructor(
             keystoreManager.get(LAST_CONVERSATION_KEY)?.toLongOrNull() ?: 0L
         } catch (_: Exception) { 0L }
     }
+
+    fun clearLastConversation() {
+        try { keystoreManager.remove(LAST_CONVERSATION_KEY) } catch (_: Exception) {}
+    }
 }

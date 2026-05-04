@@ -1,5 +1,6 @@
 package com.warped.data.remote.api
 
+import com.warped.data.remote.dto.HuggingFaceCollection
 import com.warped.data.remote.dto.HuggingFaceModel
 import com.warped.data.remote.dto.HuggingFaceModelDetail
 import retrofit2.Response
@@ -23,4 +24,10 @@ interface HuggingFaceApi {
     suspend fun getModelDetail(
         @Path(value = "modelId", encoded = true) modelId: String
     ): Response<HuggingFaceModelDetail>
+
+    @GET("api/collections/{owner}/{collection}")
+    suspend fun getCollection(
+        @Path("owner") owner: String,
+        @Path("collection") collection: String
+    ): Response<HuggingFaceCollection>
 }

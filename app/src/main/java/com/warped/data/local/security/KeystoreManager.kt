@@ -2,11 +2,10 @@ package com.warped.data.local.security
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import dagger.hilt.android.qualifiers.ApplicationContext
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -14,20 +13,9 @@ import javax.inject.Singleton
 class KeystoreManager @Inject constructor(
     @param:ApplicationContext private val context: Context
 ) {
-    private val masterKeyAlias = "_warped_master_key_"
-
     private val masterKey: MasterKey by lazy {
         MasterKey.Builder(context)
-            .setKeyGenParameterSpec(
-                KeyGenParameterSpec.Builder(
-                    masterKeyAlias,
-                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-                )
-                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                    .setKeySize(256)
-                    .build()
-            )
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
             .build()
     }
 
@@ -42,18 +30,36 @@ class KeystoreManager @Inject constructor(
     }
 
     fun put(key: String, value: String) {
-        encryptedPrefs.edit().putString(key, value).apply()
+        try {
+            encryptedPrefs.edit().putString(key, value).commit()
+            Timber.d("KeystoreManager: put succeeded for key=$key")
+        } catch (e: Exception) {
+            Timber.e(e, "KeystoreManager: put failed for key=$key")
+        }
     }
 
     fun get(key: String): String? {
-        return encryptedPrefs.getString(key, null)
+        return try {
+            encryptedPrefs.getString(key, null)
+        } catch (e: Exception) {
+            Timber.e(e, "KeystoreManager: get failed for key=$key")
+            null
+        }
     }
 
     fun remove(key: String) {
-        encryptedPrefs.edit().remove(key).apply()
+        try {
+            encryptedPrefs.edit().remove(key).apply()
+        } catch (e: Exception) {
+            Timber.e(e, "KeystoreManager: remove failed for key=$key")
+        }
     }
 
     fun clearAll() {
-        encryptedPrefs.edit().clear().apply()
+        try {
+            encryptedPrefs.edit().clear().apply()
+        } catch (e: Exception) {
+            Timber.e(e, "KeystoreManager: clearAll failed")
+        }
     }
 }

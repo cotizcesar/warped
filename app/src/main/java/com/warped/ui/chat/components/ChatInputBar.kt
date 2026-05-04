@@ -37,6 +37,7 @@ fun ChatInputBar(
     onStop: () -> Unit,
     reasoningEnabled: Boolean = true,
     onToggleReasoning: () -> Unit = {},
+    modelHasReasoning: Boolean = true,
     onAddImage: () -> Unit = {},
     attachedImages: List<Uri> = emptyList(),
     onRemoveImage: (Int) -> Unit = {}
@@ -124,10 +125,12 @@ fun ChatInputBar(
                     }
                     // Think toggle
                     Spacer(Modifier.width(10.dp))
+                    val canThink = modelHasReasoning
                     Button(
                         onClick = onToggleReasoning,
+                        enabled = canThink,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (reasoningEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent
+                            containerColor = if (reasoningEnabled && canThink) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent
                         ),
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                         shape = MaterialTheme.shapes.small,
@@ -135,7 +138,9 @@ fun ChatInputBar(
                     ) {
                         Text(
                             stringResource(R.string.thinking),
-                            color = if (reasoningEnabled) Color.White else Color.White.copy(alpha = 0.6f),
+                            color = if (!canThink) Color.White.copy(alpha = 0.25f)
+                                else if (reasoningEnabled) Color.White
+                                else Color.White.copy(alpha = 0.6f),
                             fontSize = MaterialTheme.typography.labelSmall.fontSize
                         )
                     }

@@ -22,6 +22,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 
@@ -194,6 +195,8 @@ class ChatViewModel @Inject constructor(
 
                 val rawBuffer = StringBuilder()
                 val reasoningActive = _uiState.value.reasoningEnabled
+                val modelMayThink = state.localModels.firstOrNull { it.filePath == modelId }?.capabilities?.reasoning == true
+                Timber.d("ChatVM: sendMessage reasoningActive=%b modelMayThink=%b", reasoningActive, modelMayThink)
 
                 provider.chat(request).collect { token ->
                     when (token) {
@@ -203,7 +206,7 @@ class ChatViewModel @Inject constructor(
                             if (now - lastEmitTime >= 50) {
                                 val chunk = tokenBuffer.joinToString("")
                                 rawBuffer.append(chunk)
-                                val (cleanContent, reasoning) = parseThinkBlocks(rawBuffer.toString(), reasoningActive)
+                                val (cleanContent, reasoning) = parseThinkBlocks(rawBuffer.toString(), reasoningActive, modelMayThink)
                                 _uiState.update {
                                     it.copy(
                                         streamingContent = cleanContent,
@@ -216,7 +219,7 @@ class ChatViewModel @Inject constructor(
                         }
                         is StreamToken.Done -> {
                             rawBuffer.append(tokenBuffer.joinToString(""))
-                            val (finalClean, finalReasoning) = parseThinkBlocks(rawBuffer.toString(), reasoningActive)
+                            val (finalClean, finalReasoning) = parseThinkBlocks(rawBuffer.toString(), reasoningActive, modelMayThink)
                             val content = if (finalClean.isBlank()) finalClean else finalClean.trimStart()
                             if (content.isNotBlank() || finalReasoning.isNotBlank()) {
                                 val assistantMessage = ChatMessage(
@@ -495,20 +498,28 @@ class ChatViewModel @Inject constructor(
     private fun LocalModel.isLiteRtLm(): Boolean =
         modelFormat.equals("LITERTLM", ignoreCase = true) || filePath.endsWith(".litertlm", ignoreCase = true)
 
-    private fun parseThinkBlocks(raw: String, enabled: Boolean = true): Pair<String, String> {
-        if (!enabled) return Pair(raw.trim(), "")
-
-        // Extract complete think blocks — case-insensitive for DeepSeek/other variants
+    private fun parseThinkBlocks(raw: String, enabled: Boolean = true, modelMayThink: Boolean = false): Pair<String, String> {
+        if (!enabled) {
+            Timber.d("ChatVM: parseThinkBlocks disabled — raw=%d chars, mayThink=%b", raw.length, modelMayThink)
+            val closeIdx = raw.lowercase().lastIndexOf("</think>")
+            val clean = if (closeIdx >= 0) {
+                raw.substring(closeIdx + "</think>".length).trim()
+            } else if (!modelMayThink || raw.length > 400) {
+                // No </think> and model doesn't think, or enough chars without it
+                Regex("<[/]?think>", setOf(RegexOption.IGNORE_CASE)).replace(raw, "").trim()
+            } else {
+                "" // Waiting for </think>
+            }
+            Timber.d("ChatVM: parseThinkBlocks disabled result — clean=%d chars", clean.length)
+            return Pair(clean, "")
+        }
+        Timber.d("ChatVM: parseThinkBlocks raw (%d chars) last 200: %s", raw.length, raw.takeLast(200))
         val completeRegex = Regex("<think>([\\s\\S]*?)</think>", setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE))
         val reasoning = StringBuilder()
         var clean = raw
-
-        completeRegex.findAll(clean).forEach { match ->
-            reasoning.append(match.groupValues[1].trim()).append("\n")
-        }
+        val hasCompleteTags = completeRegex.containsMatchIn(clean)
+        completeRegex.findAll(clean).forEach { match -> reasoning.append(match.groupValues[1].trim()).append("\n") }
         clean = completeRegex.replace(clean, "")
-
-        // Handle incomplete <think> at the end (streaming hasn't received <｜end▁of▁thinking｜> yet)
         val lastThinkOpen = clean.lowercase().lastIndexOf("<think>")
         if (lastThinkOpen >= 0) {
             val beforeTag = clean.substring(0, lastThinkOpen)
@@ -516,7 +527,18 @@ class ChatViewModel @Inject constructor(
             reasoning.append(afterTag.trim())
             clean = beforeTag
         }
-
+        if (reasoning.isEmpty()) {
+            val closeIdx = clean.lowercase().lastIndexOf("</think>")
+            if (closeIdx >= 0) {
+                reasoning.append(clean.substring(0, closeIdx).trim())
+                clean = clean.substring(closeIdx + "</think>".length)
+            }
+        }
+        if (reasoning.isEmpty() && modelMayThink && !hasCompleteTags && !raw.contains("<think>", ignoreCase = true) && !raw.contains("</think>", ignoreCase = true)) {
+            reasoning.append(clean.trim())
+            clean = ""
+        }
+        Timber.d("ChatVM: parseThinkBlocks result — clean=%d reasoning=%d", clean.length, reasoning.length)
         return Pair(clean.trim(), reasoning.toString().trim())
     }
 

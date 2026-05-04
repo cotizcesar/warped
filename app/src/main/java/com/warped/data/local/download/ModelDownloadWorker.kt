@@ -18,6 +18,7 @@ import com.warped.data.local.db.dao.DownloadCheckpointDao
 import com.warped.data.local.db.entity.DownloadCheckpointEntity
 import com.warped.data.local.inference.GgufMetadata
 import com.warped.data.local.inference.GgufMetadataParser
+import com.warped.data.local.security.ApiKeyStore
 import com.warped.domain.model.LocalModel
 import com.warped.domain.repository.LocalModelRepository
 import dagger.assisted.Assisted
@@ -35,7 +36,8 @@ class ModelDownloadWorker @AssistedInject constructor(
     @Assisted workerParams: WorkerParameters,
     private val okHttpClient: OkHttpClient,
     private val localModelRepository: LocalModelRepository,
-    private val checkpointDao: DownloadCheckpointDao
+    private val checkpointDao: DownloadCheckpointDao,
+    private val apiKeyStore: ApiKeyStore
 ) : CoroutineWorker(context, workerParams) {
 
     companion object {
@@ -99,16 +101,25 @@ class ModelDownloadWorker @AssistedInject constructor(
         }
 
         return try {
-            val request = Request.Builder()
+            val requestBuilder = Request.Builder()
                 .url(fileUrl)
                 .header("Range", "bytes=$resumeOffset-")
-                .build()
+            if (fileUrl.contains("huggingface.co")) {
+                val token = apiKeyStore.getHuggingFaceToken()
+                Timber.d("ModelDownloadWorker: HF token present=%b", token != null)
+                if (token != null) {
+                    val tokenStr = String(token)
+                    token.fill('0')
+                    requestBuilder.header("Authorization", "Bearer $tokenStr")
+                }
+            }
+            val request = requestBuilder.build()
 
             val response = okHttpClient.newCall(request).execute()
             Timber.d("ModelDownloadWorker: HTTP ${response.code} for $fileUrl")
             if (!response.isSuccessful && response.code != 206) {
                 val errorMsg = when (response.code) {
-                    401, 403 -> "Model requires authentication (gated). Add a HuggingFace token."
+                     401, 403 -> "Gated model — get an Access Token at huggingface.co/settings/tokens then add it in Settings."
                     404 -> "File not found on HuggingFace."
                     else -> "HTTP ${response.code}: ${response.message}"
                 }

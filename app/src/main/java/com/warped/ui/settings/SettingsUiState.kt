@@ -11,5 +11,7 @@ data class SettingsUiState(
     val showDeleteKeysDialog: Boolean = false,
     val showDeleteEndpointDialog: Long? = null,
     val message: String? = null,
-    val error: String? = null
+    val error: String? = null,
+    val hfToken: String = "",
+    val hasHfToken: Boolean = false
 )

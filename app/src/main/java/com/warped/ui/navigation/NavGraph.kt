@@ -82,11 +82,12 @@ fun WarpedNavGraph() {
 
     // Get ChatRepository for conversation list
     val context = androidx.compose.ui.platform.LocalContext.current
-    val chatRepository = remember {
+    val entryPoint = remember {
         val appContext = context.applicationContext
-        val entryPoint = EntryPointAccessors.fromApplication(appContext, ChatRepoEntryPoint::class.java)
-        entryPoint.chatRepository()
+        EntryPointAccessors.fromApplication(appContext, ChatRepoEntryPoint::class.java)
     }
+    val chatRepository = remember { entryPoint.chatRepository() }
+    val activeModelSelection = remember { entryPoint.activeModelSelection() }
     val conversations by chatRepository.observeConversations().collectAsStateWithLifecycle(emptyList())
 
     ModalNavigationDrawer(
@@ -140,14 +141,16 @@ fun WarpedNavGraph() {
                                     confirmButton = {
                                         TextButton(onClick = {
                                             scope.launch {
+                                                val wasActive = conv.id == activeConversationId
                                                 chatRepository.deleteConversation(conv.id)
-                                                if (conv.id == activeConversationId) {
+                                                showDeleteConfirm = false
+                                                if (wasActive) {
                                                     activeConversationId = null
+                                                    activeModelSelection.clearLastConversation()
                                                     navController.navigate(Screen.Chat.route) {
                                                         popUpTo(Screen.Chat.route) { inclusive = true }
                                                     }
                                                 }
-                                                showDeleteConfirm = false
                                             }
                                         }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
                                     },
@@ -252,8 +255,7 @@ fun WarpedNavGraph() {
                 ModelsScreen(
                     onUseInChat = {
                         navController.navigate(Screen.Chat.route) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true; restoreState = true
+                            popUpTo(Screen.Chat.route) { inclusive = true }
                         }
                     },
                     onOpenHuggingFace = { navController.navigate(Screen.HuggingFace.route) },
@@ -279,4 +281,5 @@ fun WarpedNavGraph() {
 @dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
 interface ChatRepoEntryPoint {
     fun chatRepository(): ChatRepository
+    fun activeModelSelection(): com.warped.domain.model.ActiveModelSelection
 }
