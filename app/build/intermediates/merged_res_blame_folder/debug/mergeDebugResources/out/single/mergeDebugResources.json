@@ -8,12 +8,12 @@
         "source": "/home/cotizcesar/.gradle/daemon/9.4.1/com.warped.app-main-64:/drawable/splash_bg.xml"
     },
     {
-        "merged": "/home/cotizcesar/.gradle/daemon/9.4.1/com.warped.app-debug-62:/mipmap-anydpi-v26_ic_launcher.xml.flat",
-        "source": "/home/cotizcesar/.gradle/daemon/9.4.1/com.warped.app-main-64:/mipmap-anydpi-v26/ic_launcher.xml"
+        "merged": "com.warped.app-debug-62:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "com.warped.app-main-64:/mipmap-anydpi-v26/ic_launcher_round.xml"
     },
     {
-        "merged": "com.warped.app-debug-62:/drawable_splash_bg.xml.flat",
-        "source": "com.warped.app-main-64:/drawable/splash_bg.xml"
+        "merged": "/home/cotizcesar/.gradle/daemon/9.4.1/com.warped.app-debug-62:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "/home/cotizcesar/.gradle/daemon/9.4.1/com.warped.app-main-64:/mipmap-anydpi-v26/ic_launcher.xml"
     },
     {
         "merged": "/home/cotizcesar/.gradle/daemon/9.4.1/com.warped.app-debug-62:/drawable_logo.png.flat",
@@ -22,6 +22,10 @@
     {
         "merged": "/home/cotizcesar/.gradle/daemon/9.4.1/com.warped.app-debug-62:/xml_data_extraction_rules.xml.flat",
         "source": "/home/cotizcesar/.gradle/daemon/9.4.1/com.warped.app-main-64:/xml/data_extraction_rules.xml"
+    },
+    {
+        "merged": "com.warped.app-debug-62:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "com.warped.app-main-64:/mipmap-anydpi-v26/ic_launcher.xml"
     },
     {
         "merged": "/home/cotizcesar/.gradle/daemon/9.4.1/com.warped.app-debug-62:/xml_network_security_config.xml.flat",
