@@ -182,7 +182,19 @@ fun HuggingFaceScreen(
                                 color = MaterialTheme.colorScheme.error,
                                 style = MaterialTheme.typography.bodyLarge
                             )
-                            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(8.dp))
+
+            val formats = listOf("staffpicks" to "Staff Picks", "litertlm" to "LiteRT-LM", "gguf" to "GGUF")
+            val selectedTabIndex = formats.indexOfFirst { it.first == uiState.activeFormat }.coerceAtLeast(0)
+            PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
+                formats.forEachIndexed { index, (formatValue, label) ->
+                    Tab(
+                        selected = selectedTabIndex == index,
+                        onClick = { viewModel.setActiveFormat(formatValue) },
+                        text = { Text(label) }
+                    )
+                }
+            }
                         }
                         Text(
                             if (uiState.searchQuery.isNotBlank()) "No results found" else "Loading models...",
