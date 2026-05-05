@@ -1,8 +1,8 @@
 #include "jni_bridge.h"
 #include <android/log.h>
 #include <jni.h>
-#include <llama.h>
-#include <ggml.h>
+#include "llama.h"
+#include "ggml.h"
 #include <vector>
 #include <string>
 #include <cstring>
@@ -21,10 +21,22 @@ LlamaEngine::~LlamaEngine() {
     unload();
 }
 
+static bool llama_batch_add(struct llama_batch & batch, llama_token id, llama_pos pos, const std::vector<llama_seq_id> & seq_ids, bool logits) {
+    batch.token   [batch.n_tokens] = id;
+    batch.pos     [batch.n_tokens] = pos;
+    batch.n_seq_id[batch.n_tokens] = seq_ids.size();
+    for (size_t i = 0; i < seq_ids.size(); ++i) {
+        batch.seq_id[batch.n_tokens][i] = seq_ids[i];
+    }
+    batch.logits  [batch.n_tokens] = logits ? 1 : 0;
+    batch.n_tokens++;
+    return true;
+}
+
 std::string LlamaEngine::loadModel(const std::string& path, int nThreads, int nCtx, int nGpuLayers, ProgressCallback progress) {
     if (loaded.load()) unload();
 
-    LOGD("Loading model: %s (threads=%d, ctx=%d)", path.c_str(), nThreads, nCtx);
+    LOGD("Loading model: %s (threads=%d, ctx=%d, gpuLayers=%d)", path.c_str(), nThreads, nCtx, nGpuLayers);
 
     if (progress) progress(0, "Validating file...");
 
@@ -48,23 +60,23 @@ std::string LlamaEngine::loadModel(const std::string& path, int nThreads, int nC
         model_params.use_mmap = true;
         model_params.use_mlock = false;
 
-        llama_context_params ctx_params = llama_context_default_params();
-        ctx_params.n_ctx = nCtx;
-        ctx_params.n_threads = nThreads;
-        ctx_params.n_threads_batch = nThreads;
-
         if (progress) progress(25, "Mapping to memory...");
 
-        llama_model_ptr = llama_load_model_from_file(path.c_str(), model_params);
+        llama_model_ptr = llama_model_load_from_file(path.c_str(), model_params);
         if (!llama_model_ptr) {
             return "Unsupported architecture — this model requires ARM64";
         }
 
         if (progress) progress(75, "Initializing context...");
 
-        llama_context_ptr = llama_new_context_with_model(llama_model_ptr, ctx_params);
+        llama_context_params ctx_params = llama_context_default_params();
+        ctx_params.n_ctx = nCtx;
+        ctx_params.n_threads = nThreads;
+        ctx_params.n_threads_batch = nThreads;
+
+        llama_context_ptr = llama_init_from_model(llama_model_ptr, ctx_params);
         if (!llama_context_ptr) {
-            llama_free_model(llama_model_ptr);
+            llama_model_free(llama_model_ptr);
             llama_model_ptr = nullptr;
             return "Out of memory — try a smaller quantization";
         }
@@ -78,12 +90,12 @@ std::string LlamaEngine::loadModel(const std::string& path, int nThreads, int nC
         return "";
     } catch (const std::bad_alloc&) {
         if (llama_context_ptr) { llama_free(llama_context_ptr); llama_context_ptr = nullptr; }
-        if (llama_model_ptr) { llama_free_model(llama_model_ptr); llama_model_ptr = nullptr; }
+        if (llama_model_ptr) { llama_model_free(llama_model_ptr); llama_model_ptr = nullptr; }
         LOGE("Out of memory loading model: %s", path.c_str());
         return "Out of memory — try a smaller quantization";
     } catch (const std::exception& e) {
         if (llama_context_ptr) { llama_free(llama_context_ptr); llama_context_ptr = nullptr; }
-        if (llama_model_ptr) { llama_free_model(llama_model_ptr); llama_model_ptr = nullptr; }
+        if (llama_model_ptr) { llama_model_free(llama_model_ptr); llama_model_ptr = nullptr; }
         LOGE("Exception loading model: %s", e.what());
         return std::string("Failed to load model: ") + e.what();
     }
@@ -98,16 +110,18 @@ void LlamaEngine::generate(const std::string& prompt, TokenCallback callback) {
     shouldStop.store(false);
 
     try {
+        const llama_vocab* vocab = llama_model_get_vocab(llama_model_ptr);
+
         // Tokenize prompt
         std::vector<llama_token> tokens;
-        tokens.push_back(llama_token_bos(llama_model_ptr));
-        int nPromptTokens = llama_tokenize(llama_model_ptr, prompt.c_str(), prompt.size(),
+        tokens.push_back(llama_vocab_bos(vocab));
+        int nPromptTokens = llama_tokenize(vocab, prompt.c_str(), prompt.size(),
                                            tokens.data() + 1, llama_n_ctx(llama_context_ptr) - 2,
                                            true, false);
         if (nPromptTokens < 0) {
             int totalTokens = -nPromptTokens;
             tokens.resize(totalTokens + 1);
-            nPromptTokens = llama_tokenize(llama_model_ptr, prompt.c_str(), prompt.size(),
+            nPromptTokens = llama_tokenize(vocab, prompt.c_str(), prompt.size(),
                                            tokens.data() + 1, totalTokens,
                                            true, false);
         }
@@ -120,8 +134,8 @@ void LlamaEngine::generate(const std::string& prompt, TokenCallback callback) {
         // Default sampler (greedy)
         struct llama_sampler* smpl = llama_sampler_init_greedy();
 
-        // Batch for prompt eval
-        int nBatches = (tokens.size() + 511) / 512;
+        // Batch for prompt eval in chunks of 512
+        int nBatches = ((int)tokens.size() + 511) / 512;
         for (int bi = 0; bi < nBatches; bi++) {
             int batchStart = bi * 512;
             int batchSize = std::min((int)tokens.size() - batchStart, 512);
@@ -149,14 +163,14 @@ void LlamaEngine::generate(const std::string& prompt, TokenCallback callback) {
             }
 
             llama_token newToken = llama_sampler_sample(smpl, llama_context_ptr, -1);
-            if (llama_token_is_eog(llama_model_ptr, newToken)) {
+            if (llama_vocab_is_eog(vocab, newToken)) {
                 llama_sampler_free(smpl);
                 callback("", true);
                 return;
             }
 
             char buf[256];
-            int nChars = llama_token_to_piece(llama_model_ptr, newToken, buf, sizeof(buf), 0, true);
+            int nChars = llama_token_to_piece(vocab, newToken, buf, sizeof(buf), 0, true);
             if (nChars > 0) {
                 std::string tokenStr(buf, nChars);
                 callback(tokenStr, false);
@@ -196,7 +210,7 @@ void LlamaEngine::unload() {
         llama_context_ptr = nullptr;
     }
     if (llama_model_ptr) {
-        llama_free_model(llama_model_ptr);
+        llama_model_free(llama_model_ptr);
         llama_model_ptr = nullptr;
     }
 
@@ -217,35 +231,53 @@ std::string LlamaEngine::getModelInfo() const {
     int n = llama_model_desc(llama_model_ptr, buf, sizeof(buf));
     std::string desc(n > 0 ? buf : "");
 
-    size_t paramCount = llama_model_n_params(llama_model_ptr);
+    uint64_t paramCount = llama_model_n_params(llama_model_ptr);
     int64_t nCtx = llama_n_ctx(llama_context_ptr);
-    uint32_t ftype = llama_model_ftype(llama_model_ptr);
 
-    std::string quantStr;
-    switch (ftype) {
-        case GGML_FTYPE_F32:     quantStr = "F32"; break;
-        case GGML_FTYPE_F16:     quantStr = "F16"; break;
-        case GGML_FTYPE_Q4_0:    quantStr = "Q4_0"; break;
-        case GGML_FTYPE_Q4_1:    quantStr = "Q4_1"; break;
-        case GGML_FTYPE_Q5_0:    quantStr = "Q5_0"; break;
-        case GGML_FTYPE_Q5_1:    quantStr = "Q5_1"; break;
-        case GGML_FTYPE_Q8_0:    quantStr = "Q8_0"; break;
-        case GGML_FTYPE_Q2_K:    quantStr = "Q2_K"; break;
-        case GGML_FTYPE_Q3_K:    quantStr = "Q3_K"; break;
-        case GGML_FTYPE_Q4_K:    quantStr = "Q4_K"; break;
-        case GGML_FTYPE_Q5_K:    quantStr = "Q5_K"; break;
-        case GGML_FTYPE_Q6_K:    quantStr = "Q6_K"; break;
-        case GGML_FTYPE_IQ2_XXS: quantStr = "IQ2_XXS"; break;
-        case GGML_FTYPE_IQ2_XS:  quantStr = "IQ2_XS"; break;
-        case GGML_FTYPE_IQ3_XXS: quantStr = "IQ3_XXS"; break;
-        case GGML_FTYPE_IQ3_S:   quantStr = "IQ3_S"; break;
-        case GGML_FTYPE_IQ1_S:   quantStr = "IQ1_S"; break;
-        case GGML_FTYPE_IQ4_NL:  quantStr = "IQ4_NL"; break;
-        case GGML_FTYPE_IQ4_XS:  quantStr = "IQ4_XS"; break;
-        case GGML_FTYPE_BF16:    quantStr = "BF16"; break;
-        case GGML_FTYPE_TQ1_0:   quantStr = "TQ1_0"; break;
-        case GGML_FTYPE_TQ2_0:   quantStr = "TQ2_0"; break;
-        default: quantStr = "Q" + std::to_string(ftype); break;
+    // Read quantization from model metadata
+    std::string quantStr = "unknown";
+    char ftypeBuf[32] = {};
+    int ftypeLen = llama_model_meta_val_str(llama_model_ptr, "general.file_type", ftypeBuf, sizeof(ftypeBuf));
+    if (ftypeLen > 0) {
+        int ftype = atoi(ftypeBuf);
+        switch (ftype) {
+            case LLAMA_FTYPE_ALL_F32:            quantStr = "F32"; break;
+            case LLAMA_FTYPE_MOSTLY_F16:         quantStr = "F16"; break;
+            case LLAMA_FTYPE_MOSTLY_Q4_0:        quantStr = "Q4_0"; break;
+            case LLAMA_FTYPE_MOSTLY_Q4_1:        quantStr = "Q4_1"; break;
+            case LLAMA_FTYPE_MOSTLY_Q8_0:        quantStr = "Q8_0"; break;
+            case LLAMA_FTYPE_MOSTLY_Q5_0:        quantStr = "Q5_0"; break;
+            case LLAMA_FTYPE_MOSTLY_Q5_1:        quantStr = "Q5_1"; break;
+            case LLAMA_FTYPE_MOSTLY_Q2_K:        quantStr = "Q2_K"; break;
+            case LLAMA_FTYPE_MOSTLY_Q3_K_S:      quantStr = "Q3_K_S"; break;
+            case LLAMA_FTYPE_MOSTLY_Q3_K_M:      quantStr = "Q3_K_M"; break;
+            case LLAMA_FTYPE_MOSTLY_Q3_K_L:      quantStr = "Q3_K_L"; break;
+            case LLAMA_FTYPE_MOSTLY_Q4_K_S:      quantStr = "Q4_K_S"; break;
+            case LLAMA_FTYPE_MOSTLY_Q4_K_M:      quantStr = "Q4_K_M"; break;
+            case LLAMA_FTYPE_MOSTLY_Q5_K_S:      quantStr = "Q5_K_S"; break;
+            case LLAMA_FTYPE_MOSTLY_Q5_K_M:      quantStr = "Q5_K_M"; break;
+            case LLAMA_FTYPE_MOSTLY_Q6_K:        quantStr = "Q6_K"; break;
+            case LLAMA_FTYPE_MOSTLY_Q2_K_S:      quantStr = "Q2_K_S"; break;
+            case LLAMA_FTYPE_MOSTLY_IQ2_XXS:     quantStr = "IQ2_XXS"; break;
+            case LLAMA_FTYPE_MOSTLY_IQ2_XS:      quantStr = "IQ2_XS"; break;
+            case LLAMA_FTYPE_MOSTLY_IQ2_S:       quantStr = "IQ2_S"; break;
+            case LLAMA_FTYPE_MOSTLY_IQ2_M:       quantStr = "IQ2_M"; break;
+            case LLAMA_FTYPE_MOSTLY_IQ3_XXS:     quantStr = "IQ3_XXS"; break;
+            case LLAMA_FTYPE_MOSTLY_IQ3_XS:      quantStr = "IQ3_XS"; break;
+            case LLAMA_FTYPE_MOSTLY_IQ3_S:       quantStr = "IQ3_S"; break;
+            case LLAMA_FTYPE_MOSTLY_IQ3_M:       quantStr = "IQ3_M"; break;
+            case LLAMA_FTYPE_MOSTLY_IQ1_S:       quantStr = "IQ1_S"; break;
+            case LLAMA_FTYPE_MOSTLY_IQ1_M:       quantStr = "IQ1_M"; break;
+            case LLAMA_FTYPE_MOSTLY_IQ4_NL:      quantStr = "IQ4_NL"; break;
+            case LLAMA_FTYPE_MOSTLY_IQ4_XS:      quantStr = "IQ4_XS"; break;
+            case LLAMA_FTYPE_MOSTLY_BF16:        quantStr = "BF16"; break;
+            case LLAMA_FTYPE_MOSTLY_TQ1_0:       quantStr = "TQ1_0"; break;
+            case LLAMA_FTYPE_MOSTLY_TQ2_0:       quantStr = "TQ2_0"; break;
+            case LLAMA_FTYPE_MOSTLY_Q1_0:        quantStr = "Q1_0"; break;
+            case LLAMA_FTYPE_MOSTLY_MXFP4_MOE:   quantStr = "MXFP4_MOE"; break;
+            case LLAMA_FTYPE_MOSTLY_NVFP4:       quantStr = "NVFP4"; break;
+            default: quantStr = "Q" + std::to_string(ftype); break;
+        }
     }
 
     std::string paramStr;

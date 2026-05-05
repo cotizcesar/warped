@@ -24,8 +24,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.data.local.download.DownloadState
 import com.warped.data.local.inference.MemoryChecker
@@ -157,34 +157,9 @@ fun ModelsScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("Connect LM Studio", style = MaterialTheme.typography.bodyLarge)
                                 Text("Add a remote LM Studio server", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
-private fun RamRecommendationBadge(text: String, color: Color) {
-    Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = color.copy(alpha = 0.12f),
-        contentColor = color
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "\u26A0", // warning sign
-                style = MaterialTheme.typography.labelSmall
-            )
-            Spacer(Modifier.width(4.dp))
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 2
-            )
-        }
-    }
-}
+                            }
+                        }
+                    }
                 },
                 confirmButton = {},
                 dismissButton = { TextButton(onClick = { showAddWizard = false }) { Text("Cancel") } }
@@ -398,16 +373,13 @@ fun ModelCard(
                     if (model.capabilities.tools) CapabilityBadge("Tools", Color(0xFF2196F3))
                 }
             }
-            Spacer(Modifier.height(8.dp))
-            // Device-aware RAM recommendation badge
-            val context = LocalContext.current
-            val checker = remember { MemoryChecker(context) }
-            val isGguf = model.modelFormat == "GGUF"
-            val ramCheck = remember(model.id, model.sizeBytes) {
-                if (isGguf) checker.checkGgufRam(model.sizeBytes)
-                else null
-            }
-            if (ramCheck != null) {
+            if (model.modelFormat == "GGUF") {
+                Spacer(Modifier.height(8.dp))
+                val context = LocalContext.current
+                val checker = remember { MemoryChecker(context) }
+                val ramCheck = remember(model.id, model.sizeBytes) {
+                    checker.checkGgufRam(model.sizeBytes)
+                }
                 val requiredGB = ramCheck.requiredBytes.toDouble() / (1024L * 1024 * 1024)
                 val availableGB = ramCheck.availableBytes.toDouble() / (1024L * 1024 * 1024)
                 val ratio = ramCheck.requiredBytes.toDouble() / ramCheck.availableBytes.toDouble()
@@ -634,5 +606,21 @@ private fun DeployedEndpointCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun RamRecommendationBadge(text: String, color: Color) {
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = color.copy(alpha = 0.12f),
+        contentColor = color
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 2
+        )
     }
 }

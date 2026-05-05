@@ -1,6 +1,7 @@
 package com.warped.di
 
 import android.content.Context
+import com.warped.data.local.inference.DeviceToolSet
 import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.local.inference.LiteRTLmProvider
 import com.warped.data.local.inference.LlamaEngine
@@ -30,8 +31,8 @@ object InferenceModule {
 
     @Provides
     @Singleton
-    fun provideLocalLlmProvider(llamaEngine: LlamaEngine): LocalLlmProvider =
-        LocalLlmProvider(llamaEngine)
+    fun provideLocalLlmProvider(llamaEngine: LlamaEngine, memoryChecker: MemoryChecker): LocalLlmProvider =
+        LocalLlmProvider(llamaEngine, memoryChecker)
 
     @Provides
     @Singleton
@@ -45,10 +46,6 @@ object InferenceModule {
 
     @Provides
     @Singleton
-    fun provideLiteRTLmEngine(): LiteRTLmEngine = LiteRTLmEngine()
-
-    @Provides
-    @Singleton
     fun provideEngineManager(
         llamaEngine: LlamaEngine,
         liteRTLmEngine: LiteRTLmEngine,
@@ -59,13 +56,6 @@ object InferenceModule {
     @Provides
     @Singleton
     fun provideInputSanitizer(): InputSanitizer = InputSanitizer()
-
-    @Provides
-    @Singleton
-    fun provideLiteRTLmProvider(
-        engineManager: EngineManager,
-        inputSanitizer: InputSanitizer
-    ): LiteRTLmProvider = LiteRTLmProvider(engineManager, inputSanitizer)
 }
 
 @Module

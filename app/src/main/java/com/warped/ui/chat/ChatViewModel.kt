@@ -110,11 +110,16 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun sendMessage(text: String, images: List<Uri> = emptyList()) {
+    fun sendMessage(text: String, images: List<Uri> = emptyList(), audioBytes: ByteArray? = null) {
         val state = _uiState.value
-        if (text.isBlank() && images.isEmpty()) return
+        if (text.isBlank() && images.isEmpty() && audioBytes == null) return
         if (state.selectedModelId == null || state.selectedProvider == null) {
             _uiState.update { it.copy(error = ChatError.NoModelSelected) }
+            return
+        }
+
+        if (state.modelUnavailable) {
+            _uiState.update { it.copy(error = ChatError.ModelUnavailable) }
             return
         }
 
@@ -137,6 +142,15 @@ class ChatViewModel @Inject constructor(
                         _uiState.update {
                             it.copy(
                                 error = ChatError.Unknown("This model does not support images (no vision capability)."),
+                                isStreaming = false
+                            )
+                        }
+                        return@launch
+                    }
+                    if (audioBytes != null && capabilities?.audio != true) {
+                        _uiState.update {
+                            it.copy(
+                                error = ChatError.Unknown("This model does not support audio input."),
                                 isStreaming = false
                             )
                         }
@@ -188,7 +202,8 @@ class ChatViewModel @Inject constructor(
                     parameters = _uiState.value.generationParameters.copy(
                         reasoningEnabled = _uiState.value.reasoningEnabled
                     ),
-                    images = imageDataUrls
+                    images = imageDataUrls,
+                    audioBytes = audioBytes
                 )
                 val tokenBuffer = mutableListOf<String>()
                 var lastEmitTime = System.currentTimeMillis()
@@ -282,6 +297,7 @@ class ChatViewModel @Inject constructor(
             val result = chatRepository.loadConversation(conversationId)
             if (result != null) {
                 val (conversation, messages) = result
+                val modelMissing = conversation.modelId != null && !isModelAvailable(conversation.modelId, conversation.providerType)
                 _uiState.update {
                     it.copy(
                         conversationId = conversation.id,
@@ -290,10 +306,13 @@ class ChatViewModel @Inject constructor(
                         selectedProvider = conversation.providerType,
                         streamingContent = "",
                         streamingReasoning = "",
-                        error = null
+                        error = null,
+                        conversationModelId = conversation.modelId,
+                        conversationProviderType = conversation.providerType,
+                        modelUnavailable = modelMissing
                     )
                 }
-                if (conversation.modelId != null) {
+                if (conversation.modelId != null && !modelMissing) {
                     activeModelSelection.select(conversation.modelId, conversation.providerType)
                     if (conversation.providerType == ProviderType.LOCAL || conversation.providerType == ProviderType.LITE_RT_LM) {
                         preloadLocalModel(conversation.modelId)
@@ -307,7 +326,16 @@ class ChatViewModel @Inject constructor(
 
     fun newConversation() {
         _uiState.update {
-            it.copy(conversationId = null, messages = emptyList(), streamingContent = "", streamingReasoning = "", error = null)
+            it.copy(
+                conversationId = null,
+                messages = emptyList(),
+                streamingContent = "",
+                streamingReasoning = "",
+                error = null,
+                conversationModelId = null,
+                conversationProviderType = null,
+                modelUnavailable = false
+            )
         }
     }
 
@@ -316,6 +344,16 @@ class ChatViewModel @Inject constructor(
     }
 
     fun launchModelSelection(modelId: String, providerType: ProviderType) {
+        val state = _uiState.value
+
+        // If we're in a conversation and the model is different, block and show dialog
+        val conversationModelId = state.conversationModelId
+        if (conversationModelId != null && state.messages.isNotEmpty() &&
+            (modelId != conversationModelId || providerType != state.conversationProviderType)) {
+            _uiState.update { it.copy(pendingModelSwitch = ModelSwitchRequest(modelId, providerType)) }
+            return
+        }
+
         // Check memory for local models
         if (providerType == ProviderType.LOCAL || providerType == ProviderType.LITE_RT_LM) {
             val model = _uiState.value.localModels.firstOrNull { it.filePath == modelId }
@@ -324,10 +362,41 @@ class ChatViewModel @Inject constructor(
                 return
             }
         }
-        // Close dropdown first, then load model to prevent UI hang
         viewModelScope.launch {
-            setSelectedModel(modelId, providerType)
+            setSelectedModel(modelId, providerType, isSameModel = false)
         }
+    }
+
+    fun confirmModelSwitch() {
+        val pending = _uiState.value.pendingModelSwitch ?: return
+        viewModelScope.launch {
+            // Create new conversation, clearing old ID and messages
+            _uiState.update {
+                it.copy(
+                    conversationId = null,
+                    messages = emptyList(),
+                    streamingContent = "",
+                    streamingReasoning = "",
+                    conversationModelId = pending.modelId,
+                    conversationProviderType = pending.providerType,
+                    pendingModelSwitch = null,
+                    error = null
+                )
+            }
+            setSelectedModel(pending.modelId, pending.providerType, isSameModel = false)
+        }
+    }
+
+    fun cancelModelSwitch() {
+        _uiState.update { it.copy(pendingModelSwitch = null) }
+    }
+
+    fun dismissModelUnavailable() {
+        _uiState.update { it.copy(
+            modelUnavailable = false,
+            conversationModelId = null,
+            conversationProviderType = null
+        ) }
     }
 
     fun confirmLoadMemoryWarning() {
@@ -335,7 +404,7 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(memoryWarningModel = null) }
         val providerType = if (model.isLiteRtLm()) ProviderType.LITE_RT_LM else ProviderType.LOCAL
         viewModelScope.launch {
-            setSelectedModel(model.filePath, providerType)
+            setSelectedModel(model.filePath, providerType, isSameModel = false)
         }
     }
 
@@ -343,11 +412,10 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(memoryWarningModel = null) }
     }
 
-    fun setSelectedModel(modelId: String, providerType: ProviderType) {
+    private fun setSelectedModel(modelId: String, providerType: ProviderType, isSameModel: Boolean) {
         val oldProvider = _uiState.value.selectedProvider
         val oldModelId = _uiState.value.selectedModelId
         val oldInstance = _uiState.value.loadedInstanceId
-        val isSameModel = modelId == oldModelId && providerType == oldProvider
         
         activeModelSelection.select(modelId, providerType)
         _uiState.update { it.copy(selectedModelId = modelId, selectedProvider = providerType) }
@@ -466,6 +534,18 @@ class ChatViewModel @Inject constructor(
 
     private suspend fun preloadLocalModel(filePath: String) {
         val model = _uiState.value.localModels.firstOrNull { it.filePath == filePath }
+        if (model != null && !memoryChecker.canLoadModel(model.sizeBytes)) {
+            val memInfo = memoryChecker.getMemoryInfo()
+            val modelMB = model.sizeBytes / (1024 * 1024)
+            val availMB = memInfo.availableBytes / (1024 * 1024)
+            _uiState.update {
+                it.copy(
+                    modelLoadError = "Not enough memory: model needs ${modelMB} MB but only ${availMB} MB available. Free up memory or use a smaller quantization."
+                )
+            }
+            return
+        }
+
         val isLitertlm = model?.isLiteRtLm() == true || filePath.endsWith(".litertlm", ignoreCase = true)
         val modelName = filePath.substringAfterLast("/").removeSuffix(".gguf").removeSuffix(".litertlm")
         _uiState.update { it.copy(isLoadingModel = true, loadingModelName = modelName, modelLoadError = null) }
@@ -474,8 +554,11 @@ class ChatViewModel @Inject constructor(
                 if (isLitertlm) {
                     engineManager.switchToLiteRT(filePath)
                 } else {
-                    val loaded = llamaEngine.loadModel(filePath)
-                    if (!loaded) throw IllegalStateException("Failed to load GGUF model")
+                    val loadResult = llamaEngine.loadModel(filePath)
+                    if (loadResult.isFailure) {
+                        val error = loadResult.exceptionOrNull()
+                        throw IllegalStateException("Failed to load GGUF model: ${error?.message}")
+                    }
                 }
             }
             _uiState.update { it.copy(isLoadingModel = false, loadingModelName = "") }
@@ -553,9 +636,26 @@ class ChatViewModel @Inject constructor(
             modelId = state.selectedModelId,
             endpointId = 0
         )
-        _uiState.update { it.copy(conversationId = conversationId) }
+        _uiState.update {
+            it.copy(
+                conversationId = conversationId,
+                conversationModelId = state.selectedModelId,
+                conversationProviderType = resolvedSelectedProvider(state)
+            )
+        }
         activeModelSelection.saveLastConversation(conversationId)
         return conversationId
+    }
+
+    private fun isModelAvailable(modelId: String, providerType: ProviderType): Boolean {
+        return when (providerType) {
+            ProviderType.LOCAL, ProviderType.LITE_RT_LM -> {
+                _uiState.value.localModels.any { it.filePath == modelId }
+            }
+            else -> {
+                _uiState.value.endpoints.any { it.modelId == modelId && it.apiType == providerType }
+            }
+        }
     }
 
     private fun uriToBase64(uri: Uri): String? {
