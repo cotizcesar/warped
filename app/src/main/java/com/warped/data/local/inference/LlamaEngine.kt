@@ -26,6 +26,9 @@ class LlamaEngine @Inject constructor() {
     @Volatile
     private var isGenerating = false
 
+    @Volatile
+    private var pendingUnload = false
+
     private external fun nativeLoadModel(
         path: String,
         nThreads: Int,
@@ -92,9 +95,17 @@ class LlamaEngine @Inject constructor() {
             awaitClose {
                 nativeStop()
                 isGenerating = false
+                if (pendingUnload) {
+                    pendingUnload = false
+                    unload()
+                }
             }
         } catch (e: Exception) {
             isGenerating = false
+            if (pendingUnload) {
+                pendingUnload = false
+                unload()
+            }
             throw e
         }
     }
@@ -102,6 +113,14 @@ class LlamaEngine @Inject constructor() {
     @Synchronized
     fun stop() {
         nativeStop()
+    }
+
+    fun scheduleUnload() {
+        if (isGenerating) {
+            pendingUnload = true
+        } else {
+            unload()
+        }
     }
 
     @Synchronized

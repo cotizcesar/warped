@@ -283,6 +283,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun selectConversation(conversationId: Long) {
+        engineManager.scheduleUnload()
         viewModelScope.launch {
             val result = chatRepository.loadConversation(conversationId)
             if (result != null) {
@@ -313,6 +314,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun newConversation() {
+        unloadLocalModels()
         _uiState.update {
             it.copy(
                 conversationId = null,
@@ -513,11 +515,8 @@ class ChatViewModel @Inject constructor(
     }
 
     fun unloadLocalModels() {
-        viewModelScope.launch(Dispatchers.Default) {
-            try { engineManager.unloadCurrent() } catch (_: Exception) {}
-            try { llamaEngine.stop(); llamaEngine.unload() } catch (_: Exception) {}
-            _uiState.update { it.copy(isLocalModelLoaded = false, activeBackend = null) }
-        }
+        try { engineManager.scheduleUnload() } catch (_: Exception) {}
+        _uiState.update { it.copy(isLocalModelLoaded = false, activeBackend = null) }
     }
 
     private suspend fun preloadLocalModel(filePath: String) {
@@ -657,5 +656,10 @@ class ChatViewModel @Inject constructor(
         } catch (_: Exception) {
             null
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        unloadLocalModels()
     }
 }

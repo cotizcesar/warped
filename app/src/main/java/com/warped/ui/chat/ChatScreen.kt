@@ -15,7 +15,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Brush
@@ -43,6 +44,7 @@ import com.warped.domain.model.ProviderType
 import com.warped.domain.model.Role
 import com.warped.ui.chat.components.ChatInputBar
 import com.warped.ui.chat.components.MessageBubble
+import com.warped.ui.components.WarpedAlertDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,9 +55,11 @@ fun ChatScreen(
     conversationId: Long = 0L
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val listState = rememberLazyListState()
+    val scrollState = rememberScrollState()
     var modelDropdownExpanded by remember { mutableStateOf(false) }
     var attachedImages by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var audioBytes by remember { mutableStateOf<ByteArray?>(null) }
+    var isRecording by remember { mutableStateOf(false) }
 
     LaunchedEffect(conversationId) {
         if (conversationId > 0) viewModel.selectConversation(conversationId)
@@ -63,6 +67,11 @@ fun ChatScreen(
     LaunchedEffect(Unit) {
         if (conversationId == 0L) {
             viewModel.loadLastConversation()
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.unloadLocalModels()
         }
     }
 
@@ -102,23 +111,23 @@ fun ChatScreen(
             it.modelId == uiState.selectedModelId && it.apiType == uiState.selectedProvider
         }
         when {
-            local != null -> local.filePath.substringAfterLast("/")
+            local != null -> local.name
             endpoint != null -> uiState.selectedModelId?.substringAfterLast("/") ?: uiState.selectedModelId
             else -> null
         }
     }
 
-    LaunchedEffect(uiState.streamingContent.length, uiState.messages.size) {
-        val totalItems = listState.layoutInfo.totalItemsCount
-        if (totalItems == 0) return@LaunchedEffect
-        val lastIndex = totalItems - 1
-        val isStreaming = uiState.streamingContent.isNotEmpty()
-        if (isStreaming) {
-            // During active streaming, always snap to bottom
-            listState.scrollToItem(lastIndex)
-        } else if (uiState.messages.isNotEmpty()) {
-            // After streaming done, smooth scroll to bottom
-            listState.animateScrollToItem(lastIndex)
+    // Auto-scroll to bottom during streaming
+    LaunchedEffect(uiState.isStreaming, uiState.streamingContent.length) {
+        if (uiState.isStreaming) {
+            scrollState.animateScrollTo(scrollState.maxValue)
+        }
+    }
+
+    // Snap to bottom when a new message is added
+    LaunchedEffect(uiState.messages.size) {
+        if (!uiState.isStreaming) {
+            scrollState.animateScrollTo(scrollState.maxValue)
         }
     }
 
@@ -193,7 +202,7 @@ fun ChatScreen(
                                                     )
                                                 }
                                                 Spacer(Modifier.width(8.dp))
-                                                Text(model.filePath.substringAfterLast("/"), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                Text(model.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             }
                                         },
                                         onClick = {
@@ -277,8 +286,9 @@ fun ChatScreen(
                 canSend = uiState.selectedModelId != null,
                 onTextChange = { viewModel.updateInput(it) },
                 onSend = {
-                    viewModel.sendMessage(uiState.inputText, attachedImages)
+                    viewModel.sendMessage(uiState.inputText, attachedImages, audioBytes)
                     attachedImages = emptyList()
+                    audioBytes = null
                 },
                 onStop = { viewModel.stopGeneration() },
                 reasoningEnabled = uiState.reasoningEnabled,
@@ -286,7 +296,10 @@ fun ChatScreen(
                 modelHasReasoning = uiState.localModels.firstOrNull { it.filePath == uiState.selectedModelId }?.capabilities?.reasoning != false,
                 onAddImage = { imagePickerLauncher.launch("image/*") },
                 attachedImages = attachedImages,
-                onRemoveImage = { i -> attachedImages = attachedImages.filterIndexed { idx, _ -> idx != i } }
+                onRemoveImage = { i -> attachedImages = attachedImages.filterIndexed { idx, _ -> idx != i } },
+                modelHasAudio = uiState.localModels.firstOrNull { it.filePath == uiState.selectedModelId }?.capabilities?.audio == true,
+                onAudioRecorded = { bytes -> audioBytes = bytes },
+                onAudioRecordingChanged = { isRecording = it }
             )
         }
     ) { padding ->
@@ -352,44 +365,41 @@ fun ChatScreen(
                 }
             } else {
                 Box(modifier = Modifier.weight(1f)) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        state = listState,
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(scrollState)
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        items(uiState.messages, key = { it.id }) { message ->
+                        uiState.messages.forEach { message ->
                             MessageBubble(message = message)
                         }
                         if (uiState.streamingContent.isNotEmpty() || uiState.streamingReasoning.isNotEmpty()) {
-                            item(key = "streaming") {
-                                MessageBubble(
-                                    message = com.warped.domain.model.ChatMessage(
-                                        role = Role.ASSISTANT,
-                                        content = uiState.streamingContent,
-                                        reasoning = uiState.streamingReasoning.ifEmpty { null }
-                                    ),
-                                    isStreaming = true
-                                )
-                            }
+                            MessageBubble(
+                                message = com.warped.domain.model.ChatMessage(
+                                    role = Role.ASSISTANT,
+                                    content = uiState.streamingContent,
+                                    reasoning = uiState.streamingReasoning.ifEmpty { null }
+                                ),
+                                isStreaming = true
+                            )
                         } else if (uiState.isStreaming) {
-                            item(key = "generating") {
-                                Row(
-                                    modifier = Modifier.padding(vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(14.dp),
-                                        strokeWidth = 2.dp,
-                                        color = Color(0xFF545450)
-                                    )
-                                    Spacer(Modifier.width(10.dp))
-                                    Text(
-                                        "Generating...",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Color(0xFF545450)
-                                    )
-                                }
+                            Row(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(14.dp),
+                                    strokeWidth = 2.dp,
+                                    color = Color(0xFF545450)
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Text(
+                                    "Generating...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFF545450)
+                                )
                             }
                         }
                     }
@@ -446,11 +456,51 @@ fun ChatScreen(
                             is ChatError.NoModelSelected -> stringResource(R.string.no_model_selected)
                             is ChatError.DownloadModelFirst -> stringResource(R.string.download_model_first)
                             is ChatError.ConnectionLost -> "Connection lost. Tap to retry."
+                            is ChatError.ModelUnavailable -> "This model is no longer available. Please select a different model or re-download it."
                             is ChatError.Unknown -> error.message
                             null -> ""
                         }
                     )
                 }
+            }
+
+            // Model unavailable banner
+            if (uiState.modelUnavailable) {
+                Snackbar(
+                    modifier = Modifier.padding(16.dp),
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    action = {
+                        TextButton(onClick = { viewModel.dismissModelUnavailable() }) { Text("Dismiss") }
+                    }
+                ) {
+                    Text("The model for this conversation is no longer installed. Select a different model or re-download it.")
+                }
+            }
+
+            // Model switch confirmation dialog
+            if (uiState.pendingModelSwitch != null) {
+                WarpedAlertDialog(
+                    onDismissRequest = { viewModel.cancelModelSwitch() },
+                    title = { Text("New model selected") },
+                    text = {
+                        Text(
+                            "Switching models mid-conversation is not allowed. " +
+                                "A new chat will be created with the selected model.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { viewModel.confirmModelSwitch() }) {
+                            Text("New Chat")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { viewModel.cancelModelSwitch() }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
             }
         }
     }

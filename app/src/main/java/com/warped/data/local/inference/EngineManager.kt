@@ -129,8 +129,8 @@ class EngineManager @Inject constructor(
 
         if (loadResult.isFailure) {
             val error = loadResult.exceptionOrNull() as? LlamaLoadError ?: LlamaLoadError.Unknown("Unknown error")
-            Timber.e(error, "EngineManager: llama.cpp failed to load model")
-            return Result.failure(error)
+            Timber.e("EngineManager: llama.cpp failed to load model — ${error.userMessage}")
+            return Result.failure(error ?: LlamaLoadError.Unknown("Unknown error"))
         }
 
         activeEngine = target
@@ -170,6 +170,24 @@ class EngineManager @Inject constructor(
             Timber.w(e, "EngineManager: error during unload of $current")
         } finally {
             activeEngine = null
+        }
+    }
+
+    /**
+     * Schedule unload of the current engine. If the engine is generating text,
+     * waits for generation to finish, then unloads. If not generating, unloads immediately.
+     * Safe to call from any thread.
+     */
+    fun scheduleUnload() {
+        val current = activeEngine ?: return
+        when (current.type) {
+            EngineType.LLAMA_CPP -> llamaEngine.scheduleUnload()
+            EngineType.LITE_RT_LM -> {
+                try {
+                    liteRTLmEngine.close()
+                } catch (_: Exception) {}
+                synchronized(this) { activeEngine = null }
+            }
         }
     }
 
