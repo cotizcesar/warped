@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -33,16 +32,11 @@ fun ModelSelector(
         it.modelId == selectedModelId && it.apiType == selectedProvider
     }
     val hasItems = localModels.isNotEmpty() || endpoints.isNotEmpty()
-    val displayLabel = when {
-        selectedLocal != null -> selectedLocal.name
-        selectedEndpoint != null -> selectedEndpoint.name
+    val label = when {
+        selectedLocal != null -> "${selectedLocal.name} (${formatLabel(selectedLocal)})"
+        selectedEndpoint != null -> "${selectedEndpoint.name} (${endpointTypeLabel(selectedEndpoint)})"
         !hasItems -> stringResource(R.string.no_models_select_model)
         else -> stringResource(R.string.select_model)
-    }
-    val displayType = when {
-        selectedLocal != null -> if (selectedLocal.modelFormat == "LITERTLM") "LiteRT-LM" else "GGUF"
-        selectedEndpoint != null -> selectedEndpoint.apiType.name
-        else -> null
     }
 
     ExposedDropdownMenuBox(
@@ -50,7 +44,7 @@ fun ModelSelector(
         onExpandedChange = { if (hasItems) expanded = !expanded }
     ) {
         TextField(
-            value = "",
+            value = label,
             onValueChange = {},
             readOnly = true,
             enabled = hasItems,
@@ -64,18 +58,6 @@ fun ModelSelector(
                 focusedContainerColor = MaterialTheme.colorScheme.surface,
                 unfocusedContainerColor = MaterialTheme.colorScheme.surface
             ),
-            placeholder = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = displayLabel,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    if (displayType != null) {
-                        Spacer(Modifier.width(8.dp))
-                        ModelTypePill(displayType)
-                    }
-                }
-            },
             trailingIcon = {
                 if (hasItems) {
                     ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
@@ -91,13 +73,12 @@ fun ModelSelector(
         ) {
             if (localModels.isNotEmpty()) {
                 localModels.forEach { model ->
-                    val formatLabel = if (model.modelFormat == "LITERTLM") "LiteRT-LM" else "GGUF"
                     DropdownMenuItem(
                         text = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(model.name)
                                 Spacer(Modifier.width(8.dp))
-                                ModelTypePill(formatLabel)
+                                ModelTypePill(formatLabel(model))
                             }
                         },
                         onClick = {
@@ -119,7 +100,7 @@ fun ModelSelector(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(endpoint.name)
                                     Spacer(Modifier.width(8.dp))
-                                    ModelTypePill(endpoint.apiType.name)
+                                    ModelTypePill(endpointTypeLabel(endpoint))
                                 }
                             },
                             onClick = {
@@ -134,15 +115,22 @@ fun ModelSelector(
     }
 }
 
+private fun formatLabel(model: LocalModel): String =
+    if (model.modelFormat == "LITERTLM") "LiteRT-LM" else "GGUF"
+
+private fun endpointTypeLabel(endpoint: Endpoint): String =
+    when {
+        endpoint.apiType == ProviderType.LM_STUDIO -> "Net"
+        endpoint.apiType == ProviderType.OLLAMA -> "Net"
+        endpoint.apiType == ProviderType.OPENAI -> "Net"
+        else -> "Net"
+    }
+
 @Composable
 private fun ModelTypePill(type: String) {
-    val (color, label) = when {
-        type == "GGUF" -> Color(0xFF2196F3) to "GGUF"
-        type == "LiteRT-LM" -> Color(0xFF4CAF50) to "LiteRT-LM"
-        type.startsWith("LM_STUDIO", ignoreCase = true) -> Color(0xFFFF9800) to "Net"
-        type.startsWith("OLLAMA", ignoreCase = true) -> Color(0xFF9C27B0) to "Net"
-        type.startsWith("OPENAI", ignoreCase = true) -> Color(0xFF00BCD4) to "Net"
-        type.startsWith("CUSTOM", ignoreCase = true) -> Color(0xFF607D8B) to "Net"
+    val (color, label) = when (type) {
+        "GGUF" -> Color(0xFF2196F3) to "GGUF"
+        "LiteRT-LM" -> Color(0xFF4CAF50) to "LiteRT-LM"
         else -> MaterialTheme.colorScheme.outline to type
     }
     Surface(
