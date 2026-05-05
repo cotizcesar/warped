@@ -8,17 +8,16 @@ An Android application equivalent to LM Studio for mobile, enabling users to run
 
 Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
 
-## Current Milestone: v1.1 LiteRT-LM Integration
+## Current Milestone: v1.2 GGUF Pipeline Remediation
 
-**Goal:** Add Google's LiteRT-LM as a second high-performance local inference engine alongside llama.cpp — search, download, import, and chat with `.litertlm` models from Hugging Face's litert-community, with auto-detected GPU/NPU acceleration.
+**Goal:** Make the full GGUF pipeline functional end-to-end — download from Hugging Face, load via llama.cpp, chat with streaming — matching the transparent UX that LiteRT-LM already delivers.
 
 **Target features:**
-- User can search and filter `.litertlm` models from the litert-community on Hugging Face
-- User can download `.litertlm` model files with progress, pause/resume
-- User can import local `.litertlm` files from device storage
-- User can load `.litertlm` models and chat with streaming via LiteRT-LM Kotlin API
-- User can switch between GGUF and LiteRT-LM model ecosystems (separate tabs)
-- App auto-detects best backend (GPU → CPU fallback)
+- GGUF model downloads from Hugging Face actually work (search, progress, resume)
+- llama.cpp JNI bridge correctly loads and initializes GGUF models
+- GGUF inference streams coherent tokens via llama.cpp to the chat UI
+- Memory management prevents OOM crashes and handles edge cases gracefully
+- Same format-agnostic UX as LiteRT-LM (pick model → chat, no friction)
 
 ## Requirements
 
@@ -56,7 +55,9 @@ The Android ecosystem lacks a polished, production-grade app that combines local
 
 The user is an experienced Android developer with deep knowledge of Kotlin, Compose, and LLM inference. They want all the artifacts needed to build this app: architecture documents, data models, domain interfaces, initial implementations, and a phased roadmap.
 
-v1.1 adds LiteRT-LM as a second local inference engine. LiteRT-LM is Google's production framework that powers on-device GenAI in Chrome, Chromebook Plus, and Pixel Watch. Its Kotlin API provides `Engine → Conversation → sendMessageAsync(Flow)` with native GPU/NPU backends and `.litertlm` model format.
+v1.1 added LiteRT-LM as a second local inference engine (shipped). LiteRT-LM is Google's production framework that powers on-device GenAI in Chrome, Chromebook Plus, and Pixel Watch. Its Kotlin API provides `Engine → Conversation → sendMessageAsync(Flow)` with native GPU/NPU backends and `.litertlm` model format.
+
+v1.2 fixes the GGUF/llama.cpp pipeline. While the v1.0 GGUF code was written (LOCL-01–05, ACQ-01–05, DEV-01–02), the end-to-end flow — download from Hugging Face → load via llama.cpp JNI → stream to chat UI — is broken. This milestone makes GGUF work with the same transparent, format-agnostic UX that LiteRT-LM already delivers.
 
 ## Constraints
 
@@ -98,5 +99,4 @@ This document evolves at phase transitions and milestone boundaries.
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
 
----
-*Last updated: 2026-05-02 after milestone v1.1 initialization*
+---\n*Last updated: 2026-05-05 after milestone v1.2 initialization*

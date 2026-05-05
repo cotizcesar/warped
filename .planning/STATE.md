@@ -1,70 +1,44 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: LiteRT-LM Integration
-status: complete
-last_updated: "2026-05-04"
-last_activity: 2026-05-04
+milestone: v1.2
+milestone_name: "GGUF Pipeline Remediation"
+status: planning
+last_updated: "2026-05-05"
+last_activity: 2026-05-05
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 15
-  completed_plans: 15
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State: Warped
 
-**Last updated:** 2026-05-04
-**Last activity:** 2026-05-04
+**Last updated:** 2026-05-05
+**Last activity:** 2026-05-05
 
 See: .planning/PROJECT.md
 
 ## Project Reference
 
 **Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** Phase 10 — Parameters & Polish (v1.1 final phase)
-**Milestone:** v1.1 LiteRT-LM Integration
+**Current focus:** Defining requirements
+**Milestone:** v1.2 GGUF Pipeline Remediation
 
 ## Current Position
 
-Phase: 10 of 10 (Parameters & Polish)
-Plan: 1 of 1
-Status: Phase complete — ready for verification
-Last activity: 2026-05-02
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-05 — Milestone v1.2 started
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Completed
 
 - ✅ v1.0 MVP — 5 phases, 30 requirements, 107 Kotlin source files
-
-## Performance Metrics
-
-**Velocity:**
-
-- Total plans completed: 11 (v1.0)
-- Average duration: —
-- Total execution time: —
-
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 1. Foundation & Remote Chat | 3 | — | — |
-| 2. Local Inference | 3 | — | — |
-| 3. Model Acquisition | 2 | — | — |
-| 4. Parameters & Presets | 2 | — | — |
-| 5. Security Hardening & Polish | 1 | — | — |
-| 6-10 (v1.1) | 6 | 15m 0s | 2m 30s |
-| Phase 06-engine-foundation P04 | 1m 20s | 3 tasks | 3 files |
-| Phase 07-provider-integration-chat P01 | 5m 48s | 3 tasks | 4 files |
-| Phase 07-provider-integration-chat P02 | 2m 19s | 2 tasks | 2 files |
-| Phase 08 P01 | 131s | 1 tasks | 2 files |
-| Phase 08 P02 | 131s | 2 tasks | 2 files |
-| Phase 08 P03 | 301s | 3 tasks | 4 files |
-| Phase 08 PGAP-01+GAP-02 | 576s | 4 tasks | 10 files |
-| Phase 10 P01 | 385s | 3 tasks | 9 files |
+- ✅ v1.1 LiteRT-LM Integration — 5 phases, 26 requirements
 
 ## Accumulated Context
 
@@ -114,9 +88,7 @@ None yet.
 
 ### Blockers/Concerns
 
-- **Phase 6 (Research flag):** GPU backend detection across SoCs is hardware-dependent. BackendDetector probe strategy may need device-specific adjustments.
-- **Phase 8 (Research flag):** litert-community HF API filter behavior needs live testing with real API responses for client-side `.litertlm` filtering.
-- ~~Cross-phase: LiteRT-LM v0.10.2 Unicode/LaTeX bug status~~ — Addressed by InputSanitizer in 07-01.
+- v1.0 GGUF pipeline (LOCL-01–05, ACQ-01–05, DEV-01–02) marked complete but user reports end-to-end flow is broken — this milestone fixes it.
 
 ### Quick Tasks Completed
 
@@ -126,6 +98,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-02T20:15:00Z
-Stopped at: Completed 10-01-PLAN.md — modelFormat presets + parameter grey-out + cross-format warnings
+Last session: 2026-05-05
+Stopped at: Started milestone v1.2 — defining requirements
 Resume file: None
