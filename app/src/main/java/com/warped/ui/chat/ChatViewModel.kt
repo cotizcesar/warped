@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.warped.data.local.inference.BackendType
 import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.LlamaEngine
+import com.warped.data.local.inference.LlamaLoadError
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.remote.provider.ProviderRouter
 import com.warped.domain.model.*
@@ -554,10 +555,11 @@ class ChatViewModel @Inject constructor(
                 if (isLitertlm) {
                     engineManager.switchToLiteRT(filePath)
                 } else {
-                    val loadResult = llamaEngine.loadModel(filePath)
+                    val loadResult = engineManager.switchToLlama(filePath)
                     if (loadResult.isFailure) {
                         val error = loadResult.exceptionOrNull()
-                        throw IllegalStateException("Failed to load GGUF model: ${error?.message}")
+                        val msg = (error as? LlamaLoadError)?.userMessage ?: error?.message ?: "Failed to load GGUF model"
+                        throw IllegalStateException(msg)
                     }
                 }
             }
