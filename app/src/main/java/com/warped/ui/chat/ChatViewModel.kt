@@ -96,9 +96,8 @@ class ChatViewModel @Inject constructor(
                             error = null
                         )
                     }
-                    // Only preload local models — LM_STUDIO loads on-demand via chat request
-                    if (activeModel.providerType == ProviderType.LOCAL ||
-                        activeModel.providerType == ProviderType.LITE_RT_LM) {
+                    // Only preload LiteRT-LM — GGUF loads on-demand on first message
+                    if (activeModel.providerType == ProviderType.LITE_RT_LM) {
                         preloadLocalModel(activeModel.modelId)
                     }
                 }
@@ -315,7 +314,7 @@ class ChatViewModel @Inject constructor(
                 }
                 if (conversation.modelId != null && !modelMissing) {
                     activeModelSelection.select(conversation.modelId, conversation.providerType)
-                    if (conversation.providerType == ProviderType.LOCAL || conversation.providerType == ProviderType.LITE_RT_LM) {
+                    if (conversation.providerType == ProviderType.LITE_RT_LM) {
                         preloadLocalModel(conversation.modelId)
                     }
                 }
@@ -478,7 +477,7 @@ class ChatViewModel @Inject constructor(
                 }
             }
             ProviderType.LOCAL -> {
-                viewModelScope.launch { preloadLocalModel(modelId) }
+                // GGUF loads on-demand on first message — skip preload
             }
             ProviderType.LITE_RT_LM -> {
                 viewModelScope.launch { preloadLocalModel(modelId) }
