@@ -8,16 +8,18 @@ An Android application equivalent to LM Studio for mobile, enabling users to run
 
 Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
 
-## Current Milestone: v1.2 GGUF Pipeline Remediation
+## Current Milestone: v1.2 GGUF Native Inference
 
-**Goal:** Make the full GGUF pipeline functional end-to-end — download from Hugging Face, load via llama.cpp, chat with streaming — matching the transparent UX that LiteRT-LM already delivers.
+**Goal:** Hacer funcionar GGUF end-to-end con llama.cpp — misma UI, mismo flujo, misma performance que LiteRT-LM.
 
 **Target features:**
-- GGUF model downloads from Hugging Face actually work (search, progress, resume)
-- llama.cpp JNI bridge correctly loads and initializes GGUF models
-- GGUF inference streams coherent tokens via llama.cpp to the chat UI
-- Memory management prevents OOM crashes and handles edge cases gracefully
-- Same format-agnostic UX as LiteRT-LM (pick model → chat, no friction)
+- Descarga de GGUF desde Hugging Face (listar archivos .gguf, progreso, pausa/reanudar)
+- Integración llama.cpp vía JNI/NDK (compilar, cargar modelos, generar tokens)
+- Inferencia GGUF con streaming de tokens al chat UI
+- Backend CPU + Vulkan GPU (detección en runtime, fallback a CPU)
+- Cuantizaciones visibles al explorar/descargar modelos GGUF
+- Manejo de memoria y OOM graceful (sin límite artificial de tamaño modelo)
+- UX transparente: misma experiencia que LiteRT-LM, sin fricción
 
 ## Requirements
 
@@ -57,7 +59,7 @@ The user is an experienced Android developer with deep knowledge of Kotlin, Comp
 
 v1.1 added LiteRT-LM as a second local inference engine (shipped). LiteRT-LM is Google's production framework that powers on-device GenAI in Chrome, Chromebook Plus, and Pixel Watch. Its Kotlin API provides `Engine → Conversation → sendMessageAsync(Flow)` with native GPU/NPU backends and `.litertlm` model format.
 
-v1.2 fixes the GGUF/llama.cpp pipeline. While the v1.0 GGUF code was written (LOCL-01–05, ACQ-01–05, DEV-01–02), the end-to-end flow — download from Hugging Face → load via llama.cpp JNI → stream to chat UI — is broken. This milestone makes GGUF work with the same transparent, format-agnostic UX that LiteRT-LM already delivers.
+v1.2 implementa inferencia GGUF nativa desde cero con llama.cpp. El pipeline GGUF nunca ha funcionado: la búsqueda en Hugging Face lista modelos pero no muestra archivos .gguf para descargar, y cargar un GGUF manualmente dice "llama not implemented". Este milestone construye el pipeline completo (download → load → streaming chat) con paridad de UX respecto a LiteRT-LM.
 
 ## Constraints
 
@@ -99,4 +101,5 @@ This document evolves at phase transitions and milestone boundaries.
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
 
----\n*Last updated: 2026-05-05 after milestone v1.2 initialization*
+---
+*Last updated: 2026-05-05 after milestone v1.2 redefinition*
