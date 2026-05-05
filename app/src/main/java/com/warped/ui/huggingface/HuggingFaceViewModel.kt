@@ -100,15 +100,23 @@ class HuggingFaceViewModel @Inject constructor(
         viewModelScope.launch {
             val result = huggingFaceRepository.getModelDetail(model.id)
             result.onSuccess { detail ->
-                val ggufSiblings = detail.siblings.filter {
-                    it.rfilename.endsWith(".gguf", ignoreCase = true)
+                val formatFilter = _uiState.value.activeFormat
+                val filteredSiblings = when (formatFilter) {
+                    "litertlm", "staffpicks" -> detail.siblings.filter {
+                        it.rfilename.endsWith(".litertlm", ignoreCase = true)
+                    }
+                    else -> detail.siblings.filter {
+                        it.rfilename.endsWith(".gguf", ignoreCase = true)
+                    }
                 }
-                val sortedFiles = ggufSiblings.sortedBy { sibling ->
+                val sortedFiles = filteredSiblings.sortedBy { sibling ->
                     sibling.size.takeIf { it > 0 } ?: sibling.lfs?.size ?: 0L
                 }
                 val fileDetails = sortedFiles.associate { sibling ->
                     val effectiveSize = sibling.size.takeIf { it > 0 } ?: sibling.lfs?.size ?: 0L
-                    val quantization = GgufQuantizationParser.parseQuantization(sibling.rfilename)
+                    val quantization = if (formatFilter == "gguf") {
+                        GgufQuantizationParser.parseQuantization(sibling.rfilename)
+                    } else null
                     sibling.rfilename to GgufFileDetail(
                         quantization = quantization,
                         fileSizeBytes = effectiveSize,
