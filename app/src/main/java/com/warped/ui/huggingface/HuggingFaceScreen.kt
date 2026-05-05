@@ -482,6 +482,16 @@ private fun ModelDetailScreen(
                     Text("Available Models", style = MaterialTheme.typography.titleLarge)
                 }
 
+                if (siblings.isEmpty() && !isDownloading && !isDownloadPaused) {
+                    item {
+                        Text(
+                            "Modelo no compatible",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
                 if (isDownloading || isDownloadPaused) {
                     item {
                         Column {

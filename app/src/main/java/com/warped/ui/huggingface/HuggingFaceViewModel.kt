@@ -100,7 +100,10 @@ class HuggingFaceViewModel @Inject constructor(
         viewModelScope.launch {
             val result = huggingFaceRepository.getModelDetail(model.id)
             result.onSuccess { detail ->
-                val sortedFiles = detail.siblings.sortedBy { sibling ->
+                val ggufSiblings = detail.siblings.filter {
+                    it.rfilename.endsWith(".gguf", ignoreCase = true)
+                }
+                val sortedFiles = ggufSiblings.sortedBy { sibling ->
                     sibling.size.takeIf { it > 0 } ?: sibling.lfs?.size ?: 0L
                 }
                 val fileDetails = sortedFiles.associate { sibling ->
