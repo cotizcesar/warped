@@ -155,8 +155,7 @@ fun ChatScreen(
                             if (uiState.selectedProvider != null && selectedModelName != null) {
                                 val isLocal = uiState.selectedProvider == ProviderType.LOCAL ||
                                     uiState.selectedProvider == ProviderType.LITE_RT_LM
-                                // Type pill: Local or Net
-                                val typePillColor = if (isLocal) Color(0xFF4CAF50) else Color(0xFFFF9800)
+                                val typePillColor = if (isLocal) Color(0xFF4CAF50) else Color(0xFF2196F3)
                                 val typePillText = if (isLocal) "Local" else "Net"
                                 Surface(
                                     shape = RoundedCornerShape(4.dp),

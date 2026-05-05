@@ -96,7 +96,6 @@ class ChatViewModel @Inject constructor(
                             error = null
                         )
                     }
-                    // Model loads on-demand on first message — no preload
                 }
             }
         }
