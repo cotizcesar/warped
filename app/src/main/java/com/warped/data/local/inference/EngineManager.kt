@@ -67,7 +67,12 @@ class EngineManager @Inject constructor(
         unloadCurrent()
 
         Timber.d("EngineManager: initializing LiteRT-LM with backend=${target.backend} path=$resolvedPath")
-        liteRTLmEngine.init(resolvedPath, target.backend!!)
+        liteRTLmEngine.init(
+            modelPath = resolvedPath,
+            backend = target.backend!!,
+            visionBackend = backendDetector.probeVisionBackend(),
+            audioBackend = backendDetector.probeAudioBackend()
+        )
         activeEngine = target
         Timber.d("EngineManager: LiteRT-LM engine now active")
     }
@@ -75,27 +80,60 @@ class EngineManager @Inject constructor(
     /**
      * Switch to the llama.cpp engine with the given model.
      * Unloads any currently loaded engine first, then loads llama.cpp.
-     * Actual model loading is handled by LlamaEngine.loadModel() — this just coordinates.
+     * Validates the file and provides loading progress callbacks.
      *
      * @param modelPath Absolute path to the GGUF model file
+     * @param onProgress Optional callback for loading progress (percent, message)
+     * @return Result with GgufMetadata on success, LlamaLoadError on failure
      */
     @Synchronized
-    fun switchToLlama(modelPath: String) {
+    fun switchToLlama(
+        modelPath: String,
+        onProgress: ((Int, String) -> Unit)? = null
+    ): Result<GgufMetadata> {
+        // Pre-validate GGUF header before attempting native load
+        val validationResult = GgufMetadataParser.validateHeader(File(modelPath))
+        if (validationResult.isFailure) {
+            Timber.e("EngineManager: GGUF validation failed — $modelPath")
+            return Result.failure(LlamaLoadError.CorruptedFile())
+        }
+
         val target = ActiveEngine(EngineType.LLAMA_CPP, modelPath)
         if (activeEngine == target) {
             Timber.d("EngineManager: $target already loaded, skipping switch")
-            return
+            val metadata = try {
+                GgufMetadataParser.parse(File(modelPath)).getOrThrow()
+            } catch (e: Exception) {
+                GgufMetadata()
+            }
+            return Result.success(metadata)
         }
         unloadCurrent()
 
-        Timber.d("EngineManager: loading llama.cpp model")
-        val loaded = llamaEngine.loadModel(modelPath)
-        if (!loaded) {
-            Timber.e("EngineManager: llama.cpp failed to load model")
-            throw IllegalStateException("Failed to load llama.cpp model: $modelPath")
+        Timber.d("EngineManager: loading llama.cpp model: $modelPath")
+        val loadResult = llamaEngine.loadModel(
+            path = modelPath,
+            onProgress = onProgress
+        )
+
+        if (loadResult.isFailure) {
+            val error = loadResult.exceptionOrNull() as? LlamaLoadError ?: LlamaLoadError.Unknown("Unknown error")
+            Timber.e(error, "EngineManager: llama.cpp failed to load model")
+            return Result.failure(error)
         }
+
         activeEngine = target
         Timber.d("EngineManager: llama.cpp engine now active")
+
+        // Parse metadata after successful load
+        val metadata = try {
+            GgufMetadataParser.parse(File(modelPath)).getOrThrow()
+        } catch (e: Exception) {
+            Timber.w(e, "EngineManager: metadata parse warning, using native info")
+            GgufMetadata()
+        }
+
+        return Result.success(metadata)
     }
 
     /**

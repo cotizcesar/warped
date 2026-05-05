@@ -12,6 +12,12 @@ data class MemoryInfo(
     val usedPercent: Int
 )
 
+data class RamCheckResult(
+    val hasEnough: Boolean,
+    val availableBytes: Long,
+    val requiredBytes: Long
+)
+
 @Singleton
 class MemoryChecker @Inject constructor(
     @param:ApplicationContext private val context: Context
@@ -35,6 +41,16 @@ class MemoryChecker @Inject constructor(
     fun shouldWarn(modelSizeBytes: Long): Boolean {
         val memInfo = getMemoryInfo()
         return modelSizeBytes > memInfo.availableBytes * 0.6
+    }
+
+    fun checkGgufRam(fileSizeBytes: Long): RamCheckResult {
+        val required = (fileSizeBytes * 1.3).toLong()
+        val memInfo = getMemoryInfo()
+        return RamCheckResult(
+            hasEnough = required <= (memInfo.availableBytes * 0.85).toLong(),
+            availableBytes = memInfo.availableBytes,
+            requiredBytes = required
+        )
     }
 
     /**

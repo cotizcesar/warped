@@ -4,14 +4,19 @@
 #include <jni.h>
 #include <string>
 #include <functional>
+#include <atomic>
 
 using TokenCallback = std::function<void(const std::string&, bool)>;
+using ProgressCallback = std::function<void(int, const std::string&)>;
+
+struct llama_model;
+struct llama_context;
 
 class LlamaEngine {
 public:
     static LlamaEngine& getInstance();
 
-    bool loadModel(const std::string& modelPath, int nThreads, int nCtx);
+    std::string loadModel(const std::string& modelPath, int nThreads, int nCtx, ProgressCallback progress);
     void generate(const std::string& prompt, TokenCallback callback);
     void stop();
     void unload();
@@ -22,11 +27,11 @@ private:
     LlamaEngine() = default;
     ~LlamaEngine();
 
-    bool loaded = false;
-    bool shouldStop = false;
-    void* llama_model = nullptr;
-    void* llama_context = nullptr;
-    std::string modelPath;
+    std::atomic<bool> loaded{false};
+    std::atomic<bool> shouldStop{false};
+    llama_model* llama_model_ptr = nullptr;
+    llama_context* llama_context_ptr = nullptr;
+    std::string loadedModelPath;
 };
 
 #endif // JNI_BRIDGE_H

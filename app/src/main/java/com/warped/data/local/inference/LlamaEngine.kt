@@ -15,19 +15,47 @@ class LlamaEngine @Inject constructor() {
         }
     }
 
-    private external fun nativeLoadModel(path: String, nThreads: Int, nCtx: Int): Boolean
+    interface LoadProgressCallback {
+        fun onProgress(percent: Int, message: String)
+    }
+
+    interface TokenCallback {
+        fun onToken(token: String, done: Boolean)
+    }
+
+    private external fun nativeLoadModel(
+        path: String,
+        nThreads: Int,
+        nCtx: Int,
+        progressCallback: LoadProgressCallback?
+    ): String?
+
     private external fun nativeGenerate(prompt: String, callback: TokenCallback)
     private external fun nativeStop()
     private external fun nativeUnload()
     private external fun nativeIsLoaded(): Boolean
     private external fun nativeGetModelInfo(): String
 
-    interface TokenCallback {
-        fun onToken(token: String, done: Boolean)
-    }
+    fun loadModel(
+        path: String,
+        nThreads: Int = 4,
+        nCtx: Int = 4096,
+        onProgress: ((percent: Int, message: String) -> Unit)? = null
+    ): Result<Unit> {
+        val callback = if (onProgress != null) {
+            object : LoadProgressCallback {
+                override fun onProgress(percent: Int, message: String) {
+                    onProgress(percent, message)
+                }
+            }
+        } else null
 
-    fun loadModel(path: String, nThreads: Int = 4, nCtx: Int = 4096): Boolean {
-        return nativeLoadModel(path, nThreads, nCtx)
+        val error = nativeLoadModel(path, nThreads, nCtx, callback)
+        return if (error == null) {
+            Result.success(Unit)
+        } else {
+            Result.failure(LlamaLoadError.fromNative(error))
+        }
     }
 
     fun generate(prompt: String): Flow<String> = callbackFlow {
