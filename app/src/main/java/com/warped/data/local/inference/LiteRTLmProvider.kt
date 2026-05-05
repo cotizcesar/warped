@@ -6,8 +6,14 @@ import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Message
+import com.google.ai.edge.litertlm.OpenApiTool
 import com.google.ai.edge.litertlm.SamplerConfig
+import com.google.ai.edge.litertlm.tool
+import com.warped.data.local.inference.tools.ToolRegistry
+import com.warped.domain.model.ActiveModelSelection
 import com.warped.domain.model.ChatRequest
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.GenerationParameters
 import com.warped.domain.model.ModelInfo
@@ -28,7 +34,9 @@ import javax.inject.Singleton
 @Singleton
 class LiteRTLmProvider @Inject constructor(
     private val engineManager: EngineManager,
-    private val inputSanitizer: InputSanitizer
+    private val inputSanitizer: InputSanitizer,
+    private val toolRegistry: ToolRegistry,
+    private val activeModelSelection: ActiveModelSelection
 ) : LlmProvider {
 
     override val type = ProviderType.LITE_RT_LM
@@ -42,11 +50,22 @@ class LiteRTLmProvider @Inject constructor(
             msg.copy(content = inputSanitizer.sanitize(msg.content))
         }
 
-        // Step 2: Pre-condition check
+        // Step 2: Load engine on-demand if not loaded
         val activeEngine = engineManager.getActiveEngine()
         if (activeEngine == null || activeEngine.type != EngineType.LITE_RT_LM) {
-            emit(StreamToken.Error("No LiteRT-LM engine is loaded. Select a .litertlm model first."))
-            return@flow
+            // Try to load the engine from the active model path
+            val modelPath = activeModelSelection.activeModel.value?.modelId
+            if (modelPath != null && modelPath.endsWith(".litertlm", ignoreCase = true)) {
+                try {
+                    engineManager.switchToLiteRT(modelPath)
+                } catch (e: Exception) {
+                    emit(StreamToken.Error("Failed to load LiteRT-LM engine: ${e.message}"))
+                    return@flow
+                }
+            } else {
+                emit(StreamToken.Error("No LiteRT-LM engine is loaded. Select a .litertlm model first."))
+                return@flow
+            }
         }
 
         // Step 3: Build history messages (text-only, no images)
@@ -59,15 +78,20 @@ class LiteRTLmProvider @Inject constructor(
             }
         }.dropLast(1) // exclude current message from history
 
-        // Step 4: Build current message contents (text + images)
+        // Step 4: Build current message contents (text + images + audio)
         val currentUserText = sanitizedMessages.lastOrNull { it.role == Role.USER }?.content ?: ""
-        val currentContents = if (hasImages) {
+        val hasAudio = request.audioBytes != null && request.audioBytes!!.isNotEmpty()
+        val currentContents = if (hasImages || hasAudio) {
             val contentList = mutableListOf<Content>()
+            if (hasAudio) {
+                contentList.add(Content.AudioBytes(request.audioBytes!!))
+                Timber.d("LiteRTLmProvider: attaching audio (${request.audioBytes!!.size} bytes)")
+            }
             request.images.forEach { dataUrl ->
                 decodeImage(dataUrl)?.let { contentList.add(Content.ImageBytes(it)) }
             }
             contentList.add(Content.Text(currentUserText))
-            Timber.d("LiteRTLmProvider: sending ${request.images.size} image(s) with text")
+            Timber.d("LiteRTLmProvider: sending ${request.images.size} image(s) + audio=${hasAudio} with text")
             Contents.of(contentList)
         } else {
             Contents.of(currentUserText)
@@ -86,11 +110,14 @@ class LiteRTLmProvider @Inject constructor(
             "reasoning_enabled" to params.reasoningEnabled
         )
 
-        // Step 6: Create conversation config with history
+        // Step 6: Create conversation config with history and tools
         val conversationConfig = ConversationConfig(
             initialMessages = historyMessages,
             samplerConfig = samplerConfig,
-            extraContext = extraContext
+            extraContext = extraContext,
+            tools = toolRegistry.buildOpenApiTools(
+                kotlinx.coroutines.runBlocking { toolRegistry.enabledToolIds.first() }
+            ).map { tool(it) }
         )
 
         // Step 7: Send content with retry loop

@@ -153,26 +153,38 @@ fun ChatScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             if (uiState.selectedProvider != null && selectedModelName != null) {
-                                val pillText = when {
-                                    uiState.selectedProvider == ProviderType.LOCAL -> "GGUF"
-                                    uiState.selectedProvider == ProviderType.LITE_RT_LM -> "LiteRT-LM"
-                                    else -> "Net"
-                                }
-                                val pillColor = when (pillText) {
-                                    "GGUF" -> Color(0xFF2196F3)
-                                    "LiteRT-LM" -> Color(0xFF4CAF50)
-                                    else -> Color(0xFFFF9800)
-                                }
+                                val isLocal = uiState.selectedProvider == ProviderType.LOCAL ||
+                                    uiState.selectedProvider == ProviderType.LITE_RT_LM
+                                // Type pill: Local or Net
+                                val typePillColor = if (isLocal) Color(0xFF4CAF50) else Color(0xFFFF9800)
+                                val typePillText = if (isLocal) "Local" else "Net"
                                 Surface(
                                     shape = RoundedCornerShape(4.dp),
-                                    color = pillColor.copy(alpha = 0.15f)
+                                    color = typePillColor.copy(alpha = 0.15f)
                                 ) {
                                     Text(
-                                        text = pillText,
+                                        text = typePillText,
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = pillColor
+                                        color = typePillColor
                                     )
+                                }
+                                Spacer(Modifier.width(4.dp))
+                                // Format pill: GGUF or LiteRT-LM
+                                if (isLocal) {
+                                    val formatPillText = if (uiState.selectedProvider == ProviderType.LOCAL) "GGUF" else "LiteRT-LM"
+                                    val formatPillColor = if (uiState.selectedProvider == ProviderType.LOCAL) Color(0xFF2196F3) else Color(0xFF4CAF50)
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = formatPillColor.copy(alpha = 0.15f)
+                                    ) {
+                                        Text(
+                                            text = formatPillText,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = formatPillColor
+                                        )
+                                    }
                                 }
                                 Spacer(Modifier.width(6.dp))
                             }
@@ -201,17 +213,31 @@ fun ChatScreen(
                                     DropdownMenuItem(
                                         text = {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                                val modelPill = if (isLiteRtLm) "LiteRT-LM" else "GGUF"
-                                                val modelPillColor = if (isLiteRtLm) Color(0xFF4CAF50) else Color(0xFF2196F3)
+                                                // Type pill
                                                 Surface(
                                                     shape = RoundedCornerShape(4.dp),
-                                                    color = modelPillColor.copy(alpha = 0.15f)
+                                                    color = Color(0xFF4CAF50).copy(alpha = 0.15f)
                                                 ) {
                                                     Text(
-                                                        text = modelPill,
+                                                        text = "Local",
                                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                                         style = MaterialTheme.typography.labelSmall,
-                                                        color = modelPillColor
+                                                        color = Color(0xFF4CAF50)
+                                                    )
+                                                }
+                                                Spacer(Modifier.width(4.dp))
+                                                // Format pill
+                                                val formatPill = if (isLiteRtLm) "LiteRT-LM" else "GGUF"
+                                                val formatPillColor = if (isLiteRtLm) Color(0xFF4CAF50) else Color(0xFF2196F3)
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = formatPillColor.copy(alpha = 0.15f)
+                                                ) {
+                                                    Text(
+                                                        text = formatPill,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = formatPillColor
                                                     )
                                                 }
                                                 Spacer(Modifier.width(8.dp))
