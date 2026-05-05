@@ -8,17 +8,17 @@
 
 - ✅ **v1.0 MVP** — Phases 1-5 (shipped 2026-05-01)
 - ✅ **v1.1 LiteRT-LM Integration** — Phases 6-10 (shipped 2026-05-02) → [archive](milestones/v1.1-ROADMAP.md)
-- 📋 **v1.2 GGUF Native Inference** — Phases 11-15 (roadmapped 2026-05-05)
+- ✅ **v1.2 GGUF Native Inference** — Phases 11-15 (shipped 2026-05-05)
 
 ## Phases
 
 - [x] **Phase 1-5: v1.0 MVP** — Remote chat, local GGUF inference, Hugging Face downloads, parameters, security (SHIPPED)
 - [x] **Phase 6-10: v1.1 LiteRT-LM** — LiteRT-LM engine, .litertlm model acquisition, UI integration, parameter support (SHIPPED)
-- [ ] **Phase 11: Native Foundation** — llama.cpp CMake build, Hugging Face GGUF browsing/download with validation
-- [ ] **Phase 12: Model Loading & Memory Foundation** — JNI model loading with progress, metadata display, pre-load RAM checks, memory pressure handling
-- [ ] **Phase 13: Inference Core & Thread Safety** — Streaming GGUF chat, stop/cancel, TPS display, generation parameters, thread-safe pipeline
-- [ ] **Phase 14: Vulkan GPU Backend** — Vulkan GPU acceleration with automatic CPU fallback, backend display
-- [ ] **Phase 15: Cross-Engine UX Parity** — Unified metadata display, TPS, stop button, RAM recommendations, model management across all engines
+- [x] **Phase 11: Native Foundation** — llama.cpp CMake build, Hugging Face GGUF browsing/download with validation
+- [x] **Phase 12: Model Loading & Memory Foundation** — JNI model loading with progress, metadata display, pre-load RAM checks, memory pressure handling
+- [x] **Phase 13: Inference Core & Thread Safety** — Streaming GGUF chat, stop/cancel, TPS display, generation parameters, thread-safe pipeline
+- [x] **Phase 14: Vulkan GPU Backend** — Vulkan GPU acceleration with automatic CPU fallback, backend display
+- [x] **Phase 15: Cross-Engine UX Parity** — Unified metadata display, TPS, stop button, RAM recommendations, model management across all engines
 
 ---
 
