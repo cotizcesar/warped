@@ -23,6 +23,9 @@ class LlamaEngine @Inject constructor() {
         fun onToken(token: String, done: Boolean)
     }
 
+    @Volatile
+    private var isGenerating = false
+
     private external fun nativeLoadModel(
         path: String,
         nThreads: Int,
@@ -36,6 +39,7 @@ class LlamaEngine @Inject constructor() {
     private external fun nativeIsLoaded(): Boolean
     private external fun nativeGetModelInfo(): String
 
+    @Synchronized
     fun loadModel(
         path: String,
         nThreads: Int = 4,
@@ -58,29 +62,58 @@ class LlamaEngine @Inject constructor() {
         }
     }
 
+    @Synchronized
     fun generate(prompt: String): Flow<String> = callbackFlow {
-        val callback = object : TokenCallback {
-            override fun onToken(token: String, done: Boolean) {
-                if (done) {
-                    close()
-                } else if (token.isNotEmpty()) {
-                    trySend(token)
+        if (isGenerating) {
+            trySend("Generation already in progress")
+            close(IllegalStateException("Concurrent generation prevented"))
+            return@callbackFlow
+        }
+        if (!isLoaded()) {
+            trySend("Model not loaded")
+            close()
+            return@callbackFlow
+        }
+
+        isGenerating = true
+        try {
+            val callback = object : TokenCallback {
+                override fun onToken(token: String, done: Boolean) {
+                    if (done) {
+                        close()
+                    } else if (token.isNotEmpty()) {
+                        trySend(token)
+                    }
                 }
             }
+            nativeGenerate(prompt, callback)
+            awaitClose {
+                nativeStop()
+                isGenerating = false
+            }
+        } catch (e: Exception) {
+            isGenerating = false
+            throw e
         }
-        nativeGenerate(prompt, callback)
-        awaitClose { nativeStop() }
     }
 
+    @Synchronized
     fun stop() {
         nativeStop()
     }
 
+    @Synchronized
     fun unload() {
+        if (isGenerating) {
+            nativeStop()
+        }
         nativeUnload()
+        isGenerating = false
     }
 
     fun isLoaded(): Boolean = nativeIsLoaded()
+
+    fun isBusy(): Boolean = isGenerating
 
     fun getModelInfo(): String = nativeGetModelInfo()
 }

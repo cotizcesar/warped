@@ -3,6 +3,9 @@
 #include <jni.h>
 #include <llama.h>
 #include <ggml.h>
+#include <vector>
+#include <string>
+#include <cstring>
 
 #define LOG_TAG "WarpedLLAMA"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
@@ -25,32 +28,26 @@ std::string LlamaEngine::loadModel(const std::string& path, int nThreads, int nC
 
     if (progress) progress(0, "Validating file...");
 
-    // Validate file existence and size
     FILE* testFile = fopen(path.c_str(), "rb");
     if (!testFile) {
-        LOGD("File not found: %s", path.c_str());
         return "Corrupted model file — please re-download";
     }
     fseek(testFile, 0, SEEK_END);
     long fileSize = ftell(testFile);
     fclose(testFile);
     if (fileSize < 32) {
-        LOGD("File too small: %ld bytes", fileSize);
         return "Corrupted model file — please re-download";
     }
 
     try {
-        // Initialize backend (CPU only for now)
         ggml_backend_load_all();
 
-        // Model parameters
         if (progress) progress(10, "Configuring model parameters...");
         llama_model_params model_params = llama_model_default_params();
-        model_params.n_gpu_layers = 0; // CPU only until Phase 14
+        model_params.n_gpu_layers = 0;
         model_params.use_mmap = true;
         model_params.use_mlock = false;
 
-        // Context parameters
         llama_context_params ctx_params = llama_context_default_params();
         ctx_params.n_ctx = nCtx;
         ctx_params.n_threads = nThreads;
@@ -60,7 +57,6 @@ std::string LlamaEngine::loadModel(const std::string& path, int nThreads, int nC
 
         llama_model_ptr = llama_load_model_from_file(path.c_str(), model_params);
         if (!llama_model_ptr) {
-            LOGD("llama_load_model_from_file returned null");
             return "Unsupported architecture — this model requires ARM64";
         }
 
@@ -70,7 +66,6 @@ std::string LlamaEngine::loadModel(const std::string& path, int nThreads, int nC
         if (!llama_context_ptr) {
             llama_free_model(llama_model_ptr);
             llama_model_ptr = nullptr;
-            LOGD("llama_new_context_with_model returned null");
             return "Out of memory — try a smaller quantization";
         }
 
@@ -80,27 +75,15 @@ std::string LlamaEngine::loadModel(const std::string& path, int nThreads, int nC
         if (progress) progress(100, "Ready");
 
         LOGD("Model loaded successfully: %s (%ld bytes)", path.c_str(), fileSize);
-        return ""; // empty string = success
+        return "";
     } catch (const std::bad_alloc&) {
-        if (llama_context_ptr) {
-            llama_free(llama_context_ptr);
-            llama_context_ptr = nullptr;
-        }
-        if (llama_model_ptr) {
-            llama_free_model(llama_model_ptr);
-            llama_model_ptr = nullptr;
-        }
+        if (llama_context_ptr) { llama_free(llama_context_ptr); llama_context_ptr = nullptr; }
+        if (llama_model_ptr) { llama_free_model(llama_model_ptr); llama_model_ptr = nullptr; }
         LOGE("Out of memory loading model: %s", path.c_str());
         return "Out of memory — try a smaller quantization";
     } catch (const std::exception& e) {
-        if (llama_context_ptr) {
-            llama_free(llama_context_ptr);
-            llama_context_ptr = nullptr;
-        }
-        if (llama_model_ptr) {
-            llama_free_model(llama_model_ptr);
-            llama_model_ptr = nullptr;
-        }
+        if (llama_context_ptr) { llama_free(llama_context_ptr); llama_context_ptr = nullptr; }
+        if (llama_model_ptr) { llama_free_model(llama_model_ptr); llama_model_ptr = nullptr; }
         LOGE("Exception loading model: %s", e.what());
         return std::string("Failed to load model: ") + e.what();
     }
@@ -112,13 +95,90 @@ void LlamaEngine::generate(const std::string& prompt, TokenCallback callback) {
         return;
     }
 
-    LOGD("Generate: %s", prompt.substr(0, 100).c_str());
     shouldStop.store(false);
 
-    // TODO: Real llama.cpp inference loop — Phase 13
-    // Stub: emit placeholder tokens until inference is implemented
-    callback("Inference not yet implemented — loading layer complete.", false);
-    callback("", true); // done signal
+    try {
+        // Tokenize prompt
+        std::vector<llama_token> tokens;
+        tokens.push_back(llama_token_bos(llama_model_ptr));
+        int nPromptTokens = llama_tokenize(llama_model_ptr, prompt.c_str(), prompt.size(),
+                                           tokens.data() + 1, llama_n_ctx(llama_context_ptr) - 2,
+                                           true, false);
+        if (nPromptTokens < 0) {
+            int totalTokens = -nPromptTokens;
+            tokens.resize(totalTokens + 1);
+            nPromptTokens = llama_tokenize(llama_model_ptr, prompt.c_str(), prompt.size(),
+                                           tokens.data() + 1, totalTokens,
+                                           true, false);
+        }
+        tokens.resize(nPromptTokens + 1);
+
+        int nPos = 0;
+        int maxTokens = 512;
+        int nPast = 0;
+
+        // Default sampler (greedy)
+        struct llama_sampler* smpl = llama_sampler_init_greedy();
+
+        // Batch for prompt eval
+        int nBatches = (tokens.size() + 511) / 512;
+        for (int bi = 0; bi < nBatches; bi++) {
+            int batchStart = bi * 512;
+            int batchSize = std::min((int)tokens.size() - batchStart, 512);
+            struct llama_batch batch = llama_batch_init(batchSize, 0, 1);
+            for (int i = 0; i < batchSize; i++) {
+                llama_batch_add(batch, tokens[batchStart + i], nPast + i, {0}, i == batchSize - 1 && bi == nBatches - 1);
+            }
+            if (llama_decode(llama_context_ptr, batch) != 0) {
+                llama_batch_free(batch);
+                llama_sampler_free(smpl);
+                callback("Decode error", true);
+                return;
+            }
+            nPast += batchSize;
+            llama_batch_free(batch);
+        }
+        nPos = nPast;
+
+        // Generation loop
+        for (int i = 0; i < maxTokens; i++) {
+            if (shouldStop.load()) {
+                llama_sampler_free(smpl);
+                callback("", true);
+                return;
+            }
+
+            llama_token newToken = llama_sampler_sample(smpl, llama_context_ptr, -1);
+            if (llama_token_is_eog(llama_model_ptr, newToken)) {
+                llama_sampler_free(smpl);
+                callback("", true);
+                return;
+            }
+
+            char buf[256];
+            int nChars = llama_token_to_piece(llama_model_ptr, newToken, buf, sizeof(buf), 0, true);
+            if (nChars > 0) {
+                std::string tokenStr(buf, nChars);
+                callback(tokenStr, false);
+            }
+
+            struct llama_batch batch = llama_batch_init(1, 0, 1);
+            llama_batch_add(batch, newToken, nPos++, {0}, true);
+            if (llama_decode(llama_context_ptr, batch) != 0) {
+                llama_batch_free(batch);
+                llama_sampler_free(smpl);
+                callback("Decode error", true);
+                return;
+            }
+            llama_batch_free(batch);
+        }
+
+        llama_sampler_free(smpl);
+        callback("", true);
+    } catch (const std::exception& e) {
+        LOGE("Generation exception: %s", e.what());
+        callback("Generation error", true);
+    }
 }
 
 void LlamaEngine::stop() {
@@ -235,11 +295,9 @@ Java_com_warped_data_local_inference_LlamaEngine_nativeLoadModel(
     env->ReleaseStringUTFChars(path, pathStr);
 
     ProgressCallback progressFn = nullptr;
-    jclass callbackClass = nullptr;
-    jmethodID onProgressMethod = nullptr;
     if (progressCallback) {
-        callbackClass = env->GetObjectClass(progressCallback);
-        onProgressMethod = env->GetMethodID(callbackClass, "onProgress", "(ILjava/lang/String;)V");
+        jclass callbackClass = env->GetObjectClass(progressCallback);
+        jmethodID onProgressMethod = env->GetMethodID(callbackClass, "onProgress", "(ILjava/lang/String;)V");
         if (onProgressMethod) {
             progressFn = [env, progressCallback, onProgressMethod](int percent, const std::string& message) {
                 jstring jMsg = env->NewStringUTF(message.c_str());
