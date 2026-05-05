@@ -1,833 +1,765 @@
-# Architecture: Warped v1.1 — LiteRT-LM Integration
+# Architecture Research: GGUF Native Inference Integration
 
-**Domain:** Android LLM client with dual local engines
-**Researched:** 2026-05-02
-**Confidence:** HIGH (verified against LiteRT-LM source code at v0.10.2, existing Warped codebase)
+**Domain:** Android local LLM inference via llama.cpp JNI/NDK
+**Researched:** 2026-05-05
+**Confidence:** HIGH
 
----
+## Executive Summary
 
-## 1. Executive Integration Summary
+The Warped app's existing Clean Architecture (UI → Domain → Data) already has stubs and integration points for GGUF/llama.cpp: `LlamaEngine` wraps a JNI bridge to native C++, `EngineManager` coordinates engine lifecycle, `LocalLlmProvider` implements `LlmProvider` for the chat pipeline, `ProviderRouter` dispatches `ProviderType.LOCAL` to llama.cpp, and `ModelDownloadWorker`/`ModelImportManager` parse GGUF metadata on download/import. The architecture is sound and the integration points are correctly placed — what's missing is the real native implementation (llama.cpp compiled from source) and production-hardening of memory management, Vulkan probing, token streaming, and thread safety.
 
-LiteRT-LM integrates as a **second local inference provider** alongside llama.cpp, reusing the existing `LlmProvider` domain abstraction without modification. The integration is a **parallel pattern** — not a replacement or refactor of the existing local inference path. Both engines coexist under the UI's model selection system, differentiated by model format (GGUF vs .litertlm) and `ProviderType`.
+This document describes the NEW patterns needed for the GGUF pipeline and how they integrate with existing code.
 
-**The central `LlmProvider` interface does not change.** LiteRT-LM gets its own provider implementation (`LiteRTLmProvider`) that conforms to the same contract. The key architectural challenge is mapping LiteRT-LM's stateful `Engine → Conversation` lifecycle onto the existing stateless `LlmProvider.chat()` call pattern.
-
----
-
-## 2. High-Level Architecture (Updated)
+## Integration Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  UI LAYER (Jetpack Compose + ViewModels)                         │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐           │
-│  │ChatScreen│ │ModelsScr │ │Endpoints │ │SettingsSc│           │
-│  │(unified) │ │(GGUF tab │ │Screen    │ │reen      │           │
-│  │          │ │ +LRTLM   │ │(remote    │ │(presets) │           │
-│  │          │ │ tab)     │ │ only)     │ │          │           │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘           │
-│       │            │            │             │                 │
-├───────┴────────────┴────────────┴─────────────┴─────────────────┤
-│  DOMAIN LAYER (pure Kotlin, zero Android deps)                   │
-│  ┌───────────────────────────────┐  ┌──────────────────────────┐│
-│  │ LlmProvider (interface)       │  │ ProviderType enum         ││
-│  │   chat(ChatRequest): Flow     │  │   OPENAI, ANTHROPIC,      ││
-│  │   listModels(): Result<>      │  │   OLLAMA, LM_STUDIO,      ││
-│  │   testConnection(): Result<>  │  │   CUSTOM, LOCAL,          ││
-│  └───────────────────────────────┘  │   LITERT_LM  ← NEW      ││
-│  ┌────────────────────────────────┐ └──────────────────────────┘│
-│  │ StreamToken, ChatRequest,      │                             │
-│  │ GenerationParameters,          │                             │
-│  │ ModelInfo, ConnectionStatus    │                             │
-│  └────────────────────────────────┘                             │
-├──────────────────────┬──────────────────────────────────────────┤
-│  DATA LAYER (all)    │  NATIVE LAYER (two engines)              │
-│  ┌────────────────┐  │  ┌────────────────────────────────────┐ │
-│  │ LocalLlmProvider│  │  │ :library:llama-native              │ │
-│  │ (wraps Llama   │  │  │  JNI bridge, .so, GGUF loader       │ │
-│  │  Engine)       │──┼──│  LlamaEngine (JNI-based)            │ │
-│  └────────────────┘  │  │  Vulkan/NNAPI delegates             │ │
-│  ┌────────────────┐  │  └────────────────────────────────────┘ │
-│  │ LiteRTLmProvider│  │  ┌────────────────────────────────────┐ │
-│  │ (wraps LiteRT  │  │  │ :library:litertlm              NEW  │ │
-│  │  Engine)       │──┼──│  LiteRTLmEngine (wraps Engine API) │ │
-│  └────────────────┘  │  │  Backend detection service           │ │
-│  ┌────────────────┐  │  │  lrtlm-android Maven dependency     │ │
-│  │ ProviderRouter │  │  └────────────────────────────────────┘ │
-│  │ (resolves to   │  │                                         │
-│  │  correct impl) │  │                                         │
-│  └────────────────┘  │                                         │
-├──────────────────────┴──────────────────────────────────────────┤
-│  INFRASTRUCTURE: Room, DataStore, OkHttp, WorkManager, Keystore │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│  EXISTING (unchanged)                                                     │
+│  ┌─────────────────┐    ┌──────────────────┐    ┌──────────────────┐     │
+│  │ ChatViewModel    │    │ ProviderRouter    │    │ EngineManager     │     │
+│  │ preloadLocalModel│───▶│ resolveLocal(     │───▶│ switchToLlama()   │     │
+│  │ sendMessage()    │    │ LOCAL, modelId)   │    │ getLlamaEngine()  │     │
+│  └─────────────────┘    └──────────────────┘    └────────┬─────────┘     │
+│                                                          │               │
+│  MODIFIED (production-hardened)                          │               │
+│  ┌─────────────────┐    ┌──────────────────┐    ┌───────▼──────────┐    │
+│  │ LocalLlmProvider │───▶│ LlamaEngine       │    │ BackendDetector  │    │
+│  │ (chat streaming) │    │ (JNI wrapper)     │    │ (+ Vulkan probe) │    │
+│  └─────────────────┘    └────────┬─────────┘    └──────────────────┘    │
+│                                  │                                       │
+│  NEW (native layer)              │                                       │
+│                         ┌───────▼──────────────────────────┐            │
+│                         │ libwarped_llama.so (NDK)          │            │
+│                         │  ├─ jni_bridge.cpp (JNI glue)    │            │
+│                         │  ├─ LlamaEngine (C++ singleton)  │            │
+│                         │  ├─ llama.cpp (compiled from src)│            │
+│                         │  ├─ GGML Vulkan backend (.so)    │            │
+│                         │  └─ GGML CPU backend (always)    │            │
+│                         └──────────────────────────────────┘            │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Key principle:** The UI layer never knows which engine is running. It only sees `ProviderType`, `ModelInfo`, and the token stream.
+## Component Boundaries
 
----
+### 1. JNI Bridge Layer — `jni_bridge.cpp` / `LlamaEngine.kt`
 
-## 3. Integration Layers — What Changes per Layer
+**What exists:**
+- `jni_bridge.cpp` has stub implementations (`loadModel` returns `true` always, `generate` emits placeholder text)
+- `LlamaEngine.kt` has correct JNI declarations, `callbackFlow` wrapping native callbacks
+- `CMakeLists.txt` compiles only `jni_bridge.cpp` — no llama.cpp source linked yet
+- Declares compile definitions `GGML_USE_CPU=1`, `GGML_USE_CPU_AARCH64=1` but doesn't use them
 
-### 3.1 Domain Layer (minimal change, 1 new enum value)
+**What must change:**
 
-| What | Action | File |
-|------|--------|------|
-| `ProviderType` enum | Add `LITERT_LM` | `domain/model/ProviderType.kt` |
-| `GenerationParameters` | No change. Map fields to `SamplerConfig` in data layer | — |
-| `LlmProvider` interface | **No change.** LiteRT-LM fits the contract | — |
-| `StreamToken`, `ChatRequest`, `ModelInfo` | No change | — |
+| File | Change | Why |
+|------|--------|-----|
+| `CMakeLists.txt` | Add llama.cpp source files, GGML subdirectories, Vulkan backend | Must compile real inference engine |
+| `jni_bridge.cpp` | Implement real `loadModel`, `generate`, `stop`, `unload` using llama.cpp API | Core inference loop |
+| `jni_bridge.h` | Add Vulkan backend params, model metadata struct | Need GPU backend and metadata |
+| `LlamaEngine.kt` | Add `loadModel(path, backend, nGpuLayers)`, add `nativeGetVulkanInfo()`, add `nativeGetContextSize()` | Vulkan backend selection, metadata extraction |
+| `LlamaEngine.kt` | Add `generate(prompt, params: GenerationParameters)` — thread count, temp, topK, topP, seed | Per-request parameter pass-through |
 
-**Why `LITERT_LM` not reuse `LOCAL`:** The UI requires separate model tabs (GGUF vs .litertlm), different download sources (HF main vs litert-community), different import UX, and different generation parameter sets. A single `LOCAL` type would force conditional branching throughout the system. Explicit typing is cheaper than runtime type checks.
-
-### 3.2 Data Layer (2 new components, 2 modified)
-
-| Component | Action | Layer |
-|-----------|--------|-------|
-| `LiteRTLmEngine` | **NEW** — wrapper around LiteRT-LM `Engine` lifecycle | `data/local/inference/` |
-| `LiteRTLmProvider` | **NEW** — implements `LlmProvider`, wraps `LiteRTLmEngine` | `data/local/inference/` |
-| `ProviderRouter` | **MODIFIED** — add `ProviderType.LITERT_LM` case | `data/remote/provider/` |
-| `ProviderModule` (DI) | **MODIFIED** — provide `LiteRTLmEngine`, `LiteRTLmProvider` bindings | `di/` |
-| `ModelRepository` | **NO CHANGE** — same `LocalModel` entity, distinguished by `filePath` extension | — |
-| `DownloadManager` | **MODIFIED** — add `.litertlm` extension to whitelist, litert-community HF endpoint | `data/download/` |
-
-### 3.3 UI Layer (1 new screen section, 1 modified)
-
-| Component | Action |
-|-----------|--------|
-| `ModelsScreen` | Add second tab: "GGUF" and "LiteRT-LM" |
-| `ChatScreen` | No change — provider-agnostic by design |
-| `SettingsScreen` | Add backend preference (GPU/CPU/NPU selection for LiteRT-LM) |
-| Navigation | Add route for LiteRT-LM model detail (or reuse existing) |
-
-### 3.4 Module Structure (1 new module)
-
-```
-app/
-├── :core:common          # + ProviderType.LITERT_LM
-├── :core:network
-├── :core:database
-├── :core:security
-├── :core:ui
-├── :feature:chat
-├── :feature:models       # + LiteRT-LM tab, litert-community HF API
-├── :feature:endpoints
-├── :feature:settings     # + LiteRT-LM backend config
-├── :library:llama-native # JNI bridge (unchanged)
-└── :library:litertlm     # NEW: LiteRTLmEngine + backend detection
-```
-
-**Dependency rule for `:library:litertlm`:**
-- Depends on: `:core:common` (domain models only, zero Android deps beyond `android.content.Context`)
-- Never depends on: `:core:network`, `:core:database`, `:feature:*`
-- Exposes only: `LiteRTLmEngine` (data layer class) and `BackendDetector` (utility)
-
----
-
-## 4. Core Integration Pattern: Stateless chat() over Stateful Conversation
-
-### 4.1 The Problem
-
-The existing architecture treats each `LlmProvider.chat()` call as stateless — the provider receives a full message history and returns a token stream. The engine (LlamaEngine) manages a single model context that gets prompted anew each time.
-
-LiteRT-LM's API is stateful: `Engine` holds a loaded model, and `Conversation` accumulates message history internally. Each `sendMessage()` appends to that history. A fresh `Conversation` is needed per `chat()` call.
-
-### 4.2 The Solution: Per-Call Conversation Factory
-
-```
-chat(request: ChatRequest) → create fresh Conversation(initialMessages=request.messages)
-                              → conversation.sendMessageAsync()
-                                → map LiteRT-LM Message.text segments → StreamToken.Delta
-                                → close conversation on completion/error
-                              → return Flow<StreamToken>
-```
-
-**Key insight:** LiteRT-LM's `ConversationConfig.initialMessages` accepts a `List<Message>` exactly matching our `ChatRequest.messages`. No prompt rewriting needed — the engine handles internal templating.
+**Key JNI design decisions:**
 
 ```kotlin
-// LiteRTLmProvider.kt — pseudocode
-override fun chat(request: ChatRequest): Flow<StreamToken> = flow {
-    checkInitialized()
+// LlamaEngine.kt — NEW API surface
+class LlamaEngine @Inject constructor() {
+    // EXISTING — unchanged
+    fun generate(prompt: String): Flow<String>
 
-    val lrtlmMessages = request.messages.map { msg ->
-        when (msg.role) {
-            Role.SYSTEM -> Message.system(msg.content)
-            Role.USER -> Message.user(msg.content)
-            Role.ASSISTANT -> Message.model(msg.content)
+    // MODIFIED — new params
+    fun loadModel(
+        path: String,
+        nThreads: Int = 4,
+        nCtx: Int = 4096,
+        nGpuLayers: Int = 0,  // NEW: 0=CPU-only, >0=offload layers to GPU
+        useVulkan: Boolean = false  // NEW: Vulkan backend toggle
+    ): Boolean
+
+    // NEW
+    fun generate(prompt: String, params: GenerationParameters): Flow<String>
+    fun getVulkanInfo(): VulkanInfo  // adapter name, VRAM, compute queue count
+    fun getContextSize(): Int
+    fun getModelArchitecture(): String  // from GGUF header via native
+}
+```
+
+**The `callbackFlow` pattern (already correct, needs hardening):**
+
+```kotlin
+// The callback is invoked from the JNI thread — NOT the Kotlin coroutine thread.
+// callbackFlow handles this correctly: trySend() is thread-safe and buffered.
+fun generate(prompt: String): Flow<String> = callbackFlow {
+    val callback = object : TokenCallback {
+        override fun onToken(token: String, done: Boolean) {
+            if (done) close()
+            else if (token.isNotEmpty()) trySend(token)
+        }
+    }
+    nativeGenerate(prompt, callback)
+    awaitClose { nativeStop() }
+}.flowOn(Dispatchers.Default)  // CPU-bound inference moves off Main
+```
+
+**Critical JNI concern: Global Reference lifecycle**
+
+The JNI `nativeGenerate` receives a `jobject callback` parameter. This is a **local reference** valid only for the duration of the JNI call. Since `nativeGenerate` is blocking (runs the entire generation loop), the local reference outlives the method scope — this is technically valid but fragile. **Mitigation:**
+```cpp
+// In nativeGenerate JNI function
+jobject globalCallback = env->NewGlobalRef(callback);
+// ... generate loop uses globalCallback ...
+env->DeleteGlobalRef(globalCallback);
+```
+
+The current stub doesn't convert to global ref — the real implementation must. This is the #1 cause of JNI crashes ("JNI local reference table overflow" or "use of deleted local reference").
+
+### 2. EngineManager Integration
+
+**What exists:**
+- `switchToLlama(modelPath)` calls `llamaEngine.loadModel(modelPath)` synchronously
+- `unloadCurrent()` calls `llamaEngine.stop()` then `llamaEngine.unload()`
+- `@Synchronized` on all public methods for mutual exclusion
+- `ActiveEngine` tracks `type`, `modelPath`, `backend`
+
+**What must change:**
+
+```kotlin
+// EngineManager.kt — MODIFIED switchToLlama
+@Synchronized
+fun switchToLlama(modelPath: String, nGpuLayers: Int = 0) {
+    val backend = backendDetector.probeBackend()  // now includes Vulkan
+    val useVulkan = backend == BackendType.GPU
+    val target = ActiveEngine(
+        type = EngineType.LLAMA_CPP,
+        modelPath = modelPath,
+        backend = backend  // NEW: was null, now populated
+    )
+    if (activeEngine == target) return
+    unloadCurrent()
+
+    // Load is a blocking call — caller (ChatViewModel) dispatches on Dispatchers.Default
+    val loaded = llamaEngine.loadModel(
+        path = modelPath,
+        nThreads = Runtime.getRuntime().availableProcessors(),
+        nCtx = 4096,
+        nGpuLayers = if (useVulkan) nGpuLayers else 0,
+        useVulkan = useVulkan
+    )
+    if (!loaded) throw IllegalStateException("Failed to load GGUF model: $modelPath")
+    activeEngine = target
+}
+```
+
+**Lifecycle state machine:**
+```
+UNLOADED ──loadModel()──▶ LOADED ──generate()──▶ GENERATING
+   ▲                         │                       │
+   │                         │                       │ stop()
+   │                         ◀───────────────────────┘
+   │                         │
+   └───unload()◀────────────┘
+         (or process death)
+```
+
+**Key constraint:** Only one engine loaded at a time (unchanged). EngineManager enforces this via `@Synchronized`. The native C++ `LlamaEngine` singleton also enforces it — `loadModel` unloads previous model first. This dual-layer enforcement prevents accidental double-load.
+
+### 3. Memory Management Across Layers
+
+**The critical numbers:**
+| Model Size | GGUF File | RAM Needed (inference) | Example |
+|-----------|-----------|----------------------|---------|
+| 1B Q4_K_M | ~600 MB | ~1.2 GB | TinyLlama |
+| 3B Q4_K_M | ~2 GB | ~3.5 GB | Phi-3-mini |
+| 7B Q4_K_M | ~4.5 GB | ~6 GB | Mistral-7B, Llama-3.2-3B |
+| 8B Q4_K_M | ~5 GB | ~7 GB | Llama-3.1-8B |
+| 13B Q4_K_M | ~8 GB | ~10 GB | (top-end flagships only) |
+
+**RAM needed ≈ GGUF file size × 1.3** (model weights + KV cache + context buffers). A 4.5 GB GGUF needs ~6 GB free RAM.
+
+**What exists:**
+- `MemoryChecker` with `canLoadModel()`, `shouldWarn()`, `getMemoryInfo()`
+- 80% available RAM threshold for `canLoadModel`
+- 60% threshold for warning
+- `ChatViewModel.preloadLocalModel()` checks `canLoadModel()` before loading
+- `ChatViewModel.launchModelSelection()` shows warning dialog via `shouldWarn()`
+
+**What must change:**
+
+1. **Tighter memory check in `preloadLocalModel`** — currently checks `canLoadModel` but doesn't use `ActivityManager.MemoryInfo` for the actual memory state. Must switch to `ActivityManager.getMemoryInfo()` which reflects the *current process* memory situation, not just the system-wide available RAM.
+
+2. **OOM recovery** — `llamaEngine.loadModel()` can throw `OutOfMemoryError` for large models on constrained devices. Must catch in `preloadLocalModel()` and surface a user-friendly error ("Model needs X MB but only Y MB available" — already partially done).
+
+3. **`android:largeHeap="true"`** — Not yet in AndroidManifest. Required for models >256MB. Without it, Android enforces a lower heap limit (~256-512MB depending on device).
+
+4. **No artificial size limit** — Per PROJECT.md requirements, must not hard-cap model size. Some flagship phones (16GB RAM) can run 13B models. Let the memory check (80% of available) be the only gate.
+
+```kotlin
+// ChatViewModel.kt — MODIFIED preloadLocalModel
+private suspend fun preloadLocalModel(filePath: String) {
+    val model = _uiState.value.localModels.firstOrNull { it.filePath == filePath }
+    if (model != null) {
+        // NEW: Check ActivityManager actual process memory, not just system-wide
+        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val memInfo = ActivityManager.MemoryInfo()
+        activityManager.getMemoryInfo(memInfo)
+
+        val modelSizeBytes = model.sizeBytes
+        val estimatedRamNeeded = (modelSizeBytes * 1.3).toLong()  // 30% overhead for KV cache + context
+        val availableForProcess = memInfo.availMem
+
+        if (estimatedRamNeeded > availableForProcess * 0.8) {
+            val modelMB = modelSizeBytes / (1024 * 1024)
+            val availMB = availableForProcess / (1024 * 1024)
+            _uiState.update {
+                it.copy(modelLoadError = "Not enough memory: model needs ~${modelMB} MB RAM but only ${availMB} MB available.")
+            }
+            return
         }
     }
 
-    val samplerConfig = SamplerConfig(
-        topK = request.parameters.topK,
-        topP = request.parameters.topP.toDouble(),
-        temperature = request.parameters.temperature.toDouble(),
-        seed = if (request.parameters.seed >= 0) request.parameters.seed else 0
-    )
-
-    val convConfig = ConversationConfig(
-        initialMessages = lrtlmMessages,
-        samplerConfig = samplerConfig,
-    )
-
-    val conversation = engine.createConversation(convConfig)
-    var lastContent = ""
+    // ... existing load logic (unchanged) ...
     try {
-        conversation.sendMessageAsync(Message.user(""))  // final user message
-            .collect { message ->
-                val delta = message.text.removePrefix(lastContent)
-                if (delta.isNotEmpty()) {
-                    lastContent = message.text
-                    emit(StreamToken.Delta(delta))
-                }
+        withContext(Dispatchers.Default) {
+            if (isLitertlm) {
+                engineManager.switchToLiteRT(filePath)
+            } else {
+                val loaded = llamaEngine.loadModel(filePath, ...)
+                if (!loaded) throw IllegalStateException("Failed to load GGUF model")
             }
-        emit(StreamToken.Done())
+        }
+    } catch (e: OutOfMemoryError) {
+        // NEW: explicit OOM handling
+        _uiState.update {
+            it.copy(modelLoadError = "Out of memory. Close other apps or use a smaller quantization.")
+        }
     } catch (e: Exception) {
-        emit(StreamToken.Error(e.message ?: "Inference error"))
-    } finally {
-        conversation.close()
+        _uiState.update { it.copy(modelLoadError = e.message) }
     }
-}.flowOn(Dispatchers.Default)
+}
 ```
 
-### 4.3 Why Not Reuse One Conversation?
+**Memory cleanup lifecycle:**
+```
+EngineManager.handleTrimMemory(level)
+  level >= TRIM_MEMORY_RUNNING_CRITICAL
+    → unloadCurrent()  (calls llamaEngine.unload())
+    → clear LiteRT-LM cache dir
+```
 
-A single long-lived `Conversation` accumulating all messages across `chat()` calls would:
-- Grow the KV cache indefinitely, degrading performance
-- Leak context from previous conversations (user switches chat → old messages still in model context)
-- Not support switching models mid-session cleanly
+Already implemented correctly. No changes needed for GGUF path.
 
-Per-call `Conversation` gives clean isolation, predictable memory usage, and matches the existing stateless contract.
+### 4. GGUF Metadata Extraction (Header Parsing)
 
----
+**What exists:**
+- `GgufMetadataParser` — reads GGUF header (magic "GGUF", version, tensor count, KV count, then iterates KV pairs)
+- Parses: `general.name`, `general.architecture`, `general.file_type` → quantization, `*.block_count` → param count, `llama.context_length`
+- `mapQuantization()` maps integer file_type to human-readable name (Q4_K_M, Q8_0, etc.)
+- Used in: `ModelDownloadWorker` (post-download), `ModelImportManager` (post-import)
 
-## 5. Engine Lifecycle Management
+**What must change:**
 
-### 5.1 Lifecycle Comparison
+1. **Complete the quantization map** — Current map is missing many GGUF v3 quantizations: Q4_K_M (15), IQ quantizations (IQ2_XXS=26, IQ2_XS=27, IQ3_XXS=28, IQ3_S=29, IQ4_XS=31, IQ4_NL=33), and newer types. The `file_type` mapping has changed across GGUF versions — the parser must handle GGUF v2 and v3.
 
-| Phase | LlamaEngine | LiteRTLmEngine |
-|-------|------------|----------------|
-| **Load/Init** | `loadModel(path)` — ~2-5s, loads GGUF into memory | `engine.initialize()` — ~5-10s, loads .litertlm, compiles for backend |
-| **Ready state** | `isLoaded() = true`, model in RAM (~4GB) | `isInitialized() = true`, model in RAM (~similar) |
-| **Generate** | `generate(prompt)` — JNI call on native thread | `createConversation().sendMessageAsync()` — JNI call on native thread |
-| **Unload/Close** | `unload()` — frees RAM | `engine.close()` — frees RAM + cached files |
-| **Concurrent use** | One context, serial access (Mutex) | Multiple Conversations, internally serialized by engine |
+2. **Pass metadata through the load pipeline** — Currently `LlamaEngine.getModelInfo()` returns a stub JSON string. The JNI layer should extract metadata from the loaded model's GGUF header (or from `llama_model_desc()` / `llama_model_meta()` which is more reliable than raw header parsing). This gives: actual context size, architecture string, quantization used, model size in parameters.
 
-### 5.2 LiteRTLmEngine Wrapper
+3. **Use metadata at download time for the ModelsScreen** — When a GGUF file downloads, `ModelDownloadWorker` parses metadata via `GgufMetadataParser` and saves it to `LocalModel` in Room. The ModelsScreen already displays `quantization`, `parameterCount`, `architecture` from Room — this works end-to-end already. Validation point: ensure the parser handles all GGUF variants (v1, v2, v3) correctly.
+
+4. **Native metadata extraction (NEW)** — After model is loaded into llama.cpp, extract richer metadata:
+
+```cpp
+// jni_bridge.cpp — NEW native functions
+JNIEXPORT jstring JNICALL Java_..._nativeGetModelArchitecture(JNIEnv* env, jobject) {
+    auto& engine = LlamaEngine::getInstance();
+    if (!engine.isLoaded()) return env->NewStringUTF("");
+    // llama.cpp API (version-dependent):
+    // const char* arch = llama_model_desc(engine.getModel());
+    // or from metadata: llama_model_meta_val_str(model, "general.architecture", buf, sizeof(buf));
+    return env->NewStringUTF(engine.getArchitecture().c_str());
+}
+
+JNIEXPORT jint JNICALL Java_..._nativeGetContextSize(JNIEnv* env, jobject) {
+    auto& engine = LlamaEngine::getInstance();
+    if (!engine.isLoaded()) return 0;
+    // return llama_n_ctx(engine.getContext());
+    return engine.getContextSize();
+}
+```
+
+### 5. Download-to-Load Pipeline
+
+**Current flow (already correct, needs file listing fix):**
+
+```
+User searches HF → HuggingFaceScreen
+  → huggingFaceRepository.searchModels(query, library="gguf")
+  → HuggingFaceApi GET /api/models?search=...&library=gguf&sort=downloads
+  → Returns List<HuggingFaceModel>
+
+User selects model → selectModel(model)
+  → huggingFaceRepository.getModelDetail(modelId)
+  → HuggingFaceApi GET /api/models/{modelId}
+  → Returns HuggingFaceModelDetail with siblings list
+  → HuggingFaceViewModel filters siblings to .gguf files only
+  → Shows sorted file list (by size)
+
+User downloads → downloadFile(modelId, fileName, fileSize)
+  → ModelDownloadManager.startDownload(downloadId, fileName, fileUrl, fileSizeBytes)
+  → WorkManager enqueues ModelDownloadWorker
+
+ModelDownloadWorker.doWork():
+  1. Restore checkpoint from Room (DownloadCheckpointDao)
+  2. OkHttp GET with Range header for resume
+  3. Write to context.filesDir/models/{filename}
+  4. Foreground notification with progress
+  5. On completion: GgufMetadataParser.parse(destFile)
+     → Save LocalModel to Room (name, filePath, sizeBytes, quantization, paramCount, architecture)
+  6. Delete checkpoint on success
+```
+
+**GGUF file listing gap (already working but subtle):**
+
+The `HuggingFaceApi.searchModels()` passes `library=gguf` which filters to GGUF-tagged models at the API level. The `HuggingFaceViewModel.selectModel()` filters siblings by `.gguf` extension. This is correct. The issue mentioned in PROJECT.md ("la búsqueda en Hugging Face lista modelos pero no muestra archivos .gguf") may be an API version mismatch — some HF API responses embed `siblings` in the search result (not just the detail endpoint). The DTO already has `HuggingFaceModel.siblings` field, so search results should carry sibling data. If not, a separate detail call per search result may be needed.
+
+**Validation pipeline (NEW — should add):**
+
+After download, before saving as a usable model, validate:
+1. File exists and size > 0
+2. `GgufMetadataParser.parse()` succeeds (not corrupt)
+3. Magic bytes = "GGUF"
+4. Architecture is a known type (llama, falcon, mistral, phi, etc.)
+5. Optional: test-load a minimal context (load model, create tiny context, run 1 token) — defer
+
+If validation fails, surface error to user, don't save invalid model to Room, delete corrupt file.
+
+### 6. Vulkan Backend Probing and Selection
+
+**What exists:**
+- `BackendDetector` probes `EGL14` (GPU presence) and `System.loadLibrary("OpenCL")` (OpenCL availability)
+- `probeBackend()` returns `BackendType.CPU` or `BackendType.GPU`
+- Result cached `@Volatile` for process lifetime
+- Used by `EngineManager.switchToLiteRT()` for LiteRT-LM backend selection
+- Not currently used for llama.cpp path (llama.cpp `ActiveEngine.backend` was always `null`)
+
+**What must change for Vulkan:**
+
+llama.cpp's GPU backend on Android uses **Vulkan** (not OpenCL, not OpenGL/EGL). Vulkan provides universal GPU compute on Android 7+ (API 24+) across all GPU vendors (Adreno, Mali, PowerVR, Xclipse). OpenCL is deprecated on Android and unreliable across vendors — many modern devices don't ship `libOpenCL.so` at all.
+
+**New Vulkan probing:**
 
 ```kotlin
-// data/local/inference/LiteRTLmEngine.kt
-@Singleton
-class LiteRTLmEngine @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val backendDetector: BackendDetector,
-) {
-    private var engine: Engine? = null
-    private var currentModelPath: String = ""
-    private val lock = Mutex()
+// BackendDetector.kt — MODIFIED
+@Synchronized
+fun probeBackend(): BackendType {
+    cachedBackend?.let { return it }
 
-    val isInitialized: Boolean get() = engine?.isInitialized() ?: false
-
-    suspend fun initialize(modelPath: String, preferredBackend: Backend? = null): Result<Unit> =
-        lock.withLock {
-            if (isInitialized && modelPath == currentModelPath) return Result.success(Unit)
-
-            // Close existing engine if switching models
-            engine?.close()
-            engine = null
-
-            val backend = preferredBackend ?: backendDetector.detectBestBackend(context)
-
-            val config = EngineConfig(
-                modelPath = modelPath,
-                backend = backend,
-                cacheDir = context.cacheDir.path,
-            )
-
-            return try {
-                withContext(Dispatchers.Default) {
-                    Engine(config).also { newEngine ->
-                        newEngine.initialize()
-                        engine = newEngine
-                        currentModelPath = modelPath
-                    }
-                }
-                Result.success(Unit)
-            } catch (e: LiteRtLmJniException) {
-                // Try fallback: GPU → CPU
-                if (backend !is Backend.CPU) {
-                    initialize(modelPath, Backend.CPU())
-                } else {
-                    Result.failure(e)
-                }
-            } catch (e: Exception) {
-                engine = null
-                Result.failure(e)
-            }
+    cachedBackend = try {
+        // Priority 1: Vulkan (for llama.cpp GPU acceleration)
+        if (isVulkanAvailable()) {
+            Timber.d("BackendDetector: Vulkan backend available")
+            BackendType.GPU
         }
-
-    fun createConversation(config: ConversationConfig = ConversationConfig()): Conversation {
-        check(isInitialized) { "Engine not initialized" }
-        return engine!!.createConversation(config)
-    }
-
-    suspend fun close() = lock.withLock {
-        engine?.close()
-        engine = null
-        currentModelPath = ""
-    }
-}
-```
-
-### 5.3 Backend Detection Service
-
-```kotlin
-// library/litertlm/BackendDetector.kt
-class BackendDetector @Inject constructor() {
-    fun detectBestBackend(context: Context): Backend {
-        // Priority: GPU > CPU (NPU requires native libraries not bundled by default)
-
-        // GPU detection: check for Vulkan/OpenCL support
-        if (hasGpuSupport(context)) {
-            return Backend.GPU()
+        // Priority 2: OpenCL + EGL (for LiteRT-LM path, existing)
+        else if (isOpenCLAvailable() && isEGLAvailable()) {
+            Timber.d("BackendDetector: OpenCL+EGL GPU backend available")
+            BackendType.GPU
         }
-
-        // CPU with optimal thread count
-        val threads = Runtime.getRuntime().availableProcessors().coerceIn(1, 8)
-        return Backend.CPU(numOfThreads = threads)
-    }
-
-    private fun hasGpuSupport(context: Context): Boolean {
-        return try {
-            // Check if OpenCL lib is loadable (LiteRT-LM uses OpenCL for GPU on Android)
-            System.loadLibrary("OpenCL")
-            true
-        } catch (e: UnsatisfiedLinkError) {
-            false
+        // Fallback: CPU only
+        else {
+            Timber.d("BackendDetector: no GPU backend available, falling back to CPU")
+            BackendType.CPU
         }
+    } catch (e: Exception) {
+        Timber.w(e, "BackendDetector: probe failed, falling back to CPU")
+        BackendType.CPU
+    }
+    return cachedBackend!!
+}
+
+// NEW
+fun probeVulkanBackend(): BackendType {
+    return if (isVulkanAvailable()) BackendType.GPU else BackendType.CPU
+}
+
+// NEW — checks for Vulkan runtime availability
+private fun isVulkanAvailable(): Boolean {
+    return try {
+        // Android ships libvulkan.so on API 24+. Try loading it.
+        System.loadLibrary("vulkan")
+        Timber.d("BackendDetector: libvulkan.so loaded — Vulkan runtime present")
+        true
+    } catch (e: UnsatisfiedLinkError) {
+        Timber.d("BackendDetector: libvulkan.so not found on this device")
+        false
     }
 }
 ```
 
----
+**Vulkan capability info (NEW):**
 
-## 6. Parameter Mapping
-
-### 6.1 GenerationParameters → LiteRT-LM SamplerConfig
-
-| Warped `GenerationParameters` | LiteRT-LM `SamplerConfig` | Mapping |
-|--------|----------|---------|
-| `temperature: Float` | `temperature: Double` | Direct cast |
-| `topP: Float` | `topP: Double` | Direct cast |
-| `topK: Int` | `topK: Int` | Direct pass |
-| `seed: Int` | `seed: Int` | Direct pass (default 0 if -1) |
-| `maxTokens: Int` | `EngineConfig.maxNumTokens` | Set at engine init, not per-request |
-| `contextSize: Int` | N/A | Built into model, not configurable |
-| `repeatPenalty: Float` | N/A | Not supported by current API |
-| `threads: Int` | `Backend.CPU(numOfThreads)` | Set at engine init, not per-request |
-| `reasoningEnabled: Boolean` | `channels` in ConversationConfig | Enable thinking channel if true |
-
-### 6.2 Parameter Hierarchy
-
-```
-Engine-scoped (set once on init, model-specific):
-  - maxNumTokens (maxTokens) → EngineConfig.maxNumTokens
-  - threads → Backend.CPU(numOfThreads)
-  - contextSize → model-inherent (not configurable)
-
-Conversation-scoped (set per chat() call):
-  - temperature, topP, topK, seed → ConversationConfig.samplerConfig
-  - reasoningEnabled → ConversationConfig.channels
-```
-
----
-
-## 7. Hugging Face Integration for LiteRT-LM Models
-
-### 7.1 Endpoint Differences
-
-| Aspect | GGUF (llama.cpp) | LiteRT-LM (.litertlm) |
-|--------|-----------------|----------------------|
-| HF Organization | All Hugging Face (TheBloke, bartowski, etc.) | `litert-community` org |
-| API filter | `?filter=gguf` | `?search=litertlm&author=litert-community` |
-| File extension | `.gguf` | `.litertlm` |
-| API endpoint | `GET /api/models` | Same (HF Hub API) |
-| Download URL | `/{repo}/resolve/main/{file}` | Same pattern |
-
-### 7.2 New Retrofit Interface (extend existing)
+After `System.loadLibrary("vulkan")` succeeds, we need more details for the user:
 
 ```kotlin
-// Same HF API, different query parameters
-interface HuggingFaceApi {
-    // Existing GGUF search
-    @GET("api/models")
-    suspend fun searchModels(
-        @Query("search") query: String,
-        @Query("filter") filter: String = "gguf",
-        @Query("sort") sort: String = "downloads",
-        @Query("limit") limit: Int = 20,
-    ): List<HFModel>
-
-    // NEW: LiteRT-LM model search
-    @GET("api/models")
-    suspend fun searchLiteRTLmModels(
-        @Query("search") query: String,
-        @Query("author") author: String = "litert-community",
-        @Query("sort") sort: String = "downloads",
-        @Query("limit") limit: Int = 20,
-    ): List<HFModel>
-}
-```
-
----
-
-## 8. ProviderRouter Changes
-
-```kotlin
-// Modified ProviderRouter.kt
-@Singleton
-class ProviderRouter @Inject constructor(
-    private val apiKeyStore: ApiKeyStore,
-    private val localLlmProvider: dagger.Lazy<LocalLlmProvider>,
-    private val liteRTLmProvider: dagger.Lazy<LiteRTLmProvider>,  // NEW
-) {
-    fun resolve(endpoint: Endpoint, modelId: String): LlmProvider {
-        return when (endpoint.apiType) {
-            // ... existing cases unchanged ...
-            ProviderType.LOCAL -> localLlmProvider.get().configure(modelId)
-            ProviderType.LITERT_LM -> liteRTLmProvider.get().configure(modelId)  // NEW
-        }
-    }
-}
-```
-
----
-
-## 9. DI Module Changes
-
-```kotlin
-// ProviderModule.kt — added LiteRT-LM bindings
-@Module
-@InstallIn(SingletonComponent::class)
-abstract class ProviderModule {
-    @Binds
-    abstract fun bindLiteRTLmEngine(impl: LiteRTLmEngine): LiteRTLmEngine  // NEW
-
-    companion object {
-        @Provides
-        @Singleton
-        fun provideLiteRTLmProvider(
-            engine: LiteRTLmEngine,
-        ): LiteRTLmProvider = LiteRTLmProvider(engine)  // NEW
-    }
-}
-```
-
----
-
-## 10. Data Flow: LiteRT-LM Chat (full path)
-
-```
-User types message in ChatScreen
-  → ChatViewModel.sendMessage(text)
-    → SendMessageUseCase.execute(conversationId, text)
-      → ChatRepository.sendMessage(...)
-        → EndpointRepository.getActive() → Endpoint(apiType = LITERT_LM)
-        → ProviderRouter.resolve(endpoint) → LiteRTLmProvider
-          → LiteRTLmEngine.initialize(modelPath)        [if not already]
-          → LiteRTLmEngine.createConversation(config)
-            → config includes: initialMessages from ChatRequest + samplerConfig
-          → conversation.sendMessageAsync() → Flow<Message>
-            → each Message has .text with accumulated content
-            → compute delta = currentText - previousText
-            → emit StreamToken.Delta(delta)
-          → on complete: emit StreamToken.Done()
-          → always: conversation.close()
-        ← ProviderRouter returns Flow<StreamToken>
-      ← ChatRepository persists message via Room
-    ← UseCase returns Flow<StreamState>
-  ← ViewModel collects Flow, updates StateFlow<ChatUiState>
-← ChatScreen recomposes with new token
-```
-
-**Comparison with existing local path:** Identical from ChatViewModel down through ProviderRouter. Only the ProviderRouter branch changes. The ViewModel and UI never know it's LiteRT-LM vs llama.cpp vs remote.
-
----
-
-## 11. Architecture Patterns
-
-### Pattern 1: Provider Polymorphism (existing, unchanged)
-
-All providers implement `LlmProvider`. UI is completely decoupled from engine specifics. LiteRT-LM is just another implementation — no architectural change needed.
-
-**Why this works without change:** Even though LiteRT-LM has a fundamentally different API (stateful Engine→Conversation vs stateless prompt-based), the `chat()` method signature abstracts this away. The wrapping in `LiteRTLmProvider` is the adapter.
-
-### Pattern 2: Per-Call Conversation (new)
-
-LiteRT-LM's stateful `Conversation` is mapped to a stateless interface by creating and closing a `Conversation` per `chat()` call.
-
-**When to use:** Any time a stateful SDK must be used through a stateless interface.
-
-**Trade-offs:**
-- **Pro:** Clean isolation between chat instances, no stale KV cache accumulation
-- **Pro:** Matches existing architecture without interface changes
-- **Con:** Slightly slower per-call startup (creating Conversation is fast, ~10ms — only Engine initialization takes seconds)
-- **Con:** Cannot support true multi-turn stateful chats through the interface (but this matches current design — each `chat()` always sends full history)
-
-### Pattern 3: Backend Fallback Chain (new)
-
-```kotlin
-// Try backends in order: NPU → GPU → CPU
-fun resolveBackend(selected: Preference): Backend {
-    return when (selected) {
-        AUTO -> {
-            if (canUseNPU(context)) Backend.NPU(nativeLibraryDir)
-            else if (canUseGPU()) Backend.GPU()
-            else Backend.CPU(getOptimalThreads())
-        }
-        GPU -> Backend.GPU()
-        CPU -> Backend.CPU(getOptimalThreads())
-        NPU -> Backend.NPU(nativeLibraryDir)
-    }
-}
-```
-
-**When to use:** Engine initialization. If GPU init fails, auto-retry with CPU before surfacing error to user.
-
----
-
-## 12. Anti-Patterns to Avoid
-
-### Anti-Pattern 1: Long-Lived Conversation Reuse
-
-**What people do:** Create one `Conversation` at model load, reuse it for all `chat()` calls.
-
-**Why it's wrong:**
-- KV cache accumulates all messages across all conversations
-- Memory grows unbounded
-- Switching between chats carries old context into new chats
-- `maxNumTokens` exhaustion causes truncation at unpredictable points
-
-**Do this instead:** Create fresh `Conversation` per `chat()` call. Engine initialization is the expensive part (~5-10s) — `createConversation()` is cheap (~10ms). Keep the Engine alive, not the Conversation.
-
-### Anti-Pattern 2: Hardcoding Backend
-
-**What people do:** Always use `Backend.GPU()`.
-
-**Why it's wrong:** Many Android devices lack GPU libraries, have incompatible drivers, or crash on GPU inference. `LiteRtLmJniException` during init causes unhandled failures.
-
-**Do this instead:** Runtime backend detection. Try GPU, catch failure, fall back to CPU. Surface the actual backend used in UI. Allow user override.
-
-### Anti-Pattern 3: Blocking UI Thread During Engine Initialize
-
-**What people do:** Call `engine.initialize()` on the main thread.
-
-**Why it's wrong:** `initialize()` can take 5-10 seconds. This guarantees ANR.
-
-**Do this instead:** Always call on `Dispatchers.Default` (CPU-bound, not IO-bound). The existing `LiteRTLmEngine.initialize()` already wraps in `withContext(Dispatchers.Default)`. Show loading indicator in UI while model initializes.
-
----
-
-## 13. Modified vs New Components Summary
-
-### New (created from scratch)
-
-| Component | Purpose | Module |
-|-----------|---------|--------|
-| `LiteRTLmEngine` | Wraps LiteRT-LM `Engine` lifecycle | `:library:litertlm` |
-| `LiteRTLmProvider` | Implements `LlmProvider` for LiteRT-LM | `data/local/inference/` |
-| `BackendDetector` | Runtime GPU/NPU/CPU capability detection | `:library:litertlm` |
-| `LiteRTLmModelRepository` | litert-community HF search API methods | `data/repository/` (or extend existing) |
-| `LiteRTLmEngineConfig` | Domain model for engine-scoped params | `data/local/inference/` |
-
-### Modified (additions to existing)
-
-| Component | Change | Why |
-|-----------|--------|-----|
-| `ProviderType` enum | Add `LITERT_LM` | UI needs separate tab/filter |
-| `ProviderRouter` | Add `LITERT_LM → liteRTLmProvider` case | Routing to correct provider |
-| `ProviderModule` (DI) | Add `LiteRTLmEngine` and `LiteRTLmProvider` bindings | Hilt dependency graph |
-| `HuggingFaceApi` (Retrofit) | Add `searchLiteRTLmModels()` method | litert-community endpoint |
-| `DownloadManager` | Add `.litertlm` extension support | Download .litertlm files |
-| `ModelsScreen` | Add second tab "GGUF \| LiteRT-LM" | Separate model ecosystems |
-| `SettingsScreen` | Add backend preference (Auto/GPU/CPU/NPU) | User control over acceleration |
-| `build.gradle.kts` | Add `litertlm-android` Maven dependency | Library dependency |
-| `AndroidManifest.xml` | Add `<uses-native-library>` for GPU | Required by LiteRT-LM GPU |
-
-### Unchanged (no modifications)
-
-| Component | Reason unchanged |
-|-----------|-----------------|
-| `LlmProvider` interface | Same contract works for LiteRT-LM |
-| `ChatRequest`, `StreamToken`, `ChatMessage` | Same domain models |
-| `GenerationParameters` | Map fields in data layer, no domain change |
-| `ChatViewModel`, `ChatScreen` | Provider-agnostic by design |
-| `Room` schema (conversations, messages) | Same chat data model |
-| `Endpoint` entity | Already has `apiType: ProviderType` field |
-| `DataStore`, `Keystore` | No change needed |
-| `:library:llama-native` | Unchanged — coexistence, not replacement |
-| `Remote providers` (OpenAI, Ollama, etc.) | Unchanged |
-| `WorkManager`, `Coroutine` infrastructure | Unchanged |
-
----
-
-## 14. Suggested Build Order for LiteRT-LM Integration
-
-This is the build order within the v1.1 milestone, assuming the v1.0 codebase (with working llama.cpp) exists:
-
-### Phase 1: Engine Integration (deepest dependency, no UI)
-
-```
-:library:litertlm module
-  ├── BackendDetector (GPU detection logic)
-  ├── LiteRTLmEngine (lifecycle wrapper)
-  └── LiteRTLmEngineConfig (engine-scoped params)
-
-DI bindings (ProviderModule)
-  └── Provide LiteRTLmEngine as @Singleton
-
-Gradle dependency
-  └── com.google.ai.edge.litertlm:litertlm-android:0.10.2
-```
-
-**Why first:** Everything else depends on being able to load a `.litertlm` model and get tokens. This is the foundation. Testable with a tiny model (Gemma-3N-1B or FunctionGemma-270M) without any UI.
-
-**Deliverable:** Unit test proving `LiteRTLmEngine.initialize(path)` → `createConversation().sendMessageAsync()` returns tokens.
-
-### Phase 2: Provider Integration (domain → data wiring)
-
-```
-Domain layer
-  └── ProviderType.LITERT_LM added
-
-Data layer
-  ├── LiteRTLmProvider (implements LlmProvider)
-  └── ProviderRouter.resolve() → LITERT_LM case
-
-Parameter mapping
-  └── GenerationParameters → SamplerConfig converter
-```
-
-**Why second:** Wires the engine into the existing architecture. Enables switching provider type in Endpoint to `LITERT_LM` and routing chat through the new provider.
-
-**Deliverable:** Integration test proving chat pipeline works end-to-end (Endpoint with LITERT_LM type → chat → tokens stream back).
-
-### Phase 3: Model Acquisition (download + management)
-
-```
-Hugging Face integration
-  └── HuggingFaceApi.searchLiteRTLmModels() (litert-community)
-  └── ModelRepository: .litertlm model metadata in Room
-
-DownloadManager
-  └── .litertlm extension support
-  └── litert-community download URLs
-
-Import
-  └── SAF file picker filters for .litertlm
-```
-
-**Why third:** Users need models on device to use the engine. Reuses existing download infrastructure — only different HF endpoint and file extension.
-
-**Deliverable:** User can search litert-community, download `.litertlm`, see model in library.
-
-### Phase 4: UI Integration (tabs, settings, UX)
-
-```
-ModelsScreen
-  └── Tabs: "GGUF" | "LiteRT-LM"
-  └── Each tab filters by format extension
-
-SettingsScreen
-  └── Backend preference: Auto | GPU | CPU | NPU
-  └── Per-model backend override in model detail
-
-ChatScreen
-  └── No changes needed (provider-agnostic)
-  └── Optional: backend badge in chat header
-```
-
-**Why fourth:** UI is the thin layer on top. By this point, the engine works, the provider works, and models can be acquired. This phase makes it user-facing.
-
-**Deliverable:** Full user flow: discover model → download → chat → with correct backend badge.
-
-### Phase 5: Polish & Edge Cases
-
-```
-Backend fallback UX
-  └── Show "GPU failed, falling back to CPU" toast
-  └── Persist backend preference per model
-
-Error recovery
-  └── Engine init failure → retry with different backend
-  └── Conversation error → clear state, re-init
-
-Memory management
-  └── Close engine when all LiteRT-LM conversations idle
-  └── Unload on app background
-```
-
-**Why last:** Polish after core path works.
-
----
-
-## 15. Cross-Cutting Concerns
-
-### 15.1 Memory: Two Engines Loaded Simultaneously
-
-**Problem:** llama.cpp model (~4GB) + LiteRT-LM model (~4GB) = 8GB+ RAM. Many devices have 8GB total.
-
-**Mitigation:**
-- Only one engine is loaded at a time. When user switches from GGUF tab to LiteRT-LM tab, unload the llama.cpp model first.
-- `LiteRTLmEngine.close()` + `LlamaEngine.unload()` are called on tab switch.
-- Show confirmation dialog: "Switching engine will unload current model. Continue?"
-- Memory check before load: `model_size * 1.2 < available_memory - 500MB_headroom`
-
-### 15.2 Thread Safety
-
-**Existing:** `LlamaEngine` uses callback-based JNI with `callbackFlow{}`. `LocalLlmProvider` uses `flowOn(Dispatchers.Default)`.
-
-**LiteRT-LM:** The `Engine` and `Conversation` internally synchronize with `synchronized(lock)` blocks (verified in source). `sendMessageAsync` runs on a native thread that calls back into Kotlin. Kotlin-side `callbackFlow {}` bridges to coroutines.
-
-**Recommendation:** Same pattern — `LiteRTLmProvider.chat()` runs on `Dispatchers.Default`. The `LiteRTLmEngine` uses a `Mutex` for initialization and closing. Conversations are inherently serial per-engine (the native engine serializes).
-
-### 15.3 Process Death
-
-**Existing pattern:** llama.cpp runs in app process. Native crash takes down entire app. Planned mitigation: separate `:inference` process.
-
-**LiteRT-LM:** Also runs in-process. Same risk profile. LiteRT-LM's JNI layer handles native errors via `LiteRtLmJniException`. No SIGSEGV recovery yet — same mitigation (separate process) applies to both engines.
-
-### 15.4 Thermal Throttling
-
-**Existing:** `PowerManager.getCurrentThermalStatus()` for llama.cpp.
-
-**LiteRT-LM:** Same approach. Monitor thermal status during streaming. Pause on `THERMAL_STATUS_SEVERE`. LiteRT-LM's `Conversation` cannot be paused mid-inference — must either let it complete or close it and re-create.
-
-### 15.5 Coexistence with Remote Providers
-
-Zero impact. Remote providers use `ProviderType.OPENAI/OLLAMA/...` completely independent code paths. ProviderRouter dispatches to correct implementation without awareness of other providers.
-
----
-
-## 16. Testing Strategy
-
-### 16.1 Unit Tests (JVM, no device)
-
-| Test | What it verifies |
-|------|-----------------|
-| `LiteRTLmEngine` lifecycle mock | Init → initialized → create conversation → close works |
-| `LiteRTLmProvider.chat()` | Maps ChatRequest → ConversationConfig correctly |
-| `BackendDetector.detectBestBackend()` | Returns GPU > CPU based on capability flags |
-| Parameter mapping | GenerationParameters → SamplerConfig is correct for all edge values |
-| `ProviderRouter.resolve(LITERT_LM)` | Returns `LiteRTLmProvider` instance |
-
-### 16.2 Integration Tests (instrumented, real device)
-
-| Test | What it verifies |
-|------|-----------------|
-| Engine init with tiny model (<100MB) | `initialize()` succeeds, `isInitialized() = true` |
-| Streaming chat round-trip | Send text → receive stream of tokens → final Done |
-| Engine close and re-init | Close → re-initialize with same/different model |
-| Backend fallback | GPU unavailable → CPU fallback succeeds |
-| Conversation isolation | Two sequential `chat()` calls don't leak context |
-
-### 16.3 UI Tests (Compose Test)
-
-| Test | What it verifies |
-|------|-----------------|
-| ModelsScreen tabs | Tap "LiteRT-LM" tab → shows litert-community models |
-| Backend preference | Select GPU in settings → preference persisted in DataStore |
-| Chat with LiteRT-LM | Full UI flow: open chat, send message, see streaming tokens |
-
----
-
-## 17. Risk Assessment
-
-| Risk | Severity | Probability | Mitigation |
-|------|----------|-------------|------------|
-| LiteRT-LM Maven artifact incompatible with project AGP/NDK version | Medium | Low | LiteRT-LM publishes to Google Maven with Gradle metadata. Test early in Phase 1. |
-| GPU backend crashes on specific SoCs (Mali, PowerVR) | Medium | Medium | Backend fallback chain. CPU is always available. Log GPU failures per device model for blocklist. |
-| Engine init time (5-10s) UX friction | Medium | High | Show loading progress. Cache engine in memory while app is in foreground. Clear "initializing model..." UI state. |
-| Two engines loaded simultaneously exhaust RAM | High | Low (preventable) | Enforce single-engine-at-a-time. Memory guard before initialization. |
-| LiteRT-LM model format API breaks in future release | Low | Low | Pin to known version in Gradle. Test before upgrading. |
-
----
-
-## Appendix A: Complete LiteRT-LM API Surface (for Integration)
-
-### Engine initialization
-```kotlin
-val config = EngineConfig(
-    modelPath = "/path/to/model.litertlm",
-    backend = Backend.GPU(),              // CPU(), NPU(nativeLibraryDir)
-    maxNumTokens = 8192,                  // max input+output tokens (null = model default)
-    cacheDir = context.cacheDir.path,     // speeds up 2nd load time
+// BackendDetector.kt — NEW
+data class VulkanInfo(
+    val deviceName: String,       // e.g., "Adreno 750"
+    val apiVersion: String,       // e.g., "1.3"
+    val maxComputeSharedMemorySize: Long,  // bytes
+    val hasFloat16Support: Boolean,
+    val hasInt8Support: Boolean
 )
-val engine = Engine(config)
-engine.initialize()  // BLOCKING — 5-10s, run on background thread
-engine.close()       // release resources
-engine.isInitialized() // check state
+
+// This requires native JNI — can't query Vulkan capabilities from pure Kotlin.
+// Add to jni_bridge.cpp:
+// JNIEXPORT jobject JNICALL Java_..._BackendDetector_nativeGetVulkanInfo(JNIEnv* env, jclass)
 ```
 
-### Conversation creation & messaging
+**Runtime backend selection logic:**
+
+When user loads a GGUF model:
+1. `BackendDetector.probeBackend()` returns `GPU` or `CPU`
+2. If `GPU`: pass `nGpuLayers = 99` (offload all layers to GPU) to `llamaEngine.loadModel()`
+3. If `CPU`: pass `nGpuLayers = 0` (pure CPU inference)
+4. `llama.cpp` internally selects Vulkan or CPU backend based on compile-time flags and runtime params
+
+**Compile-time configuration:**
+
+```cmake
+# CMakeLists.txt — MODIFIED
+option(GGML_VULKAN "Vulkan GPU backend" ON)
+option(GGML_VULKAN_CHECK_RESULTS "Check Vulkan results" ON)
+
+if(GGML_VULKAN)
+    add_subdirectory(${LLAMA_CPP_DIR}/ggml/src/ggml-vulkan ${CMAKE_BINARY_DIR}/ggml-vulkan)
+    target_link_libraries(warped_llama ggml-vulkan)
+    target_compile_definitions(warped_llama PRIVATE GGML_USE_VULKAN=1)
+endif()
+```
+
+**GPU layer offloading strategy:**
+- `nGpuLayers = 0` → pure CPU (always works, slower)
+- `nGpuLayers = 99` → all layers to GPU (fastest, requires enough VRAM)
+- `nGpuLayers = N` → partial offload (balanced, requires tuning per-device)
+
+Initial implementation should use `nGpuLayers = 0` for safety, then enable Vulkan offloading as a user toggle once stable.
+
+### 7. Streaming Token Flow (Native → Kotlin → ViewModel)
+
+**Data flow chain:**
+```
+llama.cpp inference loop (C++, jni_bridge.cpp)
+  │ on each token
+  ▼
+JNI callback: TokenCallback.onToken(token: String, done: Boolean)
+  │ called on JNI thread (not Kotlin coroutine thread)
+  ▼
+Kotlin callbackFlow { trySend(token) }
+  │ structured concurrency, thread-safe channel
+  ▼
+LocalLlmProvider.chat(request): Flow<StreamToken>
+  │ wraps generate() → maps String tokens to StreamToken.Delta
+  │ flowOn(Dispatchers.Default)
+  ▼
+ChatViewModel.sendMessage()
+  │ provider.chat(request).collect { token → ... }
+  │ 50ms debounce → update UI state
+  ▼
+ChatScreen composable (collectAsStateWithLifecycle)
+```
+
+**The critical thread transition:**
+```
+JNI thread (C++)           Coroutine context (Kotlin)
+      │                           │
+      │──onToken("Hello")────────▶│ trySend("Hello") → Channel
+      │                           │
+      │──onToken(" world")───────▶│ trySend(" world") → Channel
+      │                           │
+      │──onToken("!", done=true)─▶│ trySend("!") → close()
+                                  │
+                                  │─flowOn(Dispatchers.Default)─▶
+                                  │   emit StreamToken.Delta(token)
+                                  │
+                                  │─collect on Main──▶
+                                  │   update MutableStateFlow<ChatUiState>
+```
+
+**Thread safety in `callbackFlow`:**
+
+`trySend()` is thread-safe and non-blocking — it's designed for exactly this JNI callback pattern. `awaitClose { nativeStop() }` ensures proper cleanup when the Flow collector cancels (e.g., user taps stop, or ViewModel scope ends).
+
+**Potential issue: JNI thread overload**
+
+If the native `generate()` loop runs on the calling thread (which it does — `nativeGenerate` is blocking), then the coroutine thread that calls `flowOn(Dispatchers.Default)` is *waiting* on the native call. The JNI callbacks fire from **the same thread** that called `nativeGenerate` (llama.cpp runs inference on the calling thread). This means:
+- The coroutine worker thread IS the inference thread
+- `trySend()` from within the callback might block if the Channel buffer is full
+- Default `callbackFlow` buffer is `Channel.RENDEZVOUS` (0) — this causes `trySend` to fail if no collector is ready
+
+**Fix: Use BUFFERED channel**
+
 ```kotlin
-val convConfig = ConversationConfig(
-    systemInstruction = Contents.of("You are a helpful assistant."),
-    initialMessages = listOf(Message.user("Hello")),
-    samplerConfig = SamplerConfig(topK = 40, topP = 0.95, temperature = 0.8, seed = 0),
-)
-val conv = engine.createConversation(convConfig)
-
-// Streaming with Flow
-conv.sendMessageAsync("What is AI?").collect { message ->
-    println(message.text)  // accumulated text per chunk (not delta)
-}
-
-// Sync (full response)
-val response = conv.sendMessage("What is AI?")
-
-conv.close()
+// LlamaEngine.kt — MODIFIED
+fun generate(prompt: String): Flow<String> = callbackFlow {
+    val callback = object : TokenCallback {
+        override fun onToken(token: String, done: Boolean) {
+            if (done) close()
+            else if (token.isNotEmpty()) trySend(token)
+        }
+    }
+    nativeGenerate(prompt, callback)
+    awaitClose { nativeStop() }
+}.buffer(Channel.BUFFERED)  // NEW: prevent trySend failure when Channel is full
+ .flowOn(Dispatchers.Default)
 ```
 
-### Message types
+`buffer(Channel.BUFFERED)` = 64 element buffer by default. Tokens are small strings — this is safe and prevents dropped tokens.
+
+**Prompt templating (NEW — currently hardcoded ChatML):**
+
+`LocalLlmProvider.buildPrompt()` uses a hardcoded ChatML template (`<|system|>`, `<|user|>`, `<|assistant|>`). Different models expect different templates:
+- Llama-3: `<|begin_of_text|><|start_header_id|>system<|end_header_id|>...`
+- Mistral: `[INST] ... [/INST]`
+- DeepSeek: `User: ...\n\nAssistant:`
+- Gemma: `<start_of_turn>user\n...<end_of_turn>\n<start_of_turn>model\n`
+
+**Defer:** Initial implementation uses llama.cpp's built-in chat template via `llama_chat_apply_template()` which reads the template from the GGUF metadata. The JNI wrapper calls this to format the prompt correctly per-model. In the future, expose template selection in UI.
+
+### 8. Thread Safety for JNI Calls from Coroutines
+
+**Problem:** Multiple coroutines could call `LlamaEngine.generate()` concurrently (e.g., user rapidly taps send, or a bug). The native C++ `LlamaEngine` is a singleton — concurrent `generate()` calls would corrupt model state.
+
+**Current state:** `EngineManager` uses `@Synchronized` on public methods, but `LocalLlmProvider.chat()` calls `llamaEngine.generate()` directly (bypasses EngineManager). `ChatViewModel.sendMessage()` uses a `generationJob` that prevents concurrent sends from the UI, but doesn't protect against programmatic calls.
+
+**Solution: Layered protection**
+
+1. **UI layer:** `ChatViewModel.sendMessage()` already uses `generationJob` to prevent duplicate sends (existing, correct)
+
+2. **Provider layer:** `LocalLlmProvider.chat()` checks `llamaEngine.isLoaded()` before calling `generate()`, but doesn't guard against concurrent calls
+
+3. **Engine layer:** `LlamaEngine.generate()` should be `@Synchronized` at the Kotlin level (NEW)
+
+4. **Native layer:** `LlamaEngine::generate()` in C++ already has `shouldStop` flag for cancellation, but no mutex (NEW — add `std::mutex`)
+
 ```kotlin
-Message.user("text")                   // User message
-Message.user(Contents.of(...))         // User with multi-modal content
-Message.model("response text")         // Model response (for initialMessages)
-Message.system("system prompt")        // System message (for initialMessages)
-Message.tool(Contents.of(...))         // Tool response (manual tool calling)
+// LlamaEngine.kt — MODIFIED
+@Synchronized  // NEW
+fun generate(prompt: String): Flow<String> = callbackFlow {
+    // ... (existing code)
+}.buffer(Channel.BUFFERED)
+ .flowOn(Dispatchers.Default)
 ```
 
-### Backend details
-```kotlin
-Backend.CPU(numOfThreads = 4)          // null/0 = auto
-Backend.GPU()                          // Requires <uses-native-library> in manifest
-Backend.NPU(nativeLibraryDir = "...")  // Requires NPU libs bundled or downloaded
+```cpp
+// jni_bridge.h — MODIFIED
+class LlamaEngine {
+private:
+    std::mutex generateMutex;
+    // ...
+};
 ```
+
+**Threading summary table:**
+
+| Operation | Kotlin Dispatcher | Native Thread | Synchronization |
+|-----------|-------------------|---------------|-----------------|
+| `loadModel` | `Dispatchers.Default` | Calling thread (blocking) | `@Synchronized` + native mutex |
+| `generate` | `Dispatchers.Default` | Calling thread (blocking) | `@Synchronized` + native mutex |
+| `stop` | Any | Any | Native mutex + `shouldStop` flag |
+| `unload` | `Dispatchers.Default` | Calling thread | `@Synchronized` + native mutex |
+| `isLoaded` | Any | Calling thread | Native atomic flag |
+| Token callback | JNI thread | Same as generate thread | `callbackFlow` Channel |
+
+## New vs Modified Components
+
+### NEW Components
+
+| Component | Package | Purpose |
+|-----------|---------|---------|
+| `VulkanInfo` data class | `data/local/inference/` | Vulkan device capabilities (adapter name, VRAM, compute support) |
+| `GgufValidator` | `data/local/inference/` | Post-download GGUF file validation (magic bytes, architecture check) |
+| `PromptTemplate` enum + resolver | `domain/model/` | Per-model chat template selection (deferred to later phase) |
+| `llama.cpp` source (vendored) | `app/src/main/cpp/llama.cpp/` | Compiled llama.cpp library (ggml, llama, common) |
+| `ggml-vulkan` source (vendored) | `app/src/main/cpp/ggml-vulkan/` | Vulkan backend for GGML |
+
+### MODIFIED Components
+
+| Component | Change Summary |
+|-----------|---------------|
+| `LlamaEngine.kt` | `@Synchronized` on `generate()`, add `.buffer(Channel.BUFFERED)`, add Vulkan params to `loadModel()`, add new native methods for Vulkan info and metadata |
+| `jni_bridge.cpp` | Implement real llama.cpp calls (model load, generate loop, tokenization, sampling), add global JNI ref management, add Vulkan info queries |
+| `jni_bridge.h` | Add Vulkan params to `loadModel`, add mutex for `generate`, add metadata extraction |
+| `CMakeLists.txt` | Add llama.cpp source files, GGML Vulkan backend, cross-compilation config |
+| `EngineManager.kt` | `switchToLlama()` passes Vulkan params from `BackendDetector`, `ActiveEngine.backend` populated for llama.cpp |
+| `BackendDetector.kt` | Add `isVulkanAvailable()`, prioritize Vulkan over OpenCL, add `probeVulkanBackend()` |
+| `LocalLlmProvider.kt` | Pass `GenerationParameters` to `llamaEngine.generate()`, use native chat template instead of hardcoded ChatML |
+| `ChatViewModel.kt` | Tighter memory check using `ActivityManager.MemoryInfo`, OOM catch in `preloadLocalModel()` |
+| `GgufMetadataParser.kt` | Complete the `mapQuantization` table for all GGUF v3 quantizations, fix `parameterCount` extraction |
+| `ModelDownloadWorker.kt` | Add GGUF validation step after download (call `GgufValidator`) |
+| `AndroidManifest.xml` | Add `android:largeHeap="true"` |
+| `InferenceModule.kt` | No structural changes, but ensure `LlamaEngine` provider accounts for new dependencies |
+
+### UNCHANGED Components
+
+| Component | Why Unchanged |
+|-----------|--------------|
+| `ProviderRouter` | Already dispatches `LOCAL` to `LocalLlmProvider` — no routing change needed |
+| `ChatRepository` / `ChatRepositoryImpl` | Chat storage unchanged — messages flow the same regardless of provider |
+| `ChatScreen` (Compose) | UI unchanged — streams tokens from `ChatUiState.streamingContent` which works for any provider |
+| `ModelsScreen` / `ModelsViewModel` | Already displays `LocalModel.quantization`, `parameterCount`, `architecture` from Room — feeds from GGUF metadata parser |
+| `HuggingFaceScreen` / `HuggingFaceViewModel` | Already filters `.gguf` siblings — works; may need API detail call fix |
+| `HuggingFaceApi` / `HuggingFaceRepository` | API unchanged — endpoints already support GGUF model listing |
+| `LiteRTLmEngine` / `LiteRTLmProvider` | No changes — GGUF path is independent |
+| `Domain models` (ChatMessage, Conversation, etc.) | Unchanged — all models are provider-agnostic |
+| `Room entities / DAOs` | Unchanged — `LocalModel` table already has GGUF fields |
+| `ModelImportManager` | Already handles `.gguf` imports via `GgufMetadataParser` — unchanged |
+
+## Data Flow: GGUF Chat (End-to-End)
+
+```
+User taps send on ChatScreen
+  │
+  ▼
+ChatViewModel.sendMessage(text, images=[])
+  │ 1. Validate model selected
+  │ 2. Create user ChatMessage, save to Room
+  │ 3. Resolve provider: ProviderRouter.resolveLocal(LOCAL, modelId)
+  │    → LocalLlmProvider.configure(modelFilePath)
+  │ 4. Check engine loaded → if not, preloadLocalModel(modelId)
+  │    → Memory check (ActivityManager.MemoryInfo, 80% threshold)
+  │    → withContext(Dispatchers.Default) {
+  │        engineManager.switchToLlama(modelPath, nGpuLayers=0|99)
+  │          → backendDetector.probeBackend() → GPU (Vulkan) or CPU
+  │          → llamaEngine.loadModel(path, threads=N, ctx=4096, nGpuLayers, useVulkan)
+  │            → JNI → nativeLoadModel → llama_load_model_from_file()
+  │            → llama_new_context_with_model()
+  │      }
+  │ 5. Build ChatRequest(messages, parameters, images=[])
+  │ 6. provider.chat(request).collect { token → ... }
+  │
+  ▼
+LocalLlmProvider.chat(request): Flow<StreamToken>
+  │ 1. Check llamaEngine.isLoaded()
+  │ 2. if not loaded: auto-load (same as preloadLocalModel)
+  │ 3. format prompt via llama_chat_apply_template() [deferred: use built-in]
+  │ 4. llamaEngine.generate(prompt, params).collect { token → ... }
+  │    .flowOn(Dispatchers.Default)
+  │
+  ▼
+LlamaEngine.generate(prompt): Flow<String>
+  │ callbackFlow { callback → nativeGenerate(prompt, callback) }
+  │ .buffer(Channel.BUFFERED)
+  │
+  ▼
+jni_bridge.cpp: LlamaEngine::generate(prompt, callback)
+  │ 1. Tokenize prompt → llama_tokenize()
+  │ 2. Create llama_batch
+  │ 3. Inference loop:
+  │    while (!shouldStop) {
+  │      llama_decode(ctx, batch)
+  │      llama_sample_*() → next token
+  │      token_str = llama_token_to_piece()
+  │      callback(token_str, done=false)
+  │      if (next_token == EOS) break
+  │    }
+  │ 4. callback("", done=true)
+  │
+  ▼ (back in Kotlin)
+ChatViewModel.sendMessage() collector:
+  │ StreamToken.Delta → 50ms buffer → update streamingContent
+  │ StreamToken.Done → save assistant message to Room, clear streaming
+  │ StreamToken.Error → surface ChatError
+  │
+  ▼
+ChatScreen composable:
+  │ collectAsStateWithLifecycle(uiState)
+  │ LazyColumn with streamingContent updated every 50ms
+```
+
+## Integration Points Summary
+
+| Integration Point | Existing Hook | Status | Action |
+|------------------|---------------|--------|--------|
+| ChatViewModel → llama.cpp | `ProviderRouter.resolveLocal(LOCAL)` → `LocalLlmProvider` | Works | Harden memory check, add OOM catch |
+| Model download → load pipeline | `ModelDownloadWorker` → `GgufMetadataParser` → Room → `ChatViewModel.preloadLocalModel()` | Works | Add GGUF validation step |
+| Engine lifecycle | `EngineManager.switchToLlama()` | Works | Pass Vulkan backend params through |
+| Token streaming | `callbackFlow` in `LlamaEngine.generate()` | Works | Add `.buffer(Channel.BUFFERED)`, `@Synchronized` |
+| GGUF metadata | `GgufMetadataParser` standalone, `LlamaEngine.getModelInfo()` stub | Partial | Complete quantization map, add native metadata extraction |
+| Vulkan backend | `BackendDetector` probes EGL+OpenCL (not Vulkan) | Needs Vulkan | Add `isVulkanAvailable()`, prioritize over OpenCL |
+| Memory management | `MemoryChecker` + `preloadLocalModel()` | Partial | Add `ActivityManager.MemoryInfo`, use 1.3× size estimate |
+| Thread safety | EngineManager `@Synchronized` | Partial | Add `@Synchronized` to `LlamaEngine.generate()`, native mutex |
+| JNI global refs | `nativeGenerate` uses callback object directly | Risky | Add `NewGlobalRef`/`DeleteGlobalRef` in JNI |
+
+## Build Order Dependencies
+
+```
+Phase 1: CMake + llama.cpp compilation
+  ├── CMakeLists.txt update (add llama.cpp source)
+  ├── NDK cross-compilation config (arm64-v8a, x86_64)
+  └── Verify libwarped_llama.so builds with real llama.cpp symbols
+
+Phase 2: JNI bridge — model loading
+  ├── Implement real nativeLoadModel (llama_load_model_from_file)
+  ├── Implement nativeUnload (llama_free)
+  ├── Implement nativeIsLoaded (check model pointer)
+  ├── Implement nativeGetModelInfo (llama_model_desc)
+  ├── Fix JNI global ref management
+  └── Test: load a tiny GGUF (TinyLlama 1B), verify loaded state
+
+Phase 3: JNI bridge — token generation
+  ├── Implement nativeGenerate (llama_tokenize → decode loop → callback)
+  ├── Pass GenerationParameters to native (temperature, topK, topP, seed, threads)
+  ├── Implement nativeStop (shouldStop flag)
+  ├── Add @Synchronized + native mutex for thread safety
+  └── Test: generate a single response end-to-end
+
+Phase 4: Vulkan backend
+  ├── Add isVulkanAvailable() to BackendDetector
+  ├── Add GGML_VULKAN to CMake compilation
+  ├── Pass nGpuLayers to loadModel
+  ├── Add VulkanInfo JNI query
+  └── Test: GPU offloading on supported devices, CPU fallback on others
+
+Phase 5: Production hardening
+  ├── .buffer(Channel.BUFFERED) on callbackFlow
+  ├── ActivityManager.MemoryInfo + 1.3× RAM estimate
+  ├── OOM catch in preloadLocalModel
+  ├── GGUF validation post-download
+  ├── Complete quantization mapping table
+  ├── android:largeHeap="true" in manifest
+  └── Test: memory pressure, device rotation, process death
+```
+
+## Anti-Patterns to Avoid
+
+### Anti-Pattern 1: Loading model on Main thread
+**What people do:** Call `llamaEngine.loadModel()` from `ChatViewModel` without `withContext(Dispatchers.Default)`.
+**Why wrong:** Model loading is a blocking I/O + compute operation that can take 10-30 seconds. Freezes the UI.
+**Already correct:** `preloadLocalModel()` wraps load in `withContext(Dispatchers.Default)`. Maintain this.
+
+### Anti-Pattern 2: Not converting JNI local refs to global refs
+**What happens:** Passing a `jobject callback` to a long-running native function without `NewGlobalRef`. When the JNI call returns (could be minutes later during generation), the local reference table may have been garbage collected, causing a crash.
+**Prevention:** Always `NewGlobalRef` for objects passed to long-running native functions; `DeleteGlobalRef` on cleanup.
+
+### Anti-Pattern 3: Tokens dropped due to unbuffered Channel
+**What happens:** `callbackFlow` with default `Channel.RENDEZVOUS` (zero buffer). If the collector is slightly behind (e.g., UI thread busy), `trySend()` fails silently and tokens are lost.
+**Fix:** Add `.buffer(Channel.BUFFERED)` after `callbackFlow`.
+
+### Anti-Pattern 4: Unloading model while generating
+**What happens:** User switches models mid-generation → `unloadCurrent()` → `nativeUnload()` called while `nativeGenerate` is running on another thread. Memory freed under active use → crash.
+**Prevention:** `EngineManager.unloadCurrent()` already calls `llamaEngine.stop()` before `llamaEngine.unload()`. The `stop()` sets `shouldStop = true` which causes the native generate loop to exit gracefully. This is correct — ensure `unload()` waits for generate to finish (or add a timeout).
+
+### Anti-Pattern 5: Compiling llama.cpp pre-built .so from different NDK version
+**What happens:** Using pre-built `libllama.so` from GitHub releases compiled with a different NDK, STL, or ABI. Causes `UnsatisfiedLinkError` or segfaults at runtime.
+**Prevention:** Always build llama.cpp from source with the project's NDK version via CMake. The existing CMakeLists.txt already takes this approach (build from source).
+
+## Sources
+
+- **Warped codebase** (2026-05-05): `LlamaEngine.kt`, `jni_bridge.cpp/h`, `EngineManager.kt`, `BackendDetector.kt`, `LocalLlmProvider.kt`, `ChatViewModel.kt`, `CMakeLists.txt`, `GgufMetadataParser.kt`, `ModelDownloadWorker.kt`, `ModelImportManager.kt` — HIGH confidence (direct code analysis)
+- **llama.cpp official repository**: `github.com/ggerganov/llama.cpp` — Android build documentation, GGUF format spec, Vulkan backend documentation — HIGH confidence (authoritative source)
+- **Android NDK documentation**: JNI tips (global vs local references), `callbackFlow` thread safety — HIGH confidence (official Android docs)
+- **GGUF format specification**: `github.com/ggerganov/ggml/blob/master/docs/gguf.md` — HIGH confidence (format spec)
 
 ---
 
-## Appendix B: Open Questions
-
-1. **LiteRT-LM Maven version:** Confirm latest stable version on [Google Maven](https://maven.google.com/web/index.html#com.google.ai.edge.litertlm:litertlm-android). Current release is v0.10.2 (Apr 14, 2026).
-
-2. **Min SDK compatibility:** Verify `litertlm-android` minSdk matches our minSdk 28. The API uses `android.content.Context` and `System.loadLibrary` — likely compatible with API 21+.
-
-3. **APK size impact:** `litertlm-android` includes native .so libraries. Estimate size impact before release.
-
-4. **Model format stability:** `.litertlm` is a new model format. Confirm backward compatibility guarantees. GGUF has years of stability — .litertlm may evolve more quickly.
-
-5. **Context window:** LiteRT-LM's `maxNumTokens` is total input+output (KV cache size), not just output. Our `maxTokens` parameter is output-only. How to map? Use `maxNumTokens = messages_token_count + maxTokens` or set a generous default and let the model handle truncation.
-
-6. **Repeat penalty:** LiteRT-LM doesn't expose repeat_penalty in SamplerConfig. Is it handled internally by the model's generation defaults, or is this a missing feature?
-
-7. **Multi-turn performance:** Does per-call Conversation creation and message replay have a noticeable performance cost for long (>50 messages) conversations?
-
-8. **NPU library bundling:** To use NPU, the app must bundle NPU native libraries or download them. Is the NPU driver available on Google Play Services or must we bundle it? This adds significant APK size.
-
-9. **Offline model availability:** LiteRT-LM models from litert-community are publicly downloadable. Verify they don't require authentication for any models (similar to GGUF from TheBloke).
-
-10. **Model metadata extraction:** Can we extract parameter count, quantization, and architecture from a `.litertlm` file header before full load? Similar to GGUF header parsing.
-
----
-
-*Architecture research for: Warped v1.1 LiteRT-LM Integration*
-*Researched: 2026-05-02*
-*Sources: LiteRT-LM GitHub (v0.10.2 source code), existing Warped codebase, Hugging Face litert-community*
+*Architecture research for: GGUF native inference integration with Clean Architecture*
+*Researched: 2026-05-05*
+*Confidence: HIGH (based on direct codebase analysis + authoritative documentation)*

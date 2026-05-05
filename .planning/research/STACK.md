@@ -1,373 +1,294 @@
-# LiteRT-LM Stack Additions — Technology Stack
+# Stack Research: GGUF Native Inference (llama.cpp JNI/NDK)
 
-**Project:** Warped v1.1 — LiteRT-LM Integration
-**Researched:** 2026-05-02
-**Status:** Research complete — LiteRT-LM additions for milestone v1.1
+**Domain:** Android local LLM inference via llama.cpp C++ integration
+**Researched:** 2026-05-05
+**Confidence:** HIGH
 
-> **Note:** This document covers ONLY changes/additions to the existing v1.0 stack.
-> The full existing stack (Kotlin, Compose, Hilt, Room, llama.cpp, etc.) remains valid.
-> See the [v1.0 research STACK.md](STACK.md) for the foundational stack.
+## Executive Summary
 
----
+Adding real GGUF/llama.cpp inference requires **zero new Kotlin/Java Maven dependencies**. The entire integration is native C++: source-include the llama.cpp project, compile it alongside our existing JNI bridge via CMake+NDK, and wire the real `llama.h` API calls into the existing `jni_bridge.cpp` stubs. The Kotlin side (`LlamaEngine.kt`, `EngineManager.kt`, `LocalLlmProvider.kt`, `MemoryChecker.kt`, `GgufMetadataParser.kt`) is architecturally ready — it needs the native layer to stop being stubs and start being real.
 
-## 1. LiteRT-LM Core: Single Maven Dependency (No JNI/NDK Build Required)
+The primary stack additions are: (1) llama.cpp source in the CMake build tree, (2) Vulkan backend compilation via `GGML_VULKAN=ON`, and (3) runtime Vulkan device probing to complement the existing `BackendDetector` (which currently only probes EGL/OpenCL for LiteRT-LM).
 
-Unlike llama.cpp which requires CMake + NDK + custom JNI bridge, LiteRT-LM ships
-as a pre-built Android AAR via Google Maven. No C++ compilation needed.
+## Stack Changes Required
 
-| Layer | Choice | Version | Rationale |
-|-------|--------|---------|-----------|
-| LiteRT-LM Android SDK | `com.google.ai.edge.litertlm:litertlm-android` | **0.10.2** | Latest stable release (April 14, 2026). v0.11.0-rc1 exists but is pre-release. The library bundles pre-compiled native `.so` libraries for `arm64-v8a` and `x86_64`, shipped as JNI inside the AAR. No NDK or CMake setup required. |
-| GPU native lib deps | `libOpenCL.so`, `libvndksupport.so` (platform) | Android system libs | Declared via `<uses-native-library>` in AndroidManifest. These are platform libraries, not bundled. |
-| NPU driver path | Native library dir path | Per-device | NPU libraries are device-specific. On Android, point to `context.applicationInfo.nativeLibraryDir`. |
+### 1. Native Build: llama.cpp Source Integration
 
-**Version pinning decision:** Pin to `0.10.2` (not `latest.release` and not `0.11.0-rc1`).
-RC versions of LiteRT-LM have introduced breaking API changes in the past.
-Pinning prevents surprise breakage on CI.
+**What changes:** The existing `app/src/main/cpp/CMakeLists.txt` must source-include the llama.cpp project and compile it alongside our JNI bridge.
 
-**Maven metadata confirmed** at `https://dl.google.com/dl/android/maven2/com/google/ai/edge/litertlm/litertlm-android/maven-metadata.xml`:
-Available versions include `0.10.2` (stable), `0.11.0-rc1` (pre-release), and older `0.9.x` releases.
+**Recommended approach:** Git submodule at `app/src/main/cpp/llama.cpp/`, pinned to a known-good release tag.
 
-### Gradle dependency addition
+| Aspect | Current State | Required Change |
+|--------|--------------|-----------------|
+| CMake project | `warped_llama` SHARED library from `jni_bridge.cpp` | Add `add_subdirectory(llama.cpp)` before `add_library(warped_llama ...)` |
+| Source files | Only `jni_bridge.cpp`, `jni_bridge.h` | Same files, but `#include "llama.h"` and call real llama.cpp functions |
+| Compile defs | `GGML_USE_CPU=1`, `GGML_USE_CPU_AARCH64=1` | Add `GGML_VULKAN` for GPU variant, keep CPU defs for CPU variant |
+| Link libs | `android`, `log` | Add `llama` (the llama.cpp library target), `Vulkan::Vulkan` (for GPU variant) |
+| Include dirs | `.` (current source dir) | Add `llama.cpp/include`, `llama.cpp/ggml/include`, `llama.cpp/common` |
+| C++ standard | C++17 (already set) | No change — llama.cpp requires C++17 minimum |
 
+**Critical build flags for Android (from official llama.cpp docs):**
+```cmake
+# In our CMakeLists.txt, before add_subdirectory(llama.cpp):
+set(GGML_OPENMP OFF CACHE BOOL "OpenMP not well supported on Android NDK")
+set(GGML_LLAMAFILE OFF CACHE BOOL "llamafile does not support Android")
+set(GGML_VULKAN ON CACHE BOOL "Enable Vulkan GPU backend")
+set(GGML_CPU ON CACHE BOOL "Enable CPU backend (always needed as fallback)")
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libs, we'll link into our .so")
+
+# Tell llama.cpp we're cross-compiling for Android (auto-detected by CMake toolchain)
+# The NDK's android.toolchain.cmake sets CMAKE_SYSTEM_NAME=Android automatically
+```
+
+**Why build from source:** Pre-built `.so` binaries may use a different NDK version, STL (`libc++_shared` vs `libc++_static`), or ABI configuration than the host project. Mismatches cause cryptic `UnsatisfiedLinkError` at runtime. Building from source in the same CMake invocation ensures ABI consistency. This is already documented in the project's STACK.md as the recommended approach.
+
+**llama.cpp release tag to pin:**
+- Latest release as of 2026-05-05: **b9030** (released same day)
+- Android arm64 CPU binaries confirmed published with every release
+- Pin to a specific tag (not `master`) for reproducible builds
+- Recommended initial pin: `b9030` (verify Vulkan shader compilation works for Android before freezing)
+
+### 2. No New Kotlin/Java Maven Dependencies
+
+**This is the key finding:** The entire llama.cpp integration is native C++. No new entries in `gradle/libs.versions.toml` are required. The existing Kotlin infrastructure handles everything:
+
+| Existing Component | Role in GGUF Integration | Status |
+|--------------------|--------------------------|--------|
+| `LlamaEngine.kt` | JNI wrapper with `callbackFlow` for token streaming | **Ready** — needs real native code, not stubs |
+| `EngineManager.kt` | Engine lifecycle coordination, mutual exclusion with LiteRT-LM | **Ready** — `switchToLlama()` already implemented |
+| `LocalLlmProvider.kt` | Implements `LlmProvider`, formats chat prompts, delegates to `LlamaEngine` | **Ready** — needs real tokens flowing |
+| `GgufMetadataParser.kt` | Parses GGUF binary header (magic, version, KV metadata) | **Complete** — extracts name, architecture, quantization, parameter count, context length |
+| `MemoryChecker.kt` | Checks RAM availability, warns at 60%, blocks at 80% threshold | **Ready** — needs integration before model load |
+| `BackendDetector.kt` | Probes EGL/OpenCL for LiteRT-LM GPU backend | **Needs extension** — add Vulkan probing |
+
+### 3. Vulkan GPU Backend
+
+**What it is:** llama.cpp's Vulkan backend offloads matrix multiplication (`ggml_mul_mat`) and attention computation to the device GPU, providing 2-4x speedup on flagship Android phones with good Vulkan drivers (Snapdragon 8 Gen 2+, Mali-G715+, Tensor G3+).
+
+**Compilation:** Set `GGML_VULKAN=ON` before `add_subdirectory(llama.cpp)`. The llama.cpp Vulkan CMake module (`ggml/src/ggml-vulkan/CMakeLists.txt`) calls `find_package(Vulkan COMPONENTS glslc REQUIRED)`. On Android NDK:
+- `Vulkan::Vulkan` loader library is available via NDK (API 24+)
+- `glslc` shader compiler must be available on the host build machine (comes with the Vulkan SDK or Android NDK in `shader-tools/`)
+- The Vulkan backend compiles SPIR-V shaders at build time (not runtime)
+- Cross-compilation of shaders is handled by llama.cpp's vulkan-shaders-gen external project
+
+**Build variants needed:**
+```
+arm64-v8a + CPU only        → GGML_VULKAN=OFF  (baseline, works everywhere)
+arm64-v8a + Vulkan + CPU    → GGML_VULKAN=ON   (GPU acceleration for capable devices)
+x86_64   + CPU only          → GGML_VULKAN=OFF  (emulator only)
+```
+
+**How to handle dual-variant builds:** Use Gradle's `productFlavors` or CMake variables to produce two `.so` files:
+- `libwarped_llama_cpu.so` — CPU only (smaller, universal)
+- `libwarped_llama_vulkan.so` — Vulkan+CPU (larger, faster on capable devices)
+
+This is a build-time decision, not runtime. The app can check Vulkan availability at runtime and load the appropriate variant.
+
+**Runtime Vulkan probing** (new code needed):
 ```kotlin
-// In libs.versions.toml
-[versions]
-litertlm = "0.10.2"
+// Extend BackendDetector or create new VulkanDetector
+// Probe: try to create a Vulkan instance via vkCreateInstance
+// If successful → Vulkan available, use vulkan variant
+// If not → CPU only
+```
+The NDK provides Vulkan headers via `<vulkan/vulkan.h>` and the loader lib via `libvulkan.so`. A minimal Vulkan instance creation test confirms driver availability without needing a window surface.
 
-[libraries]
-litertlm-android = { group = "com.google.ai.edge.litertlm", name = "litertlm-android", version.ref = "litertlm" }
+**Vulkan detection integration with existing BackendDetector:**
+The existing `BackendDetector.probeBackend()` returns `BackendType.GPU` or `BackendType.CPU` based on EGL+OpenCL detection (designed for LiteRT-LM). For llama.cpp, we need a separate Vulkan probe since:
+- OpenCL != Vulkan (different APIs, different driver stacks)
+- A device might have EGL but broken Vulkan (common on older Mali GPUs)
+- A device might have Vulkan but no OpenCL (newer Adreno GPUs)
 
-// In app/build.gradle.kts (add to dependencies block)
-implementation(libs.litertlm.android)
+Recommendation: Add `BackendType.VULKAN_GPU` or a separate `VulkanDetector` class alongside `BackendDetector`. The `EngineManager` can decide which backend to prefer based on what each engine supports.
+
+### 4. JNI Bridge API — Real Implementation
+
+The existing JNI bridge (`jni_bridge.h`, `jni_bridge.cpp`) has the correct structure but contains stub implementations. The real implementation must use the llama.cpp C API:
+
+**Key API call sequence for model loading (replaces stub `loadModel()`):**
+```cpp
+// 1. Initialize backend (once per process)
+llama_backend_init();
+
+// 2. Load model from GGUF file
+llama_model_params model_params = llama_model_default_params();
+model_params.n_gpu_layers = nGpuLayers; // 0 = CPU only, -1 = all layers to GPU
+model_params.use_mmap = true;           // Memory-map the file (saves RAM)
+model_params.progress_callback = progressCallback; // Optional: loading progress
+llama_model* model = llama_model_load_from_file(path.c_str(), model_params);
+
+// 3. Create context
+llama_context_params ctx_params = llama_context_default_params();
+ctx_params.n_ctx = nCtx;                // Context window size
+ctx_params.n_batch = 512;               // Maximum batch size
+ctx_params.n_ubatch = 512;              // Physical batch size
+ctx_params.n_threads = nThreads;
+ctx_params.n_threads_batch = nThreads;  // Threads for prompt processing
+ctx_params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
+llama_context* ctx = llama_init_from_model(model, ctx_params);
+
+// 4. Set up sampler chain (temperature, top_p, top_k, etc.)
+llama_sampler* smpl = llama_sampler_chain_init(params);
+llama_sampler_chain_add(smpl, llama_sampler_init_temp(temperature));
+llama_sampler_chain_add(smpl, llama_sampler_init_top_p(topP, 1));
+llama_sampler_chain_add(smpl, llama_sampler_init_top_k(topK));
+llama_sampler_chain_add(smpl, llama_sampler_init_dist(seed));
 ```
 
-### AndroidManifest.xml additions (GPU backend)
+**Key API call sequence for token generation (replaces stub `generate()`):**
+```cpp
+// 1. Tokenize input prompt
+int n_tokens = -llama_tokenize(vocab, prompt.c_str(), prompt.size(),
+                                nullptr, 0, true, true);
+std::vector<llama_token> tokens(n_tokens);
+llama_tokenize(vocab, prompt.c_str(), prompt.size(),
+                tokens.data(), tokens.size(), true, true);
 
-```xml
-<application>
-    <!-- Required for GPU backend (OpenCL) -->
-    <uses-native-library android:name="libvndksupport.so" android:required="false"/>
-    <uses-native-library android:name="libOpenCL.so" android:required="false"/>
-</application>
-```
-
-**`android:required="false"` is critical:** Not all devices have OpenCL drivers.
-Setting `required="false"` allows installation on all devices with graceful
-fallback to CPU when GPU is unavailable.
-
----
-
-## 2. LiteRT-LM API Surface
-
-The Kotlin API is a pure Kotlin wrapper over JNI (pre-built inside the AAR).
-All public types live under `com.google.ai.edge.litertlm`.
-
-### Core Classes
-
-| Class | Purpose | Lifecycle |
-|-------|---------|-----------|
-| `Engine` | Entry point. Loads model, manages backends. | `AutoCloseable` — must call `close()` |
-| `EngineConfig` | Model path, backend selection, max tokens, cache dir. | Value object, passed to `Engine()` |
-| `Conversation` | Chat session with message history. | `AutoCloseable` — created via `engine.createConversation()` |
-| `ConversationConfig` | System prompt, initial messages, sampler, tools. | Value object, passed at conversation creation |
-| `Session` | Lower-level session for inference without chat templating. | `AutoCloseable` — created via `engine.createSession()` |
-| `SamplerConfig` | topK, topP, temperature, seed. | Value object, embedded in `ConversationConfig` |
-| `Backend` | Sealed class: `Backend.CPU(numOfThreads)`, `Backend.GPU()`, `Backend.NPU(nativeLibraryDir)` | Value object |
-| `Message` | Conversation message with role, content, tool calls, channels. | Immutable data class |
-| `Content` | Union type: `Content.Text`, `Content.ImageBytes`, `Content.ImageFile`, `Content.AudioBytes`, `Content.AudioFile` | Sealed interface |
-| `Contents` | Helper: `Contents.of(...)` to build content lists. | Utility |
-| `ToolSet` | Interface for defining tool functions with `@Tool` annotations. | Custom implementation |
-| `OpenApiTool` | Interface for defining tools via OpenAPI JSON spec. | Custom implementation |
-| `MessageCallback` | Callback interface: `onMessage()`, `onDone()`, `onError()`. | Anonymous object |
-| `LiteRtLmJniException` | Exception type for native-layer errors. | Standard exception |
-| `LogSeverity` | Enum: VERBOSE, DEBUG, INFO, WARNING, ERROR, FATAL. | Passed to `Engine.setNativeMinLogSeverity()` |
-| `BenchmarkInfo` | Performance metrics from inference (experimental). | From `conversation.getBenchmarkInfo()` |
-
-### Backend Selection
-
-```kotlin
-// CPU (default) — works everywhere
-Backend.CPU(numOfThreads = 4)  // null/0 = auto
-
-// GPU — needs manifest entries, fails gracefully to CPU
-Backend.GPU()
-
-// NPU — needs device-specific libs path
-Backend.NPU(nativeLibraryDir = context.applicationInfo.nativeLibraryDir)
-```
-
-**Auto-detection strategy recommended:**
-1. Try GPU first → if engine init fails with GPU, fall back to CPU
-2. NPU optional → user toggle, since NPU drivers are device-specific
-3. CPU always available as base
-
-### Streaming Chat (Flow-based)
-
-```kotlin
-// This is the recommended pattern for Compose integration:
-engine.createConversation(config).use { conversation ->
-    conversation.sendMessageAsync("Hello!")
-        .catch { error -> /* handle */ }
-        .collect { message -> /* emit each Message chunk */ }
-}
-```
-
-**Key difference from llama.cpp streaming:**
-- llama.cpp: Custom JNI callback → `callbackFlow<String>` (raw tokens, manual decoding)
-- LiteRT-LM: Built-in `callbackFlow<Message>` (structured messages, auto-decoded, tool calls included)
-
-Both produce `Flow<T>` which integrates identically with `collectAsStateWithLifecycle()` in Compose ViewModels.
-
-### SamplerConfig Parameters
-
-```kotlin
-SamplerConfig(
-    topK = 40,        // Top-K sampling filter
-    topP = 0.95,      // Nucleus sampling threshold
-    temperature = 0.7, // Creativity (0=deterministic, >1=more random)
-    seed = 42,        // Reproducibility (0 = random)
-)
-```
-
-**Note:** LiteRT-LM's `SamplerConfig` covers the same parameters as the existing llama.cpp
-configuration but uses **different parameter names and ranges**. The existing `Presets` table
-may need a `backend_type` column or separate `litertlm_presets` to avoid parameter mismatch.
-
----
-
-## 3. Hugging Face Integration — litert-community Org
-
-| Layer | Choice | Rationale |
-|-------|--------|-----------|
-| Model source | `huggingface.co/litert-community` org | Official Google-maintained org with 93+ `.litertlm` models. Covers Gemma, Llama, Phi, Qwen, FunctionGemma, and speech/vision models. Same HF Hub API — no new client needed. |
-| Model search | Existing Retrofit HF API client | Identical to GGUF search, different filter: search `litert-community` org and filter for `.litertlm` file extension. |
-| File filter | `.litertlm` extension | Single binary file per model (no sharding like GGUF's `.gguf-split-a`). Each `.litertlm` is self-contained. |
-| Download | Existing OkHttp + WorkManager | Same pattern as GGUF downloads: `WorkManager` + foreground notification + `Range` header resume. Stored in `filesDir/models/litertlm/` directory. |
-
-**HF API endpoints (reused, no changes):**
-- `GET /api/models?search=gemma&author=litert-community&sort=downloads` → model listing
-- `GET /api/models/litert-community/{model_id}` → model details + siblings list
-- `GET /litert-community/{model_id}/resolve/main/{filename}.litertlm` → direct download
-
-**Key HG org details:**
-- 93+ models as of May 2026
-- Models include: Gemma 4 (E2B, E4B), Gemma3 (1B, 4B, 12B), Llama 3.2 (1B, 3B), Phi-4, Qwen 2.5, FunctionGemma, FastVLM, EmbeddingGemma
-- `.litertlm` files typically 500MB–6GB depending on model size
-- All models public (no HuggingFace token needed for downloads)
-
-**No new HTTP client needed.** The existing Retrofit + OkHttp setup handles all HF API calls.
-
----
-
-## 4. Room Database Schema Changes
-
-| Change | Details |
-|--------|---------|
-| `models` table: add `model_format` column | `TEXT`, values: `"gguf"` or `"litertlm"`. Enables filtering in UI tabs. |
-| `models` table: add `backend_type` column | `TEXT`, values: `"cpu"`, `"gpu"`, `"npu"`. Stores the backend used for this model. |
-| `conversations` table: add `engine_type` column | `TEXT`, values: `"llama_cpp"`, `"litertlm"`, `"remote"`. Links conversation to the inference engine that created it. |
-| `presets` table | **No schema change needed if parameters overlap.** LiteRT-LM's `SamplerConfig` maps 1:1 to existing `top_k`, `top_p`, `temperature`, `seed` fields. Thread count is CPU-backend-specific. May need separate `litertlm_presets` table if parameter semantics diverge, but YAGNI for now. |
-
-**Migration:** Use Room's `Migration(1, 2)` with `ALTER TABLE ... ADD COLUMN ... DEFAULT ...`.
-
----
-
-## 5. Memory & Performance Considerations
-
-| Concern | llama.cpp (existing) | LiteRT-LM (new) |
-|---------|---------------------|------------------|
-| Model format | GGUF (with quantization) | `.litertlm` (LiteRT flatbuffer) |
-| Loading time | 2–10 seconds (JNI) | 2–10 seconds (JNI inside AAR), `engine.initialize()` blocks |
-| Memory (7B model) | ~4–5 GB RAM | ~4–5 GB RAM (similar footprint) |
-| CPU inference | Native C++, OpenMP threads | Native C++ via LiteRT runtime, thread config |
-| GPU inference | Vulkan (opt-in, separate CMake build) | OpenCL (built-in, one manifest entry) |
-| NPU inference | None (experimental Hexagon) | NPU backend (Snapdragon 8 Gen 3+, Google Tensor) |
-| Streaming speed | Token-by-token via JNI callback | `Flow<Message>` chunks via `callbackFlow` |
-| Benchmark metrics | Manual token counting | Built-in `BenchmarkInfo` (experimental) |
-| Cache warmup | None | Optional `cacheDir` speeds up subsequent loads |
-
-**Memory management (shared between engines):**
-- Only ONE engine should be active at a time. Loading both llama.cpp and LiteRT-LM models
-  simultaneously will cause OOM on most devices (< 12GB RAM).
-- Use `android:largeHeap="true"` (already set for llama.cpp).
-- Check `ActivityManager.MemoryInfo` before loading any model.
-- `Engine.close()` frees native resources — call before loading a different model.
-
----
-
-## 6. Architecture Integration Points
-
-### Where LiteRT-LM fits in Clean Architecture
-
-```
-UI Layer
-  └── chat.ui.LiteRtLmChatScreen.kt          (new — separate tab)
-  └── modelpicker.ui.LiteRtLmModelPicker.kt   (new — litert-community browser)
-
-Domain Layer
-  └── chat.domain.LiteRtLmChatUseCase.kt      (new — wraps Engine/Conversation)
-  └── model.domain.ModelRepository.kt         (modified — handles both formats)
-  └── model.domain.LiteRtLmModelRepository.kt (new — litertlm-specific queries)
-
-Data Layer
-  └── inference.data.LiteRtLmEngine.kt        (new — Engine lifecycle wrapper)
-  └── modelsearch.data.LiteRtLmModelSearch.kt (new — litert-community Retrofit)
-  └── download.data.LiteRtLmDownloader.kt     (modified — .litertlm file handling)
-  └── modelstore.data.LiteRtLmModelDao.kt     (modified Room queries)
-```
-
-### Hilt Module (new)
-
-```kotlin
-@Module
-@InstallIn(SingletonComponent::class)
-object LiteRtLmModule {
-    @Provides @Singleton
-    fun provideLiteRtLmEngineFactory(): LiteRtLmEngineFactory =
-        LiteRtLmEngineFactory()
-}
-```
-
-### ViewModel Pattern (unchanged)
-
-```kotlin
-@HiltViewModel
-class LitertLmChatViewModel @Inject constructor(
-    private val litertLmEngineFactory: LiteRtLmEngineFactory,
-) : ViewModel() {
-
-    private val _uiState = MutableStateFlow<LitertLmChatUiState>(LitertLmChatUiState.Loading)
-    val uiState: StateFlow<LitertLmChatUiState> = _uiState.asStateFlow()
-
-    fun sendMessage(contents: String) {
-        viewModelScope.launch(Dispatchers.Default) {
-            conversation.sendMessageAsync(contents)
-                .catch { _uiState.value = LitertLmChatUiState.Error(it) }
-                .collect { message ->
-                    _uiState.update { state ->
-                        state.appendMessage(message)
-                    }
-                }
-        }
+// 2. Process prompt in batches
+for (size_t i = 0; i < tokens.size(); i += n_batch) {
+    int n_eval = std::min(n_batch, (int)(tokens.size() - i));
+    llama_batch batch = llama_batch_init(n_eval, 0, 1);
+    for (int j = 0; j < n_eval; j++) {
+        batch.token[j] = tokens[i + j];
+        batch.pos[j] = i + j;
+        batch.n_seq_id[j] = 1;
+        batch.seq_id[j][0] = 0;
+        batch.logits[j] = (j == n_eval - 1) ? 1 : 0; // Only get logits for last token
     }
+    llama_decode(ctx, batch);
+    llama_batch_free(batch);
 }
-```
 
-**Key:** `sendMessageAsync()` blocks internally on a native thread (managed by the JNI layer),
-so it should be called from `Dispatchers.Default`, not `Dispatchers.Main`. The `Flow`
-collection itself can happen on `Dispatchers.Main` since it's just emitting pre-computed chunks.
-
----
-
-## 7. What NOT to Add
-
-| Technology | Why NOT | What to Use Instead |
-|-----------|---------|---------------------|
-| **Separate NDK/CMake build** | LiteRT-LM ships pre-built native libs in the AAR. Adding CMake would duplicate native code. | Single Maven dependency (`litertlm-android`) |
-| **Custom JNI bridge** | The library already provides a Kotlin wrapper over JNI. Writing custom JNI would fight the API. | Use `Engine`/`Conversation` directly |
-| **`.gguf` to `.litertlm` converter** | Models from `litert-community` are pre-converted. No runtime conversion needed. If users need custom conversion, point them to desktop tools or the LiteRT CLI. | Models from litert-community only |
-| **`litertlm-jvm` dependency** | JVM artifact is for desktop (Linux/macOS/Windows). Not needed on Android. Adds size to APK with no benefit. | `litertlm-android` only |
-| **Bazel build system** | LiteRT-LM is developed with Bazel but Maven artifacts are pre-built. Gradle users only need the Maven coordinate. | Standard Gradle + version catalog |
-| **Gson as app-wide JSON library** | LiteRT-LM uses Gson internally (`com.google.gson`) but the app already uses `kotlinx.serialization`. LiteRT-LM's Gson is a transitive dependency — accept it but don't use it in app code. | Keep kotlinx.serialization for app code |
-| **New HTTP client** | HF litert-community uses the same REST API. Reuse existing Retrofit + OkHttp. | Existing networking stack |
-| **New DI framework** | Hilt already provides `@Singleton` scoping for engine lifecycle. | Existing Hilt |
-| **New database** | Room already handles model metadata. Add columns/tables. | Existing Room |
-| **`latest.release` version pinning** | Unpinned versions break CI deterministically. Pinned versions with Renovate/Dependabot are safer. | Pin to `0.10.2` explicitly |
-| **FusedLocationProvider or other irrelevant Google Play Services** | LiteRT-LM has no dependency on Play Services. Don't conflate. | N/A |
-
----
-
-## 8. Transitive Dependencies (brought in by `litertlm-android`)
-
-| Dependency | Version (approx) | Impact |
-|-----------|-----------------|--------|
-| `com.google.gson:gson` | 2.10.x+ | Already a very common transitive. No conflict with kotlinx.serialization (different use). Accept. |
-| LiteRT-LM native `.so` | Bundled in AAR | Adds ~5-15 MB to APK per ABI (model-dependent). Accept as cost of built-in inference. |
-| Coroutine libraries | Bundled | LiteRT-LM's Kotlin API uses `kotlinx.coroutines` internally. Should share same version as app's coroutines dep. Verify via `./gradlew app:dependencies`. |
-
-**APK size impact estimate:** The `litertlm-android` AAR is larger than a thin JNI wrapper because it includes the full LiteRT runtime. Expect ~10-20 MB additional APK size per ABI. This is comparable to llama.cpp's `.so` size.
-
----
-
-## 9. Integration Checklist (Build System Changes)
-
-### `libs.versions.toml` additions
-
-```toml
-[versions]
-litertlm = "0.10.2"
-
-[libraries]
-litertlm-android = { group = "com.google.ai.edge.litertlm", name = "litertlm-android", version.ref = "litertlm" }
-```
-
-### `app/build.gradle.kts` — no `externalNativeBuild` needed
-
-Unlike llama.cpp which requires:
-```kotlin
-externalNativeBuild {
-    cmake { path("src/main/cpp/CMakeLists.txt") }
+// 3. Generate tokens one by one with sampling
+while (!shouldStop) {
+    llama_token new_token = llama_sampler_sample(smpl, ctx, -1);
+    
+    if (llama_vocab_is_eog(vocab, new_token)) break; // End of generation
+    
+    std::string token_text = llama_vocab_get_text(vocab, new_token);
+    callback(token_text, false); // Stream token to Kotlin via JNI callback
+    
+    // Submit single token for next iteration
+    llama_batch batch = llama_batch_init(1, 0, 1);
+    batch.token[0] = new_token;
+    batch.pos[0] = n_cur++;
+    batch.n_seq_id[0] = 1;
+    batch.seq_id[0][0] = 0;
+    batch.logits[0] = 1;
+    llama_decode(ctx, batch);
+    llama_batch_free(batch);
 }
+callback("", true); // Done signal
 ```
 
-LiteRT-LM needs **none of this**. Just the dependency.
+**JNI functions to expose (existing signatures, real implementations):**
 
-### `AndroidManifest.xml` — GPU native lib declaration
+| Native Function | llama.cpp API Called | Notes |
+|----------------|---------------------|-------|
+| `nativeLoadModel(path, nThreads, nCtx)` | `llama_model_load_from_file()` + `llama_init_from_model()` | Need additional params: `nGpuLayers`, `temperature`, `topP`, `topK` — or configure separately |
+| `nativeGenerate(prompt, callback)` | `llama_tokenize()` → `llama_decode()` → `llama_sampler_sample()` → `llama_vocab_get_text()` | Run on background thread; stream tokens via JNI callback |
+| `nativeStop()` | Set `shouldStop = true` | Interrupts the generation loop |
+| `nativeUnload()` | `llama_free(ctx)` → `llama_model_free(model)` | Also free sampler chain |
+| `nativeIsLoaded()` | Check `model != nullptr && ctx != nullptr` | No change needed |
+| `nativeGetModelInfo()` | `llama_model_desc()`, `llama_model_n_params()`, `llama_model_size()` | Real metadata, not stub JSON |
 
-```xml
-<application>
-    <uses-native-library android:name="libvndksupport.so" android:required="false"/>
-    <uses-native-library android:name="libOpenCL.so" android:required="false"/>
-</application>
+**New JNI functions needed:**
+- `nativeSetGenerationParams(temperature, topP, topK, repeatPenalty, maxTokens, seed)` — configure sampler chain dynamically (avoids reloading model on parameter changes)
+- `nativeGetContextSize()` — returns `llama_n_ctx()` for memory calculations
+- `nativeTokenCount(text)` — token counting via `llama_tokenize()` for UI display
+
+### 5. Chat Template Formatting
+
+**Current state:** `LocalLlmProvider.buildPrompt()` uses hardcoded `<|system|>`, `<|user|>`, `<|assistant|>` format (ChatML-style). This works for Llama 3, Mistral, and Qwen models but not for Gemma, Phi, Command R, or DeepSeek.
+
+**What llama.cpp provides:** `llama_model_chat_template(model, nullptr)` returns the model's built-in chat template (Jinja2 format for modern GGUF models). The C API also provides:
+- `llama_chat_apply_template()` — applies the template to a list of messages, producing the formatted prompt string complete with BOS/EOS tokens
+
+**Recommendation:** Use the model's built-in chat template via JNI:
+```cpp
+// New JNI function: nativeFormatChat(messagesJson) → formatted prompt
+// Uses llama_chat_apply_template() internally
 ```
 
-### ProGuard/R8 — No special keep rules needed
+This ensures correct formatting for ALL model architectures without hardcoded templates. Fall back to the existing ChatML format for older GGUF files that don't include a template.
 
-LiteRT-LM's JNI entry points are inside the AAR and packaged with their own ProGuard rules.
-No app-level keep rules needed. Standard `minifyEnabled = true` works.
+### 6. Stack Changes Summary Table
 
-### Min SDK: No change needed
+| Layer | Addition | Version / Source | Rationale |
+|-------|----------|------------------|-----------|
+| Native build | llama.cpp source | git tag `b9030` (2026-05-05) | GGUF inference engine. Build from source for NDK ABI consistency |
+| Native build | Vulkan SDK (host) | Latest (for `glslc` shader compiler) | Required to compile SPIR-V shaders for GPU backend |
+| Native build | `GGML_VULKAN=ON` | CMake option | Enables GPU-accelerated inference on Android |
+| Native build | `GGML_OPENMP=OFF` | CMake option | OpenMP not well supported on Android NDK |
+| Native build | `GGML_LLAMAFILE=OFF` | CMake option | llamafile does not support Android |
+| Kotlin code | `VulkanDetector` or extend `BackendDetector` | New class | Runtime Vulkan device probing (instance creation test) |
+| Kotlin code | Generation parameter setters on `LlamaEngine` | New methods | `setGenerationParams(temp, topP, ...)` — configure sampler without reloading model |
+| Kotlin code | Chat template integration | JNI bridge extension | `nativeFormatChat()` using `llama_chat_apply_template()` |
+| JNI bridge | Real llama.cpp API calls | Replace stubs | `llama_model_load_from_file()`, `llama_decode()`, `llama_sampler_sample()`, etc. |
+| CMake | `add_subdirectory(llama.cpp)` | In existing CMakeLists.txt | Source-include llama.cpp to compile alongside JNI bridge |
+| ProGuard/R8 | Keep rules for JNI | `proguard-rules.pro` | Keep `LlamaEngine` and its native methods (already covered by existing rules) |
 
-LiteRT-LM's minimum Android version is API 24+. Current minSdk = 28, already above requirement.
+## What NOT to Add
 
----
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| **java-llama.cpp** (kherud/java-llama.cpp) | Adds a Java wrapper layer on top of llama.cpp. We already have our own JNI bridge (`LlamaEngine.kt` + `jni_bridge.cpp`). The Java wrapper would duplicate our architecture and add maintenance burden. | Our existing JNI bridge |
+| **Pre-built `.so` libraries** | Risk of NDK/STL/ABI mismatch causing UnsatisfiedLinkError. Already documented as an anti-pattern in project STACK.md. | Build from source via CMake+NDK |
+| **Additional JSON library** (Gson, Moshi) | Kotlinx Serialization is already in the project for all JSON needs. GGUF metadata is binary, not JSON. | Kotlinx Serialization (already present) |
+| **OpenCL backend for llama.cpp** | llama.cpp supports OpenCL (`GGML_OPENCL=ON`) but Vulkan has broader Android GPU support and is the actively maintained backend. OpenCL is deprecated on Android 14+. | Vulkan (`GGML_VULKAN=ON`) |
+| **MLC-LLM, ExecuTorch, or other inference engines** | Project decision already made: llama.cpp is the GGUF engine. LiteRT-LM handles `.litertlm` format. Adding more engines adds complexity without value. | llama.cpp (already decided) |
+| **Custom GGUF parser library** | `GgufMetadataParser.kt` already reads the GGUF binary header (magic, version, KV pairs) and extracts all needed metadata. llama.cpp's `llama_model_meta_*()` functions are an alternative but require the model to be loaded (slow for directory browsing). | Keep existing `GgufMetadataParser` for browsing; use `llama_model_desc()` after loading for accurate data |
+| **Hexagon NPU backend** (`GGML_HEXAGON`) | Experimental, Snapdragon 8 Gen 3+ only, not yet stable. Defer to future milestone. | Vulkan GPU (broadly supported) + CPU fallback |
 
-## 10. Confidence Levels
+## Version Compatibility
 
-| Area | Confidence | Notes |
-|------|-----------|-------|
-| Core dependency (`litertlm-android` v0.10.2) | **HIGH** | Verified via Google Maven metadata XML. v0.10.2 is latest stable. |
-| API surface (Engine, Conversation, Config, Backend) | **HIGH** | Verified via official source code in `kotlin/java/com/google/ai/edge/litertlm/`. |
-| Streaming pattern (`Flow<Message>`) | **HIGH** | Verified via `Conversation.kt` source — uses `callbackFlow {}` internally. |
-| GPU backend (OpenCL) | **HIGH** | Verified via official docs and `Config.kt` source. |
-| NPU backend | **MEDIUM** | API is stable but NPU driver availability is device-specific. Auto-detection strategy needs runtime testing. |
-| Hugging Face litert-community org | **HIGH** | Verified via `huggingface.co/litert-community` — 93+ models, active maintainers from Google. |
-| `.litertlm` download (file sizes, resume) | **HIGH** | Same HF CDN as GGUF — existing OkHttp `Range` header approach works identically. |
-| Memory footprint comparison | **MEDIUM** | `.litertlm` uses LiteRT flatbuffer format — based on official docs descriptions. Exact memory delta vs GGUF needs benchmarking. |
-| APK size impact | **MEDIUM** | Estimated 10-20 MB based on prebuilt AAR structure. Exact impact needs build measurement. |
-| Gson transitive dependency | **HIGH** | Confirmed from source code imports. No conflict with kotlinx.serialization. |
-| ProGuard compatibility | **HIGH** | LiteRT-LM AAR bundles its own consumer rules. |
-| SamplerConfig parameter mapping to presets | **HIGH** | `SamplerConfig(topK, topP, temperature, seed)` maps cleanly to existing preset fields. |
-| Tool use / function calling API | **HIGH** | Verified in `Tool.kt` source — `@Tool` annotation, `ToolSet`, `OpenApiTool`. (Out of scope for v1.1 but API is stable.) |
-| BenchmarkInfo API | **MEDIUM** | Marked `@ExperimentalApi`. API shape may change in future releases. |
+| Component | Version | Compatible With | Notes |
+|-----------|---------|-----------------|-------|
+| llama.cpp source | b9030 (2026-05-05) | NDK 27+, CMake 3.22.1+, C++17 | Pinned tag ensures reproducible builds |
+| Vulkan SDK (host) | 1.3.x | NDK 27+ (provides Vulkan headers + loader) | Only `glslc` compiler needed on build host |
+| Kotlin | 2.1.10 | All existing project dependencies | No change required |
+| AGP | 9.0.0 | NDK 27+, CMake 3.22.1 | No change required |
+| CMake | 3.22.1 (existing) | llama.cpp requires 3.14+ | No version bump needed |
+| NDK | 27+ (existing) | llama.cpp requires NDK r23+ | No version bump needed |
+| minSdk | 28 (existing) | Vulkan requires API 24+ | No version bump needed |
 
----
+## Installation / Build Configuration
+
+**No new `gradle/libs.versions.toml` entries needed.** The llama.cpp integration is entirely in CMake and C++ source.
+
+**Build steps for developer:**
+```bash
+# 1. Add llama.cpp as git submodule
+cd app/src/main/cpp
+git submodule add https://github.com/ggml-org/llama.cpp.git
+cd llama.cpp
+git checkout b9030
+cd ../../../../..
+
+# 2. Install Vulkan SDK on build host (for glslc shader compiler)
+# Linux: apt install vulkan-sdk
+# macOS: brew install vulkan-sdk  
+# Windows: download from vulkan.lunarg.com
+
+# 3. Build as normal
+./gradlew assembleDebug
+```
 
 ## Sources
 
-| Source | URL | Confidence |
-|--------|-----|------------|
-| LiteRT-LM GitHub (README, releases) | `https://github.com/google-ai-edge/LiteRT-LM` | HIGH |
-| Kotlin API Getting Started Guide | `https://raw.githubusercontent.com/google-ai-edge/LiteRT-LM/main/docs/api/kotlin/getting_started.md` | HIGH |
-| Engine.kt source | `https://raw.githubusercontent.com/google-ai-edge/LiteRT-LM/main/kotlin/java/com/google/ai/edge/litertlm/Engine.kt` | HIGH |
-| Config.kt source | `https://raw.githubusercontent.com/google-ai-edge/LiteRT-LM/main/kotlin/java/com/google/ai/edge/litertlm/Config.kt` | HIGH |
-| Conversation.kt source | `https://raw.githubusercontent.com/google-ai-edge/LiteRT-LM/main/kotlin/java/com/google/ai/edge/litertlm/Conversation.kt` | HIGH |
-| Google Maven metadata XML | `https://dl.google.com/dl/android/maven2/com/google/ai/edge/litertlm/litertlm-android/maven-metadata.xml` | HIGH |
-| Hugging Face litert-community org | `https://huggingface.co/litert-community` | HIGH |
-| Context7 LiteRT-LM library | `/google-ai-edge/litert-lm` | HIGH |
+| Source | Confidence | What Was Verified |
+|--------|-----------|-------------------|
+| [llama.cpp releases](https://github.com/ggml-org/llama.cpp/releases) | **HIGH** | Latest tag b9030 (2026-05-05), Android arm64 CPU binaries published every release |
+| [llama.cpp Android build docs](https://github.com/ggml-org/llama.cpp/blob/master/docs/android.md) | **HIGH** | Official CMake flags for Android NDK cross-compilation: `GGML_OPENMP=OFF`, `GGML_LLAMAFILE=OFF`, `-march=armv8.7a` |
+| [llama.h C API](https://raw.githubusercontent.com/ggml-org/llama.cpp/master/include/llama.h) | **HIGH** | Full API surface: `llama_model_load_from_file()`, `llama_init_from_model()`, `llama_decode()`, `llama_sampler_sample()`, `llama_chat_apply_template()` |
+| [llama.cpp CMakeLists.txt](https://raw.githubusercontent.com/ggml-org/llama.cpp/master/CMakeLists.txt) | **HIGH** | Project structure: `ggml/` subdirectory, `src/` for llama lib, `common/` for utilities. `GGML_VULKAN` option at ggml level |
+| [ggml-vulkan CMakeLists.txt](https://raw.githubusercontent.com/ggml-org/llama.cpp/master/ggml/src/ggml-vulkan/CMakeLists.txt) | **HIGH** | Vulkan backend requires `find_package(Vulkan COMPONENTS glslc)`, compiles SPIR-V shaders at build time |
+| [ggml CMakeLists.txt](https://raw.githubusercontent.com/ggml-org/llama.cpp/master/ggml/CMakeLists.txt) | **HIGH** | All backend options defined here. `GGML_VULKAN=OFF` by default, must be set ON before `add_subdirectory` |
+| Existing codebase analysis | **HIGH** | `LlamaEngine.kt`, `EngineManager.kt`, `LocalLlmProvider.kt`, `GgufMetadataParser.kt`, `MemoryChecker.kt`, `BackendDetector.kt` all present and architecturally ready |
+| Existing `gradle/libs.versions.toml` | **HIGH** | Verified no new Kotlin/Java dependencies needed for GGUF integration |
+| Existing `app/build.gradle.kts` | **HIGH** | CMake 3.22.1, NDK 27+, `arm64-v8a`/`x86_64` ABIs already configured |
 
 ---
 
-*Stack research for: LiteRT-LM integration into Warped (v1.1)*
-*Researched: 2026-05-02*
+*Stack research for: GGUF native inference via llama.cpp JNI/NDK*
+*Researched: 2026-05-05*
