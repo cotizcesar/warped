@@ -3,13 +3,30 @@ project("warped_llama")
 
 set(CMAKE_CXX_STANDARD 17)
 
-# JNI wrapper source
-set(JNI_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/jni_bridge.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/jni_bridge.h
-)
+# --- llama.cpp integration ---
+set(LLAMA_STANDALONE OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_COMMON OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
+set(GGML_STANDALONE OFF CACHE BOOL "" FORCE)
+set(GGML_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(GGML_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(GGML_CPU_ALL_VARIANTS OFF CACHE BOOL "" FORCE)
+set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
+set(GGML_CUDA OFF CACHE BOOL "" FORCE)
+set(GGML_METAL OFF CACHE BOOL "" FORCE)
+set(GGML_HEXAGON OFF CACHE BOOL "" FORCE)
+set(GGML_SYCL OFF CACHE BOOL "" FORCE)
+set(GGML_BACKEND_DL OFF CACHE BOOL "" FORCE)
+add_subdirectory(llama.cpp)
 
-add_library(warped_llama SHARED ${JNI_SOURCES})
+# --- JNI wrapper ---
+add_library(warped_llama SHARED
+    jni_bridge.cpp
+    jni_bridge.h
+)
 
 target_include_directories(warped_llama PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -21,6 +38,7 @@ target_compile_definitions(warped_llama PRIVATE
 )
 
 target_link_libraries(warped_llama
+    llama
     android
     log
 )
