@@ -106,6 +106,55 @@ Requirements for LiteRT-LM integration. Each maps to roadmap phases.
 - [x] **POL-04**: Defensive error recovery reinitializes engine on "Engine not alive" errors
 - [x] **POL-05**: Memory is released when the app is backgrounded (onTrimMemory handling)
 
+## v1.2 Requirements
+
+Requirements for GGUF Native Inference via llama.cpp JNI/NDK.
+
+### GGUF Discovery & Download
+
+- [ ] **HFDL-01**: User can browse .gguf files per HF model including file name, file size, and quantization type (Q4_K_M, Q5_K_M, Q8_0, etc.) parsed from filename
+- [ ] **HFDL-02**: User can see estimated RAM requirement (file_size × 1.3) for each .gguf before downloading
+- [ ] **HFDL-03**: User can download .gguf files with foreground progress notification, pause, and resume via WorkManager
+- [ ] **HFDL-04**: Downloaded GGUF files are validated on completion (magic number + header integrity) with clear error on corruption
+
+### Native Build & Model Loading
+
+- [ ] **NTVL-01**: llama.cpp compiles from source for arm64-v8a and x86_64 (emulator) via CMake+NDK, producing loadable libwarped_llama.so
+- [ ] **NTVL-02**: JNI bridge exposes nativeLoadModel(path, nThreads, nCtx) — returns success/failure with descriptive error (OOM, corrupt, unsupported arch)
+- [ ] **NTVL-03**: User sees loading progress indicator during GGUF model load (large models take seconds to mmap)
+- [ ] **NTVL-04**: Loaded GGUF model metadata (architecture, parameter count, context size, quantization) is displayed after successful load
+- [ ] **NTVL-05**: ProGuard/R8 keep rules preserve JNI callback methods to prevent NoSuchMethodError in release builds
+
+### Inference Core
+
+- [ ] **INFR-01**: User can chat with a loaded GGUF model and receive streaming token-by-token responses via callbackFlow
+- [ ] **INFR-02**: User can stop an in-progress GGUF generation via a cancel button (nativeStop wired with std::atomic<bool>)
+- [ ] **INFR-03**: User sees real-time tokens-per-second display during GGUF generation
+- [ ] **INFR-04**: User can configure all 8 generation parameters (temperature, top_p, top_k, repeat_penalty, max_tokens, context_size, seed, threads) passed to llama.cpp sampler chain
+
+### Backend Selection
+
+- [ ] **BACK-01**: llama.cpp compiles with GGML_VULKAN=ON for Vulkan GPU acceleration
+- [ ] **BACK-02**: Runtime Vulkan availability is detected with automatic CPU fallback if Vulkan unavailable or crashes
+- [ ] **BACK-03**: User sees active backend (CPU / Vulkan GPU) during GGUF chat, matching the existing backend display pattern
+
+### Memory & Stability
+
+- [ ] **MEMS-01**: Pre-load RAM check compares required memory (file_size × 1.3 for KV cache) vs available RAM, warns user before loading if insufficient
+- [ ] **MEMS-02**: App handles onTrimMemory by unloading the GGUF model on critical memory pressure
+- [ ] **MEMS-03**: Active memory pressure monitoring during long generation warns user if approaching OOM threshold
+- [ ] **MEMS-04**: GGUF file pre-validation (magic number, header offset integrity) prevents corrupted-file crashes before native load
+- [ ] **MEMS-05**: Concurrent inference calls are prevented via @Synchronized Kotlin guards + std::atomic<bool> native guards
+- [ ] **MEMS-06**: Safe unload protocol — stop generation → join native thread → free memory; no SIGSEGV on unload-during-generate
+
+### UX & Metadata (Cross-Engine Parity)
+
+- [ ] **UXMT-01**: Model metadata display (architecture, parameters, context, quantization, license, tokenizer) works for GGUF, LiteRT-LM, and remote models where information is available
+- [ ] **UXMT-02**: Tokens-per-second real-time display works for GGUF, LiteRT-LM, and remote providers
+- [ ] **UXMT-03**: Stop generation button works consistently across GGUF, LiteRT-LM, and remote providers
+- [ ] **UXMT-04**: Quantization-aware RAM recommendation displayed for both GGUF and LiteRT-LM models
+- [ ] **UXMT-05**: Model file management (view all downloaded models, delete) works uniformly for GGUF and LiteRT-LM formats
+
 ## v2 Requirements
 
 Deferred to future release.
@@ -219,4 +268,4 @@ Deferred to future release.
 
 ---
 *Requirements defined: 2026-04-30*
-*Last updated: 2026-05-02 after milestone v1.1 requirements definition*
+*Last updated: 2026-05-05 after milestone v1.2 requirements definition*
