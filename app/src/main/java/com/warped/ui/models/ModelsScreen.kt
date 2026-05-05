@@ -21,7 +21,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.data.local.download.DownloadState
@@ -29,6 +31,7 @@ import com.warped.data.local.inference.MemoryChecker
 import com.warped.domain.model.Endpoint
 import com.warped.domain.model.LocalModel
 import com.warped.ui.endpoints.components.EndpointForm
+import com.warped.ui.components.WarpedAlertDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,17 +53,19 @@ fun ModelsScreen(
     }
 
     if (showMemoryWarning != null) {
-        AlertDialog(
+        WarpedAlertDialog(
             onDismissRequest = { showMemoryWarning = null },
             title = { Text("Memory Warning") },
             text = {
                 val model = showMemoryWarning!!
                 val context = androidx.compose.ui.platform.LocalContext.current
-                val info = MemoryChecker(context).getMemoryInfo()
+                val checker = MemoryChecker(context)
+                val ramCheck = checker.checkGgufRam(model.sizeBytes)
+                val neededGB = "%.1f GB".format(ramCheck.requiredBytes.toDouble() / (1024L * 1024 * 1024))
+                val availableGB = "%.1f GB".format(ramCheck.availableBytes.toDouble() / (1024L * 1024 * 1024))
                 Text(
-                    "This model requires ${model.sizeBytes / (1024 * 1024)} MB. " +
-                    "Your device has ${info.availableBytes / (1024 * 1024)} MB available. " +
-                    "Loading may cause instability. Continue?"
+                    "This model needs ~$neededGB, your device has $availableGB available. " +
+                    "Loading may cause instability."
                 )
             },
             confirmButton = {
@@ -113,7 +118,7 @@ fun ModelsScreen(
         }
     ) { padding ->
         if (showAddWizard) {
-            AlertDialog(
+            WarpedAlertDialog(
                 onDismissRequest = { showAddWizard = false },
                 title = { Text("Add Model", style = MaterialTheme.typography.titleLarge) },
                 text = {
@@ -212,9 +217,12 @@ fun ModelsScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("No models or endpoints yet", style = MaterialTheme.typography.bodyLarge)
+                        Text("No models or endpoints yet", style = MaterialTheme.typography.bodyLarge, color = Color(0xFF9CA3AF))
                         Spacer(Modifier.height(8.dp))
-                        TextButton(onClick = { showAddWizard = true }) { Text("Add Model") }
+                        OutlinedButton(
+                            onClick = { showAddWizard = true },
+                            shape = RoundedCornerShape(8.dp)
+                        ) { Text("Add Model") }
                     }
                 }
             } else {
@@ -224,7 +232,14 @@ fun ModelsScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (uiState.activeDownloads.isNotEmpty()) {
-                        item { Text("Active Downloads", style = MaterialTheme.typography.titleMedium) }
+                        item {
+                            Text(
+                                "Active Downloads",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
                         items(uiState.activeDownloads, key = { "dl-${it.modelId}" }) { download ->
                             DownloadCard(
                                 download = download,
@@ -233,12 +248,19 @@ fun ModelsScreen(
                             )
                         }
                     }
-                    item { Text("Local Models", style = MaterialTheme.typography.titleMedium) }
+                    item {
+                        Text(
+                            "Local Models",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
                     items(uiState.models, key = { "local-${it.id}" }) { model ->
                         ModelCard(
                             model = model,
                             onLoad = {
-                                if (viewModel.shouldWarnAboutMemory(model.sizeBytes)) {
+                                if (viewModel.shouldWarnAboutMemory(model.sizeBytes, isGguf = model.modelFormat == "GGUF")) {
                                     showMemoryWarning = model
                                 } else {
                                     viewModel.useLocalModel(model)
@@ -248,17 +270,26 @@ fun ModelsScreen(
                             onDelete = { viewModel.deleteModel(model) }
                         )
                     }
-                    item { Text("Network Endpoints", style = MaterialTheme.typography.titleMedium) }
-                    items(uiState.endpoints, key = { "endpoint-${it.id}" }) { endpoint ->
-                        DeployedEndpointCard(
-                            endpoint = endpoint,
-                            onUseInChat = {
-                                viewModel.useEndpoint(endpoint)
-                                onUseInChat()
-                            },
-                            onEdit = { viewModel.editEndpoint(endpoint) },
-                            onDelete = { viewModel.deleteEndpoint(endpoint) }
-                        )
+                    if (uiState.endpoints.isNotEmpty()) {
+                        item {
+                            Text(
+                                "Network Endpoints",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                        items(uiState.endpoints, key = { "endpoint-${it.id}" }) { endpoint ->
+                            DeployedEndpointCard(
+                                endpoint = endpoint,
+                                onUseInChat = {
+                                    viewModel.useEndpoint(endpoint)
+                                    onUseInChat()
+                                },
+                                onEdit = { viewModel.editEndpoint(endpoint) },
+                                onDelete = { viewModel.deleteEndpoint(endpoint) }
+                            )
+                        }
                     }
                 }
             }
@@ -286,7 +317,7 @@ fun ModelCard(
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     if (showDeleteConfirm) {
-        AlertDialog(
+        WarpedAlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text("Delete model") },
             text = { Text("Delete ${model.name} (${formatFileSize(model.sizeBytes)}) from the device?") },
@@ -302,7 +333,11 @@ fun ModelCard(
         )
     }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -312,46 +347,43 @@ fun ModelCard(
                 Text(
                     model.name,
                     style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(8.dp))
-                FormatBadge(model.modelFormat)
+                ModelFormatBadge(model.modelFormat)
             }
-            Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Filled.Storage,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    formatFileSize(model.sizeBytes),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ModelMetaChip("${formatFileSize(model.sizeBytes)}")
+                if (model.quantization.isNotBlank() && model.quantization != "N/A") {
+                    ModelMetaChip(model.quantization)
+                }
+                if (model.parameterCount.isNotBlank() && model.parameterCount != "Unknown") {
+                    ModelMetaChip(model.parameterCount)
+                }
             }
-            if (model.capabilities.vision || model.capabilities.reasoning || model.capabilities.tools) {
-                Spacer(Modifier.height(6.dp))
+            if (model.capabilities.vision || model.capabilities.reasoning || model.capabilities.tools || model.capabilities.audio) {
+                Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (model.capabilities.vision) {
-                        CapabilityBadge("Vision", Color(0xFF9C27B0))
-                    }
-                    if (model.capabilities.reasoning) {
-                        CapabilityBadge("Thinking", Color(0xFFFF9800))
-                    }
-                    if (model.capabilities.tools) {
-                        CapabilityBadge("Tools", Color(0xFF2196F3))
-                    }
+                    if (model.capabilities.vision) CapabilityBadge("Vision", Color(0xFF9C27B0))
+                    if (model.capabilities.audio) CapabilityBadge("Audio", Color(0xFF4CAF50))
+                    if (model.capabilities.reasoning) CapabilityBadge("Thinking", Color(0xFFFF9800))
+                    if (model.capabilities.tools) CapabilityBadge("Tools", Color(0xFF2196F3))
                 }
             }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onLoad, modifier = Modifier.weight(1f)) { Text("Use in chat") }
+                Button(
+                    onClick = onLoad,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97757)),
+                    shape = RoundedCornerShape(8.dp)
+                ) { Text("Use in chat", color = Color.White) }
                 OutlinedButton(
                     onClick = { showDeleteConfirm = true },
                     modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) {
                     Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -364,39 +396,54 @@ fun ModelCard(
 }
 
 @Composable
+private fun ModelMetaChip(text: String) {
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = Color.White.copy(alpha = 0.08f)
+    ) {
+        Text(
+            text,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color(0xFF9CA3AF),
+            fontSize = 11.sp
+        )
+    }
+}
+
+@Composable
+private fun ModelFormatBadge(format: String) {
+    val (color, label) = when {
+        format.equals("GGUF", ignoreCase = true) -> Color(0xFF2196F3) to "GGUF"
+        format.equals("LITERTLM", ignoreCase = true) -> Color(0xFF4CAF50) to "LiteRT"
+        else -> Color(0xFF9CA3AF) to format
+    }
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = color.copy(alpha = 0.15f)
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+@Composable
 private fun CapabilityBadge(label: String, color: Color) {
     Surface(
-        shape = RoundedCornerShape(4.dp),
+        shape = RoundedCornerShape(6.dp),
         color = color.copy(alpha = 0.12f)
     ) {
         Text(
             text = label,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
             style = MaterialTheme.typography.labelSmall,
-            color = color
-        )
-    }
-}
-
-@Composable
-private fun FormatBadge(format: String) {
-    val (color, label) = when {
-        format.equals("GGUF", ignoreCase = true) ->
-            Color(0xFF2196F3) to "GGUF"
-        format.equals("LITERTLM", ignoreCase = true) ->
-            Color(0xFF4CAF50) to "LiteRT-LM"
-        else -> MaterialTheme.colorScheme.outline to format
-    }
-    Surface(
-        shape = MaterialTheme.shapes.extraSmall,
-        color = color.copy(alpha = 0.15f),
-        contentColor = color
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-            style = MaterialTheme.typography.labelSmall,
-            maxLines = 1
+            color = color,
+            fontWeight = FontWeight.SemiBold
         )
     }
 }
@@ -407,9 +454,13 @@ private fun DownloadCard(
     onCancel: () -> Unit,
     onDeleteIncomplete: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(download.fileName.substringAfterLast("/"), style = MaterialTheme.typography.titleMedium)
+            Text(download.fileName.substringAfterLast("/"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             if (download.isDownloading) {
                 LinearProgressIndicator(
@@ -481,7 +532,7 @@ private fun DeployedEndpointCard(
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     if (showDeleteConfirm) {
-        AlertDialog(
+        WarpedAlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text("Delete endpoint") },
             text = { Text("Delete ${endpoint.name} (${endpoint.apiType.name})? This cannot be undone.") },
@@ -497,30 +548,38 @@ private fun DeployedEndpointCard(
         )
     }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(endpoint.name, style = MaterialTheme.typography.titleMedium)
+            Text(endpoint.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
-            Text(
-                "${endpoint.apiType.name} · ${endpoint.modelId ?: "No model id"}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ModelMetaChip(endpoint.apiType.name)
+                if (endpoint.modelId != null) ModelMetaChip("ID: ${endpoint.modelId}")
+            }
+            Spacer(Modifier.height(4.dp))
             Text(
                 endpoint.url,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = Color(0xFF9CA3AF)
             )
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onUseInChat, enabled = endpoint.modelId != null, modifier = Modifier.weight(1f)) {
-                    Text("Use in chat")
-                }
+                Button(
+                    onClick = onUseInChat,
+                    enabled = endpoint.modelId != null,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97757)),
+                    shape = RoundedCornerShape(8.dp)
+                ) { Text("Use in chat", color = Color.White) }
                 IconButton(onClick = onEdit) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Edit")
+                    Icon(Icons.Filled.Edit, "Edit", tint = Color(0xFF9CA3AF))
                 }
                 IconButton(onClick = { showDeleteConfirm = true }) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Filled.Delete, "Delete", tint = MaterialTheme.colorScheme.error)
                 }
             }
         }

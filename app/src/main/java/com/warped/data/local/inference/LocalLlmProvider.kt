@@ -30,9 +30,10 @@ class LocalLlmProvider @Inject constructor(
 
     override fun chat(request: ChatRequest): Flow<StreamToken> = flow {
         if (!llamaEngine.isLoaded()) {
-            val loaded = llamaEngine.loadModel(modelPath)
-            if (!loaded) {
-                emit(StreamToken.Error("Failed to load model"))
+            val loadResult = llamaEngine.loadModel(modelPath)
+            if (loadResult.isFailure) {
+                val error = loadResult.exceptionOrNull() as? LlamaLoadError
+                emit(StreamToken.Error(error?.userMessage ?: "Failed to load model"))
                 return@flow
             }
         }
