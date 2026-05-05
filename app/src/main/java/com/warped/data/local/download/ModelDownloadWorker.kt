@@ -45,6 +45,7 @@ class ModelDownloadWorker @AssistedInject constructor(
         const val KEY_FILE_NAME = "file_name"
         const val KEY_FILE_URL = "file_url"
         const val KEY_FILE_SIZE = "file_size_bytes"
+        const val KEY_IS_GATED = "is_gated"
         const val PROGRESS = "progress"
         const val DOWNLOADED_BYTES = "downloaded_bytes"
         const val TOTAL_BYTES = "total_bytes"
@@ -57,12 +58,14 @@ class ModelDownloadWorker @AssistedInject constructor(
             modelId: String,
             fileName: String,
             fileUrl: String,
-            fileSizeBytes: Long
+            fileSizeBytes: Long,
+            isGated: Boolean = false
         ) = workDataOf(
             KEY_MODEL_ID to modelId,
             KEY_FILE_NAME to fileName,
             KEY_FILE_URL to fileUrl,
-            KEY_FILE_SIZE to fileSizeBytes
+            KEY_FILE_SIZE to fileSizeBytes,
+            KEY_IS_GATED to isGated
         )
     }
 
@@ -71,8 +74,11 @@ class ModelDownloadWorker @AssistedInject constructor(
         val fileName = inputData.getString(KEY_FILE_NAME) ?: return Result.failure()
         val fileUrl = inputData.getString(KEY_FILE_URL) ?: return Result.failure()
         val fileSizeBytes = inputData.getLong(KEY_FILE_SIZE, 0)
+        val isGated = inputData.getBoolean(KEY_IS_GATED, false)
+        val checkpoint = checkpointDao.getCheckpoint(modelId)
+        val effectiveGated = isGated || (checkpoint?.isGated == true)
 
-        Timber.d("ModelDownloadWorker: starting download — modelId=$modelId url=$fileUrl")
+        Timber.d("ModelDownloadWorker: starting download — modelId=$modelId isGated=$isGated url=$fileUrl")
 
         val localFileName = fileName.substringAfterLast("/")
         val modelsDir =
@@ -80,7 +86,6 @@ class ModelDownloadWorker @AssistedInject constructor(
         val destFile = File(modelsDir, localFileName)
 
         // Restore checkpoint — priority: Room > file length > 0
-        val checkpoint = checkpointDao.getCheckpoint(modelId)
         val resumeOffset = when {
             checkpoint != null && destFile.exists() ->
                 destFile.length().coerceAtLeast(checkpoint.downloadedBytes)
@@ -101,25 +106,39 @@ class ModelDownloadWorker @AssistedInject constructor(
         }
 
         return try {
-            val requestBuilder = Request.Builder()
-                .url(fileUrl)
-                .header("Range", "bytes=$resumeOffset-")
-            if (fileUrl.contains("huggingface.co")) {
+            val authUrl = if (effectiveGated && fileUrl.contains("huggingface.co")) {
                 val token = apiKeyStore.getHuggingFaceToken()
-                Timber.d("ModelDownloadWorker: HF token present=%b", token != null)
                 if (token != null) {
                     val tokenStr = String(token)
                     token.fill('0')
-                    requestBuilder.header("Authorization", "Bearer $tokenStr")
-                }
-            }
-            val request = requestBuilder.build()
+                    val sep = if (fileUrl.contains("?")) "&" else "?"
+                    "$fileUrl${sep}token=$tokenStr"
+                } else fileUrl
+            } else fileUrl
+
+            val request = Request.Builder()
+                .url(authUrl)
+                .header("Range", "bytes=$resumeOffset-")
+                .build()
 
             val response = okHttpClient.newCall(request).execute()
             Timber.d("ModelDownloadWorker: HTTP ${response.code} for $fileUrl")
             if (!response.isSuccessful && response.code != 206) {
+                val hfErrorBody = if (response.code in 400..403) {
+                    try { response.body?.charStream()?.readText()?.take(500) } catch (_: Exception) { null }
+                } else null
+                Timber.e("ModelDownloadWorker: HF error body — $hfErrorBody")
                 val errorMsg = when (response.code) {
-                     401, 403 -> "Gated model — get an Access Token at huggingface.co/settings/tokens then add it in Settings."
+                    401 -> "Not authenticated — add your HuggingFace token in Settings → Hugging Face."
+                    403 -> {
+                        if (!hfErrorBody.isNullOrBlank()) {
+                            val modelId = hfErrorBody.substringAfter("model ").substringBefore(" is restricted").ifBlank { null }
+                            if (modelId != null) "Access denied — visit huggingface.co/$modelId to accept terms, then retry."
+                            else "Access denied — $hfErrorBody"
+                        } else {
+                            "Access denied — visit the model page on Hugging Face to accept terms."
+                        }
+                    }
                     404 -> "File not found on HuggingFace."
                     else -> "HTTP ${response.code}: ${response.message}"
                 }
@@ -160,6 +179,7 @@ class ModelDownloadWorker @AssistedInject constructor(
                             // Persist checkpoint before exiting
                             checkpointDao.upsertCheckpoint(
                                 DownloadCheckpointEntity(
+                                    isGated = effectiveGated,
                                     modelId = modelId,
                                     fileName = fileName,
                                     fileUrl = fileUrl,
@@ -221,6 +241,7 @@ class ModelDownloadWorker @AssistedInject constructor(
                         if (totalRead - lastCheckpointUpdate > 1_048_576) {
                             checkpointDao.upsertCheckpoint(
                                 DownloadCheckpointEntity(
+                                    isGated = effectiveGated,
                                     modelId = modelId,
                                     fileName = fileName,
                                     fileUrl = fileUrl,
@@ -237,6 +258,7 @@ class ModelDownloadWorker @AssistedInject constructor(
             // Final checkpoint update (100% complete)
             checkpointDao.upsertCheckpoint(
                 DownloadCheckpointEntity(
+                                    isGated = effectiveGated,
                     modelId = modelId,
                     fileName = fileName,
                     fileUrl = fileUrl,
@@ -247,6 +269,19 @@ class ModelDownloadWorker @AssistedInject constructor(
 
             // Parse metadata and save model (same logic as existing ModelDownloadManager)
             val isLitertlm = localFileName.endsWith(".litertlm", ignoreCase = true)
+
+            if (!isLitertlm) {
+                val validationResult = GgufMetadataParser.validateHeader(destFile)
+                if (validationResult.isFailure) {
+                    Timber.e(validationResult.exceptionOrNull(), "ModelDownloadWorker: GGUF validation failed — $localFileName")
+                    destFile.delete()
+                    checkpointDao.deleteCheckpoint(modelId)
+                    return Result.failure(
+                        workDataOf("error" to "Corrupted download — file validation failed. Please try again.")
+                    )
+                }
+            }
+
             val modelMetadata = if (!isLitertlm) {
                 try {
                     GgufMetadataParser.parse(destFile).getOrDefault(GgufMetadata())
@@ -290,6 +325,7 @@ class ModelDownloadWorker @AssistedInject constructor(
             // Save checkpoint on error so user can retry/resume
             checkpointDao.upsertCheckpoint(
                 DownloadCheckpointEntity(
+                                    isGated = effectiveGated,
                     modelId = modelId,
                     fileName = fileName,
                     fileUrl = fileUrl,

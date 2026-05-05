@@ -18,6 +18,47 @@ object GgufMetadataParser {
 
     private const val MAX_STRING_LENGTH = 4096
 
+    fun validateHeader(file: java.io.File): Result<Boolean> {
+        return try {
+            if (!file.exists() || file.length() < 32) {
+                return Result.failure(IllegalArgumentException("File is empty or too small to be a valid GGUF"))
+            }
+            java.io.RandomAccessFile(file, "r").use { raf ->
+                val header = ByteArray(4)
+                raf.read(header)
+                val magic = String(header, StandardCharsets.US_ASCII)
+                if (magic != "GGUF") {
+                    return Result.failure(IllegalArgumentException("Not a valid GGUF file — missing GGUF magic number"))
+                }
+                val versionBuf = ByteArray(4)
+                raf.read(versionBuf)
+                val version = ByteBuffer.wrap(versionBuf).order(ByteOrder.LITTLE_ENDIAN).int
+                if (version < 1 || version > 3) {
+                    return Result.failure(IllegalArgumentException("Unsupported GGUF version: $version"))
+                }
+                val tensorCountBuf = ByteArray(8)
+                raf.read(tensorCountBuf)
+                val tensorCount = ByteBuffer.wrap(tensorCountBuf).order(ByteOrder.LITTLE_ENDIAN).long
+                if (tensorCount < 0) {
+                    return Result.failure(IllegalArgumentException("Invalid tensor count in GGUF header"))
+                }
+                val kvCountBuf = ByteArray(8)
+                raf.read(kvCountBuf)
+                val kvCount = ByteBuffer.wrap(kvCountBuf).order(ByteOrder.LITTLE_ENDIAN).long
+                if (kvCount < 0) {
+                    return Result.failure(IllegalArgumentException("Invalid metadata KV count in GGUF header"))
+                }
+                val headerSize = 4 + 4 + 8 + 8
+                if (file.length() < headerSize) {
+                    return Result.failure(IllegalArgumentException("GGUF file truncated — header incomplete"))
+                }
+                Result.success(true)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     fun parse(file: File): Result<GgufMetadata> {
         return try {
             RandomAccessFile(file, "r").use { raf ->
