@@ -334,10 +334,9 @@ Java_com_warped_data_local_inference_LlamaEngine_nativeLoadModel(
         if (onProgressMethod) {
             progressRef = env->NewGlobalRef(progressCallback);
             progressFn = [env, progressRef, onProgressMethod](int percent, const std::string& message) {
-                if (env->PushLocalFrame(16) != 0) return;
                 jstring jMsg = env->NewStringUTF(message.c_str());
                 env->CallVoidMethod(progressRef, onProgressMethod, percent, jMsg);
-                env->PopLocalFrame(nullptr);
+                env->DeleteLocalRef(jMsg);
             };
         }
     }
@@ -360,10 +359,9 @@ Java_com_warped_data_local_inference_LlamaEngine_nativeGenerate(
     jobject callbackRef = env->NewGlobalRef(callback);
 
     LlamaEngine::getInstance().generate(promptCpp, [env, callbackRef, onTokenMethod](const std::string& token, bool done) {
-        if (env->PushLocalFrame(16) != 0) return;
         jstring jToken = env->NewStringUTF(token.c_str());
         env->CallVoidMethod(callbackRef, onTokenMethod, jToken, done ? JNI_TRUE : JNI_FALSE);
-        env->PopLocalFrame(nullptr);
+        env->DeleteLocalRef(jToken);
     });
 
     env->DeleteGlobalRef(callbackRef);
