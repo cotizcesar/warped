@@ -155,6 +155,38 @@ Requirements for GGUF Native Inference via llama.cpp JNI/NDK.
 - [ ] **UXMT-04**: Quantization-aware RAM recommendation displayed for both GGUF and LiteRT-LM models
 - [ ] **UXMT-05**: Model file management (view all downloaded models, delete) works uniformly for GGUF and LiteRT-LM formats
 
+## v1.2 Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| HFDL-01 | Phase 11 | Pending |
+| HFDL-02 | Phase 11 | Pending |
+| HFDL-03 | Phase 11 | Pending |
+| HFDL-04 | Phase 11 | Pending |
+| NTVL-01 | Phase 11 | Pending |
+| NTVL-02 | Phase 12 | Pending |
+| NTVL-03 | Phase 12 | Pending |
+| NTVL-04 | Phase 12 | Pending |
+| NTVL-05 | Phase 11 | Pending |
+| INFR-01 | Phase 13 | Pending |
+| INFR-02 | Phase 13 | Pending |
+| INFR-03 | Phase 13 | Pending |
+| INFR-04 | Phase 13 | Pending |
+| BACK-01 | Phase 14 | Pending |
+| BACK-02 | Phase 14 | Pending |
+| BACK-03 | Phase 14 | Pending |
+| MEMS-01 | Phase 12 | Pending |
+| MEMS-02 | Phase 12 | Pending |
+| MEMS-03 | Phase 13 | Pending |
+| MEMS-04 | Phase 11 | Pending |
+| MEMS-05 | Phase 13 | Pending |
+| MEMS-06 | Phase 13 | Pending |
+| UXMT-01 | Phase 15 | Pending |
+| UXMT-02 | Phase 15 | Pending |
+| UXMT-03 | Phase 15 | Pending |
+| UXMT-04 | Phase 15 | Pending |
+| UXMT-05 | Phase 15 | Pending |
+
 ## v2 Requirements
 
 Deferred to future release.
@@ -263,8 +295,8 @@ Deferred to future release.
 
 **Coverage:**
 - v1.0 requirements: 30 total, 30 mapped ✓
-- v1.1 requirements: 26 total, 26 mapped ✓ (25 claimed in plan, 26 present in requirements)
-- Mapped to phases: 26 mapped to Phases 6-10
+- v1.1 requirements: 26 total, 26 mapped ✓
+- v1.2 requirements: 27 total, 27 mapped ✓ (to Phases 11-15)
 
 ---
 *Requirements defined: 2026-04-30*

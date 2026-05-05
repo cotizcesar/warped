@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: GGUF Native Inference
 status: planning
-last_updated: "2026-05-05T13:46:07.099Z"
+last_updated: "2026-05-05T14:00:00.000Z"
 last_activity: 2026-05-05
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -16,22 +16,34 @@ progress:
 # Project State: Warped
 
 **Last updated:** 2026-05-05
-**Last activity:** 2026-05-05
+**Last activity:** 2026-05-05 — Roadmap created
 
 See: .planning/PROJECT.md
 
 ## Project Reference
 
 **Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** Defining requirements
-**Milestone:** v1.2 GGUF Pipeline Remediation
+**Current focus:** v1.2 GGUF Native Inference — make GGUF work end-to-end with llama.cpp, same UX as LiteRT-LM
+**Milestone:** v1.2 GGUF Native Inference
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-05-05 — Milestone v1.2 started
+| Field | Value |
+|-------|-------|
+| Phase | 11 (Native Foundation) — not started |
+| Plan | — (no plans generated yet) |
+| Status | Roadmapped — ready for `/gsd-plan-phase 11` |
+| Last activity | 2026-05-05 — v1.2 roadmap created (5 phases, 27 requirements, 24 success criteria) |
+
+## Phase Structure
+
+| Phase | Name | Requirements | Status | Depends On |
+|-------|------|--------------|--------|------------|
+| 11 | Native Foundation | NTVL-01, NTVL-05, HFDL-01..04, MEMS-04 (7) | Not started | — |
+| 12 | Model Loading & Memory | NTVL-02..04, MEMS-01, MEMS-02 (5) | Not started | Phase 11 |
+| 13 | Inference Core & Thread Safety | INFR-01..04, MEMS-03, MEMS-05, MEMS-06 (7) | Not started | Phase 12 |
+| 14 | Vulkan GPU Backend | BACK-01..03 (3) | Not started | Phase 13 |
+| 15 | Cross-Engine UX Parity | UXMT-01..05 (5) | Not started | Phase 13+14 |
 
 ## Completed
 
@@ -87,6 +99,8 @@ None yet.
 ### Blockers/Concerns
 
 - v1.0 GGUF pipeline (LOCL-01–05, ACQ-01–05, DEV-01–02) marked complete but user reports end-to-end flow is broken — this milestone fixes it.
+- Vulkan driver fragmentation requires testing on physical devices across GPU vendors (Adreno, Mali, Xclipse, PowerVR)
+- LiteRT-LM + llama.cpp coexistence in same process — verify no symbol conflicts between native .so files
 
 ### Quick Tasks Completed
 
@@ -97,5 +111,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-05-05
-Stopped at: Started milestone v1.2 — defining requirements
-Resume file: None
+Stopped at: v1.2 roadmap created — 5 phases, 27 requirements, ready for Phase 11 planning
+Resume file: .planning/ROADMAP.md
