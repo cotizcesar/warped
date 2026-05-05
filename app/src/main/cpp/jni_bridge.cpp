@@ -327,19 +327,24 @@ Java_com_warped_data_local_inference_LlamaEngine_nativeLoadModel(
     env->ReleaseStringUTFChars(path, pathStr);
 
     ProgressCallback progressFn = nullptr;
+    jobject progressRef = nullptr;
     if (progressCallback) {
         jclass callbackClass = env->GetObjectClass(progressCallback);
         jmethodID onProgressMethod = env->GetMethodID(callbackClass, "onProgress", "(ILjava/lang/String;)V");
         if (onProgressMethod) {
-            progressFn = [env, progressCallback, onProgressMethod](int percent, const std::string& message) {
+            progressRef = env->NewGlobalRef(progressCallback);
+            progressFn = [env, progressRef, onProgressMethod](int percent, const std::string& message) {
+                if (env->PushLocalFrame(16) != 0) return;
                 jstring jMsg = env->NewStringUTF(message.c_str());
-                env->CallVoidMethod(progressCallback, onProgressMethod, percent, jMsg);
-                env->DeleteLocalRef(jMsg);
+                env->CallVoidMethod(progressRef, onProgressMethod, percent, jMsg);
+                env->PopLocalFrame(nullptr);
             };
         }
     }
 
     std::string result = LlamaEngine::getInstance().loadModel(pathCpp, nThreads, nCtx, nGpuLayers, progressFn);
+
+    if (progressRef) env->DeleteGlobalRef(progressRef);
     return result.empty() ? nullptr : env->NewStringUTF(result.c_str());
 }
 
@@ -352,12 +357,16 @@ Java_com_warped_data_local_inference_LlamaEngine_nativeGenerate(
 
     jclass callbackClass = env->GetObjectClass(callback);
     jmethodID onTokenMethod = env->GetMethodID(callbackClass, "onToken", "(Ljava/lang/String;Z)V");
+    jobject callbackRef = env->NewGlobalRef(callback);
 
-    LlamaEngine::getInstance().generate(promptCpp, [env, callback, onTokenMethod](const std::string& token, bool done) {
+    LlamaEngine::getInstance().generate(promptCpp, [env, callbackRef, onTokenMethod](const std::string& token, bool done) {
+        if (env->PushLocalFrame(16) != 0) return;
         jstring jToken = env->NewStringUTF(token.c_str());
-        env->CallVoidMethod(callback, onTokenMethod, jToken, done ? JNI_TRUE : JNI_FALSE);
-        env->DeleteLocalRef(jToken);
+        env->CallVoidMethod(callbackRef, onTokenMethod, jToken, done ? JNI_TRUE : JNI_FALSE);
+        env->PopLocalFrame(nullptr);
     });
+
+    env->DeleteGlobalRef(callbackRef);
 }
 
 JNIEXPORT void JNICALL
