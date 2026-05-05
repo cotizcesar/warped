@@ -6,10 +6,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
@@ -32,9 +34,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.warped.ui.components.WarpedAlertDialog
 import com.warped.domain.model.Conversation
 import com.warped.domain.repository.ChatRepository
 import com.warped.ui.chat.ChatScreen
+import com.warped.ui.help.HelpScreen
 import com.warped.ui.huggingface.HuggingFaceScreen
 import com.warped.ui.models.ModelsScreen
 import com.warped.ui.presets.PresetsScreen
@@ -94,6 +98,7 @@ fun WarpedNavGraph() {
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
+                drawerShape = RoundedCornerShape(0.dp),
                 drawerContainerColor = DrawerBg,
                 drawerContentColor = DrawerTextPrimary
             ) {
@@ -134,7 +139,7 @@ fun WarpedNavGraph() {
                             var showDeleteConfirm by remember { mutableStateOf(false) }
                             val isActive = conv.id == activeConversationId
                             if (showDeleteConfirm) {
-                                AlertDialog(
+                                WarpedAlertDialog(
                                     onDismissRequest = { showDeleteConfirm = false },
                                     title = { Text("Delete chat") },
                                     text = { Text("Delete \"${conv.title}\"? This cannot be undone.") },
@@ -190,8 +195,8 @@ fun WarpedNavGraph() {
                         horizontalArrangement = Arrangement.SpaceEvenly) {
                         val isModels = currentRoute == Screen.Models.route
                         NavigationDrawerItem(
-                            icon = { Icon(Icons.Filled.Memory, null, tint = if (isModels) DrawerAccent else DrawerTextSecondary, modifier = Modifier.size(22.dp)) },
-                            label = { Text("Models", color = if (isModels) DrawerAccent else DrawerTextSecondary, fontSize = 14.sp) },
+                            icon = { Icon(Icons.Filled.Memory, null, tint = if (isModels) DrawerAccent else DrawerTextSecondary, modifier = Modifier.size(20.dp)) },
+                            label = { Text("Models", color = if (isModels) DrawerAccent else DrawerTextSecondary, fontSize = 12.sp) },
                             selected = isModels,
                             colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = DrawerSelectedBg, unselectedContainerColor = Color.Transparent),
                             modifier = Modifier.weight(1f),
@@ -203,10 +208,25 @@ fun WarpedNavGraph() {
                                 scope.launch { drawerState.close() }
                             }
                         )
+                        val isHelp = currentRoute == Screen.Help.route
+                        NavigationDrawerItem(
+                            icon = { Icon(Icons.Filled.Info, null, tint = if (isHelp) DrawerAccent else DrawerTextSecondary, modifier = Modifier.size(20.dp)) },
+                            label = { Text("Help", color = if (isHelp) DrawerAccent else DrawerTextSecondary, fontSize = 12.sp) },
+                            selected = isHelp,
+                            colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = DrawerSelectedBg, unselectedContainerColor = Color.Transparent),
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                navController.navigate(Screen.Help.route) {
+                                    popUpTo(Screen.Chat.route) { inclusive = false }
+                                    launchSingleTop = true
+                                }
+                                scope.launch { drawerState.close() }
+                            }
+                        )
                         val isSettings = currentRoute == Screen.Settings.route
                         NavigationDrawerItem(
-                            icon = { Icon(Icons.Filled.Settings, null, tint = if (isSettings) DrawerAccent else DrawerTextSecondary, modifier = Modifier.size(22.dp)) },
-                            label = { Text("Settings", color = if (isSettings) DrawerAccent else DrawerTextSecondary, fontSize = 14.sp) },
+                            icon = { Icon(Icons.Filled.Settings, null, tint = if (isSettings) DrawerAccent else DrawerTextSecondary, modifier = Modifier.size(20.dp)) },
+                            label = { Text("Settings", color = if (isSettings) DrawerAccent else DrawerTextSecondary, fontSize = 12.sp) },
                             selected = isSettings,
                             colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = DrawerSelectedBg, unselectedContainerColor = Color.Transparent),
                             modifier = Modifier.weight(1f),
@@ -224,8 +244,12 @@ fun WarpedNavGraph() {
         }
     ) {
         NavHost(navController, startDestination = Screen.Chat.route) {
-            composable(Screen.Chat.route) {
+            composable(
+                route = "${Screen.Chat.route}?newChat={newChat}",
+                arguments = listOf(navArgument("newChat") { type = NavType.BoolType; defaultValue = false })
+            ) {
                 ChatScreen(
+                    newChat = it.arguments?.getBoolean("newChat") ?: false,
                     onOpenDrawer = { scope.launch { drawerState.open() } },
                     onNavigateToModels = {
                         navController.navigate(Screen.Models.route) {
@@ -254,7 +278,7 @@ fun WarpedNavGraph() {
             composable(Screen.Models.route) {
                 ModelsScreen(
                     onUseInChat = {
-                        navController.navigate(Screen.Chat.route) {
+                        navController.navigate("${Screen.Chat.route}?newChat=true") {
                             popUpTo(Screen.Chat.route) { inclusive = true }
                         }
                     },
@@ -272,6 +296,9 @@ fun WarpedNavGraph() {
             composable(Screen.Presets.route) { PresetsScreen() }
             composable(Screen.Settings.route) {
                 SettingsScreen(onOpenDrawer = { scope.launch { drawerState.open() } })
+            }
+            composable(Screen.Help.route) {
+                HelpScreen(onNavigateBack = { navController.popBackStack() })
             }
         }
     }

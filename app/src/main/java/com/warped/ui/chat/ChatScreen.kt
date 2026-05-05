@@ -52,7 +52,8 @@ fun ChatScreen(
     viewModel: ChatViewModel = hiltViewModel(),
     onOpenDrawer: () -> Unit = {},
     onNavigateToModels: () -> Unit = {},
-    conversationId: Long = 0L
+    conversationId: Long = 0L,
+    newChat: Boolean = false
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
@@ -66,7 +67,11 @@ fun ChatScreen(
     }
     LaunchedEffect(Unit) {
         if (conversationId == 0L) {
-            viewModel.loadLastConversation()
+            if (newChat) {
+                viewModel.newConversation()
+            } else {
+                viewModel.loadLastConversation()
+            }
         }
     }
     DisposableEffect(Unit) {
