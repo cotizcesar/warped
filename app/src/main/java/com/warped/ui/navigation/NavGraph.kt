@@ -92,6 +92,7 @@ fun WarpedNavGraph() {
     }
     val chatRepository = remember { entryPoint.chatRepository() }
     val activeModelSelection = remember { entryPoint.activeModelSelection() }
+    val engineManager = remember { entryPoint.engineManager() }
     val conversations by chatRepository.observeConversations().collectAsStateWithLifecycle(emptyList())
 
     ModalNavigationDrawer(
@@ -152,7 +153,8 @@ fun WarpedNavGraph() {
                                                 if (wasActive) {
                                                     activeConversationId = null
                                                     activeModelSelection.clearLastConversation()
-                                                    navController.navigate(Screen.Chat.route) {
+                                                    engineManager.scheduleUnload()
+                                                    navController.navigate("${Screen.Chat.route}?newChat=true") {
                                                         popUpTo(Screen.Chat.route) { inclusive = true }
                                                     }
                                                 }
@@ -309,4 +311,5 @@ fun WarpedNavGraph() {
 interface ChatRepoEntryPoint {
     fun chatRepository(): ChatRepository
     fun activeModelSelection(): com.warped.domain.model.ActiveModelSelection
+    fun engineManager(): com.warped.data.local.inference.EngineManager
 }
