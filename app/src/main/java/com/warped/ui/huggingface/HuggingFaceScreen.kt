@@ -154,18 +154,6 @@ fun HuggingFaceScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            val formats = listOf("staffpicks" to "Staff Picks", "litertlm" to "LiteRT-LM", "gguf" to "GGUF")
-            val selectedTabIndex = formats.indexOfFirst { it.first == uiState.activeFormat }.coerceAtLeast(0)
-            PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
-                formats.forEachIndexed { index, (formatValue, label) ->
-                    Tab(
-                        selected = selectedTabIndex == index,
-                        onClick = { viewModel.setActiveFormat(formatValue) },
-                        text = { Text(label) }
-                    )
-                }
-            }
-
             Spacer(Modifier.height(4.dp))
 
             if (uiState.isLoading) {
