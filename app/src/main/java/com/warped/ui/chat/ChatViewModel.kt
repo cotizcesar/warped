@@ -96,10 +96,7 @@ class ChatViewModel @Inject constructor(
                             error = null
                         )
                     }
-                    // Only preload LiteRT-LM — GGUF loads on-demand on first message
-                    if (activeModel.providerType == ProviderType.LITE_RT_LM) {
-                        preloadLocalModel(activeModel.modelId)
-                    }
+                    // All local models load on-demand on first message
                 }
             }
         }
@@ -170,14 +167,7 @@ class ChatViewModel @Inject constructor(
                         }
                         return@launch
                     }
-                    val isEngineLoaded = when (selectedProvider) {
-                        ProviderType.LITE_RT_LM -> engineManager.getActiveEngine() != null
-                        ProviderType.LOCAL -> llamaEngine.isLoaded()
-                        else -> true
-                    }
-                    if (!isEngineLoaded) {
-                        preloadLocalModel(modelId)
-                    }
+                    // Model loads on-demand on first message
                 }
 
                 val provider = when (selectedProvider) {
@@ -314,9 +304,7 @@ class ChatViewModel @Inject constructor(
                 }
                 if (conversation.modelId != null && !modelMissing) {
                     activeModelSelection.select(conversation.modelId, conversation.providerType)
-                    if (conversation.providerType == ProviderType.LITE_RT_LM) {
-                        preloadLocalModel(conversation.modelId)
-                    }
+                    // Model loads on-demand on first message
                 }
                 activeModelSelection.saveLastConversation(conversation.id)
                 refreshActiveBackend()
@@ -477,10 +465,10 @@ class ChatViewModel @Inject constructor(
                 }
             }
             ProviderType.LOCAL -> {
-                // GGUF loads on-demand on first message — skip preload
+                // Model loads on-demand on first message
             }
             ProviderType.LITE_RT_LM -> {
-                viewModelScope.launch { preloadLocalModel(modelId) }
+                // Model loads on-demand on first message
             }
             else -> {}
         }
