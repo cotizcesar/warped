@@ -30,6 +30,7 @@ class LlamaEngine @Inject constructor() {
         path: String,
         nThreads: Int,
         nCtx: Int,
+        nGpuLayers: Int,
         progressCallback: LoadProgressCallback?
     ): String?
 
@@ -44,6 +45,7 @@ class LlamaEngine @Inject constructor() {
         path: String,
         nThreads: Int = 4,
         nCtx: Int = 4096,
+        nGpuLayers: Int = 0,
         onProgress: ((percent: Int, message: String) -> Unit)? = null
     ): Result<Unit> {
         val callback = if (onProgress != null) {
@@ -54,7 +56,7 @@ class LlamaEngine @Inject constructor() {
             }
         } else null
 
-        val error = nativeLoadModel(path, nThreads, nCtx, callback)
+        val error = nativeLoadModel(path, nThreads, nCtx, nGpuLayers, callback)
         return if (error == null) {
             Result.success(Unit)
         } else {

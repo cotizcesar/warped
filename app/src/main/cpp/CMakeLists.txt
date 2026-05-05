@@ -14,7 +14,11 @@ set(GGML_STANDALONE OFF CACHE BOOL "" FORCE)
 set(GGML_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GGML_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(GGML_CPU_ALL_VARIANTS OFF CACHE BOOL "" FORCE)
-set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
+if(ANDROID_ABI STREQUAL "arm64-v8a")
+    set(GGML_VULKAN ON CACHE BOOL "" FORCE)
+else()
+    set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
+endif()
 set(GGML_CUDA OFF CACHE BOOL "" FORCE)
 set(GGML_METAL OFF CACHE BOOL "" FORCE)
 set(GGML_HEXAGON OFF CACHE BOOL "" FORCE)
@@ -36,6 +40,10 @@ target_compile_definitions(warped_llama PRIVATE
     GGML_USE_CPU=1
     GGML_USE_CPU_AARCH64=1
 )
+
+if(GGML_VULKAN)
+    target_compile_definitions(warped_llama PRIVATE GGML_USE_VULKAN=1)
+endif()
 
 target_link_libraries(warped_llama
     llama

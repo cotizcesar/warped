@@ -16,7 +16,7 @@ class LlamaEngine {
 public:
     static LlamaEngine& getInstance();
 
-    std::string loadModel(const std::string& modelPath, int nThreads, int nCtx, ProgressCallback progress);
+    std::string loadModel(const std::string& modelPath, int nThreads, int nCtx, int nGpuLayers, ProgressCallback progress);
     void generate(const std::string& prompt, TokenCallback callback);
     void stop();
     void unload();

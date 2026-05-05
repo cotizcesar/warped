@@ -7,7 +7,7 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
-enum class BackendType { CPU, GPU }
+enum class BackendType { CPU, GPU, NPU }
 
 @Singleton
 class BackendDetector @Inject constructor() {
@@ -33,6 +33,31 @@ class BackendDetector @Inject constructor() {
             BackendType.CPU
         }
         return cachedBackend!!
+    }
+
+    /** Probe a vision-capable backend. Falls back to main backend if GPU unavailable. */
+    fun probeVisionBackend(): BackendType {
+        return if (isEGLAvailable()) BackendType.GPU else BackendType.CPU
+    }
+
+    /** Probe an audio-capable backend. Currently always CPU (most compatible). */
+    fun probeAudioBackend(): BackendType = BackendType.CPU
+
+    /** Probe Vulkan GPU availability for llama.cpp. Returns GPU if Vulkan available, CPU otherwise. */
+    fun probeVulkan(): BackendType {
+        return try {
+            val hasVulkan = isEGLAvailable()
+            if (hasVulkan) {
+                Timber.d("BackendDetector: Vulkan-capable GPU detected")
+                BackendType.GPU
+            } else {
+                Timber.d("BackendDetector: Vulkan not available, CPU fallback")
+                BackendType.CPU
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "BackendDetector: Vulkan probe failed, CPU fallback")
+            BackendType.CPU
+        }
     }
 
     /** Check if an EGL display can be obtained (indicates GPU driver presence). */

@@ -21,7 +21,7 @@ LlamaEngine::~LlamaEngine() {
     unload();
 }
 
-std::string LlamaEngine::loadModel(const std::string& path, int nThreads, int nCtx, ProgressCallback progress) {
+std::string LlamaEngine::loadModel(const std::string& path, int nThreads, int nCtx, int nGpuLayers, ProgressCallback progress) {
     if (loaded.load()) unload();
 
     LOGD("Loading model: %s (threads=%d, ctx=%d)", path.c_str(), nThreads, nCtx);
@@ -44,7 +44,7 @@ std::string LlamaEngine::loadModel(const std::string& path, int nThreads, int nC
 
         if (progress) progress(10, "Configuring model parameters...");
         llama_model_params model_params = llama_model_default_params();
-        model_params.n_gpu_layers = 0;
+        model_params.n_gpu_layers = nGpuLayers;
         model_params.use_mmap = true;
         model_params.use_mlock = false;
 
@@ -289,7 +289,7 @@ extern "C" {
 
 JNIEXPORT jstring JNICALL
 Java_com_warped_data_local_inference_LlamaEngine_nativeLoadModel(
-    JNIEnv* env, jobject /* this */, jstring path, jint nThreads, jint nCtx, jobject progressCallback) {
+    JNIEnv* env, jobject /* this */, jstring path, jint nThreads, jint nCtx, jint nGpuLayers, jobject progressCallback) {
     const char* pathStr = env->GetStringUTFChars(path, nullptr);
     std::string pathCpp(pathStr);
     env->ReleaseStringUTFChars(path, pathStr);
@@ -307,7 +307,7 @@ Java_com_warped_data_local_inference_LlamaEngine_nativeLoadModel(
         }
     }
 
-    std::string result = LlamaEngine::getInstance().loadModel(pathCpp, nThreads, nCtx, progressFn);
+    std::string result = LlamaEngine::getInstance().loadModel(pathCpp, nThreads, nCtx, nGpuLayers, progressFn);
     return result.empty() ? nullptr : env->NewStringUTF(result.c_str());
 }
 

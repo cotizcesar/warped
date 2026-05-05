@@ -98,7 +98,17 @@ class EngineManager @Inject constructor(
             return Result.failure(LlamaLoadError.CorruptedFile())
         }
 
-        val target = ActiveEngine(EngineType.LLAMA_CPP, modelPath)
+        // Probe Vulkan GPU availability for llama.cpp
+        val vulkanBackend = try {
+            backendDetector.probeVulkan()
+        } catch (e: Exception) {
+            Timber.w(e, "EngineManager: Vulkan probe error, defaulting to CPU")
+            BackendType.CPU
+        }
+        val nGpuLayers = if (vulkanBackend == BackendType.GPU) 99 else 0
+        Timber.d("EngineManager: Vulkan backend=$vulkanBackend, nGpuLayers=$nGpuLayers")
+
+        val target = ActiveEngine(EngineType.LLAMA_CPP, modelPath, backend = vulkanBackend)
         if (activeEngine == target) {
             Timber.d("EngineManager: $target already loaded, skipping switch")
             val metadata = try {
@@ -110,9 +120,10 @@ class EngineManager @Inject constructor(
         }
         unloadCurrent()
 
-        Timber.d("EngineManager: loading llama.cpp model: $modelPath")
+        Timber.d("EngineManager: loading llama.cpp model: $modelPath (gpuLayers=$nGpuLayers)")
         val loadResult = llamaEngine.loadModel(
             path = modelPath,
+            nGpuLayers = nGpuLayers,
             onProgress = onProgress
         )
 
