@@ -239,7 +239,8 @@ class HuggingFaceViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 selectedModel = null,
-                modelSiblings = emptyList()
+                modelSiblings = emptyList(),
+                ggufFileDetails = emptyMap()
             )
         }
     }
