@@ -4,12 +4,19 @@ import com.warped.data.remote.dto.HuggingFaceModel
 import com.warped.data.remote.dto.HuggingFaceModelDetail
 import com.warped.data.remote.dto.HuggingFaceSibling
 
+data class GgufFileDetail(
+    val quantization: String?,
+    val fileSizeBytes: Long,
+    val ramEstimateBytes: Long
+)
+
 data class HuggingFaceUiState(
     val searchQuery: String = "",
     val searchResults: List<HuggingFaceModel> = emptyList(),
     val isLoading: Boolean = false,
     val selectedModel: HuggingFaceModelDetail? = null,
     val modelSiblings: List<HuggingFaceSibling> = emptyList(),
+    val ggufFileDetails: Map<String, GgufFileDetail> = emptyMap(),
     val isDownloading: Boolean = false,
     val isDownloadPaused: Boolean = false,
     val downloadProgress: Float = 0f,

@@ -3,6 +3,7 @@ package com.warped.ui.huggingface
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.warped.data.local.download.ModelDownloadManager
+import com.warped.data.local.inference.GgufQuantizationParser
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.data.remote.dto.HuggingFaceModel
 import com.warped.domain.repository.HuggingFaceRepository
@@ -70,6 +71,7 @@ class HuggingFaceViewModel @Inject constructor(
             val activeFormat = _uiState.value.activeFormat
             val library = when (activeFormat) {
                 "litertlm" -> "litert"
+                "gguf" -> null  // no filter — show all results
                 else -> "gguf"
             }
             val author = when (activeFormat) {
@@ -111,10 +113,24 @@ class HuggingFaceViewModel @Inject constructor(
                 val sortedFiles = filteredSiblings.sortedBy { sibling ->
                     sibling.size.takeIf { it > 0 } ?: sibling.lfs?.size ?: 0L
                 }
+                val fileDetails = sortedFiles.associate { sibling ->
+                    val effectiveSize = sibling.size.takeIf { it > 0 } ?: sibling.lfs?.size ?: 0L
+                    val quantization = if (_uiState.value.activeFormat == "gguf") {
+                        GgufQuantizationParser.parseQuantization(sibling.rfilename)
+                    } else null
+                    sibling.rfilename to GgufFileDetail(
+                        quantization = quantization,
+                        fileSizeBytes = effectiveSize,
+                        ramEstimateBytes = if (effectiveSize > 0 && quantization != null) {
+                            GgufQuantizationParser.estimateRamBytes(effectiveSize)
+                        } else 0L
+                    )
+                }
                 _uiState.update {
                     it.copy(
                         selectedModel = detail,
                         modelSiblings = sortedFiles,
+                        ggufFileDetails = fileDetails,
                         isLoading = false
                     )
                 }
@@ -160,7 +176,8 @@ class HuggingFaceViewModel @Inject constructor(
             modelId = downloadId,
             fileName = fileName,
             fileUrl = fileUrl,
-            fileSizeBytes = fileSize
+            fileSizeBytes = fileSize,
+            isGated = gated != "false"
         )
     }
 

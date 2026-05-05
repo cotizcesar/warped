@@ -24,8 +24,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
@@ -76,25 +78,32 @@ fun HuggingFaceScreen(
     }
 
     if (uiState.selectedModel != null) {
-        ModelDetailScreen(
-            model = uiState.selectedModel!!,
-            siblings = uiState.modelSiblings,
-            isDownloading = uiState.isDownloading,
-            isDownloadPaused = uiState.isDownloadPaused,
-            downloadProgress = uiState.downloadProgress,
-            downloadedBytes = uiState.downloadedBytes,
-            totalDownloadBytes = uiState.totalDownloadBytes,
-            downloadSpeedBytesPerSecond = uiState.downloadSpeedBytesPerSecond,
-            downloadingFileName = uiState.downloadingFileName,
-            downloadError = uiState.downloadError,
-            onDownload = { fileName, size ->
-                viewModel.downloadFile(uiState.selectedModel!!.id, fileName, size)
-            },
-            onPauseDownload = { viewModel.pauseDownload() },
-            onResumeDownload = { viewModel.resumeDownload() },
-            onBack = { viewModel.clearDetail() }
-        )
-        return
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.clearDetail() },
+            sheetState = sheetState,
+            containerColor = Color(0xFF1F1F1E)
+        ) {
+            ModelDetailScreen(
+                model = uiState.selectedModel!!,
+                siblings = uiState.modelSiblings,
+                ggufFileDetails = uiState.ggufFileDetails,
+                isDownloading = uiState.isDownloading,
+                isDownloadPaused = uiState.isDownloadPaused,
+                downloadProgress = uiState.downloadProgress,
+                downloadedBytes = uiState.downloadedBytes,
+                totalDownloadBytes = uiState.totalDownloadBytes,
+                downloadSpeedBytesPerSecond = uiState.downloadSpeedBytesPerSecond,
+                downloadingFileName = uiState.downloadingFileName,
+                downloadError = uiState.downloadError,
+                onDownload = { fileName, size ->
+                    viewModel.downloadFile(uiState.selectedModel!!.id, fileName, size)
+                },
+                onPauseDownload = { viewModel.pauseDownload() },
+                onResumeDownload = { viewModel.resumeDownload() },
+                onBack = { viewModel.clearDetail() }
+            )
+        }
     }
 
     Scaffold(
@@ -301,6 +310,7 @@ private fun AssistInfoChip(text: String) {
 @Composable
 private fun SiblingFileCard(
     sibling: com.warped.data.remote.dto.HuggingFaceSibling,
+    ggufDetail: GgufFileDetail?,
     modelDownloads: Int,
     isDownloading: Boolean,
     onDownload: () -> Unit
@@ -331,12 +341,19 @@ private fun SiblingFileCard(
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 2
                 )
+                ggufDetail?.quantization?.let { quant ->
+                    Spacer(Modifier.width(8.dp))
+                    QuantizationBadge(quant)
+                }
             }
             Spacer(Modifier.height(8.dp))
             if (effectiveSize > 0) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AssistInfoChip(text = formatFileSize(effectiveSize))
                     AssistInfoChip(text = "$modelDownloads downloads")
+                    if (ggufDetail != null && ggufDetail.ramEstimateBytes > 0) {
+                        AssistInfoChip(text = "~${com.warped.data.local.inference.GgufQuantizationParser.formatRamBytes(ggufDetail.ramEstimateBytes)} RAM")
+                    }
                 }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -355,11 +372,40 @@ private fun SiblingFileCard(
     }
 }
 
+@Composable
+private fun QuantizationBadge(quantization: String) {
+    val color = when {
+        quantization.startsWith("Q2", ignoreCase = true) -> Color(0xFFE53935) // red for low quant
+        quantization.startsWith("Q3", ignoreCase = true) -> Color(0xFFFB8C00) // orange
+        quantization.startsWith("Q4", ignoreCase = true) -> Color(0xFF43A047) // green
+        quantization.startsWith("Q5", ignoreCase = true) -> Color(0xFF1E88E5) // blue
+        quantization.startsWith("Q6", ignoreCase = true) -> Color(0xFF8E24AA) // purple
+        quantization.startsWith("Q8", ignoreCase = true) -> Color(0xFF00897B) // teal
+        quantization.startsWith("F", ignoreCase = true) -> Color(0xFFFFB300) // amber for fp16/fp32
+        quantization.startsWith("IQ", ignoreCase = true) -> Color(0xFF00ACC1) // cyan for IQ
+        quantization.startsWith("TQ", ignoreCase = true) -> Color(0xFF7CB342) // light green for TQ
+        else -> MaterialTheme.colorScheme.primary
+    }
+    Surface(
+        shape = MaterialTheme.shapes.extraSmall,
+        color = color.copy(alpha = 0.15f),
+        contentColor = color
+    ) {
+        Text(
+            text = quantization,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ModelDetailScreen(
     model: com.warped.data.remote.dto.HuggingFaceModelDetail,
     siblings: List<com.warped.data.remote.dto.HuggingFaceSibling>,
+    ggufFileDetails: Map<String, GgufFileDetail>,
     isDownloading: Boolean,
     isDownloadPaused: Boolean,
     downloadProgress: Float,
@@ -481,8 +527,10 @@ private fun ModelDetailScreen(
 
                 items(siblings) { sibling ->
                     val effectiveSize = sibling.size.takeIf { it > 0 } ?: sibling.lfs?.size ?: 0L
+                    val detail = ggufFileDetails[sibling.rfilename]
                     SiblingFileCard(
                         sibling = sibling,
+                        ggufDetail = detail,
                         modelDownloads = model.downloads,
                         isDownloading = isDownloading || isDownloadPaused,
                         onDownload = { onDownload(sibling.rfilename, effectiveSize) }
