@@ -86,8 +86,9 @@ class ChatViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            // Only restore model when resuming a conversation — no auto-select on startup
             activeModelSelection.activeModel.collect { activeModel ->
-                if (activeModel != null) {
+                if (activeModel != null && _uiState.value.conversationId != null) {
                     _uiState.update {
                         it.copy(
                             selectedModelId = activeModel.modelId,
@@ -96,7 +97,6 @@ class ChatViewModel @Inject constructor(
                             error = null
                         )
                     }
-                    // All local models load on-demand on first message
                 }
             }
         }

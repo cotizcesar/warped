@@ -153,10 +153,16 @@ fun ChatScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             if (uiState.selectedProvider != null && selectedModelName != null) {
-                                val isLocal = uiState.selectedProvider == ProviderType.LOCAL ||
-                                    uiState.selectedProvider == ProviderType.LITE_RT_LM
-                                val pillColor = if (isLocal) Color(0xFF4CAF50) else Color(0xFF2196F3)
-                                val pillText = if (isLocal) "Local" else "Net"
+                                val pillText = when {
+                                    uiState.selectedProvider == ProviderType.LOCAL -> "GGUF"
+                                    uiState.selectedProvider == ProviderType.LITE_RT_LM -> "LiteRT-LM"
+                                    else -> "Net"
+                                }
+                                val pillColor = when (pillText) {
+                                    "GGUF" -> Color(0xFF2196F3)
+                                    "LiteRT-LM" -> Color(0xFF4CAF50)
+                                    else -> Color(0xFFFF9800)
+                                }
                                 Surface(
                                     shape = RoundedCornerShape(4.dp),
                                     color = pillColor.copy(alpha = 0.15f)
@@ -195,15 +201,17 @@ fun ChatScreen(
                                     DropdownMenuItem(
                                         text = {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
+                                                val modelPill = if (isLiteRtLm) "LiteRT-LM" else "GGUF"
+                                                val modelPillColor = if (isLiteRtLm) Color(0xFF4CAF50) else Color(0xFF2196F3)
                                                 Surface(
                                                     shape = RoundedCornerShape(4.dp),
-                                                    color = Color(0xFF4CAF50).copy(alpha = 0.15f)
+                                                    color = modelPillColor.copy(alpha = 0.15f)
                                                 ) {
                                                     Text(
-                                                        text = "Local",
+                                                        text = modelPill,
                                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                                         style = MaterialTheme.typography.labelSmall,
-                                                        color = Color(0xFF4CAF50)
+                                                        color = modelPillColor
                                                     )
                                                 }
                                                 Spacer(Modifier.width(8.dp))
