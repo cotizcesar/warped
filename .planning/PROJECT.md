@@ -64,6 +64,8 @@ v1.2 implementó inferencia GGUF nativa con llama.cpp: pipeline completo (downlo
 
 v1.3 expande los endpoints de red: el ProviderType enum ya tiene OPENAI, ANTHROPIC, OLLAMA, LM_STUDIO, CUSTOM, pero el EndpointForm solo muestra LM_STUDIO. ProviderRouter ya maneja todos correctamente — solo falta exponerlos en la UI con nombres legibles y agregar soporte MCP para LM Studio.
 
+**v1.3 SHIPPED (2026-05-06):** 4 fases, 31 requisitos — todos los providers remotos expuestos en UI, API keys por endpoint, OpenAI completo (chat/responses/embeddings/completions), Anthropic Messages API con SSE, Ollama API completa (9 endpoints), LM Studio con MCP ephemeral + plugin servers.
+
 ## Constraints
 
 - **Platform**: Android only (no iOS, no desktop)
