@@ -17,7 +17,8 @@ data class OpenAiStreamChoice(
 @Serializable
 data class OpenAiStreamDelta(
     val content: String? = null,
-    val role: String? = null
+    val role: String? = null,
+    @SerialName("reasoning_content") val reasoningContent: String? = null
 )
 
 @Serializable

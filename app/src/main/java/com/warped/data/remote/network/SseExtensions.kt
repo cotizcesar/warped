@@ -17,6 +17,7 @@ import java.io.IOException
 
 fun ResponseBody.asSseFlow(json: Json): Flow<StreamToken> = flow {
     val parser = SseParser()
+    var reasoningOpen = false
     try {
         val source = source()
         while (!source.exhausted()) {
@@ -25,6 +26,7 @@ fun ResponseBody.asSseFlow(json: Json): Flow<StreamToken> = flow {
             for (event in events) {
                 when {
                     event.data == "[DONE]" -> {
+                        if (reasoningOpen) emit(StreamToken.Delta("</think>"))
                         emit(StreamToken.Done())
                         return@flow
                     }
@@ -32,8 +34,19 @@ fun ResponseBody.asSseFlow(json: Json): Flow<StreamToken> = flow {
                     else -> {
                         try {
                             val chunk = json.decodeFromString<OpenAiStreamChunk>(event.data)
-                            val content = chunk.choices.firstOrNull()?.delta?.content
-                            if (content != null) {
+                            val delta = chunk.choices.firstOrNull()?.delta
+                            delta?.reasoningContent?.let { reasoning ->
+                                if (!reasoningOpen) {
+                                    emit(StreamToken.Delta("<think>"))
+                                    reasoningOpen = true
+                                }
+                                emit(StreamToken.Delta(reasoning))
+                            }
+                            delta?.content?.let { content ->
+                                if (reasoningOpen) {
+                                    emit(StreamToken.Delta("</think>"))
+                                    reasoningOpen = false
+                                }
                                 emit(StreamToken.Delta(content))
                             }
                         } catch (_: Exception) { /* skip malformed JSON */ }
@@ -42,6 +55,7 @@ fun ResponseBody.asSseFlow(json: Json): Flow<StreamToken> = flow {
             }
         }
     } catch (e: IOException) {
+        if (reasoningOpen) emit(StreamToken.Delta("</think>"))
         emit(StreamToken.Error("Connection lost: ${e.message}"))
     } finally {
         parser.reset()
