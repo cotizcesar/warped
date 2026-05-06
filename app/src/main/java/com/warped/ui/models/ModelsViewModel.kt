@@ -8,6 +8,7 @@ import com.warped.data.local.download.ModelDownloadManager
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.inference.ModelImportManager
 import com.warped.data.local.security.ApiKeyStore
+import com.warped.data.remote.provider.LMStudioProvider
 import com.warped.data.remote.provider.ProviderRouter
 import com.warped.domain.model.ActiveModelSelection
 import com.warped.domain.model.Endpoint
@@ -248,7 +249,11 @@ class ModelsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isFetchingEndpointModels = true, availableEndpointModels = emptyList(), availableEndpointModelsData = emptyList()) }
             try {
-                val provider = providerRouter.resolve(tempEndpoint, "fetch")
+                val provider = if (apiType == ProviderType.ANTHROPIC) {
+                    LMStudioProvider(baseUrl = url, modelId = "fetch")
+                } else {
+                    providerRouter.resolve(tempEndpoint, "fetch")
+                }
                 val result = provider.listModels()
                 result.onSuccess { models ->
                     _uiState.update {
