@@ -1,303 +1,138 @@
 # Requirements: Warped
 
-**Defined:** 2026-04-30
+**Defined:** 2026-05-06
 **Core Value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
 
-## v1.0 Requirements ✓
+## v1.3 Requirements
 
-Requirements for initial release. All 30 verified and complete.
+Requirements for milestone v1.3 Remote Provider Endpoints & UX. Each maps to roadmap phases.
 
-### Remote Providers
+### Provider UI & UX
 
-- [x] **PROV-01**: User can add a remote endpoint by providing a name, base URL, and provider type (OpenAI-compatible, Ollama, LM Studio, llama.cpp server, custom)
-- [x] **PROV-02**: User can edit and delete saved remote endpoints
-- [x] **PROV-03**: User can test connection to a remote endpoint and see success/failure with latency info
-- [x] **PROV-04**: User can list available models from a remote endpoint
-- [x] **PROV-05**: User can select a remote model and chat with streaming token-by-token responses
+- [ ] **PROV-01**: User can select any provider type (OpenAI, Anthropic, Ollama, LM Studio, Custom) in the endpoint form dropdown
+- [ ] **PROV-02**: Provider type names display as human-readable labels ("OpenAI", "Anthropic", "LM Studio", "Ollama", "Custom") — not UPPER_CASE enum names with underscores
+- [ ] **PROV-03**: Endpoint cards in ModelsScreen display provider name as human-readable label (not raw apiType.name)
+- [ ] **PROV-04**: Each provider type shows its specialized form fields (e.g., auth headers toggle for Anthropic/LM Studio, model load config for LM Studio, custom paths for Custom)
 
-### Chat
+### API Key & Authentication
 
-- [x] **CHAT-01**: User can send a message and receive a streaming response from a selected provider and model
-- [x] **CHAT-02**: User can stop an in-progress generation with a cancel button
-- [x] **CHAT-03**: User can view conversation history and resume previous chats
-- [x] **CHAT-04**: User can configure a system prompt per conversation
-- [x] **CHAT-05**: User can see which provider and model are currently active during chat
+- [ ] **AUTH-01**: User can configure API key per endpoint, stored encrypted via Android Keystore (EncryptedSharedPreferences)
+- [ ] **AUTH-02**: API key is sent as `Authorization: Bearer <token>` header for OpenAI-compatible endpoints
+- [ ] **AUTH-03**: API key is sent as `x-api-key` header for Anthropic-compatible and LM Studio endpoints
 
-### Local Models
+### OpenAI-Compatible Endpoints
 
-- [x] **LOCL-01**: User can import a GGUF model file from device storage via the system file picker
-- [x] **LOCL-02**: User can load a local GGUF model for inference and receive streaming responses
-- [x] **LOCL-03**: User can stop local generation and unload the model to free memory
-- [x] **LOCL-04**: User can view a list of imported local models with file size, path, and quantization info
-- [x] **LOCL-05**: User can delete a local model from device storage
+- [ ] **OPAI-01**: `POST /v1/chat/completions` — streaming chat with SSE token parsing, response_format (JSON schema structured output), tools (function calling), and all inference parameters (temperature, top_p, top_k, max_tokens, stream, stop, presence_penalty, frequency_penalty, logit_bias, repeat_penalty, seed)
+- [ ] **OPAI-02**: `GET /v1/models` — list available models from the remote endpoint
+- [ ] **OPAI-03**: `POST /v1/responses` — OpenAI Responses API (non-streaming + streaming SSE, stateful via previous_response_id, tools with MCP server_label/server_url, reasoning effort)
+- [ ] **OPAI-04**: `POST /v1/embeddings` — OpenAI Embeddings API (single + batch input, dimensions, encoding_format)
+- [ ] **OPAI-05**: `POST /v1/completions` — OpenAI legacy Completions API (prompt-based, non-chat format, streaming SSE)
 
-### Model Acquisition (Hugging Face)
+### Anthropic-Compatible Endpoints
 
-- [x] **ACQ-01**: User can search for models on Hugging Face and filter by GGUF format
-- [x] **ACQ-02**: User can view model details including file list, sizes, and quantization types (Q2-Q8)
-- [x] **ACQ-03**: User can download a GGUF model file with a foreground progress notification
-- [x] **ACQ-04**: User can pause and resume an in-progress download
-- [x] **ACQ-05**: App validates available storage space before starting a download
+- [ ] **ANTH-01**: `POST /v1/messages` — Anthropic Messages API with streaming SSE (message_start, content_block_start, content_block_delta, content_block_stop, message_delta, message_stop), tools (function calling with input_schema), tool_choice, system prompt, max_tokens
+- [ ] **ANTH-02**: Anthropic provider is selectable from endpoint form UI dropdown (provider implementation already exists in codebase)
 
-### Generation Parameters
+### LM Studio Validation & MCP
 
-- [x] **PARM-01**: User can configure temperature, top_p, top_k, repeat_penalty, max_tokens, context_size, seed, and threads before generation
-- [x] **PARM-02**: User can save named generation presets and load them for reuse
+- [ ] **LMST-01**: `POST /api/v1/chat` — stateful chat with SSE streaming (chat.start, model_load.*, prompt_processing.*, reasoning.*, tool_call.*, message.*, chat.end), multimodal input (text + image data_url), system_prompt, integrations (plugins + ephemeral MCP), context_length, reasoning setting, store/previous_response_id for stateful context
+- [ ] **LMST-02**: `GET /api/v1/models` — list LLM and embedding models with quantization, capabilities (vision, trained_for_tool_use, reasoning), loaded_instances, variants
+- [ ] **LMST-03**: `POST /api/v1/models/load` — load model into memory with configurable context_length, eval_batch_size, flash_attention, num_experts, offload_kv_cache_to_gpu, echo_load_config
+- [ ] **LMST-04**: `POST /api/v1/models/unload` — unload model by instance_id to free memory
+- [ ] **LMST-05**: `POST /api/v1/models/download` — download model from LM Studio catalog identifier or Hugging Face URL, with optional quantization
+- [ ] **LMST-06**: `GET /api/v1/models/download/status/:job_id` — check download progress (bytes_per_second, estimated_completion, downloaded_bytes, status)
+- [ ] **LMST-07**: MCP ephemeral server support — `integrations` field with `type: "ephemeral_mcp"`, `server_label`, `server_url`, `allowed_tools`, and custom `headers` for authenticated MCP servers
+- [ ] **LMST-08**: MCP mcp.json server support — `integrations` field with `type: "plugin"`, `id: "mcp/<server_label>"`, and optional `allowed_tools`
 
-### Security
+### Ollama Endpoints
 
-- [x] **SEC-01**: API keys for remote endpoints are stored encrypted via Android Keystore
-- [x] **SEC-02**: User can delete all chat history and conversation data
-- [x] **SEC-03**: User can delete saved API keys and endpoint credentials
-
-### Persistence
-
-- [x] **PERS-01**: Chat sessions and messages survive app restarts
-- [x] **PERS-02**: Endpoint configurations survive app restarts
-- [x] **PERS-03**: Local model metadata survives app restarts
-
-### Device Awareness
-
-- [x] **DEV-01**: App warns the user if a selected GGUF model is too large for the device's available RAM
-- [x] **DEV-02**: App displays a clear error message when a model fails to load due to memory or compatibility issues
-
-## v1.1 Requirements
-
-Requirements for LiteRT-LM integration. Each maps to roadmap phases.
-
-### LiteRT-LM Engine & Chat
-
-- [x] **LITE-01**: App includes litertlm-android Maven dependency and compiles successfully
-- [x] **LITE-02**: BackendDetector probes GPU availability and falls back to CPU automatically
-- [x] **LITE-03**: LiteRTLmEngine wraps Engine lifecycle (initialize, createConversation, close) with thread safety
-- [x] **LITE-04**: Room schema migration adds model_format and engine_type columns to models table
-- [x] **LITE-05**: LiteRTLmProvider implements LlmProvider with streaming chat via Conversation.sendMessageAsync(Flow)
-- [x] **LITE-06**: Input sanitization prevents Unicode/LaTeX native crashes before reaching the engine
-- [x] **LITE-07**: Generation parameters map correctly to LiteRT-LM's SamplerConfig
-- [x] **LITE-08**: AndroidManifest declares libOpenCL for GPU backend with required="false"
-
-### Model Acquisition
-
-- [x] **ACQ-06**: User can search Hugging Face for .litertlm models filtered by litert-community org
-- [x] **ACQ-07**: User can view .litertlm model details including file size and format info
-- [x] **ACQ-08**: User can download .litertlm model files with foreground progress notification
-- [x] **ACQ-09**: User can pause and resume .litertlm model downloads
-- [x] **ACQ-10**: User can import local .litertlm files from device storage
-
-### UI Integration
-
-- [x] **UI-01**: Models screen has separate GGUF and LiteRT-LM tabs via TabRow
-- [x] **UI-02**: Model list shows format badge (GGUF/LiteRT-LM) on each model card
-- [x] **UI-03**: Active backend (CPU/GPU) is displayed during chat for LiteRT-LM models
-- [x] **UI-04**: User can view and delete downloaded LiteRT-LM models
-- [x] **UI-05**: LiteRT-LM models appear in the model selector for chat sessions
-
-### Generation Parameters
-
-- [x] **PARM-03**: User can configure LiteRT-LM specific parameters (temperature, topK, topP, seed)
-- [x] **PARM-04**: Unsupported parameters (repeat_penalty, context_size, threads) are greyed out for LiteRT-LM
-- [x] **PARM-05**: Presets support both GGUF and LiteRT-LM parameter models
-
-### Polish & Hardening
-
-- [x] **POL-01**: EngineManager enforces mutual exclusion (only one local engine loaded at a time)
-- [x] **POL-02**: App warns if available RAM is insufficient for the selected .litertlm model
-- [x] **POL-03**: Cached model loading via cacheDir for faster subsequent loads
-- [x] **POL-04**: Defensive error recovery reinitializes engine on "Engine not alive" errors
-- [x] **POL-05**: Memory is released when the app is backgrounded (onTrimMemory handling)
-
-## v1.2 Requirements
-
-Requirements for GGUF Native Inference via llama.cpp JNI/NDK.
-
-### GGUF Discovery & Download
-
-- [ ] **HFDL-01**: User can browse .gguf files per HF model including file name, file size, and quantization type (Q4_K_M, Q5_K_M, Q8_0, etc.) parsed from filename
-- [ ] **HFDL-02**: User can see estimated RAM requirement (file_size × 1.3) for each .gguf before downloading
-- [ ] **HFDL-03**: User can download .gguf files with foreground progress notification, pause, and resume via WorkManager
-- [ ] **HFDL-04**: Downloaded GGUF files are validated on completion (magic number + header integrity) with clear error on corruption
-
-### Native Build & Model Loading
-
-- [ ] **NTVL-01**: llama.cpp compiles from source for arm64-v8a and x86_64 (emulator) via CMake+NDK, producing loadable libwarped_llama.so
-- [ ] **NTVL-02**: JNI bridge exposes nativeLoadModel(path, nThreads, nCtx) — returns success/failure with descriptive error (OOM, corrupt, unsupported arch)
-- [ ] **NTVL-03**: User sees loading progress indicator during GGUF model load (large models take seconds to mmap)
-- [ ] **NTVL-04**: Loaded GGUF model metadata (architecture, parameter count, context size, quantization) is displayed after successful load
-- [ ] **NTVL-05**: ProGuard/R8 keep rules preserve JNI callback methods to prevent NoSuchMethodError in release builds
-
-### Inference Core
-
-- [ ] **INFR-01**: User can chat with a loaded GGUF model and receive streaming token-by-token responses via callbackFlow
-- [ ] **INFR-02**: User can stop an in-progress GGUF generation via a cancel button (nativeStop wired with std::atomic<bool>)
-- [ ] **INFR-03**: User sees real-time tokens-per-second display during GGUF generation
-- [ ] **INFR-04**: User can configure all 8 generation parameters (temperature, top_p, top_k, repeat_penalty, max_tokens, context_size, seed, threads) passed to llama.cpp sampler chain
-
-### Backend Selection
-
-- [ ] **BACK-01**: llama.cpp compiles with GGML_VULKAN=ON for Vulkan GPU acceleration
-- [ ] **BACK-02**: Runtime Vulkan availability is detected with automatic CPU fallback if Vulkan unavailable or crashes
-- [ ] **BACK-03**: User sees active backend (CPU / Vulkan GPU) during GGUF chat, matching the existing backend display pattern
-
-### Memory & Stability
-
-- [ ] **MEMS-01**: Pre-load RAM check compares required memory (file_size × 1.3 for KV cache) vs available RAM, warns user before loading if insufficient
-- [ ] **MEMS-02**: App handles onTrimMemory by unloading the GGUF model on critical memory pressure
-- [ ] **MEMS-03**: Active memory pressure monitoring during long generation warns user if approaching OOM threshold
-- [ ] **MEMS-04**: GGUF file pre-validation (magic number, header offset integrity) prevents corrupted-file crashes before native load
-- [ ] **MEMS-05**: Concurrent inference calls are prevented via @Synchronized Kotlin guards + std::atomic<bool> native guards
-- [ ] **MEMS-06**: Safe unload protocol — stop generation → join native thread → free memory; no SIGSEGV on unload-during-generate
-
-### UX & Metadata (Cross-Engine Parity)
-
-- [ ] **UXMT-01**: Model metadata display (architecture, parameters, context, quantization, license, tokenizer) works for GGUF, LiteRT-LM, and remote models where information is available
-- [ ] **UXMT-02**: Tokens-per-second real-time display works for GGUF, LiteRT-LM, and remote providers
-- [ ] **UXMT-03**: Stop generation button works consistently across GGUF, LiteRT-LM, and remote providers
-- [ ] **UXMT-04**: Quantization-aware RAM recommendation displayed for both GGUF and LiteRT-LM models
-- [ ] **UXMT-05**: Model file management (view all downloaded models, delete) works uniformly for GGUF and LiteRT-LM formats
-
-## v1.2 Traceability
-
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| HFDL-01 | Phase 11 | Pending |
-| HFDL-02 | Phase 11 | Pending |
-| HFDL-03 | Phase 11 | Pending |
-| HFDL-04 | Phase 11 | Pending |
-| NTVL-01 | Phase 11 | Pending |
-| NTVL-02 | Phase 12 | Pending |
-| NTVL-03 | Phase 12 | Pending |
-| NTVL-04 | Phase 12 | Pending |
-| NTVL-05 | Phase 11 | Pending |
-| INFR-01 | Phase 13 | Pending |
-| INFR-02 | Phase 13 | Pending |
-| INFR-03 | Phase 13 | Pending |
-| INFR-04 | Phase 13 | Pending |
-| BACK-01 | Phase 14 | Pending |
-| BACK-02 | Phase 14 | Pending |
-| BACK-03 | Phase 14 | Pending |
-| MEMS-01 | Phase 12 | Pending |
-| MEMS-02 | Phase 12 | Pending |
-| MEMS-03 | Phase 13 | Pending |
-| MEMS-04 | Phase 11 | Pending |
-| MEMS-05 | Phase 13 | Pending |
-| MEMS-06 | Phase 13 | Pending |
-| UXMT-01 | Phase 15 | Pending |
-| UXMT-02 | Phase 15 | Pending |
-| UXMT-03 | Phase 15 | Pending |
-| UXMT-04 | Phase 15 | Pending |
-| UXMT-05 | Phase 15 | Pending |
+- [ ] **OLLM-01**: `POST /api/generate` — generate response from prompt (streaming NDJSON, non-streaming JSON, images, format/structured output, system, options, keep_alive, raw mode)
+- [ ] **OLLM-02**: `POST /api/chat` — OpenAI-compatible chat format with messages array, streaming NDJSON, tools, format, options
+- [ ] **OLLM-03**: `GET /api/tags` — list locally available models with details (format, family, parameter_size, quantization_level, size, digest)
+- [ ] **OLLM-04**: `POST /api/embed` — generate vector embeddings (single + batch input, truncate, dimensions)
+- [ ] **OLLM-05**: `GET /api/ps` — list currently running models (size, size_vram, context_length, expires_at)
+- [ ] **OLLM-06**: `POST /api/show` — show model details (parameters, license, template, capabilities, model_info metadata)
+- [ ] **OLLM-07**: `POST /api/create` — create model from modelfile content, path, or from existing model
+- [ ] **OLLM-08**: `DELETE /api/delete` — delete a model and its data
+- [ ] **OLLM-09**: `POST /api/pull` — pull/download model from registry (streaming progress NDJSON)
 
 ## v2 Requirements
 
-Deferred to future release.
+Deferred to future milestone. Tracked but not in current roadmap.
 
-### Advanced Inference
+### Remote Provider
 
-- **ADV-01**: Local model benchmarks (tokens/second, memory usage) for both GGUF and .litertlm
-- **ADV-02**: NPU auto-detection and acceleration for Snapdragon devices
+- **REM-01**: OAuth/OIDC authentication for remote endpoints — defer, API key is sufficient
+- **REM-02**: Automatic mDNS/LAN discovery of Ollama and LM Studio instances — defer, manual URL entry works
+- **REM-03**: Remote endpoint health monitoring and auto-reconnect — defer
 
-### Advanced Security
+### LM Studio
 
-- **ADV-03**: Export/import endpoint configuration (without keys)
-- **ADV-04**: Advanced logging mode for technical users
+- **LMST-09**: LM Studio `/api/v1/models/download` via WorkManager for background downloads with Android notifications — defer, use in-app download
+- **LMST-10**: Structured Output (JSON schema) for `/api/v1/chat` via grammar-based sampling — defer until grammar support is stable
 
-### Multi-Modality
+### Ollama
 
-- **ADV-05**: Vision input support via LiteRT-LM multi-modality (image attachment, camera capture)
-- **ADV-06**: Audio input support via LiteRT-LM audio backend
-
-### Agent Capabilities
-
-- **ADV-07**: Tool use / function calling via LiteRT-LM ToolSet API
-- **ADV-08**: Auto-detect Ollama/LM Studio on local network
+- **OLLM-10**: `POST /api/push` — push model to registry — defer, pull/download is sufficient
+- **OLLM-11**: `POST /api/copy` — copy/rename model — defer, low priority
 
 ## Out of Scope
 
+Explicitly excluded. Documented to prevent scope creep.
+
 | Feature | Reason |
 |---------|--------|
-| Voice input/output | Focus on text LLM chat first; adds audio pipeline complexity |
-| Image/multimodal models | LiteRT-LM supports it but requires separate vision/audio backends plus UI — defer to v2.x |
-| AI agents / tool use / function calling | LiteRT-LM supports ToolSet but adds agent architecture complexity — defer to v2.x |
-| Built-in paid subscriptions | User brings own API keys; no payment integration needed |
-| iOS or desktop support | Android-only by design |
-| Real-time sync across devices | Not core to single-device LLM workflow |
-| Model fine-tuning or training | Inference-only scope |
-| RAG / document ingestion | Deferred; chat-first MVP |
-| Converting GGUF → .litertlm on-device | Formats are fundamentally different; computationally infeasible on mobile |
-| Running both engines simultaneously | Memory exhaustion on typical 8-16GB Android devices; mutual exclusion enforced |
-| NPU auto-detection in v1.1 | SoC-fragmented; deferred to v2.x after real-world testing |
+| Voice input/output | Defer, focus on text chat |
+| Image/multimodal models (for chat) | Defer, LM Studio multimodal input is supported but not in Warped's chat UI |
+| AI agents / autonomous tool use | Defer, MCP tool calling via LM Studio API is in scope but agentic loops are not |
+| Real-time sync across devices | Defer |
+| Paid subscriptions to remote providers built into the app | User brings own API keys |
+| OAuth/OIDC authentication | API key is sufficient for v1.3 |
+| mDNS/LAN auto-discovery | Manual URL entry works |
 
-## v1.0 Traceability
+## Traceability
+
+Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PROV-01 | Phase 1 | Complete |
-| PROV-02 | Phase 1 | Complete |
-| PROV-03 | Phase 1 | Complete |
-| PROV-04 | Phase 1 | Complete |
-| PROV-05 | Phase 1 | Complete |
-| CHAT-01 | Phase 1 | Complete |
-| CHAT-02 | Phase 1 | Complete |
-| CHAT-03 | Phase 1 | Complete |
-| CHAT-04 | Phase 1 | Complete |
-| CHAT-05 | Phase 1 | Complete |
-| PERS-01 | Phase 1 | Complete |
-| PERS-02 | Phase 1 | Complete |
-| SEC-01 | Phase 1 | Complete |
-| LOCL-01 | Phase 2 | Complete |
-| LOCL-02 | Phase 2 | Complete |
-| LOCL-03 | Phase 2 | Complete |
-| LOCL-04 | Phase 2 | Complete |
-| LOCL-05 | Phase 2 | Complete |
-| PERS-03 | Phase 2 | Complete |
-| DEV-01 | Phase 2 | Complete |
-| DEV-02 | Phase 2 | Complete |
-| ACQ-01 | Phase 3 | Complete |
-| ACQ-02 | Phase 3 | Complete |
-| ACQ-03 | Phase 3 | Complete |
-| ACQ-04 | Phase 3 | Complete |
-| ACQ-05 | Phase 3 | Complete |
-| PARM-01 | Phase 4 | Complete |
-| PARM-02 | Phase 4 | Complete |
-| SEC-02 | Phase 5 | Complete |
-| SEC-03 | Phase 5 | Complete |
-
-## v1.1 Traceability
-
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| LITE-01 | Phase 6 | Complete |
-| LITE-02 | Phase 6 | Complete |
-| LITE-03 | Phase 6 | Complete |
-| LITE-04 | Phase 6 | Complete |
-| LITE-05 | Phase 7 | Complete |
-| LITE-06 | Phase 7 | Complete |
-| LITE-07 | Phase 7 | Complete |
-| LITE-08 | Phase 6 | Complete |
-| ACQ-06 | Phase 8 | Complete |
-| ACQ-07 | Phase 8 | Complete |
-| ACQ-08 | Phase 8 | Complete |
-| ACQ-09 | Phase 8 | Complete |
-| ACQ-10 | Phase 8 | Complete |
-| UI-01 | Phase 9 | Complete |
-| UI-02 | Phase 9 | Complete |
-| UI-03 | Phase 9 | Complete |
-| UI-04 | Phase 9 | Complete |
-| UI-05 | Phase 9 | Complete |
-| PARM-03 | Phase 10 | Verified |
-| PARM-04 | Phase 10 | Verified |
-| PARM-05 | Phase 10 | Verified |
-| POL-01 | Phase 6 | Complete |
-| POL-02 | Phase 6 | Complete |
-| POL-03 | Phase 9 | Complete |
-| POL-04 | Phase 7 | Complete |
-| POL-05 | Phase 9 | Complete |
+| PROV-01 | — | Pending |
+| PROV-02 | — | Pending |
+| PROV-03 | — | Pending |
+| PROV-04 | — | Pending |
+| AUTH-01 | — | Pending |
+| AUTH-02 | — | Pending |
+| AUTH-03 | — | Pending |
+| OPAI-01 | — | Pending |
+| OPAI-02 | — | Pending |
+| OPAI-03 | — | Pending |
+| OPAI-04 | — | Pending |
+| OPAI-05 | — | Pending |
+| ANTH-01 | — | Pending |
+| ANTH-02 | — | Pending |
+| LMST-01 | — | Pending |
+| LMST-02 | — | Pending |
+| LMST-03 | — | Pending |
+| LMST-04 | — | Pending |
+| LMST-05 | — | Pending |
+| LMST-06 | — | Pending |
+| LMST-07 | — | Pending |
+| LMST-08 | — | Pending |
+| OLLM-01 | — | Pending |
+| OLLM-02 | — | Pending |
+| OLLM-03 | — | Pending |
+| OLLM-04 | — | Pending |
+| OLLM-05 | — | Pending |
+| OLLM-06 | — | Pending |
+| OLLM-07 | — | Pending |
+| OLLM-08 | — | Pending |
+| OLLM-09 | — | Pending |
 
 **Coverage:**
-- v1.0 requirements: 30 total, 30 mapped ✓
-- v1.1 requirements: 26 total, 26 mapped ✓
-- v1.2 requirements: 27 total, 27 mapped ✓ (to Phases 11-15)
+- v1.3 requirements: 31 total
+- Mapped to phases: 0 (roadmap not yet created)
+- Unmapped: 31 ⚠️
 
 ---
-*Requirements defined: 2026-04-30*
-*Last updated: 2026-05-05 after milestone v1.2 requirements definition*
+*Requirements defined: 2026-05-06*
+*Last updated: 2026-05-06 after initial definition*
