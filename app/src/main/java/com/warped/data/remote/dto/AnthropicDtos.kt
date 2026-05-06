@@ -1,15 +1,17 @@
 package com.warped.data.remote.dto
 
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
 data class AnthropicChatRequest(
     val model: String,
     @SerialName("max_tokens") val maxTokens: Int,
     val messages: List<AnthropicMessage>,
     val system: String? = null,
-    val stream: Boolean = true,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val stream: Boolean = true,
     val temperature: Float? = null,
     @SerialName("top_p") val topP: Float? = null,
     @SerialName("top_k") val topK: Int? = null

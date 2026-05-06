@@ -5,6 +5,7 @@ import com.warped.data.remote.dto.OpenAiChatRequest
 import com.warped.data.remote.dto.OpenAiCompletionsRequest
 import com.warped.data.remote.dto.OpenAiEmbeddingsRequest
 import com.warped.data.remote.dto.OpenAiMessage
+import com.warped.data.remote.dto.OpenAiNonStreamingResponse
 import com.warped.data.remote.dto.OpenAiResponsesRequest
 import com.warped.data.remote.network.asCompletionsSseFlow
 import com.warped.data.remote.network.asResponsesSseFlow
@@ -23,6 +24,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 class OpenAIProvider(
@@ -72,7 +74,57 @@ class OpenAIProvider(
         try {
             val response = api.chatCompletions(body)
             if (response.isSuccessful) {
-                response.body()?.asSseFlow(json)?.collect { emit(it) }
+                val responseBody = response.body() ?: run {
+                    emit(StreamToken.Error("Empty response"))
+                    return@flow
+                }
+                val rawBody = responseBody.string()
+                var hasTokens = false
+                var sawSse = false
+
+                for (line in rawBody.lines()) {
+                    if (line.startsWith("event: ") || line.startsWith("data: ")) {
+                        sawSse = true
+                        break
+                    }
+                }
+
+                if (sawSse) {
+                    // SSE streaming: parse rawBody line-by-line
+                    var currentEvent = ""
+                    for (line in rawBody.lines()) {
+                        when {
+                            line.startsWith("event: ") -> currentEvent = line.removePrefix("event: ").trim()
+                            line.startsWith("data: ") -> {
+                                val data = line.removePrefix("data: ").trim()
+                                if (data == "[DONE]") break
+                                try {
+                                    val chunk = json.decodeFromString<com.warped.data.remote.dto.OpenAiStreamChunk>(data)
+                                    val delta = chunk.choices.firstOrNull()?.delta
+                                    delta?.reasoningContent?.let { emit(StreamToken.Delta("<think>$it</think>")); hasTokens = true }
+                                    delta?.content?.let { emit(StreamToken.Delta(it)); hasTokens = true }
+                                } catch (_: Exception) { }
+                            }
+                            line.isEmpty() -> currentEvent = ""
+                        }
+                    }
+                } else {
+                    // Non-streaming JSON fallback
+                    try {
+                        val result = json.decodeFromString<OpenAiNonStreamingResponse>(rawBody)
+                        val msg = result.choices.firstOrNull()?.message
+                        msg?.reasoningContent?.let {
+                            emit(StreamToken.Delta("<think>$it</think>"))
+                            hasTokens = true
+                        }
+                        msg?.content?.let {
+                            emit(StreamToken.Delta(it))
+                            hasTokens = true
+                        }
+                    } catch (_: Exception) { }
+                }
+                if (hasTokens) emit(StreamToken.Done())
+                else emit(StreamToken.Error("No content in response"))
             } else {
                 emit(StreamToken.Error("HTTP ${response.code()}: ${response.message()}"))
             }

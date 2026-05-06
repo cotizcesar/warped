@@ -1,13 +1,15 @@
 package com.warped.data.remote.dto
 
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
 data class OllamaChatRequest(
     val model: String,
     val messages: List<OllamaMessage>,
-    val stream: Boolean = true,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val stream: Boolean = true,
     val options: OllamaOptions? = null
 )
 
