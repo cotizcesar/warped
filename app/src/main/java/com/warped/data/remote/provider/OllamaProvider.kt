@@ -18,13 +18,17 @@ import com.warped.domain.model.ModelInfo
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.StreamToken
 import com.warped.domain.provider.LlmProvider
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import java.util.concurrent.TimeUnit
 
 class OllamaProvider(
     private val baseUrl: String,
@@ -33,8 +37,14 @@ class OllamaProvider(
     override val type = ProviderType.OLLAMA
     private val json = Json { ignoreUnknownKeys = true }
 
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(120, TimeUnit.SECONDS)
+        .build()
+
     private val retrofit = Retrofit.Builder()
         .baseUrl(baseUrl)
+        .client(client)
         .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
         .build()
 
@@ -60,7 +70,7 @@ class OllamaProvider(
         } catch (e: Exception) {
             emit(StreamToken.Error("Connection failed: ${e.message}"))
         }
-    }
+    }.flowOn(Dispatchers.IO)
 
     fun generate(prompt: String): Flow<StreamToken> = flow {
         val body = OllamaGenerateRequest(model = modelId, prompt = prompt, stream = true)
@@ -74,7 +84,7 @@ class OllamaProvider(
         } catch (e: Exception) {
             emit(StreamToken.Error("Connection failed: ${e.message}"))
         }
-    }
+    }.flowOn(Dispatchers.IO)
 
     suspend fun embed(input: List<String>): Result<List<List<Float>>> {
         return try {
@@ -133,7 +143,7 @@ class OllamaProvider(
         } catch (e: Exception) {
             emit(StreamToken.Error("Connection failed: ${e.message}"))
         }
-    }
+    }.flowOn(Dispatchers.IO)
 
     suspend fun deleteModel(modelName: String): Result<Unit> {
         return try {
@@ -160,7 +170,7 @@ class OllamaProvider(
         } catch (e: Exception) {
             emit(StreamToken.Error("Connection failed: ${e.message}"))
         }
-    }
+    }.flowOn(Dispatchers.IO)
 
     override suspend fun listModels(): Result<List<ModelInfo>> {
         return try {
