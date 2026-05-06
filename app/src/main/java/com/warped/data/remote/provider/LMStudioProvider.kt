@@ -92,7 +92,6 @@ class LMStudioProvider(
                 val source = responseBody.source()
                 var currentEvent = ""
                 var statsText: String? = null
-                val reasoningBuf = StringBuilder()
                 var hasTokens = false
                 var sawSse = false
                 val bodyAccumulator = StringBuilder()
@@ -122,7 +121,7 @@ class LMStudioProvider(
                                         emit(StreamToken.Delta(" → $out"))
                                         hasTokens = true
                                     } else {
-                                        handleSseEvent(eventType, event, reasoningBuf).forEach {
+                                        handleSseEvent(eventType, event).forEach {
                                             emit(it)
                                             if (it is StreamToken.Delta) hasTokens = true
                                         }
@@ -151,7 +150,10 @@ class LMStudioProvider(
                         val out = event.output ?: event.result?.output
                         out?.forEach { item ->
                             when (item.type) {
-                                "reasoning" -> item.content.let { reasoningBuf.append(it) }
+                                "reasoning" -> if (item.content.isNotEmpty()) {
+                                    emit(StreamToken.Delta("<think>${item.content}</think>"))
+                                    hasTokens = true
+                                }
                                 "message" -> if (item.content.isNotEmpty()) {
                                     emit(StreamToken.Delta(item.content))
                                     hasTokens = true
@@ -160,7 +162,7 @@ class LMStudioProvider(
                         }
                     } catch (_: Exception) { }
                 }
-                emit(StreamToken.Done(statsText, reasoningBuf.toString().trim().takeIf { it.isNotEmpty() }))
+                emit(StreamToken.Done(statsText, null))
             } else {
                 val errorBody = response.errorBody()?.string() ?: response.message()
                 emit(StreamToken.Error("HTTP ${response.code()}: $errorBody"))
@@ -170,13 +172,13 @@ class LMStudioProvider(
         }
     }.flowOn(Dispatchers.IO)
 
-    private fun handleSseEvent(eventType: String, event: LmStudioSseEvent, reasoningBuf: StringBuilder): List<StreamToken> {
+    private fun handleSseEvent(eventType: String, event: LmStudioSseEvent): List<StreamToken> {
         val tokens = mutableListOf<StreamToken>()
         when {
-            // reasoning
+            // reasoning — wrap in <think> tags so parseThinkBlocks() separates it
             eventType == "reasoning.start" -> { /* marker */ }
             eventType == "reasoning.delta" -> {
-                event.content?.let { reasoningBuf.append(it) }
+                event.content?.let { tokens.add(StreamToken.Delta("<think>$it</think>")) }
             }
             eventType == "reasoning.end" -> { /* marker */ }
             // message
