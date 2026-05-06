@@ -25,7 +25,7 @@ class AnthropicProvider(
     apiKey: String?
 ) : LlmProvider {
     override val type = ProviderType.ANTHROPIC
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
+    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)

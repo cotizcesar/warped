@@ -32,7 +32,7 @@ class OpenAIProvider(
     apiKey: String? = null
 ) : LlmProvider {
     override val type = ProviderType.OPENAI
-    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    private val json = Json { ignoreUnknownKeys = true }
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)

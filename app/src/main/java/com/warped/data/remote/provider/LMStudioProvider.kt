@@ -33,7 +33,7 @@ class LMStudioProvider(
     apiKey: String? = null
 ) : LlmProvider {
     override val type = ProviderType.LM_STUDIO
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
+    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)

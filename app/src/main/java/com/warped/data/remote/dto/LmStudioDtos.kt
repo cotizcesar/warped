@@ -1,14 +1,16 @@
 package com.warped.data.remote.dto
 
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
 data class LmStudioChatRequest(
     val model: String,
     val input: List<LmStudioInputItem>,
     @SerialName("system_prompt") val systemPrompt: String? = null,
-    val stream: Boolean = true,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val stream: Boolean = true,
     val temperature: Float? = null,
     @SerialName("top_p") val topP: Float? = null,
     @SerialName("top_k") val topK: Int? = null,
@@ -16,7 +18,7 @@ data class LmStudioChatRequest(
     @SerialName("max_output_tokens") val maxOutputTokens: Int? = null,
     @SerialName("context_length") val contextLength: Int? = null,
     val reasoning: String? = null,
-    val store: Boolean = false,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val store: Boolean = false,
     val integrations: List<LmStudioIntegration> = emptyList()
 )
 

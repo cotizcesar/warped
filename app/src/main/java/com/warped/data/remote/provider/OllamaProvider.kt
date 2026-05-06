@@ -31,7 +31,7 @@ class OllamaProvider(
     private val modelId: String
 ) : LlmProvider {
     override val type = ProviderType.OLLAMA
-    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    private val json = Json { ignoreUnknownKeys = true }
 
     private val retrofit = Retrofit.Builder()
         .baseUrl(baseUrl)
