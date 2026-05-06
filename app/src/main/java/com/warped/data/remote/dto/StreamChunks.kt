@@ -32,3 +32,18 @@ data class OllamaStreamMessage(
     val content: String? = null,
     val role: String? = null
 )
+
+@Serializable
+data class OllamaGenerateChunk(
+    val model: String? = null,
+    val response: String = "",
+    val done: Boolean = false
+)
+
+@Serializable
+data class OllamaPullChunk(
+    val status: String = "",
+    val digest: String? = null,
+    val total: Long? = null,
+    val completed: Long? = null
+)

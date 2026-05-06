@@ -2,8 +2,16 @@ package com.warped.data.remote.provider
 
 import com.warped.data.remote.api.OllamaApi
 import com.warped.data.remote.dto.OllamaChatRequest
+import com.warped.data.remote.dto.OllamaCreateRequest
+import com.warped.data.remote.dto.OllamaDeleteRequest
+import com.warped.data.remote.dto.OllamaEmbedRequest
+import com.warped.data.remote.dto.OllamaGenerateRequest
 import com.warped.data.remote.dto.OllamaMessage
+import com.warped.data.remote.dto.OllamaPullRequest
+import com.warped.data.remote.dto.OllamaShowRequest
 import com.warped.data.remote.network.asOllamaFlow
+import com.warped.data.remote.network.asOllamaGenerateFlow
+import com.warped.data.remote.network.asOllamaPullFlow
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.ModelInfo
@@ -46,6 +54,106 @@ class OllamaProvider(
             val response = api.chat(body)
             if (response.isSuccessful) {
                 response.body()?.asOllamaFlow(json)?.collect { emit(it) }
+            } else {
+                emit(StreamToken.Error("HTTP ${response.code()}: ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            emit(StreamToken.Error("Connection failed: ${e.message}"))
+        }
+    }
+
+    fun generate(prompt: String): Flow<StreamToken> = flow {
+        val body = OllamaGenerateRequest(model = modelId, prompt = prompt, stream = true)
+        try {
+            val response = api.generate(body)
+            if (response.isSuccessful) {
+                response.body()?.asOllamaGenerateFlow(json)?.collect { emit(it) }
+            } else {
+                emit(StreamToken.Error("HTTP ${response.code()}: ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            emit(StreamToken.Error("Connection failed: ${e.message}"))
+        }
+    }
+
+    suspend fun embed(input: List<String>): Result<List<List<Float>>> {
+        return try {
+            val body = OllamaEmbedRequest(model = modelId, input = input)
+            val response = api.embed(body)
+            if (response.isSuccessful) {
+                val embeddings = response.body()?.embeddings ?: emptyList()
+                Result.success(embeddings)
+            } else {
+                Result.failure(Exception("HTTP ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun listRunning(): Result<List<ModelInfo>> {
+        return try {
+            val response = api.ps()
+            if (response.isSuccessful) {
+                val models = response.body()?.models?.map {
+                    ModelInfo(id = it.name, name = it.name, providerType = ProviderType.OLLAMA)
+                } ?: emptyList()
+                Result.success(models)
+            } else {
+                Result.failure(Exception("HTTP ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun showModel(modelName: String): Result<String> {
+        return try {
+            val response = api.show(OllamaShowRequest(modelName))
+            if (response.isSuccessful) {
+                val modelfile = response.body()?.modelfile ?: ""
+                Result.success(modelfile)
+            } else {
+                Result.failure(Exception("HTTP ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun createModel(modelName: String, modelfile: String): Flow<StreamToken> = flow {
+        val body = OllamaCreateRequest(model = modelName, modelfile = modelfile, stream = true)
+        try {
+            val response = api.create(body)
+            if (response.isSuccessful) {
+                response.body()?.asOllamaGenerateFlow(json)?.collect { emit(it) }
+            } else {
+                emit(StreamToken.Error("HTTP ${response.code()}: ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            emit(StreamToken.Error("Connection failed: ${e.message}"))
+        }
+    }
+
+    suspend fun deleteModel(modelName: String): Result<Unit> {
+        return try {
+            val response = api.delete(OllamaDeleteRequest(modelName))
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("HTTP ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    fun pullModel(modelName: String): Flow<StreamToken> = flow {
+        val body = OllamaPullRequest(model = modelName, stream = true)
+        try {
+            val response = api.pull(body)
+            if (response.isSuccessful) {
+                response.body()?.asOllamaPullFlow(json)?.collect { emit(it) }
             } else {
                 emit(StreamToken.Error("HTTP ${response.code()}: ${response.message()}"))
             }

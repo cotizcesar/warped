@@ -3,6 +3,8 @@ package com.warped.data.remote.network
 import com.warped.data.remote.dto.OpenAiCompletionsStreamChunk
 import com.warped.data.remote.dto.OpenAiResponsesStreamEvent
 import com.warped.data.remote.dto.OpenAiStreamChunk
+import com.warped.data.remote.dto.OllamaGenerateChunk
+import com.warped.data.remote.dto.OllamaPullChunk
 import com.warped.data.remote.dto.OllamaStreamChunk
 import com.warped.domain.model.StreamToken
 import kotlinx.coroutines.Dispatchers
@@ -137,6 +139,61 @@ fun ResponseBody.asCompletionsSseFlow(json: Json): Flow<StreamToken> = flow {
         emit(StreamToken.Error("Connection lost: ${e.message}"))
     } finally {
         parser.reset()
+        close()
+    }
+}.flowOn(Dispatchers.IO)
+
+fun ResponseBody.asOllamaGenerateFlow(json: Json): Flow<StreamToken> = flow {
+    try {
+        val source = source()
+        while (!source.exhausted()) {
+            val line = source.readUtf8Line() ?: continue
+            if (line.isBlank()) continue
+            try {
+                val chunk = json.decodeFromString<OllamaGenerateChunk>(line)
+                if (chunk.done) {
+                    emit(StreamToken.Done())
+                    return@flow
+                }
+                val content = chunk.response
+                if (content.isNotBlank()) {
+                    emit(StreamToken.Delta(content))
+                }
+            } catch (_: Exception) { }
+        }
+    } catch (e: IOException) {
+        emit(StreamToken.Error("Connection lost: ${e.message}"))
+    } finally {
+        close()
+    }
+}.flowOn(Dispatchers.IO)
+
+fun ResponseBody.asOllamaPullFlow(json: Json): Flow<StreamToken> = flow {
+    try {
+        val source = source()
+        while (!source.exhausted()) {
+            val line = source.readUtf8Line() ?: continue
+            if (line.isBlank()) continue
+            try {
+                val chunk = json.decodeFromString<OllamaPullChunk>(line)
+                val msg = buildString {
+                    append(chunk.status)
+                    if (chunk.total != null && chunk.total > 0) {
+                        val completed = chunk.completed ?: 0
+                        val pct = (completed * 100 / chunk.total).coerceIn(0, 100)
+                        append(" $pct%")
+                    }
+                }
+                emit(StreamToken.Delta(msg))
+                if (chunk.status == "success") {
+                    emit(StreamToken.Done())
+                    return@flow
+                }
+            } catch (_: Exception) { }
+        }
+    } catch (e: IOException) {
+        emit(StreamToken.Error("Connection lost: ${e.message}"))
+    } finally {
         close()
     }
 }.flowOn(Dispatchers.IO)
