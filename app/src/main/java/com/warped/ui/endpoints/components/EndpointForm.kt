@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.material.icons.Icons
@@ -11,6 +12,9 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.warped.domain.model.ProviderType
+import com.warped.domain.model.displayNameRes
+import com.warped.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -20,6 +24,7 @@ fun EndpointForm(
     apiType: String,
     modelId: String,
     apiKey: String,
+    hasSavedKey: Boolean = false,
     onFieldChange: (String, String) -> Unit,
     onSave: () -> Unit,
     onDismiss: () -> Unit,
@@ -31,7 +36,9 @@ fun EndpointForm(
     var expanded by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
     var modelDropdownExpanded by remember { mutableStateOf(false) }
-    val providerTypes = listOf("LM_STUDIO")
+    val providerTypes = ProviderType.entries.filter {
+        it != ProviderType.LOCAL && it != ProviderType.LITE_RT_LM
+    }
 
     Column(
         modifier = Modifier
@@ -76,8 +83,8 @@ fun EndpointForm(
                 trailingIcon = {
                     if (isFetchingModels) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    } else if (availableModels.isEmpty()) {
-                        TextButton(onClick = onFetchModels) { Text("Fetch") }
+                    } else if (availableModels.isEmpty() && apiType == ProviderType.LM_STUDIO.name) {
+                        TextButton(onClick = onFetchModels) { Text(stringResource(R.string.fetch)) }
                     } else {
                         ExposedDropdownMenuDefaults.TrailingIcon(expanded = modelDropdownExpanded)
                     }
@@ -124,8 +131,9 @@ fun EndpointForm(
             expanded = expanded,
             onExpandedChange = { expanded = !expanded }
         ) {
+            val selectedType = ProviderType.entries.find { it.name == apiType }
             OutlinedTextField(
-                value = apiType,
+                value = if (selectedType != null) stringResource(selectedType.displayNameRes()) else apiType,
                 onValueChange = {},
                 readOnly = true,
                 label = { Text("Provider Type") },
@@ -140,9 +148,9 @@ fun EndpointForm(
             ) {
                 providerTypes.forEach { type ->
                     DropdownMenuItem(
-                        text = { Text(type) },
+                        text = { Text(stringResource(type.displayNameRes())) },
                         onClick = {
-                            onFieldChange("apiType", type)
+                            onFieldChange("apiType", type.name)
                             expanded = false
                         }
                     )
@@ -156,6 +164,7 @@ fun EndpointForm(
             label = { Text("API Key") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            placeholder = { if (hasSavedKey && apiKey.isBlank()) Text("••••••••") },
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             trailingIcon = {
                 TextButton(onClick = { passwordVisible = !passwordVisible }) {

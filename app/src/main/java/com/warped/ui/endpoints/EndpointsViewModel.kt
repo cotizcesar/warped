@@ -43,14 +43,19 @@ class EndpointsViewModel @Inject constructor(
                 editingEndpoint = null,
                 formName = "",
                 formUrl = "",
-                formApiType = "LM_STUDIO",
+                formApiType = "OPENAI",
                 formModelId = "",
-                formApiKey = ""
+                formApiKey = "",
+                hasSavedApiKey = false
             )
         }
     }
 
     fun showEditForm(endpoint: Endpoint) {
+        val hasKey = apiKeyStore.getKey(endpoint.id)?.let { key ->
+            key.fill('0')
+            true
+        } ?: false
         _uiState.update {
             it.copy(
                 isFormVisible = true,
@@ -59,7 +64,8 @@ class EndpointsViewModel @Inject constructor(
                 formUrl = endpoint.url,
                 formApiType = endpoint.apiType.name,
                 formModelId = endpoint.modelId.orEmpty(),
-                formApiKey = ""
+                formApiKey = "",
+                hasSavedApiKey = hasKey
             )
         }
     }

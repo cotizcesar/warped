@@ -13,6 +13,7 @@ data class EndpointsUiState(
     val formApiType: String = "OPENAI",
     val formModelId: String = "",
     val formApiKey: String = "",
+    val hasSavedApiKey: Boolean = false,
     val testStatus: Map<Long, ConnectionStatus> = emptyMap(),
     val error: String? = null
 )

@@ -7,8 +7,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.Endpoint
+import com.warped.domain.model.displayNameRes
 
 @Composable
 fun EndpointCard(
@@ -43,7 +45,7 @@ fun EndpointCard(
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        endpoint.apiType.name,
+                        stringResource(endpoint.apiType.displayNameRes()),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary
                     )

@@ -24,7 +24,8 @@ import java.util.concurrent.TimeUnit
 
 class LMStudioProvider(
     private val baseUrl: String = "http://localhost:1234",
-    private val modelId: String
+    private val modelId: String,
+    apiKey: String? = null
 ) : LlmProvider {
     override val type = ProviderType.LM_STUDIO
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -32,6 +33,16 @@ class LMStudioProvider(
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
+        .apply {
+            if (!apiKey.isNullOrBlank()) {
+                addInterceptor { chain ->
+                    val request = chain.request().newBuilder()
+                        .header("x-api-key", apiKey)
+                        .build()
+                    chain.proceed(request)
+                }
+            }
+        }
         .build()
 
     private val retrofit = Retrofit.Builder()

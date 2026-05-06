@@ -15,19 +15,38 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import java.util.concurrent.TimeUnit
 
 class CustomProvider(
     private val baseUrl: String,
     private val modelId: String,
     private val chatPath: String = "v1/chat/completions",
-    private val modelsPath: String = "v1/models"
+    private val modelsPath: String = "v1/models",
+    apiKey: String? = null
 ) : LlmProvider {
     override val type = ProviderType.CUSTOM
     private val json = Json { ignoreUnknownKeys = true }
 
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(120, TimeUnit.SECONDS)
+        .apply {
+            if (!apiKey.isNullOrBlank()) {
+                addInterceptor { chain ->
+                    val request = chain.request().newBuilder()
+                        .header("Authorization", "Bearer $apiKey")
+                        .build()
+                    chain.proceed(request)
+                }
+            }
+        }
+        .build()
+
     private val retrofit = Retrofit.Builder()
+        .client(client)
         .baseUrl(baseUrl)
         .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
         .build()

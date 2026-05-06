@@ -17,32 +17,29 @@ class ProviderRouter @Inject constructor(
     private val liteRTLmProvider: dagger.Lazy<LiteRTLmProvider>
 ) {
     fun resolve(endpoint: Endpoint, modelId: String): LlmProvider {
+        val key = apiKeyStore.getKey(endpoint.id)
+        val keyStr = if (key != null && key.isNotEmpty()) String(key).also { key.fill('0') } else null
         return when (endpoint.apiType) {
             ProviderType.OPENAI -> OpenAIProvider(
                 baseUrl = endpoint.url,
                 modelId = modelId,
-                endpointId = endpoint.id
+                endpointId = endpoint.id,
+                apiKey = keyStr
             )
-            // NOTE: OpenAIProvider creates its own Retrofit without passing the global
-            // OkHttpClient from NetworkModule, so it doesn't use AuthInterceptor. The
-            // apiKey should be passed through the constructor and injected via x-api-key
-            // or Bearer header internally, similar to how AnthropicProvider handles auth.
-            ProviderType.ANTHROPIC -> {
-                val key = apiKeyStore.getKey(endpoint.id)
-                val keyStr = if (key != null && key.isNotEmpty()) String(key).also { key.fill('0') } else null
-                AnthropicProvider(baseUrl = endpoint.url, modelId = modelId, apiKey = keyStr)
-            }
+            ProviderType.ANTHROPIC -> AnthropicProvider(baseUrl = endpoint.url, modelId = modelId, apiKey = keyStr)
             ProviderType.OLLAMA -> OllamaProvider(
                 baseUrl = endpoint.url,
                 modelId = modelId
             )
             ProviderType.LM_STUDIO -> LMStudioProvider(
                 baseUrl = endpoint.url,
-                modelId = modelId
+                modelId = modelId,
+                apiKey = keyStr
             )
             ProviderType.CUSTOM -> CustomProvider(
                 baseUrl = endpoint.url,
-                modelId = modelId
+                modelId = modelId,
+                apiKey = keyStr
             )
             ProviderType.LOCAL -> localLlmProvider.get().configure(modelId)
             ProviderType.LITE_RT_LM -> liteRTLmProvider.get()

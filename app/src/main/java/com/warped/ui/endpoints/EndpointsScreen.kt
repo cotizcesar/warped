@@ -39,6 +39,7 @@ fun EndpointsScreen(
                 apiType = uiState.formApiType,
                 modelId = uiState.formModelId,
                 apiKey = uiState.formApiKey,
+                hasSavedKey = uiState.hasSavedApiKey,
                 onFieldChange = { field, value -> viewModel.updateFormField(field, value) },
                 onSave = { viewModel.saveEndpoint() },
                 onDismiss = { viewModel.dismissForm() }

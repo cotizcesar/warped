@@ -87,4 +87,11 @@
     <string name="no_results_found">No results found</string>
     <string name="loading_models">Loading models…</string>
     <string name="hugging_face">Hugging Face</string>
+    <string name="provider_openai">OpenAI</string>
+    <string name="provider_anthropic">Anthropic</string>
+    <string name="provider_ollama">Ollama</string>
+    <string name="provider_lm_studio">LM Studio</string>
+    <string name="provider_custom">Custom</string>
+    <string name="provider_local">Local (llama.cpp)</string>
+    <string name="provider_lite_rt_lm">LiteRT-LM</string>
 </resources>
