@@ -16,7 +16,7 @@ data class ModelsUiState(
     val editingEndpoint: Endpoint? = null,
     val formName: String = "",
     val formUrl: String = "",
-    val formApiType: String = "OPENAI",
+    val formApiType: String = "LM_STUDIO",
     val formLmStudioMode: String = "native",
     val formModelId: String = "",
     val formApiKey: String = "",

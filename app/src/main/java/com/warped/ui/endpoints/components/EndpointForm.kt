@@ -38,9 +38,7 @@ fun EndpointForm(
     var modeExpanded by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
     var modelDropdownExpanded by remember { mutableStateOf(false) }
-    val providerTypes = ProviderType.entries.filter {
-        it != ProviderType.LOCAL && it != ProviderType.LITE_RT_LM
-    }
+    val providerTypes = listOf(ProviderType.LM_STUDIO, ProviderType.OLLAMA)
     val lmStudioModes = listOf("native" to "Native", "openai" to "OpenAI", "anthropic" to "Anthropic")
 
     Column(
