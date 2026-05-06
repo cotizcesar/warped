@@ -110,6 +110,10 @@ class OpenAIProvider(
                                 emit(StreamToken.Delta(content))
                                 hasTokens = true
                             }
+                            delta?.toolCalls?.forEach { tc ->
+                                tc.function?.name?.let { emit(StreamToken.Delta("[tool:$it]")); hasTokens = true }
+                                tc.function?.arguments?.let { emit(StreamToken.Delta("($it)")); hasTokens = true }
+                            }
                         } catch (_: Exception) { }
                     }
                     try {
@@ -141,6 +145,16 @@ class OpenAIProvider(
                                             emit(StreamToken.Delta(content))
                                             hasTokens = true
                                         }
+                                        delta?.toolCalls?.forEach { tc ->
+                                            tc.function?.name?.let { name ->
+                                                emit(StreamToken.Delta("[tool:$name]"))
+                                                hasTokens = true
+                                            }
+                                            tc.function?.arguments?.let { args ->
+                                                emit(StreamToken.Delta("($args)"))
+                                                hasTokens = true
+                                            }
+                                        }
                                     } catch (_: Exception) { }
                                 }
                                 line.isEmpty() -> currentEvent = ""
@@ -161,6 +175,16 @@ class OpenAIProvider(
                         msg?.content?.let {
                             emit(StreamToken.Delta(it))
                             hasTokens = true
+                        }
+                        msg?.toolCalls?.forEach { tc ->
+                            tc.function?.name?.let { name ->
+                                emit(StreamToken.Delta("[tool:$name]"))
+                                hasTokens = true
+                            }
+                            tc.function?.arguments?.let { args ->
+                                emit(StreamToken.Delta("($args)"))
+                                hasTokens = true
+                            }
                         }
                     } catch (_: Exception) { }
                 }

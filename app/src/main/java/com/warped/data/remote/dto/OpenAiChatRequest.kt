@@ -13,7 +13,39 @@ data class OpenAiChatRequest(
     val temperature: Float? = null,
     @SerialName("top_p") val topP: Float? = null,
     @SerialName("max_tokens") val maxTokens: Int? = null,
-    val stop: List<String>? = null
+    val stop: List<String>? = null,
+    val seed: Int? = null,
+    @SerialName("presence_penalty") val presencePenalty: Float? = null,
+    @SerialName("frequency_penalty") val frequencyPenalty: Float? = null,
+    val tools: List<OpenAiTool>? = null,
+    @SerialName("tool_choice") val toolChoice: String? = null,
+    @SerialName("response_format") val responseFormat: OpenAiResponseFormat? = null
+)
+
+@Serializable
+data class OpenAiTool(
+    val type: String = "function",
+    val function: OpenAiFunctionDef
+)
+
+@Serializable
+data class OpenAiFunctionDef(
+    val name: String,
+    val description: String? = null,
+    val parameters: kotlinx.serialization.json.JsonObject? = null
+)
+
+@Serializable
+data class OpenAiResponseFormat(
+    val type: String = "json_schema",
+    @SerialName("json_schema") val jsonSchema: OpenAiJsonSchema? = null
+)
+
+@Serializable
+data class OpenAiJsonSchema(
+    val name: String,
+    val strict: Boolean = true,
+    val schema: kotlinx.serialization.json.JsonObject? = null
 )
 
 @Serializable
@@ -146,5 +178,18 @@ data class OpenAiNonStreamingChoice(
 @Serializable
 data class OpenAiNonStreamingMessage(
     val content: String? = null,
-    @SerialName("reasoning_content") val reasoningContent: String? = null
+    @SerialName("reasoning_content") val reasoningContent: String? = null,
+    @SerialName("tool_calls") val toolCalls: List<OpenAiNonStreamingToolCall>? = null
+)
+
+@Serializable
+data class OpenAiNonStreamingToolCall(
+    val id: String? = null,
+    val function: OpenAiNonStreamingFunction? = null
+)
+
+@Serializable
+data class OpenAiNonStreamingFunction(
+    val name: String? = null,
+    val arguments: String? = null
 )
