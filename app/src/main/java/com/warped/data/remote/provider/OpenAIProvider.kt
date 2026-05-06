@@ -17,8 +17,10 @@ import com.warped.domain.model.ModelInfo
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.StreamToken
 import com.warped.domain.provider.LlmProvider
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -196,7 +198,7 @@ class OpenAIProvider(
         } catch (e: Exception) {
             emit(StreamToken.Error("Connection failed: ${e.message}"))
         }
-    }
+    }.flowOn(Dispatchers.IO)
 
     private fun parseSseData(json: Json, data: String): com.warped.data.remote.dto.OpenAiStreamDelta? {
         return try {
