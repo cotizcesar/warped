@@ -16,7 +16,8 @@ data class LmStudioChatRequest(
     @SerialName("max_output_tokens") val maxOutputTokens: Int? = null,
     @SerialName("context_length") val contextLength: Int? = null,
     val reasoning: String? = null,
-    val store: Boolean = false
+    val store: Boolean = false,
+    val integrations: List<LmStudioIntegration> = emptyList()
 )
 
 @Serializable
@@ -67,7 +68,8 @@ data class LmStudioSseEvent(
     val error: LmStudioSseError? = null,
     val output: List<LmStudioOutputItem>? = null,
     val result: LmStudioChatResult? = null,
-    val stats: LmStudioStats? = null
+    val stats: LmStudioStats? = null,
+    @SerialName("tool_call") val toolCall: LmStudioToolCall? = null
 )
 
 @Serializable
@@ -122,4 +124,46 @@ data class LmStudioUnloadRequest(
 @Serializable
 data class LmStudioUnloadResponse(
     @SerialName("instance_id") val instanceId: String = ""
+)
+
+@Serializable
+data class LmStudioDownloadRequest(
+    val model: String,
+    val quantization: String? = null
+)
+
+@Serializable
+data class LmStudioDownloadResponse(
+    @SerialName("job_id") val jobId: String = "",
+    val status: String = ""
+)
+
+@Serializable
+data class LmStudioDownloadStatusResponse(
+    @SerialName("job_id") val jobId: String = "",
+    val status: String = "",
+    val progress: Float = 0f,
+    @SerialName("bytes_per_second") val bytesPerSecond: Long = 0,
+    @SerialName("estimated_completion") val estimatedCompletion: String? = null,
+    @SerialName("downloaded_bytes") val downloadedBytes: Long = 0,
+    @SerialName("total_bytes") val totalBytes: Long? = null
+)
+
+@Serializable
+data class LmStudioIntegration(
+    val type: String,
+    @SerialName("server_label") val serverLabel: String? = null,
+    @SerialName("server_url") val serverUrl: String? = null,
+    @SerialName("allowed_tools") val allowedTools: List<String> = emptyList(),
+    val headers: Map<String, String> = emptyMap(),
+    val id: String? = null
+)
+
+@Serializable
+data class LmStudioToolCall(
+    val id: String = "",
+    val name: String = "",
+    val arguments: String? = null,
+    val result: String? = null,
+    val error: String? = null
 )

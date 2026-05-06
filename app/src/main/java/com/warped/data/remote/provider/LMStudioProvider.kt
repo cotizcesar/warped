@@ -2,7 +2,9 @@ package com.warped.data.remote.provider
 
 import com.warped.data.remote.api.LmStudioApi
 import com.warped.data.remote.dto.LmStudioChatRequest
+import com.warped.data.remote.dto.LmStudioDownloadRequest
 import com.warped.data.remote.dto.LmStudioInputItem
+import com.warped.data.remote.dto.LmStudioIntegration
 import com.warped.data.remote.dto.LmStudioSseEvent
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.ConnectionStatus
@@ -53,7 +55,9 @@ class LMStudioProvider(
 
     private val api = retrofit.create(LmStudioApi::class.java)
 
-    override fun chat(request: ChatRequest): Flow<StreamToken> = flow {
+    override fun chat(request: ChatRequest): Flow<StreamToken> = chat(request, emptyList())
+
+    fun chat(request: ChatRequest, integrations: List<LmStudioIntegration>): Flow<StreamToken> = flow {
         val systemMessage = request.messages.firstOrNull { it.role == Role.SYSTEM }?.content
         val chatMessages = request.messages
             .filter { it.role != Role.SYSTEM }
@@ -72,7 +76,8 @@ class LMStudioProvider(
             topK = request.parameters.topK,
             repeatPenalty = request.parameters.repeatPenalty,
             maxOutputTokens = request.parameters.maxTokens.takeIf { it > 0 },
-            reasoning = if (request.parameters.reasoningEnabled != false) null else "off"
+            reasoning = if (request.parameters.reasoningEnabled != false) null else "off",
+            integrations = integrations
         )
         try {
             val response = api.chat(body)
@@ -111,6 +116,26 @@ class LMStudioProvider(
                                 }
                                 if (currentEvent == "reasoning.delta" || event.type == "reasoning.delta") {
                                     event.content?.let { reasoningBuf.append(it) }
+                                }
+                                if (currentEvent == "tool_call.start" || event.type == "tool_call.start") {
+                                    event.toolCall?.let { tc ->
+                                        emit(StreamToken.Delta("[tool:${tc.name}]"))
+                                    }
+                                }
+                                if (currentEvent == "tool_call.arguments" || event.type == "tool_call.arguments") {
+                                    event.toolCall?.arguments?.let { args ->
+                                        emit(StreamToken.Delta("($args)"))
+                                    }
+                                }
+                                if (currentEvent == "tool_call.success" || event.type == "tool_call.success") {
+                                    event.toolCall?.result?.let { result ->
+                                        emit(StreamToken.Delta(" → $result"))
+                                    }
+                                }
+                                if (currentEvent == "tool_call.failure" || event.type == "tool_call.failure") {
+                                    event.toolCall?.error?.let { err ->
+                                        emit(StreamToken.Delta(" ✗ $err"))
+                                    }
                                 }
                                 if (currentEvent == "chat.end" || event.type == "chat.end") {
                                     event.result?.stats?.let { stats ->
@@ -204,6 +229,34 @@ class LMStudioProvider(
                 Result.success(Unit)
             } else {
                 Result.failure(Exception("Unload failed: HTTP ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun downloadModel(model: String, quantization: String? = null): Result<String> {
+        return try {
+            val request = LmStudioDownloadRequest(model = model, quantization = quantization)
+            val response = api.downloadModel(request)
+            if (response.isSuccessful) {
+                val jobId = response.body()?.jobId ?: ""
+                Result.success(jobId)
+            } else {
+                Result.failure(Exception("Download failed: HTTP ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun downloadStatus(jobId: String): Result<com.warped.data.remote.dto.LmStudioDownloadStatusResponse> {
+        return try {
+            val response = api.downloadStatus(jobId)
+            if (response.isSuccessful) {
+                Result.success(response.body() ?: com.warped.data.remote.dto.LmStudioDownloadStatusResponse())
+            } else {
+                Result.failure(Exception("HTTP ${response.code()}"))
             }
         } catch (e: Exception) {
             Result.failure(e)
