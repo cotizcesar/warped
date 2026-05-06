@@ -16,8 +16,10 @@ import retrofit2.http.GET
 import retrofit2.http.Headers
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Streaming
 
 interface LmStudioApi {
+    @Streaming
     @POST("api/v1/chat")
     @Headers("Content-Type: application/json")
     suspend fun chat(@Body request: LmStudioChatRequest): Response<ResponseBody>

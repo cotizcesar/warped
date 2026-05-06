@@ -12,12 +12,15 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Headers
 import retrofit2.http.POST
+import retrofit2.http.Streaming
 
 interface OpenAiApi {
+    @Streaming
     @POST("v1/chat/completions")
     @Headers("Content-Type: application/json")
     suspend fun chatCompletions(@Body request: OpenAiChatRequest): Response<ResponseBody>
 
+    @Streaming
     @POST("v1/responses")
     @Headers("Content-Type: application/json")
     suspend fun responses(@Body request: OpenAiResponsesRequest): Response<ResponseBody>
@@ -26,6 +29,7 @@ interface OpenAiApi {
     @Headers("Content-Type: application/json")
     suspend fun embeddings(@Body request: OpenAiEmbeddingsRequest): Response<OpenAiEmbeddingsResponse>
 
+    @Streaming
     @POST("v1/completions")
     @Headers("Content-Type: application/json")
     suspend fun completions(@Body request: OpenAiCompletionsRequest): Response<ResponseBody>
