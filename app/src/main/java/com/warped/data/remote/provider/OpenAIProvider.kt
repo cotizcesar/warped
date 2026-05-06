@@ -7,6 +7,7 @@ import com.warped.data.remote.dto.OpenAiEmbeddingsRequest
 import com.warped.data.remote.dto.OpenAiMessage
 import com.warped.data.remote.dto.OpenAiNonStreamingResponse
 import com.warped.data.remote.dto.OpenAiResponsesRequest
+import com.warped.data.remote.dto.OpenAiStreamChunk
 import com.warped.data.remote.network.asCompletionsSseFlow
 import com.warped.data.remote.network.asResponsesSseFlow
 import com.warped.data.remote.network.asSseFlow
@@ -17,11 +18,12 @@ import com.warped.domain.model.ProviderType
 import com.warped.domain.model.StreamToken
 import com.warped.domain.provider.LlmProvider
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.io.IOException
@@ -72,9 +74,14 @@ class OpenAIProvider(
             maxTokens = request.parameters.maxTokens
         )
         try {
-            val response = api.chatCompletions(body)
-            if (response.isSuccessful) {
-                val responseBody = response.body() ?: run {
+            val jsonBody = json.encodeToString(OpenAiChatRequest.serializer(), body)
+            val okHttpRequest = Request.Builder()
+                .url(baseUrl.trimEnd('/') + "/v1/chat/completions")
+                .post(jsonBody.toRequestBody("application/json".toMediaType()))
+                .build()
+            val okHttpResponse = client.newCall(okHttpRequest).execute()
+            if (okHttpResponse.isSuccessful) {
+                val responseBody = okHttpResponse.body ?: run {
                     emit(StreamToken.Error("Empty response"))
                     return@flow
                 }
@@ -160,7 +167,7 @@ class OpenAIProvider(
                 if (hasTokens) emit(StreamToken.Done())
                 else emit(StreamToken.Error("No content in response"))
             } else {
-                emit(StreamToken.Error("HTTP ${response.code()}: ${response.message()}"))
+                emit(StreamToken.Error("HTTP ${okHttpResponse.code}: ${okHttpResponse.message}"))
             }
         } catch (e: Exception) {
             emit(StreamToken.Error("Connection failed: ${e.message}"))
