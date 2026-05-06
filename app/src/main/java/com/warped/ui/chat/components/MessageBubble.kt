@@ -9,12 +9,14 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
+import com.warped.ui.components.WarpedAlertDialog
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -96,13 +98,15 @@ fun MessageBubble(
                             color = Color.Transparent,
                             modifier = modifier
                         ) {
-                            MarkdownText(
-                                text = message.reasoning,
-                                baseColor = Color(0xFF545450),
-                                modifier = Modifier
-                                    .padding(vertical = 4.dp),
-                                fontStyle = FontStyle.Italic
-                            )
+                            SelectionContainer {
+                                MarkdownText(
+                                    text = message.reasoning,
+                                    baseColor = Color(0xFF545450),
+                                    modifier = Modifier
+                                        .padding(vertical = 4.dp),
+                                    fontStyle = FontStyle.Italic
+                                )
+                            }
                         }
                     }
                     Spacer(Modifier.height(4.dp))
@@ -121,7 +125,7 @@ fun MessageBubble(
                                 } catch (_: Exception) { null }
                             }
                             if (showFullImage) {
-                                androidx.compose.material3.AlertDialog(
+                                WarpedAlertDialog(
                                     onDismissRequest = { showFullImage = false },
                                     confirmButton = {},
                                     dismissButton = {
@@ -159,17 +163,21 @@ fun MessageBubble(
 
                 if (message.content.isNotBlank()) {
                     if (!isUser) {
-                        MarkdownText(
-                            text = message.content + if (isStreaming) "▌" else "",
-                            baseColor = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        SelectionContainer {
+                            MarkdownText(
+                                text = message.content + if (isStreaming) "▌" else "",
+                                baseColor = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     } else {
-                        Text(
-                            text = message.content + if (isStreaming) "▌" else "",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White
-                        )
+                        SelectionContainer {
+                            Text(
+                                text = message.content + if (isStreaming) "▌" else "",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White
+                            )
+                        }
                     }
                 }
             }

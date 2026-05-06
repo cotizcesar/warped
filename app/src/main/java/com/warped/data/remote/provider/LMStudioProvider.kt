@@ -205,19 +205,10 @@ class LMStudioProvider(
                 val r = event.reason ?: "unknown error"
                 tokens.add(StreamToken.Delta(" ✗ $r"))
             }
-            // model load progress
-            eventType == "model_load.progress" -> {
-                val pct = ((event.progress ?: 0f) * 100).toInt()
-                tokens.add(StreamToken.Delta("[Loading model $pct%]"))
-            }
-            eventType == "model_load.end" -> {
-                tokens.add(StreamToken.Delta("[Model loaded]"))
-            }
-            // prompt processing progress
-            eventType == "prompt_processing.progress" -> {
-                val pct = ((event.progress ?: 0f) * 100).toInt()
-                tokens.add(StreamToken.Delta("[Processing $pct%]"))
-            }
+            // model load / prompt processing — silent (user sees spinner in UI)
+            eventType == "model_load.progress" -> { /* silent */ }
+            eventType == "model_load.end" -> { /* silent */ }
+            eventType == "prompt_processing.progress" -> { /* silent */ }
             // error
             eventType == "error" -> {
                 tokens.add(StreamToken.Error(event.error?.message ?: "LM Studio error"))
