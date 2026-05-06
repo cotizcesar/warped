@@ -322,7 +322,21 @@ class ModelDownloadWorker @AssistedInject constructor(
             Result.success()
         } catch (e: Exception) {
             Timber.e(e, "ModelDownloadWorker: download exception — modelId=$modelId")
-            // Save checkpoint on error so user can retry/resume
+            if (isStopped) {
+                // Cancelled by user (pause) — save checkpoint and don't retry
+                checkpointDao.upsertCheckpoint(
+                    DownloadCheckpointEntity(
+                        isGated = effectiveGated,
+                        modelId = modelId,
+                        fileName = fileName,
+                        fileUrl = fileUrl,
+                        totalBytes = fileSizeBytes,
+                        downloadedBytes = destFile.length()
+                    )
+                )
+                return Result.success()
+            }
+            // Genuine error — save checkpoint and retry
             checkpointDao.upsertCheckpoint(
                 DownloadCheckpointEntity(
                                     isGated = effectiveGated,
