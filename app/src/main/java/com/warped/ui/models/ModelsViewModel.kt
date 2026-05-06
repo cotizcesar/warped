@@ -8,7 +8,6 @@ import com.warped.data.local.download.ModelDownloadManager
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.inference.ModelImportManager
 import com.warped.data.local.security.ApiKeyStore
-import com.warped.data.remote.provider.LMStudioProvider
 import com.warped.data.remote.provider.ProviderRouter
 import com.warped.domain.model.ActiveModelSelection
 import com.warped.domain.model.Endpoint
@@ -244,10 +243,12 @@ class ModelsViewModel @Inject constructor(
         if (!url.endsWith("/")) {
             url = "$url/"
         }
+        val apiType = try { ProviderType.valueOf(state.formApiType) } catch (_: IllegalArgumentException) { ProviderType.CUSTOM }
+        val tempEndpoint = Endpoint(id = 0, name = "temp", url = url, apiType = apiType, modelId = "fetch")
         viewModelScope.launch {
             _uiState.update { it.copy(isFetchingEndpointModels = true, availableEndpointModels = emptyList(), availableEndpointModelsData = emptyList()) }
             try {
-                val provider = LMStudioProvider(baseUrl = url, modelId = "fetch")
+                val provider = providerRouter.resolve(tempEndpoint, "fetch")
                 val result = provider.listModels()
                 result.onSuccess { models ->
                     _uiState.update {

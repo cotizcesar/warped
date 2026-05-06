@@ -83,7 +83,7 @@ fun EndpointForm(
                 trailingIcon = {
                     if (isFetchingModels) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    } else if (availableModels.isEmpty() && apiType == ProviderType.LM_STUDIO.name) {
+                    } else if (availableModels.isEmpty() && apiType != ProviderType.ANTHROPIC.name) {
                         TextButton(onClick = onFetchModels) { Text(stringResource(R.string.fetch)) }
                     } else {
                         ExposedDropdownMenuDefaults.TrailingIcon(expanded = modelDropdownExpanded)
