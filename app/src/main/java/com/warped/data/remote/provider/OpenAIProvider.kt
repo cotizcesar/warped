@@ -78,38 +78,72 @@ class OpenAIProvider(
                     emit(StreamToken.Error("Empty response"))
                     return@flow
                 }
-                val rawBody = responseBody.string()
+                val source = responseBody.source()
+                val firstLine = source.readUtf8Line() ?: ""
+                val isSse = firstLine.startsWith("event: ") || firstLine.startsWith("data: ")
                 var hasTokens = false
-                var sawSse = false
 
-                for (line in rawBody.lines()) {
-                    if (line.startsWith("event: ") || line.startsWith("data: ")) {
-                        sawSse = true
-                        break
-                    }
-                }
-
-                if (sawSse) {
-                    // SSE streaming: parse rawBody line-by-line
-                    var currentEvent = ""
-                    for (line in rawBody.lines()) {
-                        when {
-                            line.startsWith("event: ") -> currentEvent = line.removePrefix("event: ").trim()
-                            line.startsWith("data: ") -> {
-                                val data = line.removePrefix("data: ").trim()
-                                if (data == "[DONE]") break
-                                try {
-                                    val chunk = json.decodeFromString<com.warped.data.remote.dto.OpenAiStreamChunk>(data)
-                                    val delta = chunk.choices.firstOrNull()?.delta
-                                    delta?.reasoningContent?.let { emit(StreamToken.Delta("<think>$it</think>")); hasTokens = true }
-                                    delta?.content?.let { emit(StreamToken.Delta(it)); hasTokens = true }
-                                } catch (_: Exception) { }
+                if (isSse) {
+                    // SSE streaming — read incrementally from source
+                    var currentEvent = if (firstLine.startsWith("event: ")) {
+                        firstLine.removePrefix("event: ").trim()
+                    } else ""
+                    var reasoningOpen = false
+                    if (firstLine.startsWith("data: ")) {
+                        val data = firstLine.removePrefix("data: ").trim()
+                        try {
+                            val delta = parseSseData(json, data)
+                            delta?.reasoningContent?.let { reasoning ->
+                                if (!reasoningOpen) { emit(StreamToken.Delta("<think>")); reasoningOpen = true }
+                                emit(StreamToken.Delta(reasoning))
+                                hasTokens = true
                             }
-                            line.isEmpty() -> currentEvent = ""
-                        }
+                            delta?.content?.let { content ->
+                                if (reasoningOpen) { emit(StreamToken.Delta("</think>")); reasoningOpen = false }
+                                emit(StreamToken.Delta(content))
+                                hasTokens = true
+                            }
+                        } catch (_: Exception) { }
                     }
+                    try {
+                        while (!source.exhausted()) {
+                            val line = source.readUtf8Line() ?: break
+                            when {
+                                line.startsWith("event: ") -> currentEvent = line.removePrefix("event: ").trim()
+                                line.startsWith("data: ") -> {
+                                    val data = line.removePrefix("data: ").trim()
+                                    if (data == "[DONE]") {
+                                        if (reasoningOpen) emit(StreamToken.Delta("</think>"))
+                                        break
+                                    }
+                                    try {
+                                        val delta = parseSseData(json, data)
+                                        delta?.reasoningContent?.let { reasoning ->
+                                            if (!reasoningOpen) {
+                                                emit(StreamToken.Delta("<think>"))
+                                                reasoningOpen = true
+                                            }
+                                            emit(StreamToken.Delta(reasoning))
+                                            hasTokens = true
+                                        }
+                                        delta?.content?.let { content ->
+                                            if (reasoningOpen) {
+                                                emit(StreamToken.Delta("</think>"))
+                                                reasoningOpen = false
+                                            }
+                                            emit(StreamToken.Delta(content))
+                                            hasTokens = true
+                                        }
+                                    } catch (_: Exception) { }
+                                }
+                                line.isEmpty() -> currentEvent = ""
+                            }
+                        }
+                    } catch (_: IOException) { }
                 } else {
-                    // Non-streaming JSON fallback
+                    // Non-streaming JSON — read remaining + first line
+                    val remaining = source.readUtf8() ?: ""
+                    val rawBody = firstLine + "\n" + remaining
                     try {
                         val result = json.decodeFromString<OpenAiNonStreamingResponse>(rawBody)
                         val msg = result.choices.firstOrNull()?.message
@@ -131,6 +165,12 @@ class OpenAIProvider(
         } catch (e: Exception) {
             emit(StreamToken.Error("Connection failed: ${e.message}"))
         }
+    }
+
+    private fun parseSseData(json: Json, data: String): com.warped.data.remote.dto.OpenAiStreamDelta? {
+        return try {
+            json.decodeFromString<com.warped.data.remote.dto.OpenAiStreamChunk>(data).choices.firstOrNull()?.delta
+        } catch (_: Exception) { null }
     }
 
     fun responses(input: String, previousResponseId: String? = null, params: com.warped.domain.model.GenerationParameters): Flow<StreamToken> = flow {
