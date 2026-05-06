@@ -1,7 +1,7 @@
 [versions]
 kotlin = "2.1.10"
 agp = "9.0.0"
-litertlm = "0.11.0-rc1"
+litertlm = "0.11.0"
 compose-bom = "2026.04.01"
 hilt = "2.59.2"
 hilt-navigation-compose = "1.2.0"
