@@ -200,9 +200,6 @@ class ChatViewModel @Inject constructor(
                 val rawBuffer = StringBuilder()
                 val reasoningActive = _uiState.value.reasoningEnabled
                 val modelMayThink = state.localModels.firstOrNull { it.filePath == modelId }?.capabilities?.reasoning == true
-                    || selectedProvider == ProviderType.LM_STUDIO
-                    || selectedProvider == ProviderType.ANTHROPIC
-                    || selectedProvider == ProviderType.OPENAI
                 Timber.d("ChatVM: sendMessage reasoningActive=%b modelMayThink=%b", reasoningActive, modelMayThink)
 
                 provider.chat(request).collect { token ->
