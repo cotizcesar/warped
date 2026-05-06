@@ -68,7 +68,8 @@ class AnthropicProvider(
             topP = request.parameters.topP,
             topK = request.parameters.topK,
             thinking = if (request.parameters.reasoningEnabled != false) {
-                AnthropicThinking(type = "enabled", budgetTokens = 2048)
+                val budget = (request.parameters.maxTokens * 0.75).toInt().coerceIn(1024, 8192)
+                AnthropicThinking(type = "enabled", budgetTokens = budget)
             } else null
         )
         try {
