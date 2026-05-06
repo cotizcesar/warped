@@ -125,7 +125,7 @@ fun WarpedNavGraph() {
                         colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent),
                         onClick = {
                             activeConversationId = null
-                            navController.navigate(Screen.Chat.route) {
+                            navController.navigate("${Screen.Chat.route}?newChat=true") {
                                 popUpTo(Screen.Chat.route) { inclusive = true }
                             }
                             scope.launch { drawerState.close() }
