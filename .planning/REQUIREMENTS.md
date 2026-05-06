@@ -96,43 +96,43 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PROV-01 | — | Pending |
-| PROV-02 | — | Pending |
-| PROV-03 | — | Pending |
-| PROV-04 | — | Pending |
-| AUTH-01 | — | Pending |
-| AUTH-02 | — | Pending |
-| AUTH-03 | — | Pending |
-| OPAI-01 | — | Pending |
-| OPAI-02 | — | Pending |
-| OPAI-03 | — | Pending |
-| OPAI-04 | — | Pending |
-| OPAI-05 | — | Pending |
-| ANTH-01 | — | Pending |
-| ANTH-02 | — | Pending |
-| LMST-01 | — | Pending |
-| LMST-02 | — | Pending |
-| LMST-03 | — | Pending |
-| LMST-04 | — | Pending |
-| LMST-05 | — | Pending |
-| LMST-06 | — | Pending |
-| LMST-07 | — | Pending |
-| LMST-08 | — | Pending |
-| OLLM-01 | — | Pending |
-| OLLM-02 | — | Pending |
-| OLLM-03 | — | Pending |
-| OLLM-04 | — | Pending |
-| OLLM-05 | — | Pending |
-| OLLM-06 | — | Pending |
-| OLLM-07 | — | Pending |
-| OLLM-08 | — | Pending |
-| OLLM-09 | — | Pending |
+| PROV-01 | Phase 16 | Pending |
+| PROV-02 | Phase 16 | Pending |
+| PROV-03 | Phase 16 | Pending |
+| PROV-04 | Phase 16 | Pending |
+| AUTH-01 | Phase 16 | Pending |
+| AUTH-02 | Phase 16 | Pending |
+| AUTH-03 | Phase 16 | Pending |
+| OPAI-01 | Phase 17 | Pending |
+| OPAI-02 | Phase 17 | Pending |
+| OPAI-03 | Phase 17 | Pending |
+| OPAI-04 | Phase 17 | Pending |
+| OPAI-05 | Phase 17 | Pending |
+| ANTH-01 | Phase 17 | Pending |
+| ANTH-02 | Phase 17 | Pending |
+| LMST-01 | Phase 19 | Pending |
+| LMST-02 | Phase 19 | Pending |
+| LMST-03 | Phase 19 | Pending |
+| LMST-04 | Phase 19 | Pending |
+| LMST-05 | Phase 19 | Pending |
+| LMST-06 | Phase 19 | Pending |
+| LMST-07 | Phase 19 | Pending |
+| LMST-08 | Phase 19 | Pending |
+| OLLM-01 | Phase 18 | Pending |
+| OLLM-02 | Phase 18 | Pending |
+| OLLM-03 | Phase 18 | Pending |
+| OLLM-04 | Phase 18 | Pending |
+| OLLM-05 | Phase 18 | Pending |
+| OLLM-06 | Phase 18 | Pending |
+| OLLM-07 | Phase 18 | Pending |
+| OLLM-08 | Phase 18 | Pending |
+| OLLM-09 | Phase 18 | Pending |
 
 **Coverage:**
 - v1.3 requirements: 31 total
-- Mapped to phases: 0 (roadmap not yet created)
-- Unmapped: 31 ⚠️
+- Mapped to phases: 31
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-05-06*
-*Last updated: 2026-05-06 after initial definition*
+*Last updated: 2026-05-06 after roadmap creation*

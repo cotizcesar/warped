@@ -1,177 +1,155 @@
-# Roadmap: Warped
+# Roadmap: Warped v1.3
 
-**Created:** 2026-04-30
-**Updated:** 2026-05-05 (v1.2 phases added)
-**Granularity:** Coarse (3-5 phases per milestone)
+**Milestone:** v1.3 Remote Provider Endpoints & UX
+**Created:** 2026-05-06
+**Phases:** 16–19 (4 phases, continues from v1.2)
+**Total requirements:** 31
 
-## Milestones
+## Phase Structure
 
-- ✅ **v1.0 MVP** — Phases 1-5 (shipped 2026-05-01)
-- ✅ **v1.1 LiteRT-LM Integration** — Phases 6-10 (shipped 2026-05-02) → [archive](milestones/v1.1-ROADMAP.md)
-- ✅ **v1.2 GGUF Native Inference** — Phases 11-15 (shipped 2026-05-05)
-
-## Phases
-
-- [x] **Phase 1-5: v1.0 MVP** — Remote chat, local GGUF inference, Hugging Face downloads, parameters, security (SHIPPED)
-- [x] **Phase 6-10: v1.1 LiteRT-LM** — LiteRT-LM engine, .litertlm model acquisition, UI integration, parameter support (SHIPPED)
-- [x] **Phase 11: Native Foundation** — llama.cpp CMake build, Hugging Face GGUF browsing/download with validation
-- [x] **Phase 12: Model Loading & Memory Foundation** — JNI model loading with progress, metadata display, pre-load RAM checks, memory pressure handling
-- [x] **Phase 13: Inference Core & Thread Safety** — Streaming GGUF chat, stop/cancel, TPS display, generation parameters, thread-safe pipeline
-- [x] **Phase 14: Vulkan GPU Backend** — Vulkan GPU acceleration with automatic CPU fallback, backend display
-- [x] **Phase 15: Cross-Engine UX Parity** — Unified metadata display, TPS, stop button, RAM recommendations, model management across all engines
+| # | Phase | Goal | Requirements | Success Criteria |
+|---|-------|------|--------------|------------------|
+| 16 | Provider UI & API Key Auth | Expose all provider types in UI with readable names and encrypted API key management | PROV-01..04, AUTH-01..03 (7) | 4 |
+| 17 | OpenAI + Anthropic Endpoints | Complete OpenAI-compatible API and expose Anthropic in UI | OPAI-01..05, ANTH-01..02 (7) | 4 |
+| 18 | Ollama Full API | Full Ollama endpoint coverage: generate, chat, embed, ps, show, create, delete, pull | OLLM-01..09 (9) | 4 |
+| 19 | LM Studio Validation & MCP | Validate LM Studio end-to-end with MCP ephemeral and mcp.json server support | LMST-01..08 (8) | 5 |
 
 ---
 
-## Phase Details
+## Phase 16: Provider UI & API Key Auth
 
-<details>
-<summary>✅ v1.0 MVP (Phases 1-5) — SHIPPED 2026-05-01</summary>
+**Goal:** Expose all provider types in UI with readable names and encrypted API key management — the foundation that every other phase builds on.
 
-See [milestone archive](milestones/v1.0-ROADMAP.md) for full phase details.
+**Requirements:** PROV-01, PROV-02, PROV-03, PROV-04, AUTH-01, AUTH-02, AUTH-03
 
-</details>
+**Depends on:** — (no dependencies)
 
-<details>
-<summary>✅ v1.1 LiteRT-LM Integration (Phases 6-10) — SHIPPED 2026-05-02</summary>
+### Success Criteria
 
-See [milestone archive](milestones/v1.1-ROADMAP.md) for full phase details.
+1. Endpoint form dropdown shows all 5 remote provider types: OpenAI, Anthropic, Ollama, LM Studio, Custom — each with human-readable label
+2. Provider type labels display as "OpenAI", "Anthropic", "LM Studio", "Ollama", "Custom" across all UI surfaces (dropdown, endpoint cards, chat header)
+3. API key field is present in endpoint form, encrypted on save via Android Keystore, and submitted as `Authorization: Bearer` (OpenAI) or `x-api-key` (Anthropic/LM Studio)
+4. Provider-specific form fields appear contextually (e.g., custom path fields for Custom provider, auth toggle for Anthropic/LM Studio)
 
-</details>
+### Key Deliverables
 
-### Phase 11: Native Foundation — CMake Build, Hugging Face GGUF Pipeline & Validation
-
-**Goal:** llama.cpp compiles for Android arm64-v8a/x86_64 and ProGuard rules are in place. Users can browse .gguf files on Hugging Face with per-file quantization metadata and RAM estimates, download .gguf models with foreground progress + pause/resume, and every downloaded file passes automatic integrity validation.
-
-**Depends on:** Nothing within v1.2 (foundation phase)
-
-**Requirements:** NTVL-01, NTVL-05, HFDL-01, HFDL-02, HFDL-03, HFDL-04, MEMS-04
-
-**Success Criteria** (what must be TRUE when this phase completes):
-
-1. User can search Hugging Face for models, tap a model, and see a list of available .gguf files with file name, size, and quantization type (e.g., Q4_K_M, Q5_K_M, Q8_0) parsed from the filename
-2. User can see an estimated RAM requirement (file_size × 1.3) displayed next to each .gguf file before initiating a download
-3. User can download a .gguf file with a foreground notification showing byte progress percentage, pause the download, close the app, return later, and resume from the same offset without data loss
-4. Downloaded .gguf files are automatically validated (magic number + header offset integrity) on completion — corrupted files display a clear error message and are not added to the model list
-5. llama.cpp compiles from source via CMake+NDK for arm64-v8a and x86_64, producing libwarped_llama.so with real llama.cpp symbols; ProGuard/R8 keep rules preserve all JNI callback methods for release builds
-
-**Plans:** TBD
-**UI hint:** yes
+- `ProviderType.displayName` extension property mapping enum → readable label
+- `EndpointForm` dropdown expanded from `listOf("LM_STUDIO")` to all 5 remote `ProviderType` values
+- `DeployedEndpointCard` chip updated from `apiType.name` to `apiType.displayName`
+- `ModelsUiState.formApiType` default changed to support all types
+- `ApiKeyStore` integration in endpoint save flow: encrypt key → store ref → use in provider resolution
+- `ProviderRouter.resolve()` updated to pass API key from `ApiKeyStore` to provider constructors
+- `EndpointForm` dynamic fields based on selected `apiType` (e.g., `chatPath`/`modelsPath` for Custom, auth fields for Anthropic/LM Studio)
 
 ---
 
-### Phase 12: Model Loading & Memory Foundation
+## Phase 17: OpenAI + Anthropic Endpoints
 
-**Goal:** Users can load validated GGUF models through the JNI bridge, see real-time loading progress, view rich model metadata after successful load, and receive clear pre-load memory warnings. The app handles Android memory pressure by automatically unloading models to prevent process death.
+**Goal:** Complete OpenAI-compatible API surface (chat, models, responses, embeddings, completions) and expose Anthropic Messages API in the UI.
 
-**Depends on:** Phase 11 (libwarped_llama.so must compile, GGUF files must be downloadable and validated)
+**Requirements:** OPAI-01, OPAI-02, OPAI-03, OPAI-04, OPAI-05, ANTH-01, ANTH-02
 
-**Requirements:** NTVL-02, NTVL-03, NTVL-04, MEMS-01, MEMS-02
+**Depends on:** Phase 16 (provider UI and auth must be in place)
 
-**Success Criteria** (what must be TRUE when this phase completes):
+### Success Criteria
 
-1. User can select a downloaded .gguf model and see a loading progress indicator during initialization — large models show visible progress as they mmap into memory
-2. After a GGUF model loads successfully, user can view its metadata: architecture (e.g., "llama", "mistral"), parameter count (e.g., "7.2B"), context size, quantization type, and file size — displayed on the model detail screen
-3. Before loading, the app checks available RAM against the estimated requirement (file_size × 1.3 for KV cache) and warns the user with a specific message: "This model needs ~5.8 GB, your device has 4.2 GB available. Loading may cause instability."
-4. When Android signals critical memory pressure (onTrimMemory), the active GGUF model unloads automatically to prevent the OS from killing the app process
-5. JNI nativeLoadModel returns descriptive, user-facing error messages for each failure case: "Out of memory — try a smaller quantization", "Corrupted model file — please re-download", and "Unsupported architecture — this model requires ARM64"
+1. `POST /v1/chat/completions` streams tokens via SSE to the chat UI using standard OpenAI chunk format (`choices[0].delta.content`)
+2. `POST /v1/responses` works both streaming (`stream: true` → SSE events) and non-streaming, with `previous_response_id` for stateful follow-up
+3. `POST /v1/embeddings` returns vector embeddings for single and batch input text
+4. Anthropic `POST /v1/messages` is selectable from provider dropdown, with SSE streaming events parsed and rendered in chat UI
 
-**Plans:** TBD
-**UI hint:** yes
+### Key Deliverables
 
----
-
-### Phase 13: Inference Core & Thread Safety
-
-**Goal:** Users can chat with loaded GGUF models with streaming token-by-token responses that appear in the chat UI at the same speed as LiteRT-LM, stop mid-generation with a cancel button, see real-time tokens-per-second, and configure all 8 generation parameters. The entire pipeline — from native token generation through Kotlin callbackFlow to UI — is thread-safe under concurrent use, rapid stop/unload sequences, and backgrounding during generation.
-
-**Depends on:** Phase 12 (model must load and metadata must be available before inference can run)
-
-**Requirements:** INFR-01, INFR-02, INFR-03, INFR-04, MEMS-03, MEMS-05, MEMS-06
-
-**Success Criteria** (what must be TRUE when this phase completes):
-
-1. User can type a message with a loaded GGUF model and see tokens stream into the chat UI within 2 seconds of sending — the same UI widget that works for LiteRT-LM and remote providers
-2. User can tap the stop button during GGUF generation; the partial response text is preserved in the conversation, the model remains loaded and ready for the next message, and there is no crash, ANR, or memory leak
-3. User sees a real-time tokens-per-second counter during GGUF generation, updating at least once per second, displayed in the chat header
-4. User can adjust all 8 generation parameters — temperature, top_p, top_k, repeat_penalty, max_tokens, context_size, seed, threads — via the existing presets panel and see each change affect the next generation output
-5. User can rapidly stop-then-unload, send concurrent messages (which are serialized), and background the app mid-generation without any SIGSEGV, data race, or "Engine not alive" error — verified by stress-tests of 50+ rapid stop/unload/reload cycles
-
-**Plans:** TBD
-**UI hint:** yes
+- `OpenAiApi` expanded: `@POST("v1/responses")`, `@POST("v1/embeddings")`, `@POST("v1/completions")`
+- `OpenAiResponsesRequest` / `OpenAiResponsesResponse` DTOs (responses API format)
+- `OpenAiEmbeddingsRequest` / `OpenAiEmbeddingsResponse` DTOs
+- `OpenAiCompletionsRequest` / `OpenAiCompletionsResponse` DTOs (legacy completions)
+- `AnthropicProvider` registered for UI visibility (already implemented, verify SSR SSE parsing)
+- `AnthropicApi` verified: `@POST("v1/messages")` with `x-api-key` header and SSE streaming
+- `ProviderRouter.resolve()` verified for `ProviderType.ANTHROPIC` path with API key from `ApiKeyStore`
+- SSE parsing utilities for responses API events and completions API chunks
 
 ---
 
-### Phase 14: Vulkan GPU Backend
+## Phase 18: Ollama Full API
 
-**Goal:** llama.cpp supports Vulkan GPU acceleration compiled alongside the CPU backend, with automatic runtime detection and silent CPU fallback on unsupported devices. Users see the active backend ("Running on Vulkan GPU" / "Running on CPU") during chat, matching the existing LiteRT-LM backend indicator pattern.
+**Goal:** Full Ollama endpoint coverage — generate, chat, embed, running models, model details, create, delete, pull — all accessible through the same UI patterns.
 
-**Depends on:** Phase 13 (CPU inference must be stable before adding GPU complexity; GPU debugging with untested memory management multiplies risk)
+**Requirements:** OLLM-01, OLLM-02, OLLM-03, OLLM-04, OLLM-05, OLLM-06, OLLM-07, OLLM-08, OLLM-09
 
-**Requirements:** BACK-01, BACK-02, BACK-03
+**Depends on:** Phase 16 (provider UI and auth foundation)
 
-**Success Criteria** (what must be TRUE when this phase completes):
+### Success Criteria
 
-1. llama.cpp compiles with GGML_VULKAN=ON for arm64-v8a, producing a Vulkan-capable .so variant that loads and runs GGUF inference on devices with Vulkan 1.1+ support
-2. On devices with Vulkan drivers (e.g., Snapdragon 8 Gen 2+ with Adreno 7xx), GGUF inference automatically uses GPU acceleration and runs 2-4× faster than CPU — user observes faster token generation without any configuration
-3. On devices without Vulkan support or where Vulkan initialization fails, the app silently falls back to CPU inference — no error dialogs, no manual intervention required, chat continues normally
-4. User sees the active backend label ("Running on Vulkan GPU" or "Running on CPU") during GGUF chat, using the same UI pattern already established for LiteRT-LM's backend display
+1. `POST /api/generate` and `POST /api/chat` work with streaming NDJSON and non-streaming JSON, supporting all parameters (images, format, options, system, keep_alive)
+2. `POST /api/embed` returns vector embeddings for single and batch input, with truncate and dimensions support
+3. `POST /api/pull` shows streaming progress (NDJSON) for model downloads
+4. `GET /api/ps`, `POST /api/show`, `POST /api/create`, `DELETE /api/delete` are callable from the endpoint and return correct responses
 
-**Plans:** TBD
-**UI hint:** yes
+### Key Deliverables
+
+- `OllamaApi` expanded: `@POST("api/embed")`, `@GET("api/ps")`, `@POST("api/show")`, `@POST("api/create")`, `@DELETE("api/delete")`, `@POST("api/pull")`
+- `OllamaEmbedRequest` / `OllamaEmbedResponse` DTOs
+- `OllamaPsResponse` / `OllamaShowRequest/Response` DTOs
+- `OllamaCreateRequest` / `OllamaDeleteRequest` DTOs
+- `OllamaPullRequest` with streaming NDJSON progress parsing
+- `OllamaProvider` extended with new endpoints: `embed()`, `listRunning()`, `showModel()`, `createModel()`, `deleteModel()`, `pullModel()`
+- Non-chat endpoints return results via `Result<T>` pattern, surfaced in ModelsScreen or dedicated UI as appropriate
 
 ---
 
-### Phase 15: Cross-Engine UX Parity
+## Phase 19: LM Studio Validation & MCP
 
-**Goal:** The GGUF experience is indistinguishable from LiteRT-LM and remote providers in metadata display, tokens-per-second visualization, stop button behavior, RAM recommendations, and model file management. Users experience a seamless, unified app — they choose a model, the engine is transparent.
+**Goal:** Validate LM Studio works end-to-end (chat, models, load/unload, download), and add MCP support for ephemeral servers and mcp.json plugin servers.
 
-**Depends on:** Phase 13 (inference must work), Phase 14 (Vulkan backend indicator needed for parity). Can overlap with Phase 14.
+**Requirements:** LMST-01, LMST-02, LMST-03, LMST-04, LMST-05, LMST-06, LMST-07, LMST-08
 
-**Requirements:** UXMT-01, UXMT-02, UXMT-03, UXMT-04, UXMT-05
+**Depends on:** Phase 16 (provider UI and auth)
 
-**Success Criteria** (what must be TRUE when this phase completes):
+### Success Criteria
 
-1. User viewing model details for any format — GGUF, LiteRT-LM, or remote — sees the same metadata fields where information is available: architecture, parameter count, context size, quantization, license, and tokenizer info, all using the same UI layout
-2. Tokens-per-second real-time display works identically for GGUF, LiteRT-LM, and streaming remote providers — same UI widget position, same update frequency (~1 Hz), same visual treatment
-3. Stop generation button behaves consistently across all engine types: partial response preserved in conversation, engine returns to ready state, no crashes or stale states — user experience is the same regardless of which engine is behind the chat
-4. RAM recommendation badges show device-appropriate guidance for both GGUF (e.g., "Q5_K_M — tight on your 8 GB device") and LiteRT-LM models (e.g., "1.8 GB — fits comfortably"), using the same color-coded badge system
-5. Model file management — viewing all downloaded models, seeing per-model details, and deleting models — works uniformly for GGUF and LiteRT-LM formats from the same Models screen, with consistent delete confirmation dialogs and immediate list refresh
+1. `POST /api/v1/chat` streams all event types (reasoning.delta, message.delta, tool_call.*, chat.end) correctly to the chat UI, with stats displayed after generation
+2. `POST /api/v1/models/load` and `POST /api/v1/models/unload` manage model lifecycle — chat switches models correctly without errors
+3. `POST /api/v1/models/download` initiates downloads and `GET /api/v1/models/download/status/:job_id` reports progress
+4. MCP ephemeral servers work: `integrations` with `type: "ephemeral_mcp"` sends tools to chat endpoint, tool calls are parsed from SSE events and displayed
+5. MCP mcp.json servers work: `integrations` with `type: "plugin"` and `id: "mcp/<label>"` enables pre-configured server tools
 
-**Plans:** TBD
-**UI hint:** yes
+### Key Deliverables
+
+- `LmStudioApi` verified and expanded: `@POST("api/v1/models/download")`, `@GET("api/v1/models/download/status/{jobId}")`
+- `LmStudioDownloadRequest/Response` DTOs
+- `LmStudioChatRequest` expanded with `integrations` field (ephemeral MCP + plugin)
+- `LmStudioIntegration` sealed class: `EphemeralMcp(serverLabel, serverUrl, allowedTools, headers)` + `PluginMcp(id, allowedTools)`
+- MCP tool call parsing from SSE events (`tool_call.start`, `tool_call.arguments`, `tool_call.success`, `tool_call.failure`)
+- `LmStudioSseEvent` expanded to include tool call event types
+- Chat UI renders tool calls (name, arguments, output) inline alongside messages
+- `ChatViewModel` LM Studio lifecycle management verified: load before chat, unload on switch, download with progress
+- Model management UI in ModelsScreen for LM Studio: load/unload buttons, download progress
+
+---
+
+## Dependency Graph
+
+```
+Phase 16 (Provider UI & Auth)
+   └── Phase 17 (OpenAI + Anthropic)
+   └── Phase 18 (Ollama Full API)
+   └── Phase 19 (LM Studio MCP & Validation)
+```
+
+Phases 17, 18, and 19 are independent of each other and can be developed in any order after Phase 16.
 
 ---
 
 ## Progress
 
-| Phase | Milestone | Plans Complete | Status | Completed |
-|-------|-----------|----------------|--------|-----------|
-| 1. Foundation & Remote Chat | v1.0 | 3/3 | Complete | 2026-04-30 |
-| 2. Local Inference | v1.0 | 3/3 | Complete | 2026-05-01 |
-| 3. Model Acquisition | v1.0 | 2/2 | Complete | 2026-05-01 |
-| 4. Parameters & Presets | v1.0 | 2/2 | Complete | 2026-05-01 |
-| 5. Security Hardening & Polish | v1.0 | 1/1 | Complete | 2026-05-01 |
-| 6. Engine Foundation | v1.1 | 4/4 | Complete | 2026-05-02 |
-| 7. Provider Integration & Chat | v1.1 | 2/2 | Complete | 2026-05-02 |
-| 8. Model Acquisition | v1.1 | 5/5 | Complete | 2026-05-02 |
-| 9. UI Integration | v1.1 | 3/3 | Complete | 2026-05-02 |
-| 10. Parameters & Polish | v1.1 | 1/1 | Complete | 2026-05-02 |
-| 11. Native Foundation | v1.2 | 0/? | Not started | - |
-| 12. Model Loading & Memory | v1.2 | 0/? | Not started | - |
-| 13. Inference Core & Thread Safety | v1.2 | 0/? | Not started | - |
-| 14. Vulkan GPU Backend | v1.2 | 0/? | Not started | - |
-| 15. Cross-Engine UX Parity | v1.2 | 0/? | Not started | - |
-
-## Coverage
-
-| Milestone | Requirements | Mapped | Unmapped |
-|-----------|-------------|--------|----------|
-| v1.0 | 30 | 30 ✓ | 0 |
-| v1.1 | 26 | 26 ✓ | 0 |
-| v1.2 | 27 | 27 ✓ | 0 |
-
-All v1.2 requirements are traced to exactly one phase in the [Traceability table](REQUIREMENTS.md#v12-traceability).
+| Phase | Status | Requirements | Progress |
+|-------|--------|-------------|----------|
+| 16    | ○      | 7           | 0%       |
+| 17    | ○      | 7           | 0%       |
+| 18    | ○      | 9           | 0%       |
+| 19    | ○      | 8           | 0%       |
 
 ---
-
-*Roadmap updated: 2026-05-05*
+*Roadmap created: 2026-05-06*
+*Last updated: 2026-05-06 after initial creation*

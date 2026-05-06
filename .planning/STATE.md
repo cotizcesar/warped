@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-05-06T16:26:45.987Z"
 last_activity: 2026-05-06
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -23,30 +23,32 @@ See: .planning/PROJECT.md
 ## Project Reference
 
 **Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** v1.2 GGUF Native Inference — make GGUF work end-to-end with llama.cpp, same UX as LiteRT-LM
-**Milestone:** v1.2 GGUF Native Inference
+**Current focus:** v1.3 Remote Provider Endpoints & UX — expose all remote providers in UI with readable names, API keys, MCP support
+**Milestone:** v1.3 Remote Provider Endpoints & UX
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-05-06 — Milestone v1.3 started
+| Field | Value |
+|-------|-------|
+| Phase | 16 (Provider UI & API Key Auth) — not started |
+| Plan | — (no plans generated yet) |
+| Status | Roadmapped — ready for `/gsd-plan-phase 16` |
+| Last activity | 2026-05-06 — v1.3 roadmap created (4 phases, 31 requirements, 17 success criteria) |
 
 ## Phase Structure
 
 | Phase | Name | Requirements | Status | Depends On |
 |-------|------|--------------|--------|------------|
-| 11 | Native Foundation | NTVL-01, NTVL-05, HFDL-01..04, MEMS-04 (7) | Not started | — |
-| 12 | Model Loading & Memory | NTVL-02..04, MEMS-01, MEMS-02 (5) | Not started | Phase 11 |
-| 13 | Inference Core & Thread Safety | INFR-01..04, MEMS-03, MEMS-05, MEMS-06 (7) | Not started | Phase 12 |
-| 14 | Vulkan GPU Backend | BACK-01..03 (3) | Not started | Phase 13 |
-| 15 | Cross-Engine UX Parity | UXMT-01..05 (5) | Not started | Phase 13+14 |
+| 16 | Provider UI & API Key Auth | PROV-01..04, AUTH-01..03 (7) | Not started | — |
+| 17 | OpenAI + Anthropic Endpoints | OPAI-01..05, ANTH-01..02 (7) | Not started | Phase 16 |
+| 18 | Ollama Full API | OLLM-01..09 (9) | Not started | Phase 16 |
+| 19 | LM Studio Validation & MCP | LMST-01..08 (8) | Not started | Phase 16 |
 
 ## Completed
 
 - ✅ v1.0 MVP — 5 phases, 30 requirements, 107 Kotlin source files
 - ✅ v1.1 LiteRT-LM Integration — 5 phases, 26 requirements
+- ✅ v1.2 GGUF Native Inference — 5 phases, 27 requirements, 24 success criteria
 
 ## Accumulated Context
 
@@ -96,9 +98,10 @@ None yet.
 
 ### Blockers/Concerns
 
-- v1.0 GGUF pipeline (LOCL-01–05, ACQ-01–05, DEV-01–02) marked complete but user reports end-to-end flow is broken — this milestone fixes it.
-- Vulkan driver fragmentation requires testing on physical devices across GPU vendors (Adreno, Mali, Xclipse, PowerVR)
-- LiteRT-LM + llama.cpp coexistence in same process — verify no symbol conflicts between native .so files
+- v1.2 GGUF pipeline completed — llama.cpp JNI integration, Vulkan GPU backend, OOM handling all implemented.
+- LM Studio API changes may require updates to match latest LM Studio version (0.4.0+).
+- MCP tool calling requires LM Studio Server Settings: "Allow per-request MCPs" and "Allow calling servers from mcp.json" to be enabled.
+- AnthropicProvider exists in codebase but has never been tested end-to-end through the UI.
 
 ### Quick Tasks Completed
 
@@ -108,6 +111,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-05
-Stopped at: v1.2 roadmap created — 5 phases, 27 requirements, ready for Phase 11 planning
+Last session: 2026-05-06
+Stopped at: v1.3 roadmap created — 4 phases, 31 requirements, ready for Phase 16 planning
 Resume file: .planning/ROADMAP.md
