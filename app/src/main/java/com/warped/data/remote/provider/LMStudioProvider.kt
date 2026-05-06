@@ -18,10 +18,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 class LMStudioProvider(
@@ -86,16 +89,14 @@ class LMStudioProvider(
                     emit(StreamToken.Error("Empty response"))
                     return@flow
                 }
-                val fullBody = responseBody.string()
-                var hasTokens = false
+                val rawBody = responseBody.string()
                 var currentEvent = ""
                 var statsText: String? = null
                 val reasoningBuf = StringBuilder()
-
-                // Try SSE line-by-line parsing first
-                val lines = fullBody.lines()
+                var hasTokens = false
                 var sawSse = false
-                for (line in lines) {
+
+                for (line in rawBody.lines()) {
                     when {
                         line.startsWith("event: ") -> {
                             currentEvent = line.removePrefix("event: ").trim()
@@ -106,61 +107,37 @@ class LMStudioProvider(
                             val data = line.removePrefix("data: ").trim()
                             if (data == "[DONE]") break
                             try {
+                                val eventType = currentEvent.ifBlank {
+                                    val obj = json.decodeFromString<JsonObject>(data)
+                                    obj["type"]?.jsonPrimitive?.content ?: ""
+                                }
                                 val event = json.decodeFromString<LmStudioSseEvent>(data)
-                                if (currentEvent == "message.delta" || event.type == "message.delta") {
-                                    val text = event.content ?: ""
-                                    if (text.isNotEmpty()) {
-                                        emit(StreamToken.Delta(text))
-                                        hasTokens = true
+                                if (eventType == "tool_call.success") {
+                                    val obj = json.decodeFromString<JsonObject>(data)
+                                    val out = obj["output"]?.jsonPrimitive?.content ?: ""
+                                    emit(StreamToken.Delta(" → $out"))
+                                    hasTokens = true
+                                } else {
+                                    handleSseEvent(eventType, event, reasoningBuf).forEach {
+                                        emit(it)
+                                        if (it is StreamToken.Delta) hasTokens = true
                                     }
                                 }
-                                if (currentEvent == "reasoning.delta" || event.type == "reasoning.delta") {
-                                    event.content?.let { reasoningBuf.append(it) }
-                                }
-                                if (currentEvent == "tool_call.start" || event.type == "tool_call.start") {
-                                    event.toolCall?.let { tc ->
-                                        emit(StreamToken.Delta("[tool:${tc.name}]"))
-                                    }
-                                }
-                                if (currentEvent == "tool_call.arguments" || event.type == "tool_call.arguments") {
-                                    event.toolCall?.arguments?.let { args ->
-                                        emit(StreamToken.Delta("($args)"))
-                                    }
-                                }
-                                if (currentEvent == "tool_call.success" || event.type == "tool_call.success") {
-                                    event.toolCall?.result?.let { result ->
-                                        emit(StreamToken.Delta(" → $result"))
-                                    }
-                                }
-                                if (currentEvent == "tool_call.failure" || event.type == "tool_call.failure") {
-                                    event.toolCall?.error?.let { err ->
-                                        emit(StreamToken.Delta(" ✗ $err"))
-                                    }
-                                }
-                                if (currentEvent == "chat.end" || event.type == "chat.end") {
+                                if (eventType == "chat.end") {
                                     event.result?.stats?.let { stats ->
                                         statsText = "${stats.totalOutputTokens} tokens · ${stats.inputTokens} in · ${String.format("%.0f", stats.tokensPerSecond)} tok/s · ${String.format("%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first"
                                     }
-                                    event.result?.output?.forEach { item ->
-                                        if (item.type == "message" && item.content.isNotEmpty()) {
-                                            emit(StreamToken.Delta(item.content))
-                                            hasTokens = true
-                                        }
-                                    }
                                 }
-                                if (event.error != null) {
-                                    emit(StreamToken.Error(event.error.message))
-                                    return@flow
-                                }
-                            } catch (_: Exception) {}
+                            } catch (_: Exception) { }
                         }
+                        line.isEmpty() -> { currentEvent = "" }
                     }
                 }
 
-                // Fallback: non-streaming full JSON response
+                // Fallback: non-streaming JSON response
                 if (!sawSse || !hasTokens) {
                     try {
-                        val event = json.decodeFromString<LmStudioSseEvent>(fullBody)
+                        val event = json.decodeFromString<LmStudioSseEvent>(rawBody)
                         val s = event.stats ?: event.result?.stats
                         s?.let { stats ->
                             statsText = "${stats.totalOutputTokens} tokens · ${stats.inputTokens} in · ${String.format("%.0f", stats.tokensPerSecond)} tok/s · ${String.format("%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first"
@@ -175,7 +152,7 @@ class LMStudioProvider(
                                 }
                             }
                         }
-                    } catch (_: Exception) {}
+                    } catch (_: Exception) { }
                 }
                 emit(StreamToken.Done(statsText, reasoningBuf.toString().trim().takeIf { it.isNotEmpty() }))
             } else {
@@ -186,6 +163,56 @@ class LMStudioProvider(
             emit(StreamToken.Error("Connection failed: ${e.message}"))
         }
     }.flowOn(Dispatchers.IO)
+
+    private fun handleSseEvent(eventType: String, event: LmStudioSseEvent, reasoningBuf: StringBuilder): List<StreamToken> {
+        val tokens = mutableListOf<StreamToken>()
+        when {
+            // reasoning
+            eventType == "reasoning.start" -> { /* marker */ }
+            eventType == "reasoning.delta" -> {
+                event.content?.let { reasoningBuf.append(it) }
+            }
+            eventType == "reasoning.end" -> { /* marker */ }
+            // message
+            eventType == "message.start" -> { /* marker */ }
+            eventType == "message.delta" -> {
+                event.content?.let { if (it.isNotEmpty()) tokens.add(StreamToken.Delta(it)) }
+            }
+            eventType == "message.end" -> { /* marker */ }
+            // tool_call
+            eventType == "tool_call.start" -> {
+                event.tool?.let { tokens.add(StreamToken.Delta("[tool:$it]")) }
+            }
+            eventType == "tool_call.arguments" -> {
+                event.arguments?.let { args ->
+                    tokens.add(StreamToken.Delta("(${json.encodeToString(JsonObject.serializer(), args)})"))
+                }
+            }
+            // tool_call.success handled inline (output field is a string, not a list)
+            eventType == "tool_call.failure" -> {
+                val r = event.reason ?: "unknown error"
+                tokens.add(StreamToken.Delta(" ✗ $r"))
+            }
+            // model load progress
+            eventType == "model_load.progress" -> {
+                val pct = ((event.progress ?: 0f) * 100).toInt()
+                tokens.add(StreamToken.Delta("[Loading model $pct%]"))
+            }
+            eventType == "model_load.end" -> {
+                tokens.add(StreamToken.Delta("[Model loaded]"))
+            }
+            // prompt processing progress
+            eventType == "prompt_processing.progress" -> {
+                val pct = ((event.progress ?: 0f) * 100).toInt()
+                tokens.add(StreamToken.Delta("[Processing $pct%]"))
+            }
+            // error
+            eventType == "error" -> {
+                tokens.add(StreamToken.Error(event.error?.message ?: "LM Studio error"))
+            }
+        }
+        return tokens
+    }
 
     override suspend fun listModels(): Result<List<ModelInfo>> {
         return try {

@@ -61,22 +61,41 @@ data class LmStudioQuantization(
 
 @Serializable
 data class LmStudioSseEvent(
-    val content: String? = null,
-    val token: String? = null,
     val type: String? = null,
-    val done: Boolean = false,
+    val content: String? = null,
+    // chat.start / model_load.*
+    @SerialName("model_instance_id") val modelInstanceId: String? = null,
+    val progress: Float? = null,
+    @SerialName("load_time_seconds") val loadTimeSeconds: Double? = null,
+    // tool_call.*
+    val tool: String? = null,
+    val arguments: kotlinx.serialization.json.JsonObject? = null,
+    @SerialName("provider_info") val providerInfo: LmStudioProviderInfo? = null,
+    // tool_call.failure
+    val reason: String? = null,
+    val metadata: kotlinx.serialization.json.JsonObject? = null,
+    // error event
     val error: LmStudioSseError? = null,
-    val output: List<LmStudioOutputItem>? = null,
+    // chat.end
     val result: LmStudioChatResult? = null,
-    val stats: LmStudioStats? = null,
-    @SerialName("tool_call") val toolCall: LmStudioToolCall? = null
+    // non-streaming fallback response
+    val output: List<LmStudioOutputItem>? = null,
+    val stats: LmStudioStats? = null
+)
+
+@Serializable
+data class LmStudioProviderInfo(
+    val type: String = "",
+    @SerialName("plugin_id") val pluginId: String? = null,
+    @SerialName("server_label") val serverLabel: String? = null
 )
 
 @Serializable
 data class LmStudioChatResult(
     @SerialName("model_instance_id") val modelInstanceId: String = "",
     val output: List<LmStudioOutputItem> = emptyList(),
-    val stats: LmStudioStats? = null
+    val stats: LmStudioStats? = null,
+    @SerialName("response_id") val responseId: String? = null
 )
 
 @Serializable
@@ -157,13 +176,4 @@ data class LmStudioIntegration(
     @SerialName("allowed_tools") val allowedTools: List<String> = emptyList(),
     val headers: Map<String, String> = emptyMap(),
     val id: String? = null
-)
-
-@Serializable
-data class LmStudioToolCall(
-    val id: String = "",
-    val name: String = "",
-    val arguments: String? = null,
-    val result: String? = null,
-    val error: String? = null
 )
