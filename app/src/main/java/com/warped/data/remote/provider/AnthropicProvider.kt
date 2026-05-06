@@ -124,7 +124,14 @@ class AnthropicProvider(
                                 val event = json.decodeFromString<AnthropicSseEvent>(data)
                                 when (event.type) {
                                     "content_block_delta" -> {
-                                        event.delta?.text?.let { emit(StreamToken.Delta(it)) }
+                                        when {
+                                            event.delta?.thinking != null -> {
+                                                emit(StreamToken.Delta("<think>${event.delta.thinking}</think>"))
+                                            }
+                                            event.delta?.text != null -> {
+                                                emit(StreamToken.Delta(event.delta.text))
+                                            }
+                                        }
                                     }
                                     "message_delta" -> {
                                         // Stop reason received, stream ending
@@ -134,7 +141,8 @@ class AnthropicProvider(
                                         return@flow
                                     }
                                     "error" -> {
-                                        emit(StreamToken.Error(event.delta?.text ?: "Anthropic error"))
+                                        val errorText = event.delta?.text ?: event.delta?.thinking ?: "Anthropic error"
+                                        emit(StreamToken.Error(errorText))
                                         return@flow
                                     }
                                 }

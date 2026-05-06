@@ -1,5 +1,7 @@
 package com.warped.data.remote.network
 
+import com.warped.data.remote.dto.OpenAiCompletionsStreamChunk
+import com.warped.data.remote.dto.OpenAiResponsesStreamEvent
 import com.warped.data.remote.dto.OpenAiStreamChunk
 import com.warped.data.remote.dto.OllamaStreamChunk
 import com.warped.domain.model.StreamToken
@@ -66,6 +68,75 @@ fun ResponseBody.asOllamaFlow(json: Json): Flow<StreamToken> = flow {
     } catch (e: IOException) {
         emit(StreamToken.Error("Connection lost: ${e.message}"))
     } finally {
+        close()
+    }
+}.flowOn(Dispatchers.IO)
+
+fun ResponseBody.asResponsesSseFlow(json: Json): Flow<StreamToken> = flow {
+    val parser = SseParser()
+    try {
+        val source = source()
+        while (!source.exhausted()) {
+            val line = source.readUtf8Line() ?: continue
+            val events = parser.feed(line + "\n")
+            for (event in events) {
+                if (event.data.isBlank() || event.data == "[DONE]") continue
+                try {
+                    val streamEvent = json.decodeFromString<OpenAiResponsesStreamEvent>(event.data)
+                    when (streamEvent.type) {
+                        "response.output_text.delta" -> {
+                            streamEvent.delta?.delta?.let { emit(StreamToken.Delta(it)) }
+                        }
+                        "response.completed" -> {
+                            emit(StreamToken.Done())
+                            return@flow
+                        }
+                        "error" -> {
+                            emit(StreamToken.Error(streamEvent.delta?.content ?: "Responses API error"))
+                            return@flow
+                        }
+                    }
+                } catch (_: Exception) { /* skip unknown events */ }
+            }
+        }
+    } catch (e: IOException) {
+        emit(StreamToken.Error("Connection lost: ${e.message}"))
+    } finally {
+        parser.reset()
+        close()
+    }
+}.flowOn(Dispatchers.IO)
+
+fun ResponseBody.asCompletionsSseFlow(json: Json): Flow<StreamToken> = flow {
+    val parser = SseParser()
+    try {
+        val source = source()
+        while (!source.exhausted()) {
+            val line = source.readUtf8Line() ?: continue
+            val events = parser.feed(line + "\n")
+            for (event in events) {
+                when {
+                    event.data == "[DONE]" -> {
+                        emit(StreamToken.Done())
+                        return@flow
+                    }
+                    event.data.isBlank() -> continue
+                    else -> {
+                        try {
+                            val chunk = json.decodeFromString<OpenAiCompletionsStreamChunk>(event.data)
+                            val text = chunk.choices.firstOrNull()?.text
+                            if (!text.isNullOrEmpty()) {
+                                emit(StreamToken.Delta(text))
+                            }
+                        } catch (_: Exception) { /* skip malformed JSON */ }
+                    }
+                }
+            }
+        }
+    } catch (e: IOException) {
+        emit(StreamToken.Error("Connection lost: ${e.message}"))
+    } finally {
+        parser.reset()
         close()
     }
 }.flowOn(Dispatchers.IO)

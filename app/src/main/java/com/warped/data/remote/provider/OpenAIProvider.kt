@@ -2,7 +2,12 @@ package com.warped.data.remote.provider
 
 import com.warped.data.remote.api.OpenAiApi
 import com.warped.data.remote.dto.OpenAiChatRequest
+import com.warped.data.remote.dto.OpenAiCompletionsRequest
+import com.warped.data.remote.dto.OpenAiEmbeddingsRequest
 import com.warped.data.remote.dto.OpenAiMessage
+import com.warped.data.remote.dto.OpenAiResponsesRequest
+import com.warped.data.remote.network.asCompletionsSseFlow
+import com.warped.data.remote.network.asResponsesSseFlow
 import com.warped.data.remote.network.asSseFlow
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.ConnectionStatus
@@ -11,6 +16,7 @@ import com.warped.domain.model.ProviderType
 import com.warped.domain.model.StreamToken
 import com.warped.domain.provider.LlmProvider
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -72,6 +78,64 @@ class OpenAIProvider(
             }
         } catch (e: Exception) {
             emit(StreamToken.Error("Connection failed: ${e.message}"))
+        }
+    }
+
+    fun responses(input: String, previousResponseId: String? = null, params: com.warped.domain.model.GenerationParameters): Flow<StreamToken> = flow {
+        val body = OpenAiResponsesRequest(
+            model = modelId,
+            input = input,
+            stream = true,
+            previousResponseId = previousResponseId,
+            temperature = params.temperature,
+            topP = params.topP,
+            maxOutputTokens = params.maxTokens.takeIf { it > 0 }
+        )
+        try {
+            val response = api.responses(body)
+            if (response.isSuccessful) {
+                response.body()?.asResponsesSseFlow(json)?.collect { emit(it) }
+            } else {
+                emit(StreamToken.Error("HTTP ${response.code()}: ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            emit(StreamToken.Error("Connection failed: ${e.message}"))
+        }
+    }
+
+    fun completions(prompt: String, params: com.warped.domain.model.GenerationParameters): Flow<StreamToken> = flow {
+        val body = OpenAiCompletionsRequest(
+            model = modelId,
+            prompt = prompt,
+            stream = true,
+            temperature = params.temperature,
+            topP = params.topP,
+            maxTokens = params.maxTokens.takeIf { it > 0 }
+        )
+        try {
+            val response = api.completions(body)
+            if (response.isSuccessful) {
+                response.body()?.asCompletionsSseFlow(json)?.collect { emit(it) }
+            } else {
+                emit(StreamToken.Error("HTTP ${response.code()}: ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            emit(StreamToken.Error("Connection failed: ${e.message}"))
+        }
+    }
+
+    suspend fun embed(input: List<String>): Result<List<List<Float>>> {
+        return try {
+            val body = OpenAiEmbeddingsRequest(model = modelId, input = input)
+            val response = api.embeddings(body)
+            if (response.isSuccessful) {
+                val embeddings = response.body()?.data?.map { it.embedding } ?: emptyList()
+                Result.success(embeddings)
+            } else {
+                Result.failure(Exception("HTTP ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 

@@ -33,6 +33,7 @@ data class AnthropicSseEvent(
 data class AnthropicDelta(
     val type: String = "",
     val text: String? = null,
+    val thinking: String? = null,
     @SerialName("stop_reason") val stopReason: String? = null
 )
 
