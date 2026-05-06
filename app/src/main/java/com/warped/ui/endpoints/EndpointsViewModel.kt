@@ -63,13 +63,20 @@ class EndpointsViewModel @Inject constructor(
             ProviderType.ANTHROPIC -> "anthropic"
             else -> "native"
         }
+        val displayApiType = if (endpoint.apiType == ProviderType.LM_STUDIO
+            || endpoint.apiType == ProviderType.OPENAI
+            || endpoint.apiType == ProviderType.ANTHROPIC) {
+            "LM_STUDIO"
+        } else {
+            endpoint.apiType.name
+        }
         _uiState.update {
             it.copy(
                 isFormVisible = true,
                 editingEndpoint = endpoint,
                 formName = endpoint.name,
                 formUrl = endpoint.url,
-                formApiType = endpoint.apiType.name,
+                formApiType = displayApiType,
                 formLmStudioMode = lmMode,
                 formModelId = endpoint.modelId.orEmpty(),
                 formApiKey = "",
