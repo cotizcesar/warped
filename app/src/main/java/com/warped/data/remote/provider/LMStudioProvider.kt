@@ -175,12 +175,16 @@ class LMStudioProvider(
     private fun handleSseEvent(eventType: String, event: LmStudioSseEvent): List<StreamToken> {
         val tokens = mutableListOf<StreamToken>()
         when {
-            // reasoning — wrap in <think> tags so parseThinkBlocks() separates it
-            eventType == "reasoning.start" -> { /* marker */ }
-            eventType == "reasoning.delta" -> {
-                event.content?.let { tokens.add(StreamToken.Delta("<think>$it</think>")) }
+            // reasoning — open/close <think> once so formatting is preserved
+            eventType == "reasoning.start" -> {
+                tokens.add(StreamToken.Delta("<think>"))
             }
-            eventType == "reasoning.end" -> { /* marker */ }
+            eventType == "reasoning.delta" -> {
+                event.content?.let { tokens.add(StreamToken.Delta(it)) }
+            }
+            eventType == "reasoning.end" -> {
+                tokens.add(StreamToken.Delta("</think>"))
+            }
             // message
             eventType == "message.start" -> { /* marker */ }
             eventType == "message.delta" -> {
