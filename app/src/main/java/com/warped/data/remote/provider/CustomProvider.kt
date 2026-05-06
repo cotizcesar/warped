@@ -28,7 +28,7 @@ class CustomProvider(
     apiKey: String? = null
 ) : LlmProvider {
     override val type = ProviderType.CUSTOM
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
