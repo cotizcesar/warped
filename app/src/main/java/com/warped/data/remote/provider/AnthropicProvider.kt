@@ -11,8 +11,10 @@ import com.warped.domain.model.ModelInfo
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.StreamToken
 import com.warped.domain.provider.LlmProvider
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -86,7 +88,7 @@ class AnthropicProvider(
         } catch (e: Exception) {
             emit(StreamToken.Error("Connection failed: ${e.message}"))
         }
-    }
+    }.flowOn(Dispatchers.IO)
 
     override suspend fun listModels(): Result<List<ModelInfo>> {
         return Result.success(emptyList()) // Anthropic doesn't have a public models list API
