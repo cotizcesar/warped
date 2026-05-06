@@ -28,7 +28,15 @@ data class AnthropicSseEvent(
     val type: String = "",
     val delta: AnthropicDelta? = null,
     val message: AnthropicSseMessage? = null,
-    val index: Int? = null
+    val index: Int? = null,
+    @SerialName("content_block") val contentBlock: AnthropicContentBlock? = null
+)
+
+@Serializable
+data class AnthropicContentBlock(
+    val type: String = "",
+    val text: String? = null,
+    val thinking: String? = null
 )
 
 @Serializable

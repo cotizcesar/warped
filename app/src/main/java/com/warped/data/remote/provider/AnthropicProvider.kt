@@ -113,6 +113,7 @@ class AnthropicProvider(
         private fun parseAnthropicSse(body: okhttp3.ResponseBody, json: Json): Flow<StreamToken> = flow {
             val source = body.source()
             var currentEvent: String? = null
+            var thinkingOpen = false
             try {
                 while (!source.exhausted()) {
                     val line = source.readUtf8Line() ?: break
@@ -123,20 +124,25 @@ class AnthropicProvider(
                             try {
                                 val event = json.decodeFromString<AnthropicSseEvent>(data)
                                 when (event.type) {
+                                    "content_block_start" -> { /* marker, no content */ }
                                     "content_block_delta" -> {
-                                        when {
-                                            event.delta?.thinking != null -> {
-                                                emit(StreamToken.Delta("<think>${event.delta.thinking}</think>"))
+                                        if (event.delta?.thinking != null) {
+                                            if (!thinkingOpen) {
+                                                emit(StreamToken.Delta("<think>"))
+                                                thinkingOpen = true
                                             }
-                                            event.delta?.text != null -> {
-                                                emit(StreamToken.Delta(event.delta.text))
+                                            emit(StreamToken.Delta(event.delta.thinking))
+                                        } else if (event.delta?.text != null) {
+                                            if (thinkingOpen) {
+                                                emit(StreamToken.Delta("</think>"))
+                                                thinkingOpen = false
                                             }
+                                            emit(StreamToken.Delta(event.delta.text))
                                         }
                                     }
-                                    "message_delta" -> {
-                                        // Stop reason received, stream ending
-                                    }
+                                    "message_delta" -> { }
                                     "message_stop" -> {
+                                        if (thinkingOpen) emit(StreamToken.Delta("</think>"))
                                         emit(StreamToken.Done())
                                         return@flow
                                     }
@@ -146,17 +152,17 @@ class AnthropicProvider(
                                         return@flow
                                     }
                                 }
-                            } catch (_: Exception) {
-                                // Skip unparseable events
-                            }
+                            } catch (_: Exception) { }
                         }
                         line.isEmpty() -> currentEvent = null
                     }
                 }
+                if (thinkingOpen) emit(StreamToken.Delta("</think>"))
                 if (source.exhausted()) {
                     emit(StreamToken.Done())
                 }
             } catch (e: Exception) {
+                if (thinkingOpen) emit(StreamToken.Delta("</think>"))
                 emit(StreamToken.Error("SSE parse error: ${e.message}"))
             }
         }
