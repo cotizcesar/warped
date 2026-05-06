@@ -212,7 +212,7 @@ fun ModelsScreen(
                     isFetchingModels = uiState.isFetchingEndpointModels,
                     onFetchModels = { viewModel.fetchEndpointModels() },
                 )
-            } else if (uiState.models.isEmpty() && uiState.endpoints.isEmpty() && !uiState.isImporting) {
+            } else if (uiState.models.isEmpty() && uiState.endpoints.isEmpty() && !uiState.isImporting && uiState.activeDownloads.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
