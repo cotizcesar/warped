@@ -1,5 +1,7 @@
 package com.warped.ui.huggingface
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -530,7 +533,20 @@ private fun ModelDetailScreen(
 
                 if (downloadError != null) {
                     item {
-                        Text(downloadError, color = MaterialTheme.colorScheme.error)
+                        val isGated = downloadError.startsWith("Gated model", ignoreCase = true)
+                        Column {
+                            Text(downloadError, color = MaterialTheme.colorScheme.error)
+                            if (isGated) {
+                                val context = LocalContext.current
+                                val modelUrl = "https://huggingface.co/${model.id}"
+                                Spacer(Modifier.height(8.dp))
+                                OutlinedButton(onClick = {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(modelUrl)))
+                                }) {
+                                    Text("Open on Hugging Face")
+                                }
+                            }
+                        }
                     }
                 }
 
