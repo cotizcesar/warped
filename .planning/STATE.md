@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: GGUF Native Inference
-status: complete
-last_updated: "2026-05-05T16:00:00.000Z"
-last_activity: 2026-05-05
+milestone: v1.3
+milestone_name: Remote Provider Endpoints & UX
+status: planning
+last_updated: "2026-05-06T16:26:45.987Z"
+last_activity: 2026-05-06
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 5
-  completed_plans: 5
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State: Warped
@@ -28,12 +28,10 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-| Field | Value |
-|-------|-------|
-| Phase | 11 (Native Foundation) — not started |
-| Plan | — (no plans generated yet) |
-| Status | Roadmapped — ready for `/gsd-plan-phase 11` |
-| Last activity | 2026-05-05 — v1.2 roadmap created (5 phases, 27 requirements, 24 success criteria) |
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-06 — Milestone v1.3 started
 
 ## Phase Structure
 

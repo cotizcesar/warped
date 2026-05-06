@@ -8,18 +8,19 @@ An Android application equivalent to LM Studio for mobile, enabling users to run
 
 Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
 
-## Current Milestone: v1.2 GGUF Native Inference
+## Current Milestone: v1.3 Remote Provider Endpoints & UX
 
-**Goal:** Hacer funcionar GGUF end-to-end con llama.cpp — misma UI, mismo flujo, misma performance que LiteRT-LM.
+**Goal:** Exponer todos los endpoints de red en la UI — OpenAI-compatible, Anthropic-compatible, LM Studio — con nombres legibles, soporte MCP en LM Studio, API keys por endpoint, y validación completa.
 
 **Target features:**
-- Descarga de GGUF desde Hugging Face (listar archivos .gguf, progreso, pausa/reanudar)
-- Integración llama.cpp vía JNI/NDK (compilar, cargar modelos, generar tokens)
-- Inferencia GGUF con streaming de tokens al chat UI
-- Backend CPU + Vulkan GPU (detección en runtime, fallback a CPU)
-- Cuantizaciones visibles al explorar/descargar modelos GGUF
-- Manejo de memoria y OOM graceful (sin límite artificial de tamaño modelo)
-- UX transparente: misma experiencia que LiteRT-LM, sin fricción
+- Expandir dropdown de provider en EndpointForm para mostrar todos los ProviderType (OPENAI, ANTHROPIC, OLLAMA, LM_STUDIO, CUSTOM)
+- Nombres legibles para providers: "LM Studio", "OpenAI", "Anthropic", "Ollama", "Custom" (no UPPER_CASE)
+- Agregar endpoints OpenAI-compatible: /v1/responses, /v1/embeddings, /v1/completions
+- Agregar endpoint Anthropic-compatible: /v1/messages (ya existe provider, falta exponer en UI)
+- Soporte MCP en LM Studio: ephemeral servers + mcp.json servers (tool calling vía API)
+- API key configurable por endpoint (autenticación por provider)
+- Validar LM Studio: chat, models, load/unload, download
+- Vistas especializadas por provider si es necesario
 
 ## Requirements
 
@@ -47,7 +48,7 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 - Voice input/output — defer, focus on text chat
 - Image/multimodal models — defer, focus on text LLMs
-- AI agents / tool use — defer, focus on chat
+- AI agents / autonomous tool use — defer, MCP tool calling via LM Studio API is in scope
 - Real-time sync across devices — defer
 - Paid subscriptions to remote providers built into the app — user brings own API keys
 
@@ -59,7 +60,9 @@ The user is an experienced Android developer with deep knowledge of Kotlin, Comp
 
 v1.1 added LiteRT-LM as a second local inference engine (shipped). LiteRT-LM is Google's production framework that powers on-device GenAI in Chrome, Chromebook Plus, and Pixel Watch. Its Kotlin API provides `Engine → Conversation → sendMessageAsync(Flow)` with native GPU/NPU backends and `.litertlm` model format.
 
-v1.2 implementa inferencia GGUF nativa desde cero con llama.cpp. El pipeline GGUF nunca ha funcionado: la búsqueda en Hugging Face lista modelos pero no muestra archivos .gguf para descargar, y cargar un GGUF manualmente dice "llama not implemented". Este milestone construye el pipeline completo (download → load → streaming chat) con paridad de UX respecto a LiteRT-LM.
+v1.2 implementó inferencia GGUF nativa con llama.cpp: pipeline completo (download → load → streaming chat) con paridad de UX respecto a LiteRT-LM, backend CPU + Vulkan GPU, y manejo de memoria OOM graceful.
+
+v1.3 expande los endpoints de red: el ProviderType enum ya tiene OPENAI, ANTHROPIC, OLLAMA, LM_STUDIO, CUSTOM, pero el EndpointForm solo muestra LM_STUDIO. ProviderRouter ya maneja todos correctamente — solo falta exponerlos en la UI con nombres legibles y agregar soporte MCP para LM Studio.
 
 ## Constraints
 
@@ -102,4 +105,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-05 after milestone v1.2 redefinition*
+*Last updated: 2026-05-06 after milestone v1.3 start*
