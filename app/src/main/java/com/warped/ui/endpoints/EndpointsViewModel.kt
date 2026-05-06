@@ -43,7 +43,8 @@ class EndpointsViewModel @Inject constructor(
                 editingEndpoint = null,
                 formName = "",
                 formUrl = "",
-                formApiType = "OPENAI",
+                formApiType = "LM_STUDIO",
+                formLmStudioMode = "native",
                 formModelId = "",
                 formApiKey = "",
                 hasSavedApiKey = false
@@ -56,6 +57,12 @@ class EndpointsViewModel @Inject constructor(
             key.fill('0')
             true
         } ?: false
+        val lmMode = when (endpoint.apiType) {
+            ProviderType.LM_STUDIO -> "native"
+            ProviderType.OPENAI -> "openai"
+            ProviderType.ANTHROPIC -> "anthropic"
+            else -> "native"
+        }
         _uiState.update {
             it.copy(
                 isFormVisible = true,
@@ -63,6 +70,7 @@ class EndpointsViewModel @Inject constructor(
                 formName = endpoint.name,
                 formUrl = endpoint.url,
                 formApiType = endpoint.apiType.name,
+                formLmStudioMode = lmMode,
                 formModelId = endpoint.modelId.orEmpty(),
                 formApiKey = "",
                 hasSavedApiKey = hasKey
@@ -85,11 +93,20 @@ class EndpointsViewModel @Inject constructor(
         }
         viewModelScope.launch {
             try {
+                val resolvedApiType = if (state.formApiType == ProviderType.LM_STUDIO.name) {
+                    when (state.formLmStudioMode) {
+                        "openai" -> ProviderType.OPENAI
+                        "anthropic" -> ProviderType.ANTHROPIC
+                        else -> ProviderType.LM_STUDIO
+                    }
+                } else {
+                    ProviderType.valueOf(state.formApiType)
+                }
                 val endpoint = Endpoint(
                     id = state.editingEndpoint?.id ?: 0,
                     name = state.formName,
                     url = url,
-                    apiType = ProviderType.valueOf(state.formApiType),
+                    apiType = resolvedApiType,
                     modelId = state.formModelId.ifBlank { null },
                     isActive = state.editingEndpoint?.isActive ?: false
                 )
@@ -150,7 +167,11 @@ class EndpointsViewModel @Inject constructor(
             when (field) {
                 "name" -> it.copy(formName = value)
                 "url" -> it.copy(formUrl = value)
-                "apiType" -> it.copy(formApiType = value)
+                "apiType" -> it.copy(
+                    formApiType = value,
+                    formLmStudioMode = if (value == ProviderType.LM_STUDIO.name) it.formLmStudioMode else "native"
+                )
+                "lmStudioMode" -> it.copy(formLmStudioMode = value)
                 "modelId" -> it.copy(formModelId = value)
                 "apiKey" -> it.copy(formApiKey = value)
                 else -> it

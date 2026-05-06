@@ -11,6 +11,7 @@ data class EndpointsUiState(
     val formName: String = "",
     val formUrl: String = "",
     val formApiType: String = "OPENAI",
+    val formLmStudioMode: String = "native",
     val formModelId: String = "",
     val formApiKey: String = "",
     val hasSavedApiKey: Boolean = false,

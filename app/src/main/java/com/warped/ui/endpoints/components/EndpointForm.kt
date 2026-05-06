@@ -22,6 +22,7 @@ fun EndpointForm(
     name: String,
     url: String,
     apiType: String,
+    lmStudioMode: String = "native",
     modelId: String,
     apiKey: String,
     hasSavedKey: Boolean = false,
@@ -34,11 +35,13 @@ fun EndpointForm(
     onFetchModels: () -> Unit = {},
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var modeExpanded by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
     var modelDropdownExpanded by remember { mutableStateOf(false) }
     val providerTypes = ProviderType.entries.filter {
         it != ProviderType.LOCAL && it != ProviderType.LITE_RT_LM
     }
+    val lmStudioModes = listOf("native" to "Native", "openai" to "OpenAI", "anthropic" to "Anthropic")
 
     Column(
         modifier = Modifier
@@ -154,6 +157,38 @@ fun EndpointForm(
                             expanded = false
                         }
                     )
+                }
+            }
+        }
+
+        if (apiType == ProviderType.LM_STUDIO.name) {
+            ExposedDropdownMenuBox(
+                expanded = modeExpanded,
+                onExpandedChange = { modeExpanded = !modeExpanded }
+            ) {
+                OutlinedTextField(
+                    value = lmStudioModes.firstOrNull { it.first == lmStudioMode }?.second ?: "Native",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Connection Type") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = modeExpanded) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true)
+                )
+                ExposedDropdownMenu(
+                    expanded = modeExpanded,
+                    onDismissRequest = { modeExpanded = false }
+                ) {
+                    lmStudioModes.forEach { (key, label) ->
+                        DropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = {
+                                onFieldChange("lmStudioMode", key)
+                                modeExpanded = false
+                            }
+                        )
+                    }
                 }
             }
         }

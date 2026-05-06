@@ -37,6 +37,7 @@ fun EndpointsScreen(
                 name = uiState.formName,
                 url = uiState.formUrl,
                 apiType = uiState.formApiType,
+                lmStudioMode = uiState.formLmStudioMode,
                 modelId = uiState.formModelId,
                 apiKey = uiState.formApiKey,
                 hasSavedKey = uiState.hasSavedApiKey,
