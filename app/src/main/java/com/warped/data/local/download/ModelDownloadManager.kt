@@ -68,7 +68,8 @@ class ModelDownloadManager @Inject constructor(
         modelId: String,
         fileName: String,
         fileUrl: String,
-        fileSizeBytes: Long
+        fileSizeBytes: Long,
+        isGated: Boolean = false
     ) {
         updateState(modelId) {
             it.copy(
@@ -102,7 +103,7 @@ class ModelDownloadManager @Inject constructor(
         }
 
         val inputData = ModelDownloadWorker.createInputData(
-            modelId, fileName, fileUrl, fileSizeBytes
+            modelId, fileName, fileUrl, fileSizeBytes, isGated
         )
         val workRequest = OneTimeWorkRequestBuilder<ModelDownloadWorker>()
             .setInputData(inputData)
@@ -125,12 +126,12 @@ class ModelDownloadManager @Inject constructor(
     }
 
     fun pauseDownload(modelId: String) {
-        val workId = activeWorkIds.remove(modelId)
+        val workId = activeWorkIds[modelId]
         val state = _downloadStates.value[modelId]
         if (workId != null) {
             workManager.cancelWorkById(workId)
-            // Clean up observer immediately to prevent stale updates
             cleanupObserver(workId)
+            activeWorkIds.remove(modelId)
         }
         if (state != null && state.fileName.isNotBlank() && state.fileUrl.isNotBlank()) {
             ioScope.launch {
@@ -151,12 +152,24 @@ class ModelDownloadManager @Inject constructor(
     }
 
     fun resumeDownload(modelId: String) {
-        // Clean up any stale observer from a previous download
         val oldWorkId = activeWorkIds.remove(modelId)
         if (oldWorkId != null) {
+            workManager.cancelWorkById(oldWorkId)
             cleanupObserver(oldWorkId)
         }
         ioScope.launch {
+            // Wait for any previous worker to fully stop before starting new one
+            if (oldWorkId != null) {
+                try {
+                    var attempts = 0
+                    while (attempts < 10) {
+                        val info = workManager.getWorkInfoById(oldWorkId).get()
+                        if (info == null || info.state.isFinished) break
+                        kotlinx.coroutines.delay(200)
+                        attempts++
+                    }
+                } catch (_: Exception) { }
+            }
             val checkpoint = checkpointDao.getCheckpoint(modelId)
             if (checkpoint == null) {
                 updateState(modelId) {
@@ -188,7 +201,8 @@ class ModelDownloadManager @Inject constructor(
                 modelId = modelId,
                 fileName = checkpoint.fileName,
                 fileUrl = checkpoint.fileUrl,
-                fileSizeBytes = checkpoint.totalBytes
+                fileSizeBytes = checkpoint.totalBytes,
+                isGated = checkpoint.isGated
             )
             val workRequest = OneTimeWorkRequestBuilder<ModelDownloadWorker>()
                 .setInputData(inputData)
