@@ -1,138 +1,100 @@
 # Requirements: Warped
 
-**Defined:** 2026-05-06
+**Defined:** 2026-05-08
 **Core Value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
 
-## v1.3 Requirements
+## v1.4 Requirements
 
-Requirements for milestone v1.3 Remote Provider Endpoints & UX. Each maps to roadmap phases.
+Requirements for the Onboarding Wizard milestone. Each maps to roadmap phases.
 
-### Provider UI & UX
+### Wizard Flow (WZFL)
 
-- [ ] **PROV-01**: User can select any provider type (OpenAI, Anthropic, Ollama, LM Studio, Custom) in the endpoint form dropdown
-- [ ] **PROV-02**: Provider type names display as human-readable labels ("OpenAI", "Anthropic", "LM Studio", "Ollama", "Custom") — not UPPER_CASE enum names with underscores
-- [ ] **PROV-03**: Endpoint cards in ModelsScreen display provider name as human-readable label (not raw apiType.name)
-- [ ] **PROV-04**: Each provider type shows its specialized form fields (e.g., auth headers toggle for Anthropic/LM Studio, model load config for LM Studio, custom paths for Custom)
+- [ ] **WZFL-01**: User sees wizard on first app launch via DataStore flag
+- [ ] **WZFL-02**: User can skip individual steps via "Skip" button on each step
+- [ ] **WZFL-03**: User can skip entire wizard via "Skip all" with confirmation dialog
+- [ ] **WZFL-04**: User navigates between steps via swipe (HorizontalPager) and Next/Back buttons
+- [ ] **WZFL-05**: User sees step indicator dots showing current position out of 9 steps
+- [ ] **WZFL-06**: On completion, wizard marks as completed and navigates to Chat
+- [ ] **WZFL-07**: Pressing Back on first step exits the app (first launch) or returns to previous screen (re-entry from Settings)
+- [ ] **WZFL-08**: Wizard never auto-shows again after completion or skip all; stays accessible from Settings
 
-### API Key & Authentication
+### Wizard Steps (WZST)
 
-- [ ] **AUTH-01**: User can configure API key per endpoint, stored encrypted via Android Keystore (EncryptedSharedPreferences)
-- [ ] **AUTH-02**: API key is sent as `Authorization: Bearer <token>` header for OpenAI-compatible endpoints
-- [ ] **AUTH-03**: API key is sent as `x-api-key` header for Anthropic-compatible and LM Studio endpoints
+- [ ] **WZST-01**: Step 1 — Bienvenida: introduces Warped (local + remote LLMs), warm friendly tone
+- [ ] **WZST-02**: Step 2 — Motores locales: GGUF (llama.cpp) vs LiteRT-LM, how to switch
+- [ ] **WZST-03**: Step 3 — Descargar GGUF: Hugging Face search, download, manage models
+- [ ] **WZST-04**: Step 4 — Modelos LiteRT-LM: .litertlm import and usage
+- [ ] **WZST-05**: Step 5 — Chat local: load model, configure params, streaming chat
+- [ ] **WZST-06**: Step 6 — Proveedores remotos: add OpenAI, Anthropic, Ollama, LM Studio
+- [ ] **WZST-07**: Step 7 — Chat remoto: select remote model, chat with streaming
+- [ ] **WZST-08**: Step 8 — Presets: save/load generation parameter presets
+- [ ] **WZST-09**: Step 9 — Historial: browse past conversations, resume chats
+- [ ] **WZST-10**: Each step has CTA button navigating to relevant screen, wizard stays in back stack
+- [ ] **WZST-11**: Each step has icon, title, and short description (2-3 sentences)
 
-### OpenAI-Compatible Endpoints
+### Wizard Context (WZCT)
 
-- [ ] **OPAI-01**: `POST /v1/chat/completions` — streaming chat with SSE token parsing, response_format (JSON schema structured output), tools (function calling), and all inference parameters (temperature, top_p, top_k, max_tokens, stream, stop, presence_penalty, frequency_penalty, logit_bias, repeat_penalty, seed)
-- [ ] **OPAI-02**: `GET /v1/models` — list available models from the remote endpoint
-- [ ] **OPAI-03**: `POST /v1/responses` — OpenAI Responses API (non-streaming + streaming SSE, stateful via previous_response_id, tools with MCP server_label/server_url, reasoning effort)
-- [ ] **OPAI-04**: `POST /v1/embeddings` — OpenAI Embeddings API (single + batch input, dimensions, encoding_format)
-- [ ] **OPAI-05**: `POST /v1/completions` — OpenAI legacy Completions API (prompt-based, non-chat format, streaming SSE)
+- [ ] **WZCT-01**: Wizard reads app state (model count, endpoint count, chat count) at open time
+- [ ] **WZCT-02**: Steps adapt content when data exists (e.g. "Ya tienes 3 modelos GGUF")
+- [ ] **WZCT-03**: Context data snapshotted once, not continuously observed
 
-### Anthropic-Compatible Endpoints
+### Wizard Accessibility (WZAC)
 
-- [ ] **ANTH-01**: `POST /v1/messages` — Anthropic Messages API with streaming SSE (message_start, content_block_start, content_block_delta, content_block_stop, message_delta, message_stop), tools (function calling with input_schema), tool_choice, system prompt, max_tokens
-- [ ] **ANTH-02**: Anthropic provider is selectable from endpoint form UI dropdown (provider implementation already exists in codebase)
-
-### LM Studio Validation & MCP
-
-- [ ] **LMST-01**: `POST /api/v1/chat` — stateful chat with SSE streaming (chat.start, model_load.*, prompt_processing.*, reasoning.*, tool_call.*, message.*, chat.end), multimodal input (text + image data_url), system_prompt, integrations (plugins + ephemeral MCP), context_length, reasoning setting, store/previous_response_id for stateful context
-- [ ] **LMST-02**: `GET /api/v1/models` — list LLM and embedding models with quantization, capabilities (vision, trained_for_tool_use, reasoning), loaded_instances, variants
-- [ ] **LMST-03**: `POST /api/v1/models/load` — load model into memory with configurable context_length, eval_batch_size, flash_attention, num_experts, offload_kv_cache_to_gpu, echo_load_config
-- [ ] **LMST-04**: `POST /api/v1/models/unload` — unload model by instance_id to free memory
-- [ ] **LMST-05**: `POST /api/v1/models/download` — download model from LM Studio catalog identifier or Hugging Face URL, with optional quantization
-- [ ] **LMST-06**: `GET /api/v1/models/download/status/:job_id` — check download progress (bytes_per_second, estimated_completion, downloaded_bytes, status)
-- [ ] **LMST-07**: MCP ephemeral server support — `integrations` field with `type: "ephemeral_mcp"`, `server_label`, `server_url`, `allowed_tools`, and custom `headers` for authenticated MCP servers
-- [ ] **LMST-08**: MCP mcp.json server support — `integrations` field with `type: "plugin"`, `id: "mcp/<server_label>"`, and optional `allowed_tools`
-
-### Ollama Endpoints
-
-- [ ] **OLLM-01**: `POST /api/generate` — generate response from prompt (streaming NDJSON, non-streaming JSON, images, format/structured output, system, options, keep_alive, raw mode)
-- [ ] **OLLM-02**: `POST /api/chat` — OpenAI-compatible chat format with messages array, streaming NDJSON, tools, format, options
-- [ ] **OLLM-03**: `GET /api/tags` — list locally available models with details (format, family, parameter_size, quantization_level, size, digest)
-- [ ] **OLLM-04**: `POST /api/embed` — generate vector embeddings (single + batch input, truncate, dimensions)
-- [ ] **OLLM-05**: `GET /api/ps` — list currently running models (size, size_vram, context_length, expires_at)
-- [ ] **OLLM-06**: `POST /api/show` — show model details (parameters, license, template, capabilities, model_info metadata)
-- [ ] **OLLM-07**: `POST /api/create` — create model from modelfile content, path, or from existing model
-- [ ] **OLLM-08**: `DELETE /api/delete` — delete a model and its data
-- [ ] **OLLM-09**: `POST /api/pull` — pull/download model from registry (streaming progress NDJSON)
+- [ ] **WZAC-01**: User can re-open wizard from Settings → General → "Setup Wizard"
+- [ ] **WZAC-02**: Re-opened wizard shows review variant with current app state (checkmarks, counts)
+- [ ] **WZAC-03**: Back from re-opened wizard returns to Settings (not exits app)
 
 ## v2 Requirements
 
-Deferred to future milestone. Tracked but not in current roadmap.
+Deferred to future release. Tracked but not in current roadmap.
 
-### Remote Provider
-
-- **REM-01**: OAuth/OIDC authentication for remote endpoints — defer, API key is sufficient
-- **REM-02**: Automatic mDNS/LAN discovery of Ollama and LM Studio instances — defer, manual URL entry works
-- **REM-03**: Remote endpoint health monitoring and auto-reconnect — defer
-
-### LM Studio
-
-- **LMST-09**: LM Studio `/api/v1/models/download` via WorkManager for background downloads with Android notifications — defer, use in-app download
-- **LMST-10**: Structured Output (JSON schema) for `/api/v1/chat` via grammar-based sampling — defer until grammar support is stable
-
-### Ollama
-
-- **OLLM-10**: `POST /api/push` — push model to registry — defer, pull/download is sufficient
-- **OLLM-11**: `POST /api/copy` — copy/rename model — defer, low priority
+(None yet)
 
 ## Out of Scope
 
-Explicitly excluded. Documented to prevent scope creep.
-
 | Feature | Reason |
 |---------|--------|
-| Voice input/output | Defer, focus on text chat |
-| Image/multimodal models (for chat) | Defer, LM Studio multimodal input is supported but not in Warped's chat UI |
-| AI agents / autonomous tool use | Defer, MCP tool calling via LM Studio API is in scope but agentic loops are not |
-| Real-time sync across devices | Defer |
-| Paid subscriptions to remote providers built into the app | User brings own API keys |
-| OAuth/OIDC authentication | API key is sufficient for v1.3 |
-| mDNS/LAN auto-discovery | Manual URL entry works |
+| Tooltips/coach marks on main UI | Defer — full-screen wizard is cleaner for v1. Coach marks add complexity with positioning and z-ordering. |
+| Wizard re-trigger on app update | Avoid annoyance — wizard only shows on fresh install, not on updates. |
+| Video or animated illustrations | Unnecessary overhead for a text-based LLM app. Static icons + text are sufficient. |
+| Forced sequential completion | User must be able to skip or exit at any time — already covered by skip per step + skip all. |
+| Per-step analytics/telemetry | No tracking in the app. Out of scope for privacy. |
 
 ## Traceability
 
-Which phases cover which requirements. Updated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PROV-01 | Phase 16 | Pending |
-| PROV-02 | Phase 16 | Pending |
-| PROV-03 | Phase 16 | Pending |
-| PROV-04 | Phase 16 | Pending |
-| AUTH-01 | Phase 16 | Pending |
-| AUTH-02 | Phase 16 | Pending |
-| AUTH-03 | Phase 16 | Pending |
-| OPAI-01 | Phase 17 | Pending |
-| OPAI-02 | Phase 17 | Pending |
-| OPAI-03 | Phase 17 | Pending |
-| OPAI-04 | Phase 17 | Pending |
-| OPAI-05 | Phase 17 | Pending |
-| ANTH-01 | Phase 17 | Pending |
-| ANTH-02 | Phase 17 | Pending |
-| LMST-01 | Phase 19 | Pending |
-| LMST-02 | Phase 19 | Pending |
-| LMST-03 | Phase 19 | Pending |
-| LMST-04 | Phase 19 | Pending |
-| LMST-05 | Phase 19 | Pending |
-| LMST-06 | Phase 19 | Pending |
-| LMST-07 | Phase 19 | Pending |
-| LMST-08 | Phase 19 | Pending |
-| OLLM-01 | Phase 18 | Pending |
-| OLLM-02 | Phase 18 | Pending |
-| OLLM-03 | Phase 18 | Pending |
-| OLLM-04 | Phase 18 | Pending |
-| OLLM-05 | Phase 18 | Pending |
-| OLLM-06 | Phase 18 | Pending |
-| OLLM-07 | Phase 18 | Pending |
-| OLLM-08 | Phase 18 | Pending |
-| OLLM-09 | Phase 18 | Pending |
+| WZFL-01 | — | Pending |
+| WZFL-02 | — | Pending |
+| WZFL-03 | — | Pending |
+| WZFL-04 | — | Pending |
+| WZFL-05 | — | Pending |
+| WZFL-06 | — | Pending |
+| WZFL-07 | — | Pending |
+| WZFL-08 | — | Pending |
+| WZST-01 | — | Pending |
+| WZST-02 | — | Pending |
+| WZST-03 | — | Pending |
+| WZST-04 | — | Pending |
+| WZST-05 | — | Pending |
+| WZST-06 | — | Pending |
+| WZST-07 | — | Pending |
+| WZST-08 | — | Pending |
+| WZST-09 | — | Pending |
+| WZST-10 | — | Pending |
+| WZST-11 | — | Pending |
+| WZCT-01 | — | Pending |
+| WZCT-02 | — | Pending |
+| WZCT-03 | — | Pending |
+| WZAC-01 | — | Pending |
+| WZAC-02 | — | Pending |
+| WZAC-03 | — | Pending |
 
 **Coverage:**
-- v1.3 requirements: 31 total
-- Mapped to phases: 31
-- Unmapped: 0 ✓
+- v1.4 requirements: 25 total
+- Mapped to phases: 0
+- Unmapped: 25 ⚠️
 
 ---
-*Requirements defined: 2026-05-06*
-*Last updated: 2026-05-06 after roadmap creation*
+*Requirements defined: 2026-05-08*
+*Last updated: 2026-05-08 after v1.4 requirements definition*
