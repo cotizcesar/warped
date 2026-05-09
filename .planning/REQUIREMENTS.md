@@ -64,36 +64,36 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WZFL-01 | — | Pending |
-| WZFL-02 | — | Pending |
-| WZFL-03 | — | Pending |
-| WZFL-04 | — | Pending |
-| WZFL-05 | — | Pending |
-| WZFL-06 | — | Pending |
-| WZFL-07 | — | Pending |
-| WZFL-08 | — | Pending |
-| WZST-01 | — | Pending |
-| WZST-02 | — | Pending |
-| WZST-03 | — | Pending |
-| WZST-04 | — | Pending |
-| WZST-05 | — | Pending |
-| WZST-06 | — | Pending |
-| WZST-07 | — | Pending |
-| WZST-08 | — | Pending |
-| WZST-09 | — | Pending |
-| WZST-10 | — | Pending |
-| WZST-11 | — | Pending |
-| WZCT-01 | — | Pending |
-| WZCT-02 | — | Pending |
-| WZCT-03 | — | Pending |
-| WZAC-01 | — | Pending |
-| WZAC-02 | — | Pending |
-| WZAC-03 | — | Pending |
+| WZFL-01 | Phase 20 | Pending |
+| WZFL-02 | Phase 20 | Pending |
+| WZFL-03 | Phase 20 | Pending |
+| WZFL-04 | Phase 20 | Pending |
+| WZFL-05 | Phase 20 | Pending |
+| WZFL-06 | Phase 20 | Pending |
+| WZFL-07 | Phase 20 | Pending |
+| WZFL-08 | Phase 20 | Pending |
+| WZCT-03 | Phase 20 | Pending |
+| WZST-01 | Phase 21 | Pending |
+| WZST-02 | Phase 21 | Pending |
+| WZST-03 | Phase 21 | Pending |
+| WZST-04 | Phase 21 | Pending |
+| WZST-05 | Phase 21 | Pending |
+| WZST-06 | Phase 21 | Pending |
+| WZST-07 | Phase 21 | Pending |
+| WZST-08 | Phase 21 | Pending |
+| WZST-09 | Phase 21 | Pending |
+| WZST-10 | Phase 21 | Pending |
+| WZST-11 | Phase 21 | Pending |
+| WZCT-01 | Phase 21 | Pending |
+| WZCT-02 | Phase 21 | Pending |
+| WZAC-01 | Phase 22 | Pending |
+| WZAC-02 | Phase 22 | Pending |
+| WZAC-03 | Phase 22 | Pending |
 
 **Coverage:**
 - v1.4 requirements: 25 total
-- Mapped to phases: 0
-- Unmapped: 25 ⚠️
+- Mapped to phases: 25
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-05-08*

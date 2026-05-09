@@ -1,155 +1,122 @@
-# Roadmap: Warped v1.3
+# Roadmap: Warped v1.4 — Onboarding Wizard
 
-**Milestone:** v1.3 Remote Provider Endpoints & UX
-**Created:** 2026-05-06
-**Phases:** 16–19 (4 phases, continues from v1.2)
-**Total requirements:** 31
+**Milestone:** v1.4 Onboarding Wizard
+**Created:** 2026-05-08
+**Phases:** 3 (continues from Phase 19 of v1.3)
+**Requirements:** 25 total, all mapped
 
-## Phase Structure
+## Phase Overview
 
 | # | Phase | Goal | Requirements | Success Criteria |
 |---|-------|------|--------------|------------------|
-| 16 | Provider UI & API Key Auth | Expose all provider types in UI with readable names and encrypted API key management | PROV-01..04, AUTH-01..03 (7) | 4 |
-| 17 | OpenAI + Anthropic Endpoints | Complete OpenAI-compatible API and expose Anthropic in UI | OPAI-01..05, ANTH-01..02 (7) | 4 |
-| 18 | Ollama Full API | Full Ollama endpoint coverage: generate, chat, embed, ps, show, create, delete, pull | OLLM-01..09 (9) | 4 |
-| 19 | LM Studio Validation & MCP | Validate LM Studio end-to-end with MCP ephemeral and mcp.json server support | LMST-01..08 (8) | 5 |
+| 20 | Foundation & Flow | DataStore first-launch detection, HorizontalPager shell with skip/next/back, completion flow | WZFL-01..08, WZCT-03 (9) | 5 |
+| 21 | Step Content & Context | All 9 step contents with icons, context-aware adaptation, warm friendly tone | WZST-01..11, WZCT-01, WZCT-02 (13) | 5 |
+| 22 | Integration & Accessibility | Settings entry, CTA navigation wiring, re-entry review mode, back handling | WZAC-01..03 (3) | 4 |
 
 ---
 
-## Phase 16: Provider UI & API Key Auth
+## Phase 20: Foundation & Flow
 
-**Goal:** Expose all provider types in UI with readable names and encrypted API key management — the foundation that every other phase builds on.
+**Goal:** Build the DataStore persistence layer for first-launch detection and the HorizontalPager shell with complete skip/next/back/completion navigation flow.
 
-**Requirements:** PROV-01, PROV-02, PROV-03, PROV-04, AUTH-01, AUTH-02, AUTH-03
+**Requirements:** WZFL-01, WZFL-02, WZFL-03, WZFL-04, WZFL-05, WZFL-06, WZFL-07, WZFL-08, WZCT-03
 
-**Depends on:** — (no dependencies)
+**New files:**
+- `data/local/preferences/WizardPreferences.kt` — DataStore with `booleanPreferencesKey("wizard_completed")` and `stringSetPreferencesKey("skipped_steps")`
+- `ui/wizard/WizardScreen.kt` — Full-screen composable with HorizontalPager, TopAppBar, skip/next/back buttons, page indicator dots
+- `ui/wizard/WizardViewModel.kt` — @HiltViewModel managing pager state, skip logic, completion
+- `ui/wizard/WizardUiState.kt` — Data class with currentPage, isCompleted, skippedSteps, showSkipConfirm
 
-### Success Criteria
+**Modified files:**
+- `ui/navigation/Screen.kt` — Add `data object Wizard : Screen("wizard", "Wizard", Icons.Filled.Tour)`
+- `ui/navigation/NavGraph.kt` — Add `composable(Screen.Wizard.route)` with startDestination logic
+- `ui/components/WarpedAlertDialog.kt` — No changes (reuse existing)
 
-1. Endpoint form dropdown shows all 5 remote provider types: OpenAI, Anthropic, Ollama, LM Studio, Custom — each with human-readable label
-2. Provider type labels display as "OpenAI", "Anthropic", "LM Studio", "Ollama", "Custom" across all UI surfaces (dropdown, endpoint cards, chat header)
-3. API key field is present in endpoint form, encrypted on save via Android Keystore, and submitted as `Authorization: Bearer` (OpenAI) or `x-api-key` (Anthropic/LM Studio)
-4. Provider-specific form fields appear contextually (e.g., custom path fields for Custom provider, auth toggle for Anthropic/LM Studio)
-
-### Key Deliverables
-
-- `ProviderType.displayName` extension property mapping enum → readable label
-- `EndpointForm` dropdown expanded from `listOf("LM_STUDIO")` to all 5 remote `ProviderType` values
-- `DeployedEndpointCard` chip updated from `apiType.name` to `apiType.displayName`
-- `ModelsUiState.formApiType` default changed to support all types
-- `ApiKeyStore` integration in endpoint save flow: encrypt key → store ref → use in provider resolution
-- `ProviderRouter.resolve()` updated to pass API key from `ApiKeyStore` to provider constructors
-- `EndpointForm` dynamic fields based on selected `apiType` (e.g., `chatPath`/`modelsPath` for Custom, auth fields for Anthropic/LM Studio)
-
----
-
-## Phase 17: OpenAI + Anthropic Endpoints
-
-**Goal:** Complete OpenAI-compatible API surface (chat, models, responses, embeddings, completions) and expose Anthropic Messages API in the UI.
-
-**Requirements:** OPAI-01, OPAI-02, OPAI-03, OPAI-04, OPAI-05, ANTH-01, ANTH-02
-
-**Depends on:** Phase 16 (provider UI and auth must be in place)
-
-### Success Criteria
-
-1. `POST /v1/chat/completions` streams tokens via SSE to the chat UI using standard OpenAI chunk format (`choices[0].delta.content`)
-2. `POST /v1/responses` works both streaming (`stream: true` → SSE events) and non-streaming, with `previous_response_id` for stateful follow-up
-3. `POST /v1/embeddings` returns vector embeddings for single and batch input text
-4. Anthropic `POST /v1/messages` is selectable from provider dropdown, with SSE streaming events parsed and rendered in chat UI
-
-### Key Deliverables
-
-- `OpenAiApi` expanded: `@POST("v1/responses")`, `@POST("v1/embeddings")`, `@POST("v1/completions")`
-- `OpenAiResponsesRequest` / `OpenAiResponsesResponse` DTOs (responses API format)
-- `OpenAiEmbeddingsRequest` / `OpenAiEmbeddingsResponse` DTOs
-- `OpenAiCompletionsRequest` / `OpenAiCompletionsResponse` DTOs (legacy completions)
-- `AnthropicProvider` registered for UI visibility (already implemented, verify SSR SSE parsing)
-- `AnthropicApi` verified: `@POST("v1/messages")` with `x-api-key` header and SSE streaming
-- `ProviderRouter.resolve()` verified for `ProviderType.ANTHROPIC` path with API key from `ApiKeyStore`
-- SSE parsing utilities for responses API events and completions API chunks
+**Success criteria:**
+1. Fresh install → app opens directly to Wizard screen (not Chat)
+2. User can swipe left/right between placeholder step cards
+3. "Skip" button on each step advances to next step without completing wizard
+4. "Skip all" shows confirmation dialog; confirming marks wizard completed and navigates to Chat
+5. "Done" on last step marks wizard completed; subsequent launches go straight to Chat
 
 ---
 
-## Phase 18: Ollama Full API
+## Phase 21: Step Content & Context
 
-**Goal:** Full Ollama endpoint coverage — generate, chat, embed, running models, model details, create, delete, pull — all accessible through the same UI patterns.
+**Goal:** Populate all 9 wizard steps with icons, titles, warm descriptions, and context-aware content variants. Read app state at open time to adapt messaging.
 
-**Requirements:** OLLM-01, OLLM-02, OLLM-03, OLLM-04, OLLM-05, OLLM-06, OLLM-07, OLLM-08, OLLM-09
+**Requirements:** WZST-01, WZST-02, WZST-03, WZST-04, WZST-05, WZST-06, WZST-07, WZST-08, WZST-09, WZST-10, WZST-11, WZCT-01, WZCT-02
 
-**Depends on:** Phase 16 (provider UI and auth foundation)
+**New files:**
+- `ui/wizard/WizardStep.kt` — Enum with 9 steps: `WELCOME, ENGINES, GGUF_DOWNLOAD, LITERT_LM, LOCAL_CHAT, REMOTE_PROVIDERS, REMOTE_CHAT, PRESETS, HISTORY`. Each has `title: String`, `description: String`, `icon: ImageVector`, `ctaLabel: String`, `ctaRoute: String`.
+- `ui/wizard/StepContent.kt` — Composable rendering a single step: icon, title, description, CTA button. Handles context variants (e.g. "Ya tienes 3 modelos GGUF" vs "Descarga tu primer modelo").
+- `ui/components/PageIndicator.kt` — Reusable dot indicator composable (Row of Box with CircleShape, current page highlighted).
 
-### Success Criteria
+**Modified files:**
+- `ui/wizard/WizardViewModel.kt` — Add context reading: inject ModelsRepo, EndpointsRepo, ChatRepo; snapshot counts via `.first()` on init.
+- `ui/wizard/WizardUiState.kt` — Add `WizardContextData` (modelCount, endpointCount, chatCount, hasGgufModels, hasLitertlmModels, hasRemoteEndpoints).
 
-1. `POST /api/generate` and `POST /api/chat` work with streaming NDJSON and non-streaming JSON, supporting all parameters (images, format, options, system, keep_alive)
-2. `POST /api/embed` returns vector embeddings for single and batch input, with truncate and dimensions support
-3. `POST /api/pull` shows streaming progress (NDJSON) for model downloads
-4. `GET /api/ps`, `POST /api/show`, `POST /api/create`, `DELETE /api/delete` are callable from the endpoint and return correct responses
-
-### Key Deliverables
-
-- `OllamaApi` expanded: `@POST("api/embed")`, `@GET("api/ps")`, `@POST("api/show")`, `@POST("api/create")`, `@DELETE("api/delete")`, `@POST("api/pull")`
-- `OllamaEmbedRequest` / `OllamaEmbedResponse` DTOs
-- `OllamaPsResponse` / `OllamaShowRequest/Response` DTOs
-- `OllamaCreateRequest` / `OllamaDeleteRequest` DTOs
-- `OllamaPullRequest` with streaming NDJSON progress parsing
-- `OllamaProvider` extended with new endpoints: `embed()`, `listRunning()`, `showModel()`, `createModel()`, `deleteModel()`, `pullModel()`
-- Non-chat endpoints return results via `Result<T>` pattern, surfaced in ModelsScreen or dedicated UI as appropriate
+**Success criteria:**
+1. Each of the 9 steps renders with a distinct Material icon, title, and 2-3 sentence description in Spanish
+2. All text uses warm, friendly tone (not technical documentation style)
+3. If user has 0 models downloaded, Step 3 shows "Descarga tu primer modelo GGUF" CTA
+4. If user has 3 models downloaded, Step 3 shows "Ya tienes 3 modelos descargados. ¡Explora más!" variant
+5. CTA button appears on each step with correct label; UI renders but navigation is wired in Phase 22
 
 ---
 
-## Phase 19: LM Studio Validation & MCP
+## Phase 22: Integration & Accessibility
 
-**Goal:** Validate LM Studio works end-to-end (chat, models, load/unload, download), and add MCP support for ephemeral servers and mcp.json plugin servers.
+**Goal:** Wire CTA navigation to actual screens, add Settings entry point, implement re-entry review mode, handle back navigation correctly for first-launch vs settings re-entry.
 
-**Requirements:** LMST-01, LMST-02, LMST-03, LMST-04, LMST-05, LMST-06, LMST-07, LMST-08
+**Requirements:** WZAC-01, WZAC-02, WZAC-03
 
-**Depends on:** Phase 16 (provider UI and auth)
+**Modified files:**
+- `ui/navigation/NavGraph.kt` — Pass navigation callbacks to WizardScreen (onNavigateToModels, onNavigateToEndpoints, onNavigateToChat, onNavigateToPresets, onNavigateToHuggingFace)
+- `ui/settings/SettingsScreen.kt` — Add "Setup Wizard" card in General tab with "Run" TextButton
+- `ui/wizard/WizardScreen.kt` — Wire CTA buttons to navigation callbacks; handle re-entry vs first-launch mode (forward to Settings on Back for re-entry, exit app on first launch page 0)
+- `ui/wizard/WizardViewModel.kt` — Add `isReEntry: Boolean` parameter; on re-entry, show review variant with checkmarks and current state counts
 
-### Success Criteria
-
-1. `POST /api/v1/chat` streams all event types (reasoning.delta, message.delta, tool_call.*, chat.end) correctly to the chat UI, with stats displayed after generation
-2. `POST /api/v1/models/load` and `POST /api/v1/models/unload` manage model lifecycle — chat switches models correctly without errors
-3. `POST /api/v1/models/download` initiates downloads and `GET /api/v1/models/download/status/:job_id` reports progress
-4. MCP ephemeral servers work: `integrations` with `type: "ephemeral_mcp"` sends tools to chat endpoint, tool calls are parsed from SSE events and displayed
-5. MCP mcp.json servers work: `integrations` with `type: "plugin"` and `id: "mcp/<label>"` enables pre-configured server tools
-
-### Key Deliverables
-
-- `LmStudioApi` verified and expanded: `@POST("api/v1/models/download")`, `@GET("api/v1/models/download/status/{jobId}")`
-- `LmStudioDownloadRequest/Response` DTOs
-- `LmStudioChatRequest` expanded with `integrations` field (ephemeral MCP + plugin)
-- `LmStudioIntegration` sealed class: `EphemeralMcp(serverLabel, serverUrl, allowedTools, headers)` + `PluginMcp(id, allowedTools)`
-- MCP tool call parsing from SSE events (`tool_call.start`, `tool_call.arguments`, `tool_call.success`, `tool_call.failure`)
-- `LmStudioSseEvent` expanded to include tool call event types
-- Chat UI renders tool calls (name, arguments, output) inline alongside messages
-- `ChatViewModel` LM Studio lifecycle management verified: load before chat, unload on switch, download with progress
-- Model management UI in ModelsScreen for LM Studio: load/unload buttons, download progress
+**Success criteria:**
+1. "Setup Wizard" card visible in Settings → General tab; tapping "Run" opens wizard
+2. CTA buttons on each step navigate to the correct screen; pressing Back returns to wizard at same step
+3. Re-opening wizard from Settings shows each step with current state counts (not generic text)
+4. Back from re-entered wizard returns to Settings; Back from first-launch wizard on step 1 exits app
 
 ---
 
 ## Dependency Graph
 
 ```
-Phase 16 (Provider UI & Auth)
-   └── Phase 17 (OpenAI + Anthropic)
-   └── Phase 18 (Ollama Full API)
-   └── Phase 19 (LM Studio MCP & Validation)
+Phase 20 (Foundation & Flow)
+    └─► Phase 21 (Step Content & Context)
+            └─► Phase 22 (Integration & Accessibility)
 ```
 
-Phases 17, 18, and 19 are independent of each other and can be developed in any order after Phase 16.
+No parallel phases — each builds on the previous. Phase 21 depends on Phase 20's WizardViewModel and HorizontalPager shell. Phase 22 depends on Phase 21's completed step content and Phase 20's navigation shell.
 
 ---
 
-## Progress
+## Risk Assessment
 
-| Phase | Status | Requirements | Progress |
-|-------|--------|-------------|----------|
-| 16    | ○      | 7           | 0%       |
-| 17    | ○      | 7           | 0%       |
-| 18    | ○      | 9           | 0%       |
-| 19    | ○      | 8           | 0%       |
+| Risk | Likelihood | Impact | Mitigation |
+|------|-----------|--------|------------|
+| StartDestination flash (Chat shows before Wizard) | Medium | Low | Use `initialValue = null` guard in NavGraph to show empty box until DataStore emits |
+| Dark theme contrast issues with step content | Low | Medium | Use theme tokens exclusively; test all 9 steps on dark background |
+| Context data causes recomposition storms | Low | Medium | Snapshot once with `.first()`, don't collect continuously |
+| Back navigation edge case (first launch vs re-entry) | Low | Medium | Pass `isReEntry` flag; Phase 22 tests both paths explicitly |
 
 ---
-*Roadmap created: 2026-05-06*
-*Last updated: 2026-05-06 after initial creation*
+
+## File Count Estimate
+
+| Phase | New Files | Modified Files |
+|-------|-----------|---------------|
+| 20 | 4 | 2 |
+| 21 | 3 | 2 |
+| 22 | 0 | 4 |
+| **Total** | **7** | **8** |
+
+---
+*Roadmap created: 2026-05-08*
+*Last updated: 2026-05-08 after v1.4 roadmap creation*
