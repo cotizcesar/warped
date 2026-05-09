@@ -4,5 +4,14 @@ data class WizardUiState(
     val currentPage: Int = 0,
     val isWizardComplete: Boolean = false,
     val skippedSteps: Set<String> = emptySet(),
-    val showSkipAllConfirm: Boolean = false
+    val showSkipAllConfirm: Boolean = false,
+    val contextData: WizardContextData = WizardContextData()
+)
+
+data class WizardContextData(
+    val ggufModelCount: Int = 0,
+    val litertlmModelCount: Int = 0,
+    val endpointCount: Int = 0,
+    val chatCount: Int = 0,
+    val presetCount: Int = 0
 )

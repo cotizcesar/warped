@@ -3,53 +3,34 @@ package com.warped.ui.wizard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.warped.data.local.preferences.WizardPreferences
+import com.warped.domain.repository.ChatRepository
+import com.warped.domain.repository.EndpointRepository
+import com.warped.domain.repository.LocalModelRepository
+import com.warped.domain.repository.PresetRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class WizardViewModel @Inject constructor(
-    private val wizardPreferences: WizardPreferences
+    private val wizardPreferences: WizardPreferences,
+    private val localModelRepository: LocalModelRepository,
+    private val endpointRepository: EndpointRepository,
+    private val chatRepository: ChatRepository,
+    private val presetRepository: PresetRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WizardUiState())
     val uiState: StateFlow<WizardUiState> = _uiState.asStateFlow()
 
-    private val stepKeys = listOf(
-        "welcome", "engines", "gguf", "litertlm",
-        "chat_local", "remote_providers", "chat_remote",
-        "presets", "history"
-    )
-
-    val stepLabels = listOf(
-        "Bienvenida",
-        "Motores locales",
-        "Modelos GGUF",
-        "Modelos LiteRT-LM",
-        "Chat local",
-        "Proveedores remotos",
-        "Chat remoto",
-        "Presets",
-        "Historial"
-    )
-
-    val stepDescriptions = listOf(
-        "Conoce Warped: ejecuta LLMs locales y conéctate a proveedores remotos desde un solo lugar.",
-        "Aprende sobre GGUF (llama.cpp) y LiteRT-LM, los dos motores de inferencia local.",
-        "Descarga modelos GGUF desde Hugging Face y adminístralos en tu dispositivo.",
-        "Importa y usa modelos .litertlm con LiteRT-LM, el motor de Google para Android.",
-        "Carga un modelo local, configura los parámetros y chatea con streaming en tiempo real.",
-        "Conecta Warped a OpenAI, Anthropic, Ollama, LM Studio y servidores personalizados.",
-        "Selecciona un modelo remoto y chatea con streaming usando tus propias API keys.",
-        "Guarda y reutiliza configuraciones de parámetros de generación como presets.",
-        "Explora tu historial de conversaciones y retoma chats donde los dejaste."
-    )
-
-    val pageCount: Int get() = stepLabels.size
+    val steps = WizardStep.entries
+    val pageCount: Int get() = steps.size
 
     init {
         viewModelScope.launch {
@@ -61,6 +42,34 @@ class WizardViewModel @Inject constructor(
             wizardPreferences.skippedSteps.collect { steps ->
                 _uiState.update { it.copy(skippedSteps = steps) }
             }
+        }
+        viewModelScope.launch {
+            snapshotContext()
+        }
+    }
+
+    private suspend fun snapshotContext() {
+        val models = localModelRepository.observeModels().first()
+        val endpoints = endpointRepository.observeEndpoints().first()
+        val chats = chatRepository.observeConversations().first()
+        val presets = presetRepository.observePresets().first()
+
+        val ggufCount = models.count { it.modelFormat == "GGUF" || it.modelFormat == "gguf" }
+        val litertlmCount = models.count {
+            it.modelFormat.equals("LITERTLM", ignoreCase = true) ||
+                    it.modelFormat.equals("litertlm", ignoreCase = true)
+        }
+
+        _uiState.update {
+            it.copy(
+                contextData = WizardContextData(
+                    ggufModelCount = ggufCount,
+                    litertlmModelCount = litertlmCount,
+                    endpointCount = endpoints.size,
+                    chatCount = chats.size,
+                    presetCount = presets.size
+                )
+            )
         }
     }
 
@@ -84,7 +93,7 @@ class WizardViewModel @Inject constructor(
     }
 
     fun skipCurrentStep() {
-        val currentKey = stepKeys[_uiState.value.currentPage]
+        val currentKey = steps[_uiState.value.currentPage].name.lowercase()
         viewModelScope.launch {
             wizardPreferences.markStepsSkipped(setOf(currentKey))
         }
@@ -100,7 +109,7 @@ class WizardViewModel @Inject constructor(
     }
 
     fun confirmSkipAll() {
-        val keys = stepKeys.toSet()
+        val keys = steps.map { it.name.lowercase() }.toSet()
         viewModelScope.launch {
             wizardPreferences.markStepsSkipped(keys)
             wizardPreferences.markWizardComplete()
