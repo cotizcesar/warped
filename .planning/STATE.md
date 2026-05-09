@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.3
-milestone_name: Remote Provider Endpoints & UX
-status: complete
-last_updated: "2026-05-06"
-last_activity: 2026-05-06
+milestone: v1.4
+milestone_name: Onboarding Wizard
+status: planning
+last_updated: "2026-05-09T02:10:52.218Z"
+last_activity: 2026-05-09
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 4
-  completed_plans: 4
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State: Warped
@@ -28,11 +28,10 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-| Field | Value |
-|-------|-------|
-| Phase | — (all phases complete) |
-| Status | Milestone v1.3 complete — all 31 requirements shipped |
-| Last activity | 2026-05-06 — v1.3 all 4 phases executed and verified |
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-09 — Milestone v1.4 started
 
 ## Phase Structure
 

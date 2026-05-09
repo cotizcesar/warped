@@ -8,19 +8,19 @@ An Android application equivalent to LM Studio for mobile, enabling users to run
 
 Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
 
-## Current Milestone: v1.3 Remote Provider Endpoints & UX
+## Current Milestone: v1.4 Onboarding Wizard
 
-**Goal:** Exponer todos los endpoints de red en la UI — OpenAI-compatible, Anthropic-compatible, LM Studio — con nombres legibles, soporte MCP en LM Studio, API keys por endpoint, y validación completa.
+**Goal:** Build a full-screen introductory wizard that guides new users through the complete app workflow — understanding Warped, local engines (GGUF + LiteRT-LM), downloading models, chatting locally/remotely, managing presets, and browsing history — with a warm, friendly tone. First-launch auto-trigger with skip options, always accessible from Settings.
 
 **Target features:**
-- Expandir dropdown de provider en EndpointForm para mostrar todos los ProviderType (OPENAI, ANTHROPIC, OLLAMA, LM_STUDIO, CUSTOM)
-- Nombres legibles para providers: "LM Studio", "OpenAI", "Anthropic", "Ollama", "Custom" (no UPPER_CASE)
-- Agregar endpoints OpenAI-compatible: /v1/responses, /v1/embeddings, /v1/completions
-- Agregar endpoint Anthropic-compatible: /v1/messages (ya existe provider, falta exponer en UI)
-- Soporte MCP en LM Studio: ephemeral servers + mcp.json servers (tool calling vía API)
-- API key configurable por endpoint (autenticación por provider)
-- Validar LM Studio: chat, models, load/unload, download
-- Vistas especializadas por provider si es necesario
+- Full-screen onboarding flow with slides/swipe navigation between steps
+- 9-step wizard: Bienvenida & qué es Warped, Motores locales (GGUF + LiteRT-LM), Descargar modelos GGUF, Modelos LiteRT-LM, Chat con modelo local, Conectar proveedores remotos (OpenAI, Anthropic, Ollama, LM Studio), Chat con modelos remotos, Presets de generación, Historial de chats
+- Context-aware: adapts steps based on existing app state (models downloaded, endpoints configured, chats created)
+- First-launch detection via DataStore flag — auto-triggers wizard on fresh install
+- "Skip" per step (skip individual) + "Skip all" (skip entire wizard) at each step
+- Call-to-action buttons per step that navigate to relevant screens
+- Re-accessible anytime from Settings screen
+- Warm, friendly visual tone with Material 3 styling
 
 ## Requirements
 
