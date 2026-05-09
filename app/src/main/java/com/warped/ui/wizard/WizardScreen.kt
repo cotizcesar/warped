@@ -13,9 +13,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.warped.R
 import com.warped.ui.components.PageIndicator
 import com.warped.ui.components.WarpedAlertDialog
 
@@ -53,23 +55,24 @@ fun WizardScreen(
         }
     }
 
-    // Skip all / Close wizard dialog
     if (uiState.showSkipAllConfirm) {
         WarpedAlertDialog(
             onDismissRequest = { viewModel.dismissSkipAllConfirm() },
             title = {
                 Text(
-                    text = if (uiState.isReEntry) "Close wizard" else "Skip wizard",
+                    text = stringResource(
+                        if (uiState.isReEntry) R.string.wizard_close_confirm_title
+                        else R.string.wizard_skip_confirm_title
+                    ),
                     color = TextPrimary
                 )
             },
             text = {
                 Text(
-                    text = if (uiState.isReEntry) {
-                        "Close the wizard? You can re-open it anytime from Settings."
-                    } else {
-                        "Skip the onboarding wizard? You can re-open it anytime from Settings."
-                    },
+                    text = stringResource(
+                        if (uiState.isReEntry) R.string.wizard_close_confirm_text
+                        else R.string.wizard_skip_confirm_text
+                    ),
                     color = TextSecondary
                 )
             },
@@ -83,38 +86,37 @@ fun WizardScreen(
                     }
                 }) {
                     Text(
-                        text = if (uiState.isReEntry) "Close" else "Skip",
+                        text = stringResource(
+                            if (uiState.isReEntry) R.string.wizard_close
+                            else R.string.wizard_skip
+                        ),
                         color = MaterialTheme.colorScheme.error
                     )
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissSkipAllConfirm() }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.wizard_cancel))
                 }
             }
         )
     }
 
-    // Exit confirmation dialog (first launch, page 0)
     if (uiState.showExitConfirm) {
         WarpedAlertDialog(
             onDismissRequest = { viewModel.dismissExitDialog() },
-            title = { Text("Exit Warped?", color = TextPrimary) },
+            title = { Text(stringResource(R.string.wizard_exit_title), color = TextPrimary) },
             text = {
-                Text(
-                    "The wizard will continue next time you open the app.",
-                    color = TextSecondary
-                )
+                Text(stringResource(R.string.wizard_exit_text), color = TextSecondary)
             },
             confirmButton = {
                 TextButton(onClick = onWizardComplete) {
-                    Text("Exit", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.wizard_exit), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissExitDialog() }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.wizard_cancel))
                 }
             }
         )
@@ -124,7 +126,6 @@ fun WizardScreen(
     val isLastPage = uiState.currentPage == viewModel.pageCount - 1
     val currentStep = viewModel.steps[uiState.currentPage]
 
-    // System back handler
     BackHandler {
         if (isFirstPage) {
             if (uiState.isReEntry) {
@@ -143,7 +144,7 @@ fun WizardScreen(
                 title = {
                     Column {
                         Text(
-                            text = currentStep.title,
+                            text = stringResource(currentStep.titleRes),
                             color = TextPrimary
                         )
                         PageIndicator(
@@ -161,7 +162,7 @@ fun WizardScreen(
                             IconButton(onClick = onBackFromReEntry) {
                                 Icon(
                                     Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Back to Settings",
+                                    contentDescription = stringResource(R.string.wizard_back),
                                     tint = TextPrimary
                                 )
                             }
@@ -169,7 +170,7 @@ fun WizardScreen(
                             IconButton(onClick = { viewModel.showExitDialog() }) {
                                 Icon(
                                     Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Exit wizard",
+                                    contentDescription = stringResource(R.string.wizard_exit),
                                     tint = TextPrimary
                                 )
                             }
@@ -178,7 +179,7 @@ fun WizardScreen(
                         IconButton(onClick = { viewModel.goToPreviousPage() }) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
+                                contentDescription = stringResource(R.string.wizard_back),
                                 tint = TextPrimary
                             )
                         }
@@ -187,7 +188,11 @@ fun WizardScreen(
                 actions = {
                     TextButton(onClick = { viewModel.showSkipAllConfirm() }) {
                         Text(
-                            text = if (uiState.isReEntry) "Close" else if (isFirstPage) "Skip all" else "Skip",
+                            text = when {
+                                uiState.isReEntry -> stringResource(R.string.wizard_close)
+                                isFirstPage -> stringResource(R.string.wizard_skip_all)
+                                else -> stringResource(R.string.wizard_skip)
+                            },
                             color = Accent
                         )
                     }
@@ -211,10 +216,7 @@ fun WizardScreen(
                 ) {
                     if (!isFirstPage) {
                         TextButton(onClick = { viewModel.goToPreviousPage() }) {
-                            Text(
-                                text = if (uiState.isReEntry) "Back" else "Back",
-                                color = TextSecondary
-                            )
+                            Text(stringResource(R.string.wizard_back), color = TextSecondary)
                         }
                     } else {
                         Spacer(Modifier.width(64.dp))
@@ -239,7 +241,7 @@ fun WizardScreen(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(Modifier.width(8.dp))
-                            Text("Done")
+                            Text(stringResource(R.string.wizard_done))
                         }
                     } else {
                         Button(
@@ -247,7 +249,10 @@ fun WizardScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = Accent),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text(text = if (uiState.isReEntry) "Revisar" else "Next")
+                            Text(
+                                text = if (uiState.isReEntry) stringResource(R.string.wizard_revisar)
+                                else stringResource(R.string.wizard_next)
+                            )
                         }
                     }
                 }

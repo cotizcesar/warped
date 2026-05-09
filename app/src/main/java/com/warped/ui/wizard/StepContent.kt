@@ -7,10 +7,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.warped.R
 
 private val CardBg = Color(0xFF2B2B29)
 private val Accent = Color(0xFFD97757)
@@ -44,13 +46,13 @@ fun StepContent(
             ) {
                 Icon(
                     imageVector = step.icon,
-                    contentDescription = step.title,
+                    contentDescription = stringResource(step.titleRes),
                     tint = Accent,
                     modifier = Modifier.size(48.dp)
                 )
                 Spacer(Modifier.height(20.dp))
                 Text(
-                    text = step.title,
+                    text = stringResource(step.titleRes),
                     color = TextPrimary,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
@@ -81,7 +83,7 @@ fun StepContent(
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
-                    text = step.ctaLabel,
+                    text = stringResource(step.ctaLabelRes),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -95,49 +97,59 @@ private fun ContextBadge(step: WizardStep, contextData: WizardContextData) {
     val text = when (step) {
         WizardStep.GGUF_DOWNLOAD -> {
             if (contextData.ggufModelCount > 0) {
-                "Ya tienes ${contextData.ggufModelCount} ${if (contextData.ggufModelCount == 1) "modelo" else "modelos"} GGUF descargado${if (contextData.ggufModelCount != 1) "s" else ""}"
+                val pluralRes = if (contextData.ggufModelCount == 1) R.string.wizard_model_singular else R.string.wizard_model_plural
+                stringResource(R.string.wizard_badge_has_gguf, contextData.ggufModelCount, stringResource(pluralRes))
             } else {
-                "Aún no tienes modelos GGUF"
+                stringResource(R.string.wizard_badge_no_gguf)
             }
         }
         WizardStep.LITERT_LM -> {
             if (contextData.litertlmModelCount > 0) {
-                "Ya tienes ${contextData.litertlmModelCount} ${if (contextData.litertlmModelCount == 1) "modelo" else "modelos"} LiteRT-LM importado${if (contextData.litertlmModelCount != 1) "s" else ""}"
+                val pluralRes = if (contextData.litertlmModelCount == 1) R.string.wizard_litertlm_singular else R.string.wizard_litertlm_plural
+                stringResource(R.string.wizard_badge_has_litertlm, contextData.litertlmModelCount, stringResource(pluralRes))
             } else {
-                "Aún no tienes modelos LiteRT-LM"
+                stringResource(R.string.wizard_badge_no_litertlm)
             }
         }
         WizardStep.REMOTE_PROVIDERS -> {
             if (contextData.endpointCount > 0) {
-                "Ya tienes ${contextData.endpointCount} ${if (contextData.endpointCount == 1) "endpoint" else "endpoints"} configurado${if (contextData.endpointCount != 1) "s" else ""}"
+                val pluralRes = if (contextData.endpointCount == 1) R.string.wizard_endpoint_singular else R.string.wizard_endpoint_plural
+                stringResource(R.string.wizard_badge_has_endpoints, contextData.endpointCount, stringResource(pluralRes))
             } else {
-                "Aún no tienes endpoints configurados"
+                stringResource(R.string.wizard_badge_no_endpoints)
             }
         }
         WizardStep.PRESETS -> {
             if (contextData.presetCount > 0) {
-                "Ya tienes ${contextData.presetCount} ${if (contextData.presetCount == 1) "preset" else "presets"} guardado${if (contextData.presetCount != 1) "s" else ""}"
+                val pluralRes = if (contextData.presetCount == 1) R.string.wizard_preset_singular else R.string.wizard_preset_plural
+                stringResource(R.string.wizard_badge_has_presets, contextData.presetCount, stringResource(pluralRes))
             } else {
-                "Aún no tienes presets guardados"
+                stringResource(R.string.wizard_badge_no_presets)
             }
         }
         WizardStep.HISTORY -> {
             if (contextData.chatCount > 0) {
-                "Ya tienes ${contextData.chatCount} ${if (contextData.chatCount == 1) "conversación" else "conversaciones"} en tu historial"
+                val pluralRes = if (contextData.chatCount == 1) R.string.wizard_chat_singular else R.string.wizard_chat_plural
+                stringResource(R.string.wizard_badge_has_chats, contextData.chatCount, stringResource(pluralRes))
             } else {
-                "Aún no tienes conversaciones"
+                stringResource(R.string.wizard_badge_no_chats)
             }
         }
-        else -> null
+        else -> ""
     }
-    if (text != null) {
+    if (text.isNotEmpty()) {
+        val isPositive = text.contains(stringResource(R.string.wizard_badge_has_gguf).take(2))
         Surface(
             shape = RoundedCornerShape(8.dp),
-            color = if (text.startsWith("Ya")) Accent.copy(alpha = 0.15f) else TextSecondary.copy(alpha = 0.1f)
+            color = if (contextData.ggufModelCount > 0 || contextData.litertlmModelCount > 0 ||
+                contextData.endpointCount > 0 || contextData.presetCount > 0 || contextData.chatCount > 0
+            ) Accent.copy(alpha = 0.15f) else TextSecondary.copy(alpha = 0.1f)
         ) {
             Text(
                 text = text,
-                color = if (text.startsWith("Ya")) Accent else TextSecondary,
+                color = if (contextData.ggufModelCount > 0 || contextData.litertlmModelCount > 0 ||
+                    contextData.endpointCount > 0 || contextData.presetCount > 0 || contextData.chatCount > 0
+                ) Accent else TextSecondary,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
@@ -146,55 +158,51 @@ private fun ContextBadge(step: WizardStep, contextData: WizardContextData) {
     }
 }
 
+@Composable
 private fun contextDescription(step: WizardStep, contextData: WizardContextData?): String {
-    if (contextData == null) return step.description
+    if (contextData == null) return stringResource(step.descriptionRes)
 
     return when (step) {
         WizardStep.GGUF_DOWNLOAD -> {
             if (contextData.ggufModelCount > 0) {
-                "Ya tienes ${contextData.ggufModelCount} ${if (contextData.ggufModelCount == 1) "modelo GGUF descargado" else "modelos GGUF descargados"}. " +
-                        "¡Explora el catálogo de Hugging Face para encontrar más modelos!"
+                val pluralRes = if (contextData.ggufModelCount == 1) R.string.wizard_model_singular else R.string.wizard_model_plural
+                stringResource(R.string.wizard_step_3_desc_has, contextData.ggufModelCount, stringResource(pluralRes))
             } else {
-                "Descarga tu primer modelo GGUF desde Hugging Face. " +
-                        "Hay miles de modelos disponibles: desde 1B hasta 70B parámetros."
+                stringResource(R.string.wizard_step_3_desc_no)
             }
         }
         WizardStep.LITERT_LM -> {
             if (contextData.litertlmModelCount > 0) {
-                "Ya tienes ${contextData.litertlmModelCount} ${if (contextData.litertlmModelCount == 1) "modelo LiteRT-LM importado" else "modelos LiteRT-LM importados"}. " +
-                        "Puedes importar más desde el almacenamiento de tu dispositivo."
+                val pluralRes = if (contextData.litertlmModelCount == 1) R.string.wizard_litertlm_singular else R.string.wizard_litertlm_plural
+                stringResource(R.string.wizard_step_4_desc_has, contextData.litertlmModelCount, stringResource(pluralRes))
             } else {
-                "Importa tu primer modelo .litertlm desde el almacenamiento de tu dispositivo. " +
-                        "LiteRT-LM está optimizado para Android con aceleración por GPU."
+                stringResource(R.string.wizard_step_4_desc_no)
             }
         }
         WizardStep.REMOTE_PROVIDERS -> {
             if (contextData.endpointCount > 0) {
-                "Ya tienes ${contextData.endpointCount} ${if (contextData.endpointCount == 1) "endpoint configurado" else "endpoints configurados"}. " +
-                        "¡Conéctate a más proveedores o administra los existentes!"
+                val pluralRes = if (contextData.endpointCount == 1) R.string.wizard_endpoint_singular else R.string.wizard_endpoint_plural
+                stringResource(R.string.wizard_step_6_desc_has, contextData.endpointCount, stringResource(pluralRes))
             } else {
-                "Configura tu primer endpoint para conectarte a OpenAI, Anthropic, Ollama o LM Studio. " +
-                        "Tus API keys se guardan de forma segura en el dispositivo."
+                stringResource(R.string.wizard_step_6_desc_no)
             }
         }
         WizardStep.PRESETS -> {
             if (contextData.presetCount > 0) {
-                "Ya tienes ${contextData.presetCount} ${if (contextData.presetCount == 1) "preset guardado" else "presets guardados"}. " +
-                        "Crea nuevos presets para diferentes estilos de conversación."
+                val pluralRes = if (contextData.presetCount == 1) R.string.wizard_preset_singular else R.string.wizard_preset_plural
+                stringResource(R.string.wizard_step_8_desc_has, contextData.presetCount, stringResource(pluralRes))
             } else {
-                "Crea tu primer preset de generación. Define temperatura, tokens máximos, " +
-                        "semilla y más para reutilizar tus configuraciones favoritas."
+                stringResource(R.string.wizard_step_8_desc_no)
             }
         }
         WizardStep.HISTORY -> {
             if (contextData.chatCount > 0) {
-                "Ya tienes ${contextData.chatCount} ${if (contextData.chatCount == 1) "conversación" else "conversaciones"} en tu historial. " +
-                        "Retoma cualquiera de ellas desde el panel de conversaciones."
+                val pluralRes = if (contextData.chatCount == 1) R.string.wizard_chat_singular else R.string.wizard_chat_plural
+                stringResource(R.string.wizard_step_9_desc_has, contextData.chatCount, stringResource(pluralRes))
             } else {
-                "Tu historial de conversaciones aparecerá aquí. " +
-                        "Cada chat se guarda automáticamente para que puedas retomarlo cuando quieras."
+                stringResource(R.string.wizard_step_9_desc_no)
             }
         }
-        else -> step.description
+        else -> stringResource(step.descriptionRes)
     }
 }

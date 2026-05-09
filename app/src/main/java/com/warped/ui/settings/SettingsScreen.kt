@@ -21,10 +21,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.warped.R
 import com.warped.data.local.inference.tools.ToolCategory
 import com.warped.ui.components.WarpedAlertDialog
 import com.warped.data.local.inference.tools.ToolDefinitions
@@ -224,16 +226,16 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Setup Wizard", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.settings_wizard_title), style = MaterialTheme.typography.bodyLarge)
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Re-run the onboarding wizard to explore Warped features.",
+                        stringResource(R.string.settings_wizard_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(8.dp))
                     TextButton(onClick = onNavigateToWizard) {
-                        Text("Run", color = Color(0xFFD97757))
+                        Text(stringResource(R.string.settings_wizard_run), color = Color(0xFFD97757))
                     }
                 }
             }
