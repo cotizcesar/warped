@@ -2,36 +2,36 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Onboarding Wizard
-status: planning
-last_updated: "2026-05-09T02:10:52.218Z"
+status: complete
+last_updated: "2026-05-09T05:40:00.000Z"
 last_activity: 2026-05-09
 progress:
-  total_phases: 0
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_phases: 3
+  completed_phases: 3
+  total_plans: 3
+  completed_plans: 3
+  percent: 100
 ---
 
 # Project State: Warped
 
-**Last updated:** 2026-05-06
-**Last activity:** 2026-05-06 — Milestone v1.3 completed
+**Last updated:** 2026-05-09
+**Last activity:** 2026-05-09 — Milestone v1.4 completed
 
 See: .planning/PROJECT.md
 
 ## Project Reference
 
 **Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** v1.3 complete — next milestone pending
-**Milestone:** v1.3 Remote Provider Endpoints & UX — COMPLETE ✅
+**Current focus:** v1.4 complete — next milestone pending
+**Milestone:** v1.4 Onboarding Wizard — COMPLETE ✅
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-05-09 — Milestone v1.4 started
+Phase: All complete
+Plan: All complete
+Status: Milestone v1.4 complete — 3 phases, 25 requirements, 10 files
+Last activity: 2026-05-09 — Milestone v1.4 lifecycle: audit → complete → cleanup
 
 ## Phase Structure
 
@@ -41,12 +41,32 @@ Last activity: 2026-05-09 — Milestone v1.4 started
 | 17 | OpenAI + Anthropic Endpoints | OPAI-01..05, ANTH-01..02 (7) | ✅ Complete | Phase 16 |
 | 18 | Ollama Full API | OLLM-01..09 (9) | ✅ Complete | Phase 16 |
 | 19 | LM Studio Validation & MCP | LMST-01..08 (8) | ✅ Complete | Phase 16 |
+| 20 | Foundation & Flow | WZFL-01..08, WZCT-03 (9) | ✅ Complete | — |
+| 21 | Step Content & Context | WZST-01..11, WZCT-01, WZCT-02 (13) | ✅ Complete | Phase 20 |
+| 22 | Integration & Accessibility | WZAC-01..03 (3) | ✅ Complete | Phase 20, 21 |
 
 ## Completed
 
 - ✅ v1.0 MVP — 5 phases, 30 requirements, 107 Kotlin source files
 - ✅ v1.1 LiteRT-LM Integration — 5 phases, 26 requirements
 - ✅ v1.2 GGUF Native Inference — 5 phases, 27 requirements, 24 success criteria
+- ✅ v1.3 Remote Provider Endpoints & UX — 4 phases, 31 requirements
+- ✅ v1.4 Onboarding Wizard — 3 phases, 25 requirements, 10 files (7 new, 3 modified)
+
+## v1.4 Deliverables
+
+| File | Status |
+|------|--------|
+| `data/local/preferences/WizardPreferences.kt` | NEW |
+| `ui/wizard/WizardUiState.kt` | NEW |
+| `ui/wizard/WizardViewModel.kt` | NEW |
+| `ui/wizard/WizardScreen.kt` | NEW |
+| `ui/wizard/WizardStep.kt` | NEW |
+| `ui/wizard/StepContent.kt` | NEW |
+| `ui/components/PageIndicator.kt` | NEW |
+| `ui/navigation/Screen.kt` | MODIFIED |
+| `ui/navigation/NavGraph.kt` | MODIFIED |
+| `ui/settings/SettingsScreen.kt` | MODIFIED |
 
 ## Accumulated Context
 
@@ -89,6 +109,13 @@ Last activity: 2026-05-09 — Milestone v1.4 started
 - [10-01]: D-10-01c — Grey-out uses Material3 enabled=false + alpha 0.38f modifier with onSurfaceVariant label
 - [10-01]: D-10-01d — FormatBadge composable reused from Phase 9 ModelsScreen (GGUF=blue, LiteRT-LM=green)
 - [10-01]: D-10-01e — activeFormat derived from EngineManager.getActiveEngine()?.type, defaults to "GGUF"
+- [v1.4]: WizardPreferences DataStore with wizard_completed + skipped_steps keys
+- [v1.4]: HorizontalPager 9-page shell with TopAppBar/bottomBar navigation
+- [v1.4]: First-launch redirect via LaunchedEffect + flash guard
+- [v1.4]: WizardStep enum with 9 steps, warm Spanish descriptions, Material icons
+- [v1.4]: Context-aware step content with count badges and adapted descriptions
+- [v1.4]: Re-entry review mode with isReEntry flag, "Close wizard"/"Revisar" labels
+- [v1.4]: Back navigation: exit dialog on first launch page 0, back to Settings on re-entry
 
 ### Pending Todos
 
@@ -97,9 +124,9 @@ None yet.
 ### Blockers/Concerns
 
 - v1.2 GGUF pipeline completed — llama.cpp JNI integration, Vulkan GPU backend, OOM handling all implemented.
+- v1.3 Remote providers completed — all provider types exposed, API keys secure.
+- v1.4 Onboarding wizard completed — full-screen 9-step flow with context-aware content.
 - LM Studio API changes may require updates to match latest LM Studio version (0.4.0+).
-- MCP tool calling requires LM Studio Server Settings: "Allow per-request MCPs" and "Allow calling servers from mcp.json" to be enabled.
-- AnthropicProvider exists in codebase but has never been tested end-to-end through the UI.
 
 ### Quick Tasks Completed
 
@@ -109,6 +136,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-06
-Stopped at: v1.3 roadmap created — 4 phases, 31 requirements, ready for Phase 16 planning
-Resume file: .planning/ROADMAP.md
+Last session: 2026-05-09
+Stopped at: Milestone v1.4 completed — 3 phases, 25 requirements, audit passed
+Resume file: .planning/milestones/v1.4-ROADMAP.md
