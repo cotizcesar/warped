@@ -35,6 +35,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.warped.ui.components.WarpedAlertDialog
+import com.warped.data.local.preferences.WizardPreferences
 import com.warped.domain.model.Conversation
 import com.warped.domain.repository.ChatRepository
 import com.warped.ui.chat.ChatScreen
@@ -43,6 +44,7 @@ import com.warped.ui.huggingface.HuggingFaceScreen
 import com.warped.ui.models.ModelsScreen
 import com.warped.ui.presets.PresetsScreen
 import com.warped.ui.settings.SettingsScreen
+import com.warped.ui.wizard.WizardScreen
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -93,7 +95,22 @@ fun WarpedNavGraph() {
     val chatRepository = remember { entryPoint.chatRepository() }
     val activeModelSelection = remember { entryPoint.activeModelSelection() }
     val engineManager = remember { entryPoint.engineManager() }
+    val wizardPreferences = remember { entryPoint.wizardPreferences() }
     val conversations by chatRepository.observeConversations().collectAsStateWithLifecycle(emptyList())
+
+    val isWizardComplete by wizardPreferences.isWizardComplete
+        .collectAsStateWithLifecycle(initialValue = null)
+
+    // First-launch redirect to wizard
+    LaunchedEffect(isWizardComplete) {
+        if (isWizardComplete == false &&
+            currentRoute != Screen.Wizard.route
+        ) {
+            navController.navigate(Screen.Wizard.route) {
+                popUpTo(Screen.Chat.route) { inclusive = true }
+            }
+        }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -245,6 +262,16 @@ fun WarpedNavGraph() {
             }
         }
     ) {
+        // Guard against flash: show empty dark screen until DataStore emits
+        if (isWizardComplete == null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(DrawerBg)
+            )
+            return@ModalNavigationDrawer
+        }
+
         NavHost(navController, startDestination = Screen.Chat.route) {
             composable(
                 route = "${Screen.Chat.route}?newChat={newChat}",
@@ -302,6 +329,15 @@ fun WarpedNavGraph() {
             composable(Screen.Help.route) {
                 HelpScreen(onNavigateBack = { navController.popBackStack() })
             }
+            composable(Screen.Wizard.route) {
+                WizardScreen(
+                    onWizardComplete = {
+                        navController.navigate(Screen.Chat.route) {
+                            popUpTo(Screen.Wizard.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
         }
     }
 }
@@ -312,4 +348,5 @@ interface ChatRepoEntryPoint {
     fun chatRepository(): ChatRepository
     fun activeModelSelection(): com.warped.domain.model.ActiveModelSelection
     fun engineManager(): com.warped.data.local.inference.EngineManager
+    fun wizardPreferences(): WizardPreferences
 }
