@@ -11,38 +11,36 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.warped.data.local.inference.tools.ToolCategory
+import com.warped.ui.components.WarpedAlertDialog
+import com.warped.data.local.inference.tools.ToolDefinitions
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
-    onOpenDrawer: () -> Unit = {}
+    onOpenDrawer: () -> Unit = {},
+    onNavigateToTools: () -> Unit = {},
+    onNavigateToWizard: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     if (uiState.showDeleteChatsDialog) {
-        AlertDialog(
+            WarpedAlertDialog(
             onDismissRequest = { viewModel.dismissDeleteChatsDialog() },
             title = { Text("Delete All Chats") },
             text = {
@@ -54,46 +52,25 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(
                     onClick = { viewModel.deleteAllChats() },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text("Delete All")
-                }
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete All") }
             },
-            dismissButton = {
-                TextButton(onClick = { viewModel.dismissDeleteChatsDialog() }) {
-                    Text("Cancel")
-                }
-            }
+            dismissButton = { TextButton(onClick = { viewModel.dismissDeleteChatsDialog() }) { Text("Cancel") } }
         )
     }
 
     if (uiState.showDeleteKeysDialog) {
-        AlertDialog(
+            WarpedAlertDialog(
             onDismissRequest = { viewModel.dismissDeleteKeysDialog() },
             title = { Text("Delete All API Keys") },
-            text = {
-                Text(
-                    "This will delete all stored API keys for ${uiState.endpointCount} " +
-                        "endpoints. You will need to re-enter them to connect."
-                )
-            },
+            text = { Text("This will permanently delete all stored API keys. This cannot be undone.") },
             confirmButton = {
                 TextButton(
                     onClick = { viewModel.deleteAllApiKeys() },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text("Delete All")
-                }
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete All") }
             },
-            dismissButton = {
-                TextButton(onClick = { viewModel.dismissDeleteKeysDialog() }) {
-                    Text("Cancel")
-                }
-            }
+            dismissButton = { TextButton(onClick = { viewModel.dismissDeleteKeysDialog() }) { Text("Cancel") } }
         )
     }
 
@@ -109,159 +86,69 @@ fun SettingsScreen(
             )
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            "Warped",
-                            style = MaterialTheme.typography.headlineMedium
-                        )
-                        Text(
-                            "v0.1.0",
-                            style = MaterialTheme.typography.bodySmall
-                        )
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            // Tab row
+            PrimaryTabRow(
+                selectedTabIndex = uiState.selectedTab.ordinal,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                SettingsTab.entries.forEach { tab ->
+                    Tab(
+                        selected = uiState.selectedTab == tab,
+                        onClick = { viewModel.selectTab(tab) },
+                        text = { Text(tab.name) }
+                    )
+                }
+            }
+
+            when (uiState.selectedTab) {
+                SettingsTab.General -> GeneralTab(uiState, viewModel, onNavigateToWizard)
+                SettingsTab.Tools -> ToolsTab(uiState, viewModel)
+                SettingsTab.Advanced -> AdvancedTab(uiState, viewModel)
+            }
+        }
+
+        if (uiState.message != null) {
+            Snackbar(modifier = Modifier.padding(16.dp)) { Text(uiState.message!!) }
+        }
+        if (uiState.error != null) {
+            Snackbar(modifier = Modifier.padding(16.dp)) { Text(uiState.error!!, color = MaterialTheme.colorScheme.error) }
+        }
+    }
+}
+
+// =========================================
+// GENERAL TAB
+// =========================================
+@Composable
+private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, onNavigateToWizard: () -> Unit) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(vertical = 12.dp)
+    ) {
+        // Hugging Face section
+        item {
+            Text("Hugging Face", style = MaterialTheme.typography.titleMedium)
+        }
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Access Token", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        if (uiState.hasHfToken) "Token configured" else "Required for gated/private models",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (uiState.hasHfToken) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (!uiState.hasHfToken) {
                         Spacer(Modifier.height(8.dp))
-                        Text(
-                            "LM Studio for Android — run LLMs locally and remotely.",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            }
-
-            item {
-                Text("Data", style = MaterialTheme.typography.titleMedium)
-            }
-
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text(
-                                "Chat History",
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text(
-                                "${uiState.chatCount} conversations",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                        TextButton(
-                            onClick = { viewModel.showDeleteChatsDialog() },
-                            enabled = uiState.chatCount > 0 && !uiState.isDeletingChats,
-                            colors = ButtonDefaults.textButtonColors(
-                                contentColor = MaterialTheme.colorScheme.error
-                            )
-                        ) {
-                            Text(
-                                if (uiState.isDeletingChats) "Deleting..." else "Delete All"
-                            )
-                        }
-                    }
-                }
-            }
-
-            item {
-                Text("API Keys", style = MaterialTheme.typography.titleMedium)
-            }
-
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text(
-                                "Stored API Keys",
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text(
-                                "${uiState.endpointCount} endpoints with keys",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                        TextButton(
-                            onClick = { viewModel.showDeleteKeysDialog() },
-                            enabled = uiState.endpointCount > 0 && !uiState.isDeletingKeys,
-                            colors = ButtonDefaults.textButtonColors(
-                                contentColor = MaterialTheme.colorScheme.error
-                            )
-                        ) {
-                            Text(
-                                if (uiState.isDeletingKeys) "Deleting..." else "Delete All"
-                            )
-                        }
-                    }
-                }
-            }
-
-            item {
-                Text("Storage", style = MaterialTheme.typography.titleMedium)
-            }
-
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                "Local Models",
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text("${uiState.modelCount} imported")
-                        }
-                        Spacer(Modifier.height(4.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                "Saved Presets",
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text("${uiState.presetCount} presets")
-                        }
-                    }
-                }
-            }
-
-            item {
-                Text("Hugging Face", style = MaterialTheme.typography.titleMedium)
-            }
-
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Access Token", style = MaterialTheme.typography.bodyLarge)
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            if (uiState.hasHfToken) "Token configured" else "Required for gated/private models",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (uiState.hasHfToken) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                        ) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             OutlinedTextField(
                                 value = uiState.hfToken,
                                 onValueChange = { viewModel.updateHfToken(it) },
@@ -271,62 +158,403 @@ fun SettingsScreen(
                                 singleLine = true
                             )
                             Spacer(Modifier.width(8.dp))
-                            TextButton(onClick = { viewModel.saveHfToken() }) {
-                                Text("Save")
-                            }
-                        }
-                        if (uiState.hasHfToken) {
-                            Spacer(Modifier.height(4.dp))
-                            TextButton(
-                                onClick = { viewModel.deleteHfToken() },
-                                colors = ButtonDefaults.textButtonColors(
-                                    contentColor = MaterialTheme.colorScheme.error
-                                )
-                            ) {
-                                Text("Remove token")
-                            }
+                            TextButton(onClick = { viewModel.saveHfToken() }) { Text("Save") }
                         }
                     }
-                }
-            }
-
-            item {
-                Text("Security", style = MaterialTheme.typography.titleMedium)
-            }
-
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            "API keys are encrypted using Android Keystore (AES-256-GCM)",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                    if (uiState.hasHfToken) {
                         Spacer(Modifier.height(4.dp))
-                        Text(
-                            "Keys never appear in logs — RedactingTree filters sensitive data",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "Network: cleartext blocked except for local LAN addresses",
-                            style = MaterialTheme.typography.bodySmall
-                        )
+                        TextButton(
+                            onClick = { viewModel.deleteHfToken() },
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        ) { Text("Remove token") }
                     }
                 }
             }
         }
-    }
 
-    if (uiState.message != null || uiState.error != null) {
-        Snackbar(
-            modifier = Modifier.padding(16.dp),
-            action = {
-                TextButton(onClick = { viewModel.clearMessage() }) {
-                    Text("OK")
+        // Data section
+        item {
+            Text("Data", style = MaterialTheme.typography.titleMedium)
+        }
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Chats", style = MaterialTheme.typography.bodyLarge)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("${uiState.chatCount}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.width(8.dp))
+                            TextButton(
+                                onClick = { viewModel.showDeleteChatsDialog() },
+                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                            ) { Text("Delete") }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Endpoints", style = MaterialTheme.typography.bodyLarge)
+                        Text("${uiState.endpointCount}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Models", style = MaterialTheme.typography.bodyLarge)
+                        Text("${uiState.modelCount}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Presets", style = MaterialTheme.typography.bodyLarge)
+                        Text("${uiState.presetCount}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
-        ) {
-            Text(uiState.message ?: uiState.error ?: "")
+        }
+
+        // App section
+        item {
+            Text("App", style = MaterialTheme.typography.titleMedium)
+        }
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Setup Wizard", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Re-run the onboarding wizard to explore Warped features.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(onClick = onNavigateToWizard) {
+                        Text("Run", color = Color(0xFFD97757))
+                    }
+                }
+            }
+        }
+
+        // Security section
+        item {
+            Text("Security", style = MaterialTheme.typography.titleMedium)
+        }
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        "API keys are encrypted using Android Keystore (AES-256-GCM)",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(
+                        onClick = { viewModel.showDeleteKeysDialog() },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) { Text("Delete all keys") }
+                }
+            }
+        }
+        item { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+// =========================================
+// TOOLS TAB
+// =========================================
+@Composable
+private fun ToolsTab(uiState: SettingsUiState, viewModel: SettingsViewModel) {
+    val enabledCount = uiState.toolStates.count { it.enabled }
+    val enabledTokenSum = uiState.toolStates.filter { it.enabled }.sumOf { it.tokenEstimate }
+    val contextSize = uiState.advancedParams.contextSize
+    val maxOutTokens = uiState.advancedParams.maxTokens
+    val availableForConv = contextSize - enabledTokenSum - maxOutTokens
+    val toolsRatio = (enabledTokenSum.toFloat() / contextSize.toFloat() * 100).toInt()
+    val totalRatio = ((enabledTokenSum + maxOutTokens).toFloat() / contextSize.toFloat() * 100).toInt()
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
+        contentPadding = PaddingValues(vertical = 12.dp)
+    ) {
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF2B2B29)
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Info, null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Token Budget", fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Context window: $contextSize tokens. Max output: $maxOutTokens tokens. " +
+                            "Each tool you enable consumes tokens from what's left for conversation history.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    // Progress bar: tools / total
+                    LinearProgressIndicator(
+                        progress = { (enabledTokenSum.toFloat() / contextSize).coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth().height(6.dp),
+                        color = when { toolsRatio > 25 -> Color(0xFFFF4444); toolsRatio > 10 -> Color(0xFFFF9800); else -> Color(0xFF4CAF50) },
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Column {
+                            Text(
+                                "$enabledCount / ${ToolDefinitions.all.size}",
+                                fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary
+                            )
+                            Text("tools on", style = MaterialTheme.typography.labelSmall)
+                        }
+                        Column {
+                            Text(
+                                "~$enabledTokenSum",
+                                fontWeight = FontWeight.Bold,
+                                color = if (toolsRatio > 25) Color(0xFFFF4444)
+                                    else if (toolsRatio > 10) Color(0xFFFF9800)
+                                    else Color(0xFF4CAF50)
+                            )
+                            Text("tool tokens ($toolsRatio%)", style = MaterialTheme.typography.labelSmall)
+                        }
+                        Column {
+                            Text(
+                                "$maxOutTokens",
+                                fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text("max output", style = MaterialTheme.typography.labelSmall)
+                        }
+                        Column {
+                            Text(
+                                "$availableForConv",
+                                fontWeight = FontWeight.Bold,
+                                color = if (availableForConv < 1000) Color(0xFFFF4444)
+                                    else if (availableForConv < 4096) Color(0xFFFF9800)
+                                    else Color(0xFF4CAF50)
+                            )
+                            Text("for history (${100 - totalRatio}%)", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+
+        val categories = ToolDefinitions.all.groupBy { it.category }
+        categories.forEach { (category, tools) ->
+            item {
+                Text(
+                    category.displayName,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
+                )
+            }
+            items(tools, key = { it.id }) { tool ->
+                val toolState = uiState.toolStates.find { it.id == tool.id }
+                val enabled = toolState?.enabled ?: tool.defaultEnabled
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (enabled) Color(0xFF2B2B29)
+                            else Color(0xFF2B2B29).copy(alpha = 0.4f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                tool.name, style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = if (enabled) FontWeight.Medium else FontWeight.Normal,
+                                color = if (enabled) MaterialTheme.colorScheme.onSurface
+                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                            Text(
+                                tool.description, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2
+                            )
+                            Text(
+                                "~${tool.tokenEstimate} tokens",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Switch(checked = enabled, onCheckedChange = { viewModel.toggleTool(tool.id) })
+                    }
+                }
+            }
+        }
+        item { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+// =========================================
+// ADVANCED TAB
+// =========================================
+@Composable
+private fun AdvancedTab(uiState: SettingsUiState, viewModel: SettingsViewModel) {
+    val p = uiState.advancedParams
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(vertical = 12.dp)
+    ) {
+        item {
+            Text("Model Defaults", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "These parameters apply to new conversations",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        // Temperature
+        item {
+            ParamSlider(
+                label = "Temperature",
+                value = p.temperature,
+                range = 0f..2f,
+                steps = 19,
+                description = "Controls randomness. Lower = more deterministic.",
+                format = { "%.1f".format(it) }
+            ) { v -> viewModel.updateAdvancedParam { it.copy(temperature = v) } }
+        }
+
+        // Top P
+        item {
+            ParamSlider(
+                label = "Top P",
+                value = p.topP,
+                range = 0f..1f,
+                steps = 9,
+                description = "Nucleus sampling. Lower = more focused.",
+                format = { "%.1f".format(it) }
+            ) { v -> viewModel.updateAdvancedParam { it.copy(topP = v) } }
+        }
+
+        // Top K
+        item {
+            ParamSlider(
+                label = "Top K",
+                value = p.topK.toFloat(),
+                range = 1f..100f,
+                steps = 9,
+                description = "Limits token selection to top K.",
+                format = { it.toInt().toString() }
+            ) { v -> viewModel.updateAdvancedParam { it.copy(topK = v.toInt()) } }
+        }
+
+        // Repeat Penalty
+        item {
+            ParamSlider(
+                label = "Repeat Penalty",
+                value = p.repeatPenalty,
+                range = 1f..2f,
+                steps = 9,
+                description = "Penalizes token repetition. Higher = less repetition.",
+                format = { "%.2f".format(it) }
+            ) { v -> viewModel.updateAdvancedParam { it.copy(repeatPenalty = v) } }
+        }
+
+        // Max Tokens
+        item {
+            ParamSlider(
+                label = "Max Tokens",
+                value = p.maxTokens.toFloat(),
+                range = 128f..8192f,
+                steps = 8,
+                description = "Maximum output tokens per response.",
+                format = { it.toInt().toString() }
+            ) { v -> viewModel.updateAdvancedParam { it.copy(maxTokens = v.toInt()) } }
+        }
+
+        // Context Size
+        item {
+            ParamSlider(
+                label = "Context Size",
+                value = p.contextSize.toFloat(),
+                range = 512f..32768f,
+                steps = 6,
+                description = "Maximum context window size.",
+                format = { it.toInt().toString() }
+            ) { v -> viewModel.updateAdvancedParam { it.copy(contextSize = v.toInt()) } }
+        }
+
+        // Seed
+        item {
+            ParamSlider(
+                label = "Seed",
+                value = p.seed.toFloat(),
+                range = -1f..100000f,
+                steps = 10,
+                description = "Random seed. -1 = random each time.",
+                format = { if (it.toInt() == -1) "Random" else it.toInt().toString() }
+            ) { v -> viewModel.updateAdvancedParam { it.copy(seed = v.toInt()) } }
+        }
+
+        item { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+@Composable
+private fun ParamSlider(
+    label: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    description: String,
+    format: (Float) -> String,
+    onValueChange: (Float) -> Unit
+) {
+    Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                Text(
+                    format(value),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Slider(
+                value = value,
+                onValueChange = onValueChange,
+                valueRange = range,
+                steps = steps,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text(
+                description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
+
+private operator fun <T : Comparable<T>> ClosedFloatingPointRange<T>.component1(): T = start
+private operator fun <T : Comparable<T>> ClosedFloatingPointRange<T>.component2(): T = endInclusive

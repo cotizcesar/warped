@@ -1,5 +1,6 @@
 package com.warped.ui.wizard
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -27,9 +28,15 @@ private val TextSecondary = Color(0xFF9CA3AF)
 fun WizardScreen(
     onWizardComplete: () -> Unit,
     onNavigate: (String) -> Unit = {},
+    isReEntry: Boolean = false,
+    onBackFromReEntry: () -> Unit = {},
     viewModel: WizardViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(isReEntry) {
+        viewModel.setIsReEntry(isReEntry)
+    }
 
     val pagerState = rememberPagerState(
         initialPage = uiState.currentPage,
@@ -46,22 +53,39 @@ fun WizardScreen(
         }
     }
 
+    // Skip all / Close wizard dialog
     if (uiState.showSkipAllConfirm) {
         WarpedAlertDialog(
             onDismissRequest = { viewModel.dismissSkipAllConfirm() },
-            title = { Text("Skip wizard", color = TextPrimary) },
+            title = {
+                Text(
+                    text = if (uiState.isReEntry) "Close wizard" else "Skip wizard",
+                    color = TextPrimary
+                )
+            },
             text = {
                 Text(
-                    "Skip the onboarding wizard? You can re-open it anytime from Settings.",
+                    text = if (uiState.isReEntry) {
+                        "Close the wizard? You can re-open it anytime from Settings."
+                    } else {
+                        "Skip the onboarding wizard? You can re-open it anytime from Settings."
+                    },
                     color = TextSecondary
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.confirmSkipAll()
-                    onWizardComplete()
+                    if (uiState.isReEntry) {
+                        onBackFromReEntry()
+                    } else {
+                        onWizardComplete()
+                    }
                 }) {
-                    Text("Skip", color = MaterialTheme.colorScheme.error)
+                    Text(
+                        text = if (uiState.isReEntry) "Close" else "Skip",
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
             },
             dismissButton = {
@@ -72,9 +96,46 @@ fun WizardScreen(
         )
     }
 
+    // Exit confirmation dialog (first launch, page 0)
+    if (uiState.showExitConfirm) {
+        WarpedAlertDialog(
+            onDismissRequest = { viewModel.dismissExitDialog() },
+            title = { Text("Exit Warped?", color = TextPrimary) },
+            text = {
+                Text(
+                    "The wizard will continue next time you open the app.",
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = onWizardComplete) {
+                    Text("Exit", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissExitDialog() }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     val isFirstPage = uiState.currentPage == 0
     val isLastPage = uiState.currentPage == viewModel.pageCount - 1
     val currentStep = viewModel.steps[uiState.currentPage]
+
+    // System back handler
+    BackHandler {
+        if (isFirstPage) {
+            if (uiState.isReEntry) {
+                onBackFromReEntry()
+            } else {
+                viewModel.showExitDialog()
+            }
+        } else {
+            viewModel.goToPreviousPage()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -95,7 +156,25 @@ fun WizardScreen(
                     }
                 },
                 navigationIcon = {
-                    if (!isFirstPage) {
+                    if (isFirstPage) {
+                        if (uiState.isReEntry) {
+                            IconButton(onClick = onBackFromReEntry) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back to Settings",
+                                    tint = TextPrimary
+                                )
+                            }
+                        } else {
+                            IconButton(onClick = { viewModel.showExitDialog() }) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Exit wizard",
+                                    tint = TextPrimary
+                                )
+                            }
+                        }
+                    } else {
                         IconButton(onClick = { viewModel.goToPreviousPage() }) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
@@ -106,15 +185,9 @@ fun WizardScreen(
                     }
                 },
                 actions = {
-                    TextButton(onClick = {
-                        if (isFirstPage) {
-                            viewModel.showSkipAllConfirm()
-                        } else {
-                            viewModel.skipCurrentStep()
-                        }
-                    }) {
+                    TextButton(onClick = { viewModel.showSkipAllConfirm() }) {
                         Text(
-                            text = if (isFirstPage) "Skip all" else "Skip",
+                            text = if (uiState.isReEntry) "Close" else if (isFirstPage) "Skip all" else "Skip",
                             color = Accent
                         )
                     }
@@ -138,7 +211,10 @@ fun WizardScreen(
                 ) {
                     if (!isFirstPage) {
                         TextButton(onClick = { viewModel.goToPreviousPage() }) {
-                            Text("Back", color = TextSecondary)
+                            Text(
+                                text = if (uiState.isReEntry) "Back" else "Back",
+                                color = TextSecondary
+                            )
                         }
                     } else {
                         Spacer(Modifier.width(64.dp))
@@ -148,7 +224,11 @@ fun WizardScreen(
                         Button(
                             onClick = {
                                 viewModel.completeWizard()
-                                onWizardComplete()
+                                if (uiState.isReEntry) {
+                                    onBackFromReEntry()
+                                } else {
+                                    onWizardComplete()
+                                }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Accent),
                             shape = RoundedCornerShape(12.dp)
@@ -167,7 +247,7 @@ fun WizardScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = Accent),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("Next")
+                            Text(text = if (uiState.isReEntry) "Revisar" else "Next")
                         }
                     }
                 }

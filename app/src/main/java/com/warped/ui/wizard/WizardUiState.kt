@@ -5,6 +5,8 @@ data class WizardUiState(
     val isWizardComplete: Boolean = false,
     val skippedSteps: Set<String> = emptySet(),
     val showSkipAllConfirm: Boolean = false,
+    val showExitConfirm: Boolean = false,
+    val isReEntry: Boolean = false,
     val contextData: WizardContextData = WizardContextData()
 )
 

@@ -73,6 +73,10 @@ class WizardViewModel @Inject constructor(
         }
     }
 
+    fun setIsReEntry(isReEntry: Boolean) {
+        _uiState.update { it.copy(isReEntry = isReEntry) }
+    }
+
     fun goToPage(page: Int) {
         val clamped = page.coerceIn(0, pageCount - 1)
         _uiState.update { it.copy(currentPage = clamped) }
@@ -114,6 +118,14 @@ class WizardViewModel @Inject constructor(
             wizardPreferences.markStepsSkipped(keys)
             wizardPreferences.markWizardComplete()
         }
+    }
+
+    fun showExitDialog() {
+        _uiState.update { it.copy(showExitConfirm = true) }
+    }
+
+    fun dismissExitDialog() {
+        _uiState.update { it.copy(showExitConfirm = false) }
     }
 
     fun completeWizard() {

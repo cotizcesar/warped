@@ -324,17 +324,37 @@ fun WarpedNavGraph() {
             }
             composable(Screen.Presets.route) { PresetsScreen() }
             composable(Screen.Settings.route) {
-                SettingsScreen(onOpenDrawer = { scope.launch { drawerState.open() } })
+                SettingsScreen(
+                    onOpenDrawer = { scope.launch { drawerState.open() } },
+                    onNavigateToWizard = {
+                        navController.navigate("${Screen.Wizard.route}?review=true") {
+                            launchSingleTop = true
+                        }
+                    }
+                )
             }
             composable(Screen.Help.route) {
                 HelpScreen(onNavigateBack = { navController.popBackStack() })
             }
-            composable(Screen.Wizard.route) {
+            composable(
+                route = "${Screen.Wizard.route}?review={review}",
+                arguments = listOf(navArgument("review") { type = NavType.BoolType; defaultValue = false })
+            ) { backStackEntry ->
+                val isReEntry = backStackEntry.arguments?.getBoolean("review") ?: false
                 WizardScreen(
+                    isReEntry = isReEntry,
                     onWizardComplete = {
                         navController.navigate(Screen.Chat.route) {
                             popUpTo(Screen.Wizard.route) { inclusive = true }
                         }
+                    },
+                    onNavigate = { route ->
+                        navController.navigate(route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onBackFromReEntry = {
+                        navController.popBackStack()
                     }
                 )
             }
