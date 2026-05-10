@@ -56,22 +56,14 @@ class HuggingFaceViewModel @Inject constructor(
 
     fun search(query: String) {
         val trimmedQuery = query.trim()
-        val activeFormat = _uiState.value.activeFormat
-
-        if (activeFormat == "staffpicks") {
-            loadStaffPicks()
-            return
-        }
 
         if (trimmedQuery.length < MIN_SEARCH_LENGTH) return
         searchJob?.cancel()
         _uiState.update { it.copy(searchQuery = trimmedQuery, isLoading = true, error = null) }
         searchJob = viewModelScope.launch {
-            val library = "litert"
             val author: String? = null
             val result = huggingFaceRepository.searchModels(
                 query = trimmedQuery.ifBlank { null },
-                format = library,
                 author = author
             )
             result.onSuccess { models ->
@@ -99,19 +91,10 @@ class HuggingFaceViewModel @Inject constructor(
                 val sortedFiles = filteredSiblings.sortedBy { sibling ->
                     sibling.size.takeIf { it > 0 } ?: sibling.lfs?.size ?: 0L
                 }
-                val fileDetails = sortedFiles.associate { sibling ->
-                    val effectiveSize = sibling.size.takeIf { it > 0 } ?: sibling.lfs?.size ?: 0L
-                    sibling.rfilename to GgufFileDetail(
-                        quantization = null,
-                        fileSizeBytes = effectiveSize,
-                        ramEstimateBytes = 0L
-                    )
-                }
                 _uiState.update {
                     it.copy(
                         selectedModel = detail,
                         modelSiblings = sortedFiles,
-                        ggufFileDetails = fileDetails,
                         isLoading = false
                     )
                 }
@@ -182,46 +165,11 @@ class HuggingFaceViewModel @Inject constructor(
         _uiState.update { it.copy(searchQuery = "", searchResults = emptyList(), error = null) }
     }
 
-    fun setActiveFormat(format: String) {
-        _uiState.update {
-            it.copy(
-                activeFormat = format,
-                searchResults = emptyList(),
-                selectedModel = null
-            )
-        }
-        search(_uiState.value.searchQuery)
-    }
-
-    private fun loadStaffPicks() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
-            val result = huggingFaceRepository.getCollectionModels("google", "gemma-3n-preview")
-            result.onSuccess { items ->
-                val models = items.map { item ->
-                    com.warped.data.remote.dto.HuggingFaceModel(
-                        id = item.id,
-                        author = item.author,
-                        downloads = item.downloads,
-                        likes = item.likes,
-                        pipelineTag = item.pipelineTag,
-                        gated = item.gated,
-                        lastModified = item.lastModified
-                    )
-                }
-                _uiState.update { it.copy(searchResults = models, isLoading = false) }
-            }.onFailure { e ->
-                _uiState.update { it.copy(error = e.message, isLoading = false) }
-            }
-        }
-    }
-
     fun clearDetail() {
         _uiState.update {
             it.copy(
                 selectedModel = null,
-                modelSiblings = emptyList(),
-                ggufFileDetails = emptyMap()
+                modelSiblings = emptyList()
             )
         }
     }
