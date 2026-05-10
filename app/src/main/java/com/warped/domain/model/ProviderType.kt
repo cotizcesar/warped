@@ -3,7 +3,7 @@ package com.warped.domain.model
 import androidx.annotation.StringRes
 import com.warped.R
 
-enum class ProviderType { OPENAI, ANTHROPIC, OLLAMA, LM_STUDIO, CUSTOM, LOCAL, LITE_RT_LM }
+enum class ProviderType { OPENAI, ANTHROPIC, OLLAMA, LM_STUDIO, CUSTOM, @Deprecated("Use LITE_RT_LM instead") LOCAL, LITE_RT_LM }
 
 @StringRes
 fun ProviderType.displayNameRes(): Int = when (this) {

@@ -61,11 +61,11 @@ fun ModelsScreen(
                 val model = showMemoryWarning!!
                 val context = androidx.compose.ui.platform.LocalContext.current
                 val checker = MemoryChecker(context)
-                val ramCheck = checker.checkGgufRam(model.sizeBytes)
-                val neededGB = "%.1f GB".format(ramCheck.requiredBytes.toDouble() / (1024L * 1024 * 1024))
-                val availableGB = "%.1f GB".format(ramCheck.availableBytes.toDouble() / (1024L * 1024 * 1024))
+                val memInfo = checker.getMemoryInfo()
+                val neededMB = model.sizeBytes / (1024 * 1024)
+                val availableMB = memInfo.availableBytes / (1024 * 1024)
                 Text(
-                    "This model needs ~$neededGB, your device has $availableGB available. " +
+                    "This model needs ~$neededMB MB, your device has $availableMB MB available. " +
                     "Loading may cause instability."
                 )
             },
@@ -132,7 +132,7 @@ fun ModelsScreen(
                             Spacer(Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("Download from Hugging Face", style = MaterialTheme.typography.bodyLarge)
-                                Text("Browse and download GGUF & LiteRT-LM models", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Browse and download LiteRT-LM models", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                         HorizontalDivider()
@@ -265,7 +265,7 @@ fun ModelsScreen(
                         ModelCard(
                             model = model,
                             onLoad = {
-                                if (viewModel.shouldWarnAboutMemory(model.sizeBytes, isGguf = model.modelFormat == "GGUF")) {
+                                if (viewModel.shouldWarnAboutMemory(model.sizeBytes, isGguf = false)) {
                                     showMemoryWarning = model
                                 } else {
                                     viewModel.useLocalModel(model)
@@ -377,28 +377,6 @@ fun ModelCard(
                     if (model.capabilities.tools) CapabilityBadge("Tools", Color(0xFF2196F3))
                 }
             }
-            if (model.modelFormat == "GGUF") {
-                Spacer(Modifier.height(8.dp))
-                val context = LocalContext.current
-                val checker = remember { MemoryChecker(context) }
-                val ramCheck = remember(model.id, model.sizeBytes) {
-                    checker.checkGgufRam(model.sizeBytes)
-                }
-                val requiredGB = ramCheck.requiredBytes.toDouble() / (1024L * 1024 * 1024)
-                val availableGB = ramCheck.availableBytes.toDouble() / (1024L * 1024 * 1024)
-                val ratio = ramCheck.requiredBytes.toDouble() / ramCheck.availableBytes.toDouble()
-                val (color, label) = when {
-                    ratio > 1.0 -> Color(0xFFE53935) to "Won't fit on your ${"%.1f".format(availableGB)} GB device"
-                    ratio > 0.8 -> Color(0xFFFF9800) to "Tight on your ${"%.1f".format(availableGB)} GB device"
-                    ratio > 0.5 -> Color(0xFFFFB300) to "May affect other apps"
-                    else -> Color(0xFF43A047) to "Fits comfortably"
-                }
-                val quantLabel = if (model.quantization.isNotBlank() && model.quantization != "N/A") " — ${model.quantization}" else ""
-                RamRecommendationBadge(
-                    text = "~${"%.1f".format(requiredGB)} GB$quantLabel: $label",
-                    color = color
-                )
-            }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
@@ -440,11 +418,8 @@ private fun ModelMetaChip(text: String) {
 
 @Composable
 private fun ModelFormatBadge(format: String) {
-    val (color, label) = when {
-        format.equals("GGUF", ignoreCase = true) -> Color(0xFF2196F3) to "GGUF"
-        format.equals("LITERTLM", ignoreCase = true) -> Color(0xFF4CAF50) to "LiteRT"
-        else -> Color(0xFF9CA3AF) to format
-    }
+    val color = Color(0xFF4CAF50)
+    val label = "LiteRT"
     Surface(
         shape = RoundedCornerShape(6.dp),
         color = color.copy(alpha = 0.15f)

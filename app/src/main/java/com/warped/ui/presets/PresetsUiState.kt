@@ -11,7 +11,7 @@ data class PresetsUiState(
     val isSaving: Boolean = false,
     val saveDialogVisible: Boolean = false,
     val presetNameInput: String = "",
-    val activeFormat: String = "GGUF",
+    val activeFormat: String = "LITERTLM",
     val showFormatWarning: Boolean = false,
     val formatWarningPreset: Preset? = null,
     val error: String? = null

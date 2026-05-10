@@ -25,7 +25,7 @@
     <string name="select_model">Selecciona un modelo</string>
     <string name="no_models_select_model">Sin modelos, selecciona uno</string>
     <string name="no_model_selected">Selecciona un modelo antes de enviar un mensaje.</string>
-    <string name="hugging_face_suggestions">Sugerencias GGUF de Hugging Face</string>
+    <string name="hugging_face_suggestions">Sugerencias de modelos de Hugging Face</string>
     <string name="download_model_first">Descarga este modelo antes de usarlo en chat local.</string>
     <string name="compatible_with_device">Compatible con este dispositivo</string>
     <string name="may_be_too_large">Puede ser muy grande para este dispositivo</string>
@@ -61,9 +61,9 @@
     <string name="recents">Recientes</string>
     <string name="empty_state_message">Selecciona el modelo y empieza a escribir…</string>
     <string name="download_from_hf">Descargar desde Hugging Face</string>
-    <string name="download_from_hf_desc">Explorar y descargar modelos GGUF y LiteRT-LM</string>
-    <string name="import_gguf">Importar archivo de modelo</string>
-    <string name="import_gguf_desc">Cargar un modelo .gguf o .litertlm desde tu dispositivo</string>
+    <string name="download_from_hf_desc">Explorar y descargar modelos LiteRT-LM</string>
+    <string name="import_model_file">Importar archivo de modelo</string>
+    <string name="import_model_file_desc">Cargar un modelo .litertlm desde tu dispositivo</string>
     <string name="connect_lm_studio">Conectar LM Studio</string>
     <string name="connect_lm_studio_desc">Agregar un servidor LM Studio remoto</string>
     <string name="no_models_endpoints_yet">Sin modelos ni endpoints aún</string>

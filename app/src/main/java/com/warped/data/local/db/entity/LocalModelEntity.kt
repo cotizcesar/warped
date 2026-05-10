@@ -14,5 +14,5 @@ data class LocalModelEntity(
     @ColumnInfo(name = "parameter_count") val parameterCount: String,
     @ColumnInfo(name = "architecture") val architecture: String,
     @ColumnInfo(name = "imported_at") val importedAt: Long,
-    @ColumnInfo(name = "model_format", defaultValue = "GGUF") val modelFormat: String = "GGUF"
+    @ColumnInfo(name = "model_format", defaultValue = "LITERTLM") val modelFormat: String = "LITERTLM"
 )

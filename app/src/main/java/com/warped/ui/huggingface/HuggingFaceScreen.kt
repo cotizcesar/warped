@@ -157,7 +157,7 @@ fun HuggingFaceScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            val formats = listOf("staffpicks" to "Staff Picks", "litertlm" to "LiteRT-LM", "gguf" to "GGUF")
+            val formats = listOf("staffpicks" to "Staff Picks", "litertlm" to "LiteRT-LM")
             val selectedTabIndex = formats.indexOfFirst { it.first == uiState.activeFormat }.coerceAtLeast(0)
             PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
                 formats.forEachIndexed { index, (formatValue, label) ->
@@ -275,7 +275,6 @@ private fun ModelSearchResultCard(
 @Composable
 private fun FormatBadge(format: String) {
     val (color, label) = when {
-        format.equals("gguf", ignoreCase = true) -> Color(0xFF2196F3) to "GGUF"
         format.equals("litertlm", ignoreCase = true) || format.equals("staffpicks", ignoreCase = true) -> Color(0xFF4CAF50) to "LiteRT-LM"
         else -> MaterialTheme.colorScheme.outline to format
     }
@@ -343,10 +342,6 @@ private fun SiblingFileCard(
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 2
                 )
-                ggufDetail?.quantization?.let { quant ->
-                    Spacer(Modifier.width(8.dp))
-                    QuantizationBadge(quant)
-                }
             }
             Spacer(Modifier.height(8.dp))
             if (effectiveSize > 0) {

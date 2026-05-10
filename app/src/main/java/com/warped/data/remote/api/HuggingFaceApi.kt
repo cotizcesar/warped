@@ -12,7 +12,7 @@ interface HuggingFaceApi {
     @GET("api/models")
     suspend fun searchModels(
         @Query("search") query: String? = null,
-        @Query("library") library: String = "gguf",
+        @Query("library") library: String? = "litert",
         @Query("author") author: String? = null,
         @Query("sort") sort: String = "downloads",
         @Query("direction") direction: String = "-1",

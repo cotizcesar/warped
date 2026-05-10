@@ -17,7 +17,6 @@ import com.warped.WarpedApplication
 import com.warped.data.local.db.dao.DownloadCheckpointDao
 import com.warped.data.local.db.entity.DownloadCheckpointEntity
 import com.warped.data.local.inference.GgufMetadata
-import com.warped.data.local.inference.GgufMetadataParser
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.domain.model.LocalModel
 import com.warped.domain.repository.LocalModelRepository
@@ -267,39 +266,17 @@ class ModelDownloadWorker @AssistedInject constructor(
                 )
             )
 
-            // Parse metadata and save model (same logic as existing ModelDownloadManager)
-            val isLitertlm = localFileName.endsWith(".litertlm", ignoreCase = true)
-
-            if (!isLitertlm) {
-                val validationResult = GgufMetadataParser.validateHeader(destFile)
-                if (validationResult.isFailure) {
-                    Timber.e(validationResult.exceptionOrNull(), "ModelDownloadWorker: GGUF validation failed — $localFileName")
-                    destFile.delete()
-                    checkpointDao.deleteCheckpoint(modelId)
-                    return Result.failure(
-                        workDataOf("error" to "Corrupted download — file validation failed. Please try again.")
-                    )
-                }
-            }
-
-            val modelMetadata = if (!isLitertlm) {
-                try {
-                    GgufMetadataParser.parse(destFile).getOrDefault(GgufMetadata())
-                } catch (e: Exception) {
-                    GgufMetadata()
-                }
-            } else {
-                GgufMetadata()
-            }
+            // Parse metadata and save model (LiteRT-LM only)
+            val modelMetadata = GgufMetadata()
 
             val localModel = LocalModel(
-                name = localFileName.removeSuffix(".gguf").removeSuffix(".litertlm"),
+                name = localFileName.removeSuffix(".litertlm"),
                 filePath = destFile.absolutePath,
                 sizeBytes = destFile.length().takeIf { it > 0 } ?: fileSizeBytes,
-                quantization = if (isLitertlm) "N/A" else modelMetadata.quantization,
-                parameterCount = if (isLitertlm) "Unknown" else modelMetadata.parameterCount,
-                architecture = if (isLitertlm) "LiteRT-LM" else modelMetadata.architecture,
-                modelFormat = if (isLitertlm) "LITERTLM" else "GGUF",
+                quantization = "N/A",
+                parameterCount = "Unknown",
+                architecture = "LiteRT-LM",
+                modelFormat = "LITERTLM",
                 importedAt = Instant.now()
             )
             localModelRepository.saveModel(localModel)

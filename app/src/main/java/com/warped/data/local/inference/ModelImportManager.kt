@@ -24,7 +24,7 @@ class ModelImportManager @Inject constructor(
         withContext(Dispatchers.IO) {
             try {
                 val fileName = getFileName(uri)?.takeIf { it.isNotBlank() }
-                    ?: "model.gguf" // keep backward-compatible default
+                    ?: "model.litertlm" // keep backward-compatible default
                 val destFile = File(modelsDir, fileName)
 
                 context.contentResolver.openInputStream(uri)?.use { input ->
@@ -44,25 +44,14 @@ class ModelImportManager @Inject constructor(
                     }
                 }
 
-                val isLitertlm = fileName.endsWith(".litertlm", ignoreCase = true)
-
-                val metadata = if (!isLitertlm) {
-                    GgufMetadataParser.parse(destFile)
-                } else {
-                    Result.success(GgufMetadata()) // .litertlm has different binary header
-                }
-                val modelMetadata = metadata.getOrDefault(GgufMetadata())
-
                 val localModel = LocalModel(
-                    name = modelMetadata.name.ifEmpty {
-                        fileName.removeSuffix(".gguf").removeSuffix(".litertlm")
-                    },
+                    name = fileName.removeSuffix(".litertlm"),
                     filePath = destFile.absolutePath,
                     sizeBytes = destFile.length(),
-                    quantization = if (isLitertlm) "N/A" else modelMetadata.quantization,
-                    parameterCount = if (isLitertlm) "Unknown" else modelMetadata.parameterCount,
-                    architecture = if (isLitertlm) "LiteRT-LM" else modelMetadata.architecture,
-                    modelFormat = if (isLitertlm) "LITERTLM" else "GGUF",
+                    quantization = "N/A",
+                    parameterCount = "Unknown",
+                    architecture = "LiteRT-LM",
+                    modelFormat = "LITERTLM",
                     importedAt = Instant.now()
                 )
 

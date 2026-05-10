@@ -25,7 +25,7 @@
     <string name="select_model">Select a model</string>
     <string name="no_models_select_model">No models, select a model</string>
     <string name="no_model_selected">Select a model before sending a message.</string>
-    <string name="hugging_face_suggestions">Hugging Face GGUF suggestions</string>
+    <string name="hugging_face_suggestions">Hugging Face model suggestions</string>
     <string name="download_model_first">Download this model before using it for local chat.</string>
     <string name="compatible_with_device">Compatible with this device</string>
     <string name="may_be_too_large">May be too large for this device</string>
@@ -61,9 +61,9 @@
     <string name="recents">Recents</string>
     <string name="empty_state_message">Select a model and start typing…</string>
     <string name="download_from_hf">Download from Hugging Face</string>
-    <string name="download_from_hf_desc">Browse and download GGUF &amp; LiteRT-LM models</string>
-    <string name="import_gguf">Import Model File</string>
-    <string name="import_gguf_desc">Load a .gguf or .litertlm model from your device</string>
+    <string name="download_from_hf_desc">Browse and download LiteRT-LM models</string>
+    <string name="import_model_file">Import Model File</string>
+    <string name="import_model_file_desc">Load a .litertlm model from your device</string>
     <string name="connect_lm_studio">Connect LM Studio</string>
     <string name="connect_lm_studio_desc">Add a remote LM Studio server</string>
     <string name="no_models_endpoints_yet">No models or endpoints yet</string>
@@ -92,7 +92,7 @@
     <string name="provider_ollama">Ollama</string>
     <string name="provider_lm_studio">LM Studio</string>
     <string name="provider_custom">Custom</string>
-    <string name="provider_local">Local (llama.cpp)</string>
+    <string name="provider_local">Local (legacy)</string>
     <string name="provider_lite_rt_lm">LiteRT-LM</string>
 
     <!-- Wizard -->

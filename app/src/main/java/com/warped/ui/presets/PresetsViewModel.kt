@@ -3,7 +3,6 @@ package com.warped.ui.presets
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.warped.data.local.inference.EngineManager
-import com.warped.data.local.inference.EngineType
 import com.warped.domain.model.GenerationParameters
 import com.warped.domain.model.ParameterStore
 import com.warped.domain.model.Preset
@@ -38,11 +37,7 @@ class PresetsViewModel @Inject constructor(
 
     /** Derive the currently active format string from the loaded engine. */
     private fun refreshActiveFormat() {
-        val format = when (engineManager.getActiveEngine()?.type) {
-            EngineType.LITE_RT_LM -> "LITERTLM"
-            EngineType.LLAMA_CPP -> "GGUF"
-            null -> "GGUF" // default to GGUF when no engine loaded
-        }
+        val format = "LITERTLM"
         _uiState.update { it.copy(activeFormat = format) }
         Timber.d("PresetsViewModel: activeFormat=$format")
     }

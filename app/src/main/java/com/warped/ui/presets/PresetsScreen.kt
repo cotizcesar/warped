@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.domain.model.GenerationParameters
+import com.warped.ui.components.WarpedAlertDialog
 import com.warped.domain.model.Preset
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -178,7 +179,7 @@ fun PresetsScreen(
     }
 
     if (uiState.saveDialogVisible) {
-        AlertDialog(
+        WarpedAlertDialog(
             onDismissRequest = { viewModel.dismissSaveDialog() },
             title = { Text("Save Preset") },
             text = {
@@ -201,7 +202,7 @@ fun PresetsScreen(
     if (uiState.showFormatWarning && uiState.formatWarningPreset != null) {
         val preset = uiState.formatWarningPreset!!
         val formatLabel = if (preset.modelFormat.equals("LITERTLM", ignoreCase = true)) "LiteRT-LM" else preset.modelFormat
-        AlertDialog(
+        WarpedAlertDialog(
             onDismissRequest = { viewModel.dismissFormatWarning() },
             title = { Text("Format Mismatch") },
             text = {
@@ -360,8 +361,6 @@ fun PresetItem(
 @Composable
 private fun FormatBadge(format: String) {
     val (color, label) = when {
-        format.equals("GGUF", ignoreCase = true) ->
-            Color(0xFF2196F3) to "GGUF"
         format.equals("LITERTLM", ignoreCase = true) ->
             Color(0xFF4CAF50) to "LiteRT-LM"
         else -> MaterialTheme.colorScheme.outline to format

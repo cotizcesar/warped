@@ -3,7 +3,6 @@ package com.warped.ui.huggingface
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.warped.data.local.download.ModelDownloadManager
-import com.warped.data.local.inference.GgufQuantizationParser
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.data.remote.dto.HuggingFaceModel
 import com.warped.domain.repository.HuggingFaceRepository
@@ -68,14 +67,8 @@ class HuggingFaceViewModel @Inject constructor(
         searchJob?.cancel()
         _uiState.update { it.copy(searchQuery = trimmedQuery, isLoading = true, error = null) }
         searchJob = viewModelScope.launch {
-            val library = when (activeFormat) {
-                "litertlm" -> "litert"
-                else -> "gguf"
-            }
-            val author = when (activeFormat) {
-                "litertlm" -> "litert-community"
-                else -> null
-            }
+            val library = "litert"
+            val author: String? = null
             val result = huggingFaceRepository.searchModels(
                 query = trimmedQuery.ifBlank { null },
                 format = library,
@@ -100,29 +93,18 @@ class HuggingFaceViewModel @Inject constructor(
         viewModelScope.launch {
             val result = huggingFaceRepository.getModelDetail(model.id)
             result.onSuccess { detail ->
-                val formatFilter = _uiState.value.activeFormat
-                val filteredSiblings = when (formatFilter) {
-                    "litertlm", "staffpicks" -> detail.siblings.filter {
-                        it.rfilename.endsWith(".litertlm", ignoreCase = true)
-                    }
-                    else -> detail.siblings.filter {
-                        it.rfilename.endsWith(".gguf", ignoreCase = true)
-                    }
+                val filteredSiblings = detail.siblings.filter {
+                    it.rfilename.endsWith(".litertlm", ignoreCase = true)
                 }
                 val sortedFiles = filteredSiblings.sortedBy { sibling ->
                     sibling.size.takeIf { it > 0 } ?: sibling.lfs?.size ?: 0L
                 }
                 val fileDetails = sortedFiles.associate { sibling ->
                     val effectiveSize = sibling.size.takeIf { it > 0 } ?: sibling.lfs?.size ?: 0L
-                    val quantization = if (formatFilter == "gguf") {
-                        GgufQuantizationParser.parseQuantization(sibling.rfilename)
-                    } else null
                     sibling.rfilename to GgufFileDetail(
-                        quantization = quantization,
+                        quantization = null,
                         fileSizeBytes = effectiveSize,
-                        ramEstimateBytes = if (effectiveSize > 0 && quantization != null) {
-                            GgufQuantizationParser.estimateRamBytes(effectiveSize)
-                        } else 0L
+                        ramEstimateBytes = 0L
                     )
                 }
                 _uiState.update {

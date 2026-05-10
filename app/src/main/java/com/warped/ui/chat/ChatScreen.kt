@@ -168,23 +168,6 @@ fun ChatScreen(
                                         color = typePillColor
                                     )
                                 }
-                                Spacer(Modifier.width(4.dp))
-                                // Format pill: GGUF or LiteRT-LM
-                                if (isLocal) {
-                                    val formatPillText = if (uiState.selectedProvider == ProviderType.LOCAL) "GGUF" else "LiteRT-LM"
-                                    val formatPillColor = if (uiState.selectedProvider == ProviderType.LOCAL) Color(0xFF2196F3) else Color(0xFF4CAF50)
-                                    Surface(
-                                        shape = RoundedCornerShape(4.dp),
-                                        color = formatPillColor.copy(alpha = 0.15f)
-                                    ) {
-                                        Text(
-                                            text = formatPillText,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = formatPillColor
-                                        )
-                                    }
-                                }
                                 Spacer(Modifier.width(6.dp))
                             }
                             Text(
@@ -222,21 +205,6 @@ fun ChatScreen(
                                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                                         style = MaterialTheme.typography.labelSmall,
                                                         color = Color(0xFF4CAF50)
-                                                    )
-                                                }
-                                                Spacer(Modifier.width(4.dp))
-                                                // Format pill
-                                                val formatPill = if (isLiteRtLm) "LiteRT-LM" else "GGUF"
-                                                val formatPillColor = if (isLiteRtLm) Color(0xFF4CAF50) else Color(0xFF2196F3)
-                                                Surface(
-                                                    shape = RoundedCornerShape(4.dp),
-                                                    color = formatPillColor.copy(alpha = 0.15f)
-                                                ) {
-                                                    Text(
-                                                        text = formatPill,
-                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                                        style = MaterialTheme.typography.labelSmall,
-                                                        color = formatPillColor
                                                     )
                                                 }
                                                 Spacer(Modifier.width(8.dp))

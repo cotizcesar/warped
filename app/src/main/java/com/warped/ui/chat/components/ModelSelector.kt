@@ -115,8 +115,7 @@ fun ModelSelector(
     }
 }
 
-private fun formatLabel(model: LocalModel): String =
-    if (model.modelFormat == "LITERTLM") "LiteRT-LM" else "GGUF"
+private fun formatLabel(model: LocalModel): String = "LiteRT-LM"
 
 private fun endpointTypeLabel(endpoint: Endpoint): String =
     when {
@@ -129,7 +128,6 @@ private fun endpointTypeLabel(endpoint: Endpoint): String =
 @Composable
 private fun ModelTypePill(type: String) {
     val (color, label) = when (type) {
-        "GGUF" -> Color(0xFF2196F3) to "GGUF"
         "LiteRT-LM" -> Color(0xFF4CAF50) to "LiteRT-LM"
         else -> MaterialTheme.colorScheme.outline to type
     }
