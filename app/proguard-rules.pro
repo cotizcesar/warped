@@ -14,5 +14,3 @@
 # LiteRT-LM
 -keep class com.google.ai.edge.litertlm.** { *; }
 
-# llama.cpp JNI
--keep class com.warped.data.local.inference.llama.** { native <methods>; }
