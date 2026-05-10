@@ -23,10 +23,12 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("keystore/warped-release.jks")
-            storePassword = "warped123"
-            keyAlias = "warped"
-            keyPassword = "warped123"
+            storeFile = file(
+                project.findProperty("RELEASE_STORE_FILE") as? String ?: "keystore/warped-release.jks"
+            )
+            storePassword = project.findProperty("RELEASE_STORE_PASSWORD") as? String ?: ""
+            keyAlias = project.findProperty("RELEASE_KEY_ALIAS") as? String ?: "warped"
+            keyPassword = project.findProperty("RELEASE_KEY_PASSWORD") as? String ?: ""
         }
     }
 
