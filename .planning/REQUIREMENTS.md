@@ -60,10 +60,10 @@ Requirements for the Bug Hunt, Cleanup & Hardening milestone. Each maps to a roa
 
 ### Search Simplification (SRCH)
 
-- [ ] **SRCH-01**: All tabs removed — PrimaryTabRow with Staff Picks/LiteRT-LM/GGUF tabs deleted from HuggingFaceScreen; single OutlinedTextField search bar remains
-- [ ] **SRCH-02**: Staff Picks code removed — loadStaffPicks() deleted from ViewModel; getCollectionModels() removed from HuggingFaceApi, HuggingFaceRepository (domain + impl); HuggingFaceCollection/HuggingFaceCollectionItem DTOs removed
-- [ ] **SRCH-03**: Search hardcoded — library=litert, no author filter, no format switching; always searches all .litertlm models on Hugging Face
-- [ ] **SRCH-04**: UI state simplified — activeFormat and ggufFileDetails fields removed from HuggingFaceUiState; format badge always shows "LiteRT-LM"
+- [x] **SRCH-01**: All tabs removed — PrimaryTabRow with Staff Picks/LiteRT-LM/GGUF tabs deleted from HuggingFaceScreen; single OutlinedTextField search bar remains
+- [x] **SRCH-02**: Staff Picks code removed — loadStaffPicks() deleted from ViewModel; getCollectionModels() removed from HuggingFaceApi, HuggingFaceRepository (domain + impl); HuggingFaceCollection/HuggingFaceCollectionItem DTOs removed
+- [x] **SRCH-03**: Search hardcoded — library=litert, no author filter, no format switching; always searches all .litertlm models on Hugging Face
+- [x] **SRCH-04**: UI state simplified — activeFormat and ggufFileDetails fields removed from HuggingFaceUiState; format badge always shows "LiteRT-LM"
 
 ### Bug Fixes (BUG)
 
@@ -114,10 +114,10 @@ Requirements for the Bug Hunt, Cleanup & Hardening milestone. Each maps to a roa
 | GGUF-05 | Phase 23 | ✅ Complete |
 | GGUF-06 | Phase 23 | ✅ Complete |
 | GGUF-07 | Phase 23 | ✅ Complete |
-| SRCH-01 | Phase 24 | Pending |
-| SRCH-02 | Phase 24 | Pending |
-| SRCH-03 | Phase 24 | Pending |
-| SRCH-04 | Phase 24 | Pending |
+| SRCH-01 | Phase 24 | Complete |
+| SRCH-02 | Phase 24 | Complete |
+| SRCH-03 | Phase 24 | Complete |
+| SRCH-04 | Phase 24 | Complete |
 | BUG-01 | Phase 25 | Pending |
 | BUG-02 | Phase 25 | Pending |
 | BUG-03 | Phase 25 | Pending |

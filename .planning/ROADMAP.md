@@ -100,7 +100,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 24-01-PLAN.md — Delete Staff Picks DTOs/API/Repository, hardcode litert search, remove tabs and activeFormat from UI state and screen
+- [x] 24-01-PLAN.md — Delete Staff Picks DTOs/API/Repository, hardcode litert search, remove tabs and activeFormat from UI state and screen
 
 ---
 

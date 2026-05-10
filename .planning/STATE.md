@@ -2,37 +2,37 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Bug Hunt, Cleanup & Hardening Pre-Prod
-status: Defining requirements
-stopped_at: Completed Phase 23 (GGUF Removal) — 1 plan, 3 tasks, 7 requirements
-last_updated: "2026-05-10T03:41:32.000Z"
-last_activity: 2026-05-10 — Phase 23 complete
+status: Completed Phase 24 (Search Simplification), ready for Phase 25
+stopped_at: Completed 24-01-PLAN.md (Search Simplification)
+last_updated: "2026-05-10T04:28:56.000Z"
+last_activity: 2026-05-10 — Phase 24 complete
 progress:
   total_phases: 5
-  completed_phases: 1
-  total_plans: 5
-  completed_plans: 1
-  percent: 20
+  completed_phases: 2
+  total_plans: 2
+  completed_plans: 2
+  percent: 100
 ---
 
 # Project State: Warped
 
 **Last updated:** 2026-05-10
-**Last activity:** 2026-05-10 — Phase 23 complete
+**Last activity:** 2026-05-10 — Phase 24 complete
 **Milestone:** v1.5 Bug Hunt, Cleanup & Hardening Pre-Prod — In Progress
 
 ## Current Position
 
-Phase: 23-gguf-removal
+Phase: 24-search-simplification
 Plan: 01 — COMPLETE ✅
-Status: Ready for Phase 24 (Search Simplification)
-Last activity: 2026-05-10 — Phase 23 GGUF Removal completed
+Status: Ready for Phase 25 (Bug Fixes)
+Last activity: 2026-05-10 — Phase 24 Search Simplification completed
 
 ## Phase Structure
 
 | Phase | Name | Requirements | Status | Depends On |
 |-------|------|--------------|--------|------------|
 | 23 | GGUF Removal | GGUF-01..07 (7) | ✅ Complete | — |
-| 24 | Search Simplification | SRCH-01..04 (4) | ⏳ Pending | Phase 23 |
+| 24 | Search Simplification | SRCH-01..04 (4) | ✅ Complete | Phase 23 |
 | 25 | Bug Fixes | BUG-01..04 (4) | ⏳ Pending | Phase 23 |
 | 26 | Security Hardening | SEC-01..08 (8) | ⏳ Pending | — |
 | 27 | Wizard Update | WZRD-01..03 (3) | ⏳ Pending | Phase 23 |
@@ -111,6 +111,9 @@ Last activity: 2026-05-10 — Phase 23 GGUF Removal completed
 - [23-01]: MemoryChecker retained in ChatViewModel — removing it alongside LlamaEngine would break non-GGUF memory checks (shouldWarn, canLoadModel, getMemoryInfo still used)
 - [23-01]: LocalLlmProvider deprecated as no-op stub instead of deleted — backward compatibility with existing injection points
 - [23-01]: Wizard files NOT modified per CONTEXT.md deferral to Phase 27
+- [24-01]: Hardcoded library=litert at HuggingFaceRepositoryImpl level — callers pass only query + author
+- [24-01]: Removed library default from HuggingFaceApi.searchModels() — all callers pass explicit library value
+- [24-01]: FormatBadge simplified to parameterless composable — always green 0xFF4CAF50 for LiteRT-LM
 
 ### Pending Todos
 
@@ -132,5 +135,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-05-10
-Stopped at: Completed 23-01-PLAN.md (GGUF Removal)
+Stopped at: Completed 24-01-PLAN.md (Search Simplification)
 Resume file: None
