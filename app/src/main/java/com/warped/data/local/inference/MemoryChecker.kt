@@ -43,19 +43,9 @@ class MemoryChecker @Inject constructor(
         return modelSizeBytes > memInfo.availableBytes * 0.6
     }
 
-    fun checkGgufRam(fileSizeBytes: Long): RamCheckResult {
-        val required = (fileSizeBytes * 1.3).toLong()
-        val memInfo = getMemoryInfo()
-        return RamCheckResult(
-            hasEnough = required <= (memInfo.availableBytes * 0.85).toLong(),
-            availableBytes = memInfo.availableBytes,
-            requiredBytes = required
-        )
-    }
-
     /**
      * Check if the device has enough available RAM to load a .litertlm model.
-     * Uses the same 80% threshold as GGUF models (canLoadModel).
+     * Uses an 80% threshold for safe model loading.
      * LiteRT-LM models typically require more RAM headroom for GPU/NPU backend overhead.
      *
      * @param modelSizeBytes The size of the .litertlm model file in bytes

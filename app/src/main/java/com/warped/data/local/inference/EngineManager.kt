@@ -9,18 +9,17 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /** Identifies which local inference engine type. */
-enum class EngineType { LLAMA_CPP, LITE_RT_LM }
+enum class EngineType { LITE_RT_LM }
 
 /** Tracks which engine (if any) is currently loaded and which model. */
 data class ActiveEngine(
     val type: EngineType,
     val modelPath: String,
-    val backend: BackendType? = null  // null for llama.cpp (no backend concept)
+    val backend: BackendType? = null
 )
 
 @Singleton
 class EngineManager @Inject constructor(
-    private val llamaEngine: LlamaEngine,
     private val liteRTLmEngine: LiteRTLmEngine,
     private val backendDetector: BackendDetector,
     @param:ApplicationContext private val context: Context
@@ -78,76 +77,6 @@ class EngineManager @Inject constructor(
     }
 
     /**
-     * Switch to the llama.cpp engine with the given model.
-     * Unloads any currently loaded engine first, then loads llama.cpp.
-     * Validates the file and provides loading progress callbacks.
-     *
-     * @param modelPath Absolute path to the GGUF model file
-     * @param onProgress Optional callback for loading progress (percent, message)
-     * @return Result with GgufMetadata on success, LlamaLoadError on failure
-     */
-    @Synchronized
-    fun switchToLlama(
-        modelPath: String,
-        onProgress: ((Int, String) -> Unit)? = null
-    ): Result<GgufMetadata> {
-        // Pre-validate GGUF header before attempting native load
-        val validationResult = GgufMetadataParser.validateHeader(File(modelPath))
-        if (validationResult.isFailure) {
-            Timber.e("EngineManager: GGUF validation failed — $modelPath")
-            return Result.failure(LlamaLoadError.CorruptedFile())
-        }
-
-        // Probe Vulkan GPU availability for llama.cpp
-        val vulkanBackend = try {
-            backendDetector.probeVulkan()
-        } catch (e: Exception) {
-            Timber.w(e, "EngineManager: Vulkan probe error, defaulting to CPU")
-            BackendType.CPU
-        }
-        val nGpuLayers = if (vulkanBackend == BackendType.GPU) 99 else 0
-        Timber.d("EngineManager: Vulkan backend=$vulkanBackend, nGpuLayers=$nGpuLayers")
-
-        val target = ActiveEngine(EngineType.LLAMA_CPP, modelPath, backend = vulkanBackend)
-        if (activeEngine == target) {
-            Timber.d("EngineManager: $target already loaded, skipping switch")
-            val metadata = try {
-                GgufMetadataParser.parse(File(modelPath)).getOrThrow()
-            } catch (e: Exception) {
-                GgufMetadata()
-            }
-            return Result.success(metadata)
-        }
-        unloadCurrent()
-
-        Timber.d("EngineManager: loading llama.cpp model: $modelPath (gpuLayers=$nGpuLayers)")
-        val loadResult = llamaEngine.loadModel(
-            path = modelPath,
-            nGpuLayers = nGpuLayers,
-            onProgress = onProgress
-        )
-
-        if (loadResult.isFailure) {
-            val error = loadResult.exceptionOrNull() as? LlamaLoadError ?: LlamaLoadError.Unknown("Unknown error")
-            Timber.e("EngineManager: llama.cpp failed to load model — ${error.userMessage}")
-            return Result.failure(error ?: LlamaLoadError.Unknown("Unknown error"))
-        }
-
-        activeEngine = target
-        Timber.d("EngineManager: llama.cpp engine now active")
-
-        // Parse metadata after successful load
-        val metadata = try {
-            GgufMetadataParser.parse(File(modelPath)).getOrThrow()
-        } catch (e: Exception) {
-            Timber.w(e, "EngineManager: metadata parse warning, using native info")
-            GgufMetadata()
-        }
-
-        return Result.success(metadata)
-    }
-
-    /**
      * Unload the current engine (if any). Releases all native resources.
      * Safe to call even if nothing is loaded.
      */
@@ -157,15 +86,7 @@ class EngineManager @Inject constructor(
         Timber.d("EngineManager: unloading current engine: $current")
 
         try {
-            when (current.type) {
-                EngineType.LLAMA_CPP -> {
-                    llamaEngine.stop()
-                    llamaEngine.unload()
-                }
-                EngineType.LITE_RT_LM -> {
-                    liteRTLmEngine.close()
-                }
-            }
+            liteRTLmEngine.close()
         } catch (e: Exception) {
             Timber.w(e, "EngineManager: error during unload of $current")
         } finally {
@@ -180,15 +101,10 @@ class EngineManager @Inject constructor(
      */
     fun scheduleUnload() {
         val current = activeEngine ?: return
-        when (current.type) {
-            EngineType.LLAMA_CPP -> llamaEngine.scheduleUnload()
-            EngineType.LITE_RT_LM -> {
-                try {
-                    liteRTLmEngine.close()
-                } catch (_: Exception) {}
-                synchronized(this) { activeEngine = null }
-            }
-        }
+        try {
+            liteRTLmEngine.close()
+        } catch (_: Exception) {}
+        synchronized(this) { activeEngine = null }
     }
 
     /** Returns true if any engine is currently loaded. */
@@ -234,7 +150,4 @@ class EngineManager @Inject constructor(
 
     /** Returns the LiteRT-LM engine directly for advanced usage. */
     fun getLiteRTLmEngine(): LiteRTLmEngine = liteRTLmEngine
-
-    /** Returns the llama.cpp engine directly for advanced usage. */
-    fun getLlamaEngine(): LlamaEngine = llamaEngine
 }

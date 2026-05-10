@@ -353,9 +353,6 @@ private fun SiblingFileCard(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AssistInfoChip(text = formatFileSize(effectiveSize))
                     AssistInfoChip(text = "$modelDownloads downloads")
-                    if (ggufDetail != null && ggufDetail.ramEstimateBytes > 0) {
-                        AssistInfoChip(text = "~${com.warped.data.local.inference.GgufQuantizationParser.formatRamBytes(ggufDetail.ramEstimateBytes)} RAM")
-                    }
                 }
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

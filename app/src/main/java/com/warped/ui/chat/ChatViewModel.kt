@@ -8,8 +8,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.warped.data.local.inference.BackendType
 import com.warped.data.local.inference.EngineManager
-import com.warped.data.local.inference.LlamaEngine
-import com.warped.data.local.inference.LlamaLoadError
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.remote.provider.ProviderRouter
 import com.warped.domain.model.*
@@ -36,7 +34,6 @@ class ChatViewModel @Inject constructor(
     private val providerRouter: ProviderRouter,
     private val savedStateHandle: SavedStateHandle,
     private val parameterStore: ParameterStore,
-    private val llamaEngine: LlamaEngine,
     private val engineManager: EngineManager,
     private val memoryChecker: MemoryChecker,
     @param:ApplicationContext private val context: Context
@@ -413,7 +410,6 @@ class ChatViewModel @Inject constructor(
             // Even if same model, reload if engine was unloaded (memory pressure)
             val needsReload = when (providerType) {
                 ProviderType.LITE_RT_LM -> engineManager.getActiveEngine() == null
-                ProviderType.LOCAL -> !llamaEngine.isLoaded()
                 else -> false
             }
             if (!needsReload) return
@@ -432,11 +428,6 @@ class ChatViewModel @Inject constructor(
                             }
                         } catch (_: Exception) {}
                     }
-                }
-            }
-            ProviderType.LOCAL -> {
-                viewModelScope.launch(Dispatchers.Default) {
-                    try { llamaEngine.unload() } catch (_: Exception) {}
                 }
             }
             ProviderType.LITE_RT_LM -> {
@@ -464,9 +455,6 @@ class ChatViewModel @Inject constructor(
                         }
                     } catch (_: Exception) {}
                 }
-            }
-            ProviderType.LOCAL -> {
-                // Model loads on-demand on first message
             }
             ProviderType.LITE_RT_LM -> {
                 // Model loads on-demand on first message
@@ -500,16 +488,11 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun refreshActiveBackend() {
-        val isLocal = _uiState.value.selectedProvider == ProviderType.LOCAL ||
-            _uiState.value.selectedProvider == ProviderType.LITE_RT_LM
+        val isLocal = _uiState.value.selectedProvider == ProviderType.LITE_RT_LM
         val backend = if (_uiState.value.selectedProvider == ProviderType.LITE_RT_LM) {
             engineManager.getActiveEngine()?.backend
         } else null
-        val isLoaded = when {
-            _uiState.value.selectedProvider == ProviderType.LITE_RT_LM -> engineManager.getActiveEngine() != null
-            _uiState.value.selectedProvider == ProviderType.LOCAL -> llamaEngine.isLoaded()
-            else -> false
-        }
+        val isLoaded = _uiState.value.selectedProvider == ProviderType.LITE_RT_LM && engineManager.getActiveEngine() != null
         _uiState.update { it.copy(activeBackend = backend, isLocalModelLoaded = isLocal && isLoaded) }
     }
 
@@ -532,21 +515,11 @@ class ChatViewModel @Inject constructor(
             return
         }
 
-        val isLitertlm = model?.isLiteRtLm() == true || filePath.endsWith(".litertlm", ignoreCase = true)
-        val modelName = filePath.substringAfterLast("/").removeSuffix(".gguf").removeSuffix(".litertlm")
+        val modelName = filePath.substringAfterLast("/").removeSuffix(".litertlm")
         _uiState.update { it.copy(isLoadingModel = true, loadingModelName = modelName, modelLoadError = null) }
         try {
             withContext(Dispatchers.Default) {
-                if (isLitertlm) {
-                    engineManager.switchToLiteRT(filePath)
-                } else {
-                    val loadResult = engineManager.switchToLlama(filePath)
-                    if (loadResult.isFailure) {
-                        val error = loadResult.exceptionOrNull()
-                        val msg = (error as? LlamaLoadError)?.userMessage ?: error?.message ?: "Failed to load GGUF model"
-                        throw IllegalStateException(msg)
-                    }
-                }
+                engineManager.switchToLiteRT(filePath)
             }
             _uiState.update { it.copy(isLoadingModel = false, loadingModelName = "") }
             refreshActiveBackend()
@@ -556,13 +529,8 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun resolvedSelectedProvider(state: ChatUiState): ProviderType {
-        val selectedModelId = state.selectedModelId ?: return state.selectedProvider ?: ProviderType.LOCAL
-        val selectedLocalModel = state.localModels.firstOrNull { it.filePath == selectedModelId }
-        return if (selectedLocalModel?.isLiteRtLm() == true || selectedModelId.endsWith(".litertlm", ignoreCase = true)) {
-            ProviderType.LITE_RT_LM
-        } else {
-            state.selectedProvider ?: ProviderType.LOCAL
-        }
+        val selectedModelId = state.selectedModelId ?: return state.selectedProvider ?: ProviderType.LITE_RT_LM
+        return ProviderType.LITE_RT_LM
     }
 
     private fun LocalModel.isLiteRtLm(): Boolean =
