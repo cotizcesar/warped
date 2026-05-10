@@ -12,7 +12,7 @@
 | 23 | GGUF Removal | Delete all llama.cpp/GGUF code, JNI, NDK, and references | GGUF-01..07 (7) | 5 |
 | 24 | Search Simplification | Remove tabs, hardcode litert search, delete Staff Picks | SRCH-01..04 (4) | 4 |
 | 25 | Bug Fixes | 1/1 | Complete   | 2026-05-10 |
-| 26 | Security Hardening | ProGuard, input sanitization, crash resilience, storage, network | SEC-01..08 (8) | 5 |
+| 26 | Security Hardening | ProGuard, input sanitization, crash resilience, storage, network | SEC-01..08 (8) | 8 |
 | 27 | Wizard Update | Update onboarding wizard for LiteRT-LM-only engine | WZRD-01..03 (3) | 3 |
 
 **26 requirements | 5 phases | All covered ✓**
@@ -166,6 +166,11 @@ Plans:
 - **SEC-06:** In `HttpClientFactory.kt` and `NetworkModule.kt`, wrap `HttpLoggingInterceptor` level: `if (BuildConfig.DEBUG) Level.BODY else Level.NONE` (or `Level.HEADERS` for debug). Remove the unconditional `Level.BODY`/`HEADERS`.
 - **SEC-07:** Move `storeFile`, `storePassword`, `keyAlias`, `keyPassword` from `build.gradle.kts` to `~/.gradle/gradle.properties` or `local.properties`. Reference via `project.findProperty()`. Generate strong password; ensure `local.properties` is in `.gitignore`.
 - **SEC-08:** Add `net.zetetic:android-database-sqlcipher` dependency to `libs.versions.toml`. In `DatabaseModule.kt`, wrap `Room.databaseBuilder()` with `.openHelperFactory(SupportFactory(passphrase))`. Derive passphrase from Android Keystore (not hardcoded). Apply to release builds only (keep in-memory for tests).
+
+**Plans:** 1 plan
+
+Plans:
+- [ ] 26-01-PLAN.md — Build &amp; network config hardening, input sanitization on all 4 providers, crash resilience with global handler + ViewModel exception handlers + empty catch block elimination, secure storage audit with CharArray fix and key alias log removal, logging protection conditioned on BuildConfig.DEBUG, signing credential externalization to local.properties, Room SQLCipher encryption
 
 ---
 
