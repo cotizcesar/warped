@@ -275,15 +275,30 @@ class ChatViewModel @Inject constructor(
     fun stopGeneration() {
         generationJob?.cancel()
         generationJob = null
-        _uiState.update { it.copy(isStreaming = false) }
+        _uiState.update { it.copy(
+            isStreaming = false,
+            streamingContent = "",
+            streamingReasoning = ""
+        ) }
     }
 
     fun selectConversation(conversationId: Long) {
-        engineManager.scheduleUnload()
         viewModelScope.launch {
             val result = chatRepository.loadConversation(conversationId)
             if (result != null) {
                 val (conversation, messages) = result
+
+                // BUG-02: Only unload if the conversation's model differs from the currently loaded engine.
+                // If the same model is already loaded, keep it warm and skip the reload cost.
+                val activeModelPath = engineManager.getActiveEngine()?.modelPath
+                val needsReload = conversation.modelId != null &&
+                    conversation.providerType == ProviderType.LITE_RT_LM &&
+                    activeModelPath != conversation.modelId
+
+                if (needsReload) {
+                    engineManager.scheduleUnload()
+                }
+
                 val modelMissing = conversation.modelId != null && !isModelAvailable(conversation.modelId, conversation.providerType)
                 _uiState.update {
                     it.copy(
@@ -301,7 +316,12 @@ class ChatViewModel @Inject constructor(
                 }
                 if (conversation.modelId != null && !modelMissing) {
                     activeModelSelection.select(conversation.modelId, conversation.providerType)
-                    // Model loads on-demand on first message
+                    // BUG-02: Preload the model if reload is needed, so the loading indicator shows.
+                    // If engine already matches, preloadLocalModel will be a no-op (EngineManager.switchToLiteRT
+                    // skips when activeEngine matches the target).
+                    if (conversation.providerType == ProviderType.LITE_RT_LM) {
+                        preloadLocalModel(conversation.modelId)
+                    }
                 }
                 activeModelSelection.saveLastConversation(conversation.id)
                 refreshActiveBackend()
@@ -481,6 +501,15 @@ class ChatViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    fun deleteMessage(messageId: Long) {
+        viewModelScope.launch {
+            chatRepository.deleteMessage(messageId)
+            _uiState.update { state ->
+                state.copy(messages = state.messages.filter { it.id != messageId.toString() })
+            }
+        }
     }
 
     fun clearModelLoadError() {
