@@ -33,7 +33,10 @@ data class HuggingFaceModelDetail(
     val config: Map<String, JsonElement>? = null,
     @SerialName("safetensors") val safeTensors: HuggingFaceSafeTensors? = null,
     @SerialName("gated") val gated: String = "false",
-    val lastModified: String = ""
+    @SerialName("private") val isPrivate: Boolean = false,
+    val lastModified: String = "",
+    val createdAt: String = "",
+    @SerialName("sha") val sha: String? = null
 )
 
 @Serializable
@@ -74,20 +77,3 @@ data class HuggingFaceSearchResult(
     val likes: Int = 0
 )
 
-@Serializable
-data class HuggingFaceCollection(
-    val slug: String = "",
-    val title: String = "",
-    val items: List<HuggingFaceCollectionItem> = emptyList()
-)
-
-@Serializable
-data class HuggingFaceCollectionItem(
-    val id: String = "",
-    val author: String = "",
-    val downloads: Int = 0,
-    val likes: Int = 0,
-    @SerialName("gated") val gated: String = "false",
-    @SerialName("pipeline_tag") val pipelineTag: String = "",
-    @SerialName("lastModified") val lastModified: String = ""
-)

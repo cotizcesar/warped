@@ -1,9 +1,9 @@
 package com.warped.data.repository
 
 import com.warped.data.remote.api.HuggingFaceApi
-import com.warped.data.remote.dto.HuggingFaceCollectionItem
 import com.warped.data.remote.dto.HuggingFaceModel
 import com.warped.data.remote.dto.HuggingFaceModelDetail
+import com.warped.data.remote.network.HuggingFaceAuthInterceptor
 import com.warped.domain.repository.HuggingFaceRepository
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -18,12 +18,14 @@ import javax.inject.Singleton
 @Singleton
 class HuggingFaceRepositoryImpl @Inject constructor(
     okHttpClient: OkHttpClient,
-    json: Json
+    json: Json,
+    huggingFaceAuthInterceptor: HuggingFaceAuthInterceptor
 ) : HuggingFaceRepository {
 
     private val client = okHttpClient.newBuilder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .addNetworkInterceptor(huggingFaceAuthInterceptor)
         .build()
 
     private val retrofit = Retrofit.Builder()
@@ -34,9 +36,9 @@ class HuggingFaceRepositoryImpl @Inject constructor(
 
     private val api = retrofit.create(HuggingFaceApi::class.java)
 
-    override suspend fun searchModels(query: String?, format: String, author: String?, limit: Int): Result<List<HuggingFaceModel>> {
+    override suspend fun searchModels(query: String?, author: String?, limit: Int): Result<List<HuggingFaceModel>> {
         return try {
-            val response = api.searchModels(query = query, library = format, author = author, limit = limit)
+            val response = api.searchModels(query = query, library = "litert", author = author, limit = limit)
             if (response.isSuccessful) {
                 val body = response.body() ?: emptyList()
                 Result.success(body)
@@ -46,7 +48,7 @@ class HuggingFaceRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Search failed: HTTP ${response.code()}"))
             }
         } catch (e: Exception) {
-            Timber.e(e, "HF API search failed: query=$query format=$format author=$author")
+            Timber.e(e, "HF API search failed: query=$query author=$author")
             Result.failure(e)
         }
     }
@@ -65,18 +67,4 @@ class HuggingFaceRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getCollectionModels(owner: String, collection: String): Result<List<HuggingFaceCollectionItem>> {
-        return try {
-            val response = api.getCollection(owner, collection)
-            if (response.isSuccessful) {
-                val body = response.body() ?: throw Exception("Empty response")
-                Result.success(body.items)
-            } else {
-                Result.failure(Exception("Collection fetch failed: HTTP ${response.code()}"))
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "HF API collection failed: $owner/$collection")
-            Result.failure(e)
-        }
-    }
 }
