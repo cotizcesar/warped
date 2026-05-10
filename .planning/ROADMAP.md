@@ -130,6 +130,11 @@ Plans:
 - **BUG-04 — ChatRepository.kt + ChatRepositoryImpl.kt:** Add `suspend fun deleteMessage(messageId: Long)`.
 - **BUG-04 — ChatViewModel.kt:** Add `fun deleteMessage(messageId: Long)` that calls repository, removes message from `_uiState.value.messages`, and forces UI recomposition.
 
+**Plans:** 1 plan
+
+Plans:
+- [ ] 25-01-PLAN.md — Fix code block streaming rendering, model reload optimization, active conversation highlighting, and ghost message cleanup across 6 files
+
 ---
 
 ## Phase 26: Security Hardening
