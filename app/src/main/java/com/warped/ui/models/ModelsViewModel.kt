@@ -309,12 +309,8 @@ class ModelsViewModel @Inject constructor(
     }
 
     fun canLoadModel(modelSizeBytes: Long): Boolean = memoryChecker.canLoadModel(modelSizeBytes)
-    fun shouldWarnAboutMemory(modelSizeBytes: Long, isGguf: Boolean = false): Boolean {
-        return if (isGguf) {
-            !memoryChecker.checkGgufRam(modelSizeBytes).hasEnough
-        } else {
-            memoryChecker.shouldWarn(modelSizeBytes)
-        }
+    fun shouldWarnAboutMemory(modelSizeBytes: Long): Boolean {
+        return memoryChecker.shouldWarn(modelSizeBytes)
     }
 
     fun cancelDownload(modelId: String) {

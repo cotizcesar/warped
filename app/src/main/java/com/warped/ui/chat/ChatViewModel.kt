@@ -529,8 +529,8 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun resolvedSelectedProvider(state: ChatUiState): ProviderType {
-        val selectedModelId = state.selectedModelId ?: return state.selectedProvider ?: ProviderType.LITE_RT_LM
-        return ProviderType.LITE_RT_LM
+        val provider = state.selectedProvider ?: return ProviderType.LITE_RT_LM
+        return if (provider == ProviderType.LOCAL) ProviderType.LITE_RT_LM else provider
     }
 
     private fun LocalModel.isLiteRtLm(): Boolean =

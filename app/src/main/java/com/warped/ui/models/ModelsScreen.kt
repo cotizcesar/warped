@@ -144,7 +144,7 @@ fun ModelsScreen(
                             Spacer(Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("Import Model File", style = MaterialTheme.typography.bodyLarge)
-                                Text("Load a .gguf or .litertlm model from your device", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(stringResource(R.string.import_model_file_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                         HorizontalDivider()
@@ -265,7 +265,7 @@ fun ModelsScreen(
                         ModelCard(
                             model = model,
                             onLoad = {
-                                if (viewModel.shouldWarnAboutMemory(model.sizeBytes, isGguf = false)) {
+                                if (viewModel.shouldWarnAboutMemory(model.sizeBytes)) {
                                     showMemoryWarning = model
                                 } else {
                                     viewModel.useLocalModel(model)

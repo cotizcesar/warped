@@ -16,7 +16,6 @@ import com.warped.MainActivity
 import com.warped.WarpedApplication
 import com.warped.data.local.db.dao.DownloadCheckpointDao
 import com.warped.data.local.db.entity.DownloadCheckpointEntity
-import com.warped.data.local.inference.GgufMetadata
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.domain.model.LocalModel
 import com.warped.domain.repository.LocalModelRepository
@@ -265,9 +264,6 @@ class ModelDownloadWorker @AssistedInject constructor(
                     downloadedBytes = totalSize
                 )
             )
-
-            // Parse metadata and save model (LiteRT-LM only)
-            val modelMetadata = GgufMetadata()
 
             val localModel = LocalModel(
                 name = localFileName.removeSuffix(".litertlm"),
