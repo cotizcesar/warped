@@ -103,7 +103,7 @@ class EngineManager @Inject constructor(
         val current = activeEngine ?: return
         try {
             liteRTLmEngine.close()
-        } catch (_: Exception) {}
+        } catch (e: Exception) { Timber.e(e, "EngineManager: scheduleUnload failed") }
         synchronized(this) { activeEngine = null }
     }
 

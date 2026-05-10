@@ -136,12 +136,12 @@ class LMStudioProvider(
                                             statsText = "${stats.totalOutputTokens} tokens · ${stats.inputTokens} in · ${String.format("%.0f", stats.tokensPerSecond)} tok/s · ${String.format("%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first"
                                         }
                                     }
-                                } catch (_: Exception) { }
+                                } catch (e: Exception) { Timber.e(e, "LMStudio: SSE event parse failed") }
                             }
                             line.isEmpty() -> { currentEvent = "" }
                         }
                     }
-                } catch (_: IOException) { }
+                } catch (e: IOException) { Timber.e(e, "LMStudio: SSE stream read failed") }
 
                 // Fallback: non-streaming JSON response
                 if (!sawSse || !hasTokens) {
@@ -165,7 +165,7 @@ class LMStudioProvider(
                                 }
                             }
                         }
-                    } catch (_: Exception) { }
+                    } catch (e: Exception) { Timber.e(e, "LMStudio: non-streaming JSON parse failed") }
                 }
                 emit(StreamToken.Done(statsText, null))
             } else {

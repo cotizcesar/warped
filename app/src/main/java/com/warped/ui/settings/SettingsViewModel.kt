@@ -2,7 +2,11 @@ package com.warped.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.warped.data.local.preferences.AdvancedPreferences
+import com.warped.data.local.inference.tools.ToolDefinitions
+import com.warped.data.local.inference.tools.ToolPreferences
 import com.warped.data.local.security.ApiKeyStore
+import com.warped.domain.model.GenerationParameters
 import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.LocalModelRepository
@@ -13,7 +17,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
+
 import javax.inject.Inject
 
 @HiltViewModel
@@ -22,40 +28,86 @@ class SettingsViewModel @Inject constructor(
     private val endpointRepository: EndpointRepository,
     private val localModelRepository: LocalModelRepository,
     private val presetRepository: PresetRepository,
-    private val apiKeyStore: ApiKeyStore
+    private val apiKeyStore: ApiKeyStore,
+    private val advancedPreferences: AdvancedPreferences,
+    private val toolPreferences: ToolPreferences
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
+    private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        timber.log.Timber.e(throwable, "Unhandled coroutine exception")
+    }
+
     init {
-        // Load existing HF token status on background thread
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             try {
                 val hasToken = apiKeyStore.getHuggingFaceToken() != null
                 _uiState.update { it.copy(hasHfToken = hasToken) }
-            } catch (_: Exception) {}
+            } catch (e: Exception) { Timber.e(e, "Settings: initial load failed") }
         }
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             chatRepository.observeConversations().collect { conversations ->
                 _uiState.update { it.copy(chatCount = conversations.size) }
             }
         }
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             endpointRepository.observeEndpoints().collect { endpoints ->
                 _uiState.update { it.copy(endpointCount = endpoints.size) }
             }
         }
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             localModelRepository.observeModels().collect { models ->
                 _uiState.update { it.copy(modelCount = models.size) }
             }
         }
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             presetRepository.observePresets().collect { presets ->
                 _uiState.update { it.copy(presetCount = presets.size) }
             }
         }
+        viewModelScope.launch(coroutineExceptionHandler) {
+            advancedPreferences.defaultParameters.collect { params ->
+                _uiState.update { it.copy(advancedParams = params) }
+            }
+        }
+        viewModelScope.launch(coroutineExceptionHandler) {
+            toolPreferences.enabledTools.collect { enabledIds ->
+                _uiState.update { current ->
+                    current.copy(
+                        enabledToolIds = enabledIds,
+                        toolStates = ToolDefinitions.all.map { tool ->
+                            ToolState(
+                                id = tool.id,
+                                name = tool.name,
+                                description = tool.description,
+                                tokenEstimate = tool.tokenEstimate,
+                                defaultEnabled = tool.defaultEnabled,
+                                enabled = tool.id in enabledIds
+                            )
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    fun toggleTool(toolId: String) {
+        viewModelScope.launch(coroutineExceptionHandler) {
+            val current = _uiState.value.toolStates.find { it.id == toolId } ?: return@launch
+            toolPreferences.setEnabled(toolId, !current.enabled)
+        }
+    }
+
+    fun selectTab(tab: SettingsTab) {
+        _uiState.update { it.copy(selectedTab = tab) }
+    }
+
+    fun updateAdvancedParam(transform: (GenerationParameters) -> GenerationParameters) {
+        val newParams = transform(_uiState.value.advancedParams)
+        _uiState.update { it.copy(advancedParams = newParams) }
+        viewModelScope.launch(coroutineExceptionHandler) { advancedPreferences.save(newParams) }
     }
 
     fun showDeleteChatsDialog() {
@@ -67,7 +119,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun deleteAllChats() {
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             _uiState.update { it.copy(isDeletingChats = true) }
             try {
                 chatRepository.deleteAllConversations()
@@ -94,7 +146,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun deleteAllApiKeys() {
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             _uiState.update { it.copy(isDeletingKeys = true) }
             try {
                 val endpoints = endpointRepository.observeEndpoints().first()
@@ -113,7 +165,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun deleteEndpointKey(endpointId: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             try {
                 apiKeyStore.deleteKey(endpointId)
                 _uiState.update { it.copy(message = "API key deleted") }
@@ -134,7 +186,7 @@ class SettingsViewModel @Inject constructor(
     fun saveHfToken() {
         val token = _uiState.value.hfToken.trim()
         if (token.isBlank()) return
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             try {
                 apiKeyStore.storeHuggingFaceToken(token.toCharArray())
                 // Verify token was persisted
@@ -151,7 +203,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun deleteHfToken() {
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             try {
                 apiKeyStore.deleteHuggingFaceToken()
                 _uiState.update { it.copy(hasHfToken = false, hfToken = "", message = "Access Token removed") }

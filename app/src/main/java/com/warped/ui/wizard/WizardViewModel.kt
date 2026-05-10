@@ -14,7 +14,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
+
 import javax.inject.Inject
 
 @HiltViewModel
@@ -32,18 +34,22 @@ class WizardViewModel @Inject constructor(
     val steps = WizardStep.entries
     val pageCount: Int get() = steps.size
 
+    private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        timber.log.Timber.e(throwable, "Unhandled coroutine exception")
+    }
+
     init {
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             wizardPreferences.isWizardComplete.collect { complete ->
                 _uiState.update { it.copy(isWizardComplete = complete) }
             }
         }
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             wizardPreferences.skippedSteps.collect { steps ->
                 _uiState.update { it.copy(skippedSteps = steps) }
             }
         }
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             snapshotContext()
         }
     }
@@ -98,7 +104,7 @@ class WizardViewModel @Inject constructor(
 
     fun skipCurrentStep() {
         val currentKey = steps[_uiState.value.currentPage].name.lowercase()
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             wizardPreferences.markStepsSkipped(setOf(currentKey))
         }
         goToNextPage()
@@ -114,7 +120,7 @@ class WizardViewModel @Inject constructor(
 
     fun confirmSkipAll() {
         val keys = steps.map { it.name.lowercase() }.toSet()
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             wizardPreferences.markStepsSkipped(keys)
             wizardPreferences.markWizardComplete()
         }
@@ -129,7 +135,7 @@ class WizardViewModel @Inject constructor(
     }
 
     fun completeWizard() {
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             wizardPreferences.markWizardComplete()
         }
     }

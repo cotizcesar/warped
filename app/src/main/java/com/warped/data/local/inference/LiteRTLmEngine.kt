@@ -1,23 +1,27 @@
 package com.warped.data.local.inference
 
+import android.content.Context
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.LogSeverity
+import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class LiteRTLmEngine @Inject constructor() {
+class LiteRTLmEngine @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
 
     companion object {
         init {
             try {
                 System.loadLibrary("litertlm_jni")
-            } catch (_: UnsatisfiedLinkError) {}
+            } catch (e: UnsatisfiedLinkError) { Timber.e(e, "LiteRTLmEngine: native lib not found") }
             Engine.setNativeMinLogSeverity(LogSeverity.ERROR)
         }
     }
@@ -33,29 +37,40 @@ class LiteRTLmEngine @Inject constructor() {
     fun isInitialized(): Boolean = engine?.isInitialized() == true
 
     /**
-     * Initialize the LiteRT-LM engine with a .litertlm model and backend.
+     * Initialize the LiteRT-LM engine with a .litertlm model and backends.
      * This is a blocking call (can take seconds) — caller must dispatch on Dispatchers.Default.
      *
      * @param modelPath Absolute path to the .litertlm model file
-     * @param backend   BackendType.CPU or BackendType.GPU
+     * @param backend   Main backend (CPU or GPU)
+     * @param visionBackend Backend for vision processing, or null to use main backend
+     * @param audioBackend  Backend for audio processing, or null to use main backend
      * @throws IllegalStateException if engine is already initialized
      */
     @Synchronized
-    fun init(modelPath: String, backend: BackendType) {
+    fun init(
+        modelPath: String,
+        backend: BackendType,
+        visionBackend: BackendType? = null,
+        audioBackend: BackendType? = null
+    ) {
         require(!isInitialized()) { "LiteRTLmEngine is already initialized. Call close() first." }
 
         val litertlmBackend = when (backend) {
             BackendType.CPU -> Backend.CPU()
             BackendType.GPU -> Backend.GPU()
+            BackendType.NPU -> Backend.GPU() // fallback: NPU not yet supported by EngineConfig
         }
+
+        val cacheDir = java.io.File(context.cacheDir, "litertlm_cache").also { it.mkdirs() }
 
         val config = EngineConfig(
             modelPath = modelPath,
             backend = litertlmBackend,
+            cacheDir = cacheDir.absolutePath
         )
 
         engine = Engine(config).also { e ->
-            Timber.d("LiteRTLmEngine: initializing with backend=$backend, modelPath=$modelPath")
+            Timber.d("LiteRTLmEngine: initializing backend=$backend vision=$visionBackend audio=$audioBackend cache=${cacheDir.absolutePath}")
             e.initialize()
             Timber.d("LiteRTLmEngine: initialization complete")
         }

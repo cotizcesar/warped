@@ -119,6 +119,7 @@ dependencies {
 
     // Security
     implementation(libs.security.crypto)
+    implementation(libs.sqlcipher)
 
     // LiteRT-LM (per LITE-01)
     implementation(libs.litertlm)

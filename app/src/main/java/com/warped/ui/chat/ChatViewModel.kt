@@ -19,7 +19,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
+
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.ByteArrayOutputStream
@@ -44,22 +46,26 @@ class ChatViewModel @Inject constructor(
 
     private var generationJob: Job? = null
 
+    private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        timber.log.Timber.e(throwable, "Unhandled coroutine exception")
+    }
+
     init {
         // Restore persisted loaded instance ID
         activeModelSelection.activeModel.value?.instanceId?.let {
             _uiState.value = _uiState.value.copy(loadedInstanceId = it)
         }
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             chatRepository.observeConversations().collect { conversations ->
                 _uiState.update { it.copy(conversations = conversations) }
             }
         }
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             parameterStore.parameters.collect { params ->
                 _uiState.update { it.copy(generationParameters = params) }
             }
         }
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             localModelRepository.observeModels().collect { models ->
                 _uiState.update { state ->
                     if (state.selectedProvider == ProviderType.LOCAL ||
@@ -82,7 +88,7 @@ class ChatViewModel @Inject constructor(
                 }
             }
         }
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             activeModelSelection.activeModel.collect { activeModel ->
                 if (activeModel != null) {
                     _uiState.update {
@@ -96,7 +102,7 @@ class ChatViewModel @Inject constructor(
                 }
             }
         }
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             endpointRepository.observeEndpoints().collect { endpoints ->
                 _uiState.update { it.copy(endpoints = endpoints) }
             }
@@ -120,7 +126,7 @@ class ChatViewModel @Inject constructor(
         val userMessage = ChatMessage(role = Role.USER, content = text, imageUris = imageDataUrls)
         _uiState.update { it.copy(messages = it.messages + userMessage, inputText = "", isStreaming = true) }
 
-        generationJob = viewModelScope.launch {
+        generationJob = viewModelScope.launch(coroutineExceptionHandler) {
             try {
                 val conversationId = ensureConversation(text)
                 chatRepository.saveMessage(conversationId, userMessage)
@@ -283,7 +289,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun selectConversation(conversationId: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             val result = chatRepository.loadConversation(conversationId)
             if (result != null) {
                 val (conversation, messages) = result
@@ -368,14 +374,14 @@ class ChatViewModel @Inject constructor(
                 return
             }
         }
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             setSelectedModel(modelId, providerType, isSameModel = false)
         }
     }
 
     fun confirmModelSwitch() {
         val pending = _uiState.value.pendingModelSwitch ?: return
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             // Create new conversation, clearing old ID and messages
             _uiState.update {
                 it.copy(
@@ -409,7 +415,7 @@ class ChatViewModel @Inject constructor(
         val model = _uiState.value.memoryWarningModel ?: return
         _uiState.update { it.copy(memoryWarningModel = null) }
         val providerType = if (model.isLiteRtLm()) ProviderType.LITE_RT_LM else ProviderType.LOCAL
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             setSelectedModel(model.filePath, providerType, isSameModel = false)
         }
     }
@@ -439,20 +445,20 @@ class ChatViewModel @Inject constructor(
         when (oldProvider) {
             ProviderType.LM_STUDIO -> {
                 if (oldInstance != null && oldModelId != null) {
-                    viewModelScope.launch {
+                    viewModelScope.launch(coroutineExceptionHandler) {
                         try {
                             val endpoint = endpointRepository.getActive()
                             if (endpoint != null) {
                                 val provider = com.warped.data.remote.provider.LMStudioProvider(endpoint.url, oldModelId)
                                 provider.unloadModel(oldInstance)
                             }
-                        } catch (_: Exception) {}
+                        } catch (e: Exception) { Timber.e(e, "Chat: LMStudio unload failed") }
                     }
                 }
             }
             ProviderType.LITE_RT_LM -> {
-                viewModelScope.launch(Dispatchers.Default) {
-                    try { engineManager.unloadCurrent() } catch (_: Exception) {}
+                viewModelScope.launch(coroutineExceptionHandler + Dispatchers.Default) {
+                    try { engineManager.unloadCurrent() } catch (e: Exception) { Timber.e(e, "Chat: unloadCurrent failed") }
                 }
             }
             else -> {}
@@ -461,7 +467,7 @@ class ChatViewModel @Inject constructor(
         // Load new model
         when (providerType) {
             ProviderType.LM_STUDIO -> {
-                viewModelScope.launch {
+                viewModelScope.launch(coroutineExceptionHandler) {
                     try {
                         _uiState.update { it.copy(loadedInstanceId = null) }
                         val endpoint = endpointRepository.getActive()
@@ -473,7 +479,7 @@ class ChatViewModel @Inject constructor(
                                 activeModelSelection.select(modelId, providerType, instanceId)
                             }
                         }
-                    } catch (_: Exception) {}
+                    } catch (e: Exception) { Timber.e(e, "Chat: LMStudio load failed") }
                 }
             }
             ProviderType.LITE_RT_LM -> {
@@ -504,7 +510,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun deleteMessage(messageId: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             chatRepository.deleteMessage(messageId)
             _uiState.update { state ->
                 state.copy(messages = state.messages.filter { it.id != messageId.toString() })
@@ -526,7 +532,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun unloadLocalModels() {
-        try { engineManager.scheduleUnload() } catch (_: Exception) {}
+        try { engineManager.scheduleUnload() } catch (e: Exception) { Timber.e(e, "Chat: scheduleUnload failed") }
         _uiState.update { it.copy(isLocalModelLoaded = false, activeBackend = null) }
     }
 

@@ -21,7 +21,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
+
 import javax.inject.Inject
 
 @HiltViewModel
@@ -39,18 +41,22 @@ class ModelsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ModelsUiState())
     val uiState: StateFlow<ModelsUiState> = _uiState.asStateFlow()
 
+    private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        timber.log.Timber.e(throwable, "Unhandled coroutine exception")
+    }
+
     init {
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             localModelRepository.observeModels().collect { models ->
                 _uiState.update { it.copy(models = models) }
             }
         }
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             endpointRepository.observeEndpoints().collect { endpoints ->
                 _uiState.update { it.copy(endpoints = endpoints) }
             }
         }
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             modelDownloadManager.downloadStates.collect { states ->
                 val active = states.values.filter {
                     it.isDownloading || it.isPaused || it.progress < 1f
@@ -61,7 +67,7 @@ class ModelsViewModel @Inject constructor(
     }
 
     fun importModel(uri: Uri) {
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             _uiState.update { it.copy(isImporting = true, importProgress = 0f, error = null) }
             val result = modelImportManager.importFromUri(uri) { progress ->
                 _uiState.update { it.copy(importProgress = progress) }
@@ -75,7 +81,7 @@ class ModelsViewModel @Inject constructor(
     }
 
     fun deleteModel(model: LocalModel) {
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             try {
                 modelImportManager.deleteModel(model)
             } catch (e: Exception) {
@@ -141,7 +147,7 @@ class ModelsViewModel @Inject constructor(
         if (!url.endsWith("/")) {
             url = "$url/"
         }
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             try {
                 val resolvedApiType = resolveApiType(state.formApiType, state.formLmStudioMode)
                 val savedId = endpointRepository.saveEndpoint(
@@ -197,7 +203,7 @@ class ModelsViewModel @Inject constructor(
 
     fun deleteEndpoint(endpoint: Endpoint) {
         _uiState.update { it.copy(endpoints = it.endpoints.filter { e -> e.id != endpoint.id }) }
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             try {
                 endpointRepository.deleteEndpoint(endpoint.id)
                 // If this endpoint was the active selection, clear it from chat
@@ -221,7 +227,7 @@ class ModelsViewModel @Inject constructor(
         if (!url.endsWith("/")) {
             url = "$url/"
         }
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             try {
                 val resolvedApiType = resolveApiType(state.formApiType, state.formLmStudioMode)
                 val endpoint = Endpoint(
@@ -250,7 +256,7 @@ class ModelsViewModel @Inject constructor(
     fun useEndpoint(endpoint: Endpoint) {
         val modelId = endpoint.modelId ?: return
         activeModelSelection.select(modelId, endpoint.apiType)
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             endpointRepository.activateEndpoint(endpoint.id)
             fetchEndpointModels(endpoint)
         }
@@ -267,7 +273,7 @@ class ModelsViewModel @Inject constructor(
         }
         val apiType = try { ProviderType.valueOf(state.formApiType) } catch (_: IllegalArgumentException) { ProviderType.CUSTOM }
         val tempEndpoint = Endpoint(id = 0, name = "temp", url = url, apiType = apiType, modelId = "fetch")
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             _uiState.update { it.copy(isFetchingEndpointModels = true, availableEndpointModels = emptyList(), availableEndpointModelsData = emptyList()) }
             try {
                 val provider = if (apiType == ProviderType.ANTHROPIC) {

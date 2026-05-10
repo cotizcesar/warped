@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.json.Json
 import okhttp3.ResponseBody
+import timber.log.Timber
 import java.io.IOException
 
 fun ResponseBody.asSseFlow(json: Json): Flow<StreamToken> = flow {
@@ -173,7 +174,7 @@ fun ResponseBody.asOllamaGenerateFlow(json: Json): Flow<StreamToken> = flow {
                 if (content.isNotBlank()) {
                     emit(StreamToken.Delta(content))
                 }
-            } catch (_: Exception) { }
+            } catch (e: Exception) { Timber.e(e, "SSE: Ollama generate chunk parse failed") }
         }
     } catch (e: IOException) {
         emit(StreamToken.Error("Connection lost: ${e.message}"))
@@ -203,7 +204,7 @@ fun ResponseBody.asOllamaPullFlow(json: Json): Flow<StreamToken> = flow {
                     emit(StreamToken.Done())
                     return@flow
                 }
-            } catch (_: Exception) { }
+            } catch (e: Exception) { Timber.e(e, "SSE: Ollama pull chunk parse failed") }
         }
     } catch (e: IOException) {
         emit(StreamToken.Error("Connection lost: ${e.message}"))

@@ -14,7 +14,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
+
 import javax.inject.Inject
 
 @HiltViewModel
@@ -28,8 +30,12 @@ class EndpointsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(EndpointsUiState())
     val uiState: StateFlow<EndpointsUiState> = _uiState.asStateFlow()
 
+    private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        timber.log.Timber.e(throwable, "Unhandled coroutine exception")
+    }
+
     init {
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             endpointRepository.observeEndpoints().collect { endpoints ->
                 _uiState.update { it.copy(endpoints = endpoints) }
             }
@@ -98,7 +104,7 @@ class EndpointsViewModel @Inject constructor(
         if (!url.endsWith("/")) {
             url = "$url/"
         }
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             try {
                 val resolvedApiType = if (state.formApiType == ProviderType.LM_STUDIO.name) {
                     when (state.formLmStudioMode) {
@@ -130,7 +136,7 @@ class EndpointsViewModel @Inject constructor(
 
     fun deleteEndpoint(endpointId: Long) {
         _uiState.update { it.copy(endpoints = it.endpoints.filter { e -> e.id != endpointId }) }
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             try {
                 endpointRepository.deleteEndpoint(endpointId)
             } catch (e: Exception) {
@@ -140,7 +146,7 @@ class EndpointsViewModel @Inject constructor(
     }
 
     fun testConnection(endpointId: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             _uiState.update { it.copy(testStatus = it.testStatus + (endpointId to ConnectionStatus.Connecting)) }
             try {
                 val endpoint = _uiState.value.endpoints.find { it.id == endpointId } ?: return@launch
@@ -156,7 +162,7 @@ class EndpointsViewModel @Inject constructor(
     }
 
     fun activateEndpoint(endpointId: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             try {
                 endpointRepository.activateEndpoint(endpointId)
             } catch (e: Exception) {

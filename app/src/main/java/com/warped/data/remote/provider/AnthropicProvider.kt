@@ -182,7 +182,7 @@ class AnthropicProvider(
                                         return@flow
                                     }
                                 }
-                            } catch (_: Exception) { }
+                            } catch (e: Exception) { Timber.e(e, "Anthropic: SSE event parse failed") }
                         }
                         line.isEmpty() -> currentEvent = null
                     }

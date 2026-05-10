@@ -174,7 +174,7 @@ class LiteRTLmProvider @Inject constructor(
                 activeConversation!!
             } else {
                 activeConversation?.let { prev ->
-                    try { prev.close() } catch (_: Exception) {}
+                    try { prev.close() } catch (e: Exception) { Timber.e(e, "LiteRTLm: prev.close() failed") }
                 }
                 val conv = engineManager.createLiteRTConversation(conversationConfig)
                 activeConversation = conv

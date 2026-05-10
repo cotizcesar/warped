@@ -12,7 +12,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
+
 import javax.inject.Inject
 
 @HiltViewModel
@@ -26,9 +28,13 @@ class HuggingFaceViewModel @Inject constructor(
     val uiState: StateFlow<HuggingFaceUiState> = _uiState.asStateFlow()
     private var searchJob: Job? = null
 
+    private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        timber.log.Timber.e(throwable, "Unhandled coroutine exception")
+    }
+
     init {
         search("")
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             downloadManager.downloadStates.collect { states ->
                 val activeId = _uiState.value.activeDownloadId
                 if (activeId != null) {
@@ -60,7 +66,7 @@ class HuggingFaceViewModel @Inject constructor(
         if (trimmedQuery.length < MIN_SEARCH_LENGTH) return
         searchJob?.cancel()
         _uiState.update { it.copy(searchQuery = trimmedQuery, isLoading = true, error = null) }
-        searchJob = viewModelScope.launch {
+        searchJob = viewModelScope.launch(coroutineExceptionHandler) {
             val author: String? = null
             val result = huggingFaceRepository.searchModels(
                 query = trimmedQuery.ifBlank { null },
@@ -82,7 +88,7 @@ class HuggingFaceViewModel @Inject constructor(
 
     fun selectModel(model: HuggingFaceModel) {
         _uiState.update { it.copy(isLoading = true) }
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             val result = huggingFaceRepository.getModelDetail(model.id)
             result.onSuccess { detail ->
                 val filteredSiblings = detail.siblings.filter {

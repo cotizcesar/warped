@@ -12,7 +12,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
+
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -26,8 +28,12 @@ class PresetsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(PresetsUiState())
     val uiState: StateFlow<PresetsUiState> = _uiState.asStateFlow()
 
+    private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        timber.log.Timber.e(throwable, "Unhandled coroutine exception")
+    }
+
     init {
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             presetRepository.observePresets().collect { presets ->
                 _uiState.update { it.copy(presets = presets) }
             }
@@ -140,7 +146,7 @@ class PresetsViewModel @Inject constructor(
         val state = _uiState.value
         if (state.presetNameInput.isBlank()) return
 
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             try {
                 val params = state.parameters
                 refreshActiveFormat()
@@ -172,7 +178,7 @@ class PresetsViewModel @Inject constructor(
     }
 
     fun deletePreset(id: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(coroutineExceptionHandler) {
             try {
                 presetRepository.delete(id)
                 if (_uiState.value.selectedPresetId == id) {

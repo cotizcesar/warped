@@ -120,7 +120,7 @@ class OpenAIProvider(
                                 tc.function?.name?.let { emit(StreamToken.Delta("[tool:$it]")); hasTokens = true }
                                 tc.function?.arguments?.let { emit(StreamToken.Delta("($it)")); hasTokens = true }
                             }
-                        } catch (_: Exception) { }
+                        } catch (e: Exception) { Timber.e(e, "OpenAI: SSE first-line delta parse failed") }
                     }
                     try {
                         while (!source.exhausted()) {
@@ -161,12 +161,12 @@ class OpenAIProvider(
                                                 hasTokens = true
                                             }
                                         }
-                                    } catch (_: Exception) { }
+                                    } catch (e: Exception) { Timber.e(e, "OpenAI: SSE delta parse failed") }
                                 }
                                 line.isEmpty() -> currentEvent = ""
                             }
                         }
-                    } catch (_: IOException) { }
+                    } catch (e: IOException) { Timber.e(e, "OpenAI: SSE stream read failed") }
                 } else {
                     // Non-streaming JSON — read remaining + first line
                     val remaining = source.readUtf8() ?: ""
@@ -192,7 +192,7 @@ class OpenAIProvider(
                                 hasTokens = true
                             }
                         }
-                    } catch (_: Exception) { }
+                    } catch (e: Exception) { Timber.e(e, "OpenAI: non-streaming JSON parse failed") }
                 }
                 if (hasTokens) emit(StreamToken.Done())
                 else emit(StreamToken.Error("No content in response"))

@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.ComponentCallbacks2
 import android.os.Build
+import android.os.Process
 import android.os.StrictMode
 
 import androidx.hilt.work.HiltWorkerFactory
@@ -32,6 +33,10 @@ class WarpedApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            Timber.e(throwable, "Unhandled exception in thread ${thread.name}")
+            Process.killProcess(Process.myPid())
+        }
         if (BuildConfig.DEBUG) {
             Timber.plant(RedactingTree())
             StrictMode.setThreadPolicy(

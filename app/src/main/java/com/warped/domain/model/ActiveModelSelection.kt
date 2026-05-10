@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -34,17 +35,17 @@ class ActiveModelSelection @Inject constructor(
                     instanceId = saved.instanceId
                 )
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) { Timber.e(e, "ActiveModel: init load failed") }
     }
 
     fun select(modelId: String, providerType: ProviderType, instanceId: String? = null) {
         _activeModel.value = ActiveModel(modelId = modelId, providerType = providerType, instanceId = instanceId)
-        try { persist() } catch (_: Exception) {}
+        try { persist() } catch (e: Exception) { Timber.e(e, "ActiveModel: persist failed") }
     }
 
     fun clear() {
         _activeModel.value = null
-        try { keystoreManager.remove(LAST_MODEL_KEY) } catch (_: Exception) {}
+        try { keystoreManager.remove(LAST_MODEL_KEY) } catch (e: Exception) { Timber.e(e, "ActiveModel: remove model failed") }
     }
 
     private fun persist() {
@@ -68,7 +69,7 @@ class ActiveModelSelection @Inject constructor(
     }
 
     fun saveLastConversation(conversationId: Long) {
-        try { keystoreManager.put(LAST_CONVERSATION_KEY, conversationId.toString()) } catch (_: Exception) {}
+        try { keystoreManager.put(LAST_CONVERSATION_KEY, conversationId.toString()) } catch (e: Exception) { Timber.e(e, "ActiveModel: persist conversation failed") }
     }
 
     fun getLastConversation(): Long {
@@ -78,6 +79,6 @@ class ActiveModelSelection @Inject constructor(
     }
 
     fun clearLastConversation() {
-        try { keystoreManager.remove(LAST_CONVERSATION_KEY) } catch (_: Exception) {}
+        try { keystoreManager.remove(LAST_CONVERSATION_KEY) } catch (e: Exception) { Timber.e(e, "ActiveModel: remove conversation failed") }
     }
 }

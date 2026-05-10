@@ -168,7 +168,7 @@ class ModelDownloadManager @Inject constructor(
                         kotlinx.coroutines.delay(200)
                         attempts++
                     }
-                } catch (_: Exception) { }
+                } catch (e: Exception) { Timber.e(e, "ModelDownload: checkpoint wait failed") }
             }
             val checkpoint = checkpointDao.getCheckpoint(modelId)
             if (checkpoint == null) {
