@@ -107,12 +107,37 @@ Requirements for the Bug Hunt, Cleanup & Hardening milestone. Each maps to a roa
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| — | — | — |
+| GGUF-01 | Phase 23 | Pending |
+| GGUF-02 | Phase 23 | Pending |
+| GGUF-03 | Phase 23 | Pending |
+| GGUF-04 | Phase 23 | Pending |
+| GGUF-05 | Phase 23 | Pending |
+| GGUF-06 | Phase 23 | Pending |
+| GGUF-07 | Phase 23 | Pending |
+| SRCH-01 | Phase 24 | Pending |
+| SRCH-02 | Phase 24 | Pending |
+| SRCH-03 | Phase 24 | Pending |
+| SRCH-04 | Phase 24 | Pending |
+| BUG-01 | Phase 25 | Pending |
+| BUG-02 | Phase 25 | Pending |
+| BUG-03 | Phase 25 | Pending |
+| BUG-04 | Phase 25 | Pending |
+| SEC-01 | Phase 26 | Pending |
+| SEC-02 | Phase 26 | Pending |
+| SEC-03 | Phase 26 | Pending |
+| SEC-04 | Phase 26 | Pending |
+| SEC-05 | Phase 26 | Pending |
+| SEC-06 | Phase 26 | Pending |
+| SEC-07 | Phase 26 | Pending |
+| SEC-08 | Phase 26 | Pending |
+| WZRD-01 | Phase 27 | Pending |
+| WZRD-02 | Phase 27 | Pending |
+| WZRD-03 | Phase 27 | Pending |
 
 **Coverage:**
 - v1.5 requirements: 26 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 26 ⚠️
+- Mapped to phases: 26
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-05-08*
