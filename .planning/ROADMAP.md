@@ -11,7 +11,7 @@
 |---|-------|------|--------------|------------------|
 | 23 | GGUF Removal | Delete all llama.cpp/GGUF code, JNI, NDK, and references | GGUF-01..07 (7) | 5 |
 | 24 | Search Simplification | Remove tabs, hardcode litert search, delete Staff Picks | SRCH-01..04 (4) | 4 |
-| 25 | Bug Fixes | Fix 4 chat bugs: code rendering, model reload, tracking, ghost delete | BUG-01..04 (4) | 4 |
+| 25 | Bug Fixes | 1/1 | Complete   | 2026-05-10 |
 | 26 | Security Hardening | ProGuard, input sanitization, crash resilience, storage, network | SEC-01..08 (8) | 5 |
 | 27 | Wizard Update | Update onboarding wizard for LiteRT-LM-only engine | WZRD-01..03 (3) | 3 |
 
@@ -133,7 +133,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 25-01-PLAN.md — Fix code block streaming rendering, model reload optimization, active conversation highlighting, and ghost message cleanup across 6 files
+- [x] 25-01-PLAN.md — Fix code block streaming rendering, model reload optimization, active conversation highlighting, and ghost message cleanup across 6 files
 
 ---
 

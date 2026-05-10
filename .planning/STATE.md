@@ -2,30 +2,30 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Bug Hunt, Cleanup & Hardening Pre-Prod
-status: Completed Phase 24 (Search Simplification), ready for Phase 25
-stopped_at: Completed 24-01-PLAN.md (Search Simplification)
-last_updated: "2026-05-10T04:28:56.000Z"
-last_activity: 2026-05-10 — Phase 24 complete
+status: Completed Phase 25 (Bug Fixes), ready for Phase 26
+stopped_at: Completed 25-01-PLAN.md (Bug Fixes)
+last_updated: "2026-05-10T04:58:39.920Z"
+last_activity: 2026-05-10 — Phase 25 complete
 progress:
   total_phases: 5
-  completed_phases: 2
-  total_plans: 2
-  completed_plans: 2
+  completed_phases: 3
+  total_plans: 3
+  completed_plans: 3
   percent: 100
 ---
 
 # Project State: Warped
 
 **Last updated:** 2026-05-10
-**Last activity:** 2026-05-10 — Phase 24 complete
+**Last activity:** 2026-05-10 — Phase 25 complete
 **Milestone:** v1.5 Bug Hunt, Cleanup & Hardening Pre-Prod — In Progress
 
 ## Current Position
 
-Phase: 24-search-simplification
+Phase: 25-bug-fixes
 Plan: 01 — COMPLETE ✅
-Status: Ready for Phase 25 (Bug Fixes)
-Last activity: 2026-05-10 — Phase 24 Search Simplification completed
+Status: Ready for Phase 26 (Security Hardening)
+Last activity: 2026-05-10 — Phase 25 Bug Fixes completed (4 bugs fixed in 3 tasks, 6 files)
 
 ## Phase Structure
 
@@ -33,7 +33,7 @@ Last activity: 2026-05-10 — Phase 24 Search Simplification completed
 |-------|------|--------------|--------|------------|
 | 23 | GGUF Removal | GGUF-01..07 (7) | ✅ Complete | — |
 | 24 | Search Simplification | SRCH-01..04 (4) | ✅ Complete | Phase 23 |
-| 25 | Bug Fixes | BUG-01..04 (4) | ⏳ Pending | Phase 23 |
+| 25 | Bug Fixes | BUG-01..04 (4) | ✅ Complete | Phase 23 |
 | 26 | Security Hardening | SEC-01..08 (8) | ⏳ Pending | — |
 | 27 | Wizard Update | WZRD-01..03 (3) | ⏳ Pending | Phase 23 |
 
@@ -114,6 +114,7 @@ Last activity: 2026-05-10 — Phase 24 Search Simplification completed
 - [24-01]: Hardcoded library=litert at HuggingFaceRepositoryImpl level — callers pass only query + author
 - [24-01]: Removed library default from HuggingFaceApi.searchModels() — all callers pass explicit library value
 - [24-01]: FormatBadge simplified to parameterless composable — always green 0xFF4CAF50 for LiteRT-LM
+- [25-01]: Filter deleteMessage by it.id != messageId.toString() because ChatMessage.id is String (derived from MessageEntity Long ID via .toString()), not Long
 
 ### Pending Todos
 
@@ -134,6 +135,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-10
+Last session: 2026-05-10T04:58:39.915Z
 Stopped at: Completed 24-01-PLAN.md (Search Simplification)
 Resume file: None

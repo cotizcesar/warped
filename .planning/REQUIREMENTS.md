@@ -67,10 +67,10 @@ Requirements for the Bug Hunt, Cleanup & Hardening milestone. Each maps to a roa
 
 ### Bug Fixes (BUG)
 
-- [ ] **BUG-01**: Code blocks render correctly during streaming — MarkdownText handles unclosed code fences without swallowing content; partial code blocks displayed as they stream
-- [ ] **BUG-02**: Model reload fixed — selectConversation() does not unload engine when the already-loaded model matches the conversation's model; loading indicator shown when reload is actually needed
-- [ ] **BUG-03**: Active conversation tracked — NavGraph activeConversationId synchronized when chat loads via chat/{conversationId} route; conversation highlighted in drawer
-- [ ] **BUG-04**: Ghost message fixed — stopGeneration() clears streamingContent and streamingReasoning; deleteMessage(id) added at MessageDao, ChatRepository, and ChatViewModel layers; deleted message immediately removed from UI
+- [x] **BUG-01**: Code blocks render correctly during streaming — MarkdownText handles unclosed code fences without swallowing content; partial code blocks displayed as they stream
+- [x] **BUG-02**: Model reload fixed — selectConversation() does not unload engine when the already-loaded model matches the conversation's model; loading indicator shown when reload is actually needed
+- [x] **BUG-03**: Active conversation tracked — NavGraph activeConversationId synchronized when chat loads via chat/{conversationId} route; conversation highlighted in drawer
+- [x] **BUG-04**: Ghost message fixed — stopGeneration() clears streamingContent and streamingReasoning; deleteMessage(id) added at MessageDao, ChatRepository, and ChatViewModel layers; deleted message immediately removed from UI
 
 ### Security Hardening (SEC)
 
@@ -118,10 +118,10 @@ Requirements for the Bug Hunt, Cleanup & Hardening milestone. Each maps to a roa
 | SRCH-02 | Phase 24 | Complete |
 | SRCH-03 | Phase 24 | Complete |
 | SRCH-04 | Phase 24 | Complete |
-| BUG-01 | Phase 25 | Pending |
-| BUG-02 | Phase 25 | Pending |
-| BUG-03 | Phase 25 | Pending |
-| BUG-04 | Phase 25 | Pending |
+| BUG-01 | Phase 25 | Complete |
+| BUG-02 | Phase 25 | Complete |
+| BUG-03 | Phase 25 | Complete |
+| BUG-04 | Phase 25 | Complete |
 | SEC-01 | Phase 26 | Pending |
 | SEC-02 | Phase 26 | Pending |
 | SEC-03 | Phase 26 | Pending |
