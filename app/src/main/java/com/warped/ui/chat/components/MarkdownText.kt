@@ -65,6 +65,15 @@ fun MarkdownText(
             parseInlineMarkdown(line, baseStyle)
             append("\n")
         }
+        // Flush buffered code block content if fence never closed (stream ended mid-block)
+        if (inCodeBlock && codeBlockContent.isNotEmpty()) {
+            withStyle(SpanStyle(
+                fontFamily = FontFamily.Monospace,
+                background = Color(0xFF1E1E1E)
+            )) {
+                append(codeBlockContent.toString().trimEnd())
+            }
+        }
     }
 
     Text(annotated, modifier = modifier, color = baseColor, style = MaterialTheme.typography.bodyLarge, maxLines = maxLines)
