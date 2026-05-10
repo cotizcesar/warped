@@ -12,7 +12,7 @@
 | 23 | GGUF Removal | Delete all llama.cpp/GGUF code, JNI, NDK, and references | GGUF-01..07 (7) | 5 |
 | 24 | Search Simplification | Remove tabs, hardcode litert search, delete Staff Picks | SRCH-01..04 (4) | 4 |
 | 25 | Bug Fixes | 1/1 | Complete   | 2026-05-10 |
-| 26 | Security Hardening | ProGuard, input sanitization, crash resilience, storage, network | SEC-01..08 (8) | 8 |
+| 26 | Security Hardening | 1/1 | Complete   | 2026-05-10 |
 | 27 | Wizard Update | Update onboarding wizard for LiteRT-LM-only engine | WZRD-01..03 (3) | 3 |
 
 **26 requirements | 5 phases | All covered ✓**
@@ -170,7 +170,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 26-01-PLAN.md — Build &amp; network config hardening, input sanitization on all 4 providers, crash resilience with global handler + ViewModel exception handlers + empty catch block elimination, secure storage audit with CharArray fix and key alias log removal, logging protection conditioned on BuildConfig.DEBUG, signing credential externalization to local.properties, Room SQLCipher encryption
+- [x] 26-01-PLAN.md — Build &amp; network config hardening, input sanitization on all 4 providers, crash resilience with global handler + ViewModel exception handlers + empty catch block elimination, secure storage audit with CharArray fix and key alias log removal, logging protection conditioned on BuildConfig.DEBUG, signing credential externalization to local.properties, Room SQLCipher encryption
 
 ---
 

@@ -74,14 +74,14 @@ Requirements for the Bug Hunt, Cleanup & Hardening milestone. Each maps to a roa
 
 ### Security Hardening (SEC)
 
-- [ ] **SEC-01**: ProGuard/R8 hardened — keep rules added for OkHttp, Retrofit, Hilt/Dagger, Kotlin Coroutines; -keepattributes Signature,Exceptions; -dontwarn for okhttp3, retrofit2
-- [ ] **SEC-02**: Input sanitization applied globally — InputSanitizer.sanitize() called in OpenAIProvider, AnthropicProvider, and OllamaProvider on all user messages before sending
-- [ ] **SEC-03**: Crash resilience — Thread.setDefaultUncaughtExceptionHandler set in WarpedApplication.onCreate(); CoroutineExceptionHandler added to viewModelScope; empty catch blocks replaced with Timber.e() logging
-- [ ] **SEC-04**: Secure storage audited — CharArray→String conversion fixed in ApiKeyStore (direct ByteArray to Keystore); key alias logging removed from KeystoreManager; security-crypto upgraded from alpha to stable
-- [ ] **SEC-05**: Network security config hardened — cleartextTrafficPermitted=false on base-config; domain-config blocks scoped to LAN IP ranges (192.168.x.x, 10.x.x.x, localhost); extractNativeLibs=false in AndroidManifest
-- [ ] **SEC-06**: Logging secured — HttpLoggingInterceptor level conditioned on BuildConfig.DEBUG (Level.NONE in release, Level.BODY/HEADERS in debug) in both HttpClientFactory and NetworkModule
-- [ ] **SEC-07**: Signing credentials externalized — keystore passwords and alias moved from build.gradle.kts to local.properties (gitignored); strong password generated
-- [ ] **SEC-08**: Room database encrypted — SQLCipher SupportFactory applied in DatabaseModule; passphrase stored in Android Keystore; fallbackToDestructiveMigration retained for dev, removed for release
+- [x] **SEC-01**: ProGuard/R8 hardened — keep rules added for OkHttp, Retrofit, Hilt/Dagger, Kotlin Coroutines; -keepattributes Signature,Exceptions; -dontwarn for okhttp3, retrofit2
+- [x] **SEC-02**: Input sanitization applied globally — InputSanitizer.sanitize() called in OpenAIProvider, AnthropicProvider, and OllamaProvider on all user messages before sending
+- [x] **SEC-03**: Crash resilience — Thread.setDefaultUncaughtExceptionHandler set in WarpedApplication.onCreate(); CoroutineExceptionHandler added to viewModelScope; empty catch blocks replaced with Timber.e() logging
+- [x] **SEC-04**: Secure storage audited — CharArray→String conversion fixed in ApiKeyStore (direct ByteArray to Keystore); key alias logging removed from KeystoreManager; security-crypto upgraded from alpha to stable
+- [x] **SEC-05**: Network security config hardened — cleartextTrafficPermitted=false on base-config; domain-config blocks scoped to LAN IP ranges (192.168.x.x, 10.x.x.x, localhost); extractNativeLibs=false in AndroidManifest
+- [x] **SEC-06**: Logging secured — HttpLoggingInterceptor level conditioned on BuildConfig.DEBUG (Level.NONE in release, Level.BODY/HEADERS in debug) in both HttpClientFactory and NetworkModule
+- [x] **SEC-07**: Signing credentials externalized — keystore passwords and alias moved from build.gradle.kts to local.properties (gitignored); strong password generated
+- [x] **SEC-08**: Room database encrypted — SQLCipher SupportFactory applied in DatabaseModule; passphrase stored in Android Keystore; fallbackToDestructiveMigration retained for dev, removed for release
 
 ### Wizard Update (WZRD)
 
@@ -122,14 +122,14 @@ Requirements for the Bug Hunt, Cleanup & Hardening milestone. Each maps to a roa
 | BUG-02 | Phase 25 | Complete |
 | BUG-03 | Phase 25 | Complete |
 | BUG-04 | Phase 25 | Complete |
-| SEC-01 | Phase 26 | Pending |
-| SEC-02 | Phase 26 | Pending |
-| SEC-03 | Phase 26 | Pending |
-| SEC-04 | Phase 26 | Pending |
-| SEC-05 | Phase 26 | Pending |
-| SEC-06 | Phase 26 | Pending |
-| SEC-07 | Phase 26 | Pending |
-| SEC-08 | Phase 26 | Pending |
+| SEC-01 | Phase 26 | Complete |
+| SEC-02 | Phase 26 | Complete |
+| SEC-03 | Phase 26 | Complete |
+| SEC-04 | Phase 26 | Complete |
+| SEC-05 | Phase 26 | Complete |
+| SEC-06 | Phase 26 | Complete |
+| SEC-07 | Phase 26 | Complete |
+| SEC-08 | Phase 26 | Complete |
 | WZRD-01 | Phase 27 | Pending |
 | WZRD-02 | Phase 27 | Pending |
 | WZRD-03 | Phase 27 | Pending |
