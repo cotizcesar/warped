@@ -112,6 +112,14 @@ fun WarpedNavGraph() {
         }
     }
 
+    // BUG-03: Sync activeConversationId from last conversation on fresh app start
+    LaunchedEffect(Unit) {
+        if (activeConversationId == null) {
+            val lastConvId = activeModelSelection.getLastConversation()
+            if (lastConvId > 0) activeConversationId = lastConvId
+        }
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -293,6 +301,9 @@ fun WarpedNavGraph() {
                 arguments = listOf(navArgument("conversationId") { type = NavType.LongType })
             ) { backStackEntry ->
                 val convId = backStackEntry.arguments?.getLong("conversationId") ?: 0L
+                LaunchedEffect(convId) {
+                    activeConversationId = convId
+                }
                 ChatScreen(
                     conversationId = convId,
                     onOpenDrawer = { scope.launch { drawerState.open() } },

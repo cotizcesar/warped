@@ -13,4 +13,5 @@ interface ChatRepository {
     suspend fun updateConversationTitle(conversationId: Long, title: String)
     suspend fun deleteConversation(conversationId: Long)
     suspend fun deleteAllConversations()
+    suspend fun deleteMessage(messageId: Long)
 }

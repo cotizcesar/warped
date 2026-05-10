@@ -61,4 +61,8 @@ class ChatRepositoryImpl @Inject constructor(
         messageDao.deleteAll()
         conversationDao.deleteAll()
     }
+
+    override suspend fun deleteMessage(messageId: Long) {
+        messageDao.deleteById(messageId)
+    }
 }
