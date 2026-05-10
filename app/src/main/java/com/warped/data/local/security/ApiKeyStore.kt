@@ -13,8 +13,10 @@ class ApiKeyStore @Inject constructor(
 
     fun storeKey(endpointId: Long, apiKey: CharArray) {
         val alias = "api_key_$endpointId"
-        keystoreManager.put(alias, String(apiKey))
+        val bytes = apiKey.concatToString().toByteArray(Charsets.UTF_8)
         apiKey.fill('0')
+        keystoreManager.put(alias, bytes.toString(Charsets.UTF_8))
+        bytes.fill(0)
     }
 
     fun getKey(endpointId: Long): CharArray? {
@@ -32,8 +34,10 @@ class ApiKeyStore @Inject constructor(
     }
 
     fun storeHuggingFaceToken(token: CharArray) {
-        keystoreManager.put(HF_TOKEN_KEY, String(token))
+        val bytes = token.concatToString().toByteArray(Charsets.UTF_8)
         token.fill('0')
+        keystoreManager.put(HF_TOKEN_KEY, bytes.toString(Charsets.UTF_8))
+        bytes.fill(0)
     }
 
     fun getHuggingFaceToken(): CharArray? {

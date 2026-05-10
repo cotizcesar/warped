@@ -1,5 +1,6 @@
 package com.warped.data.remote.provider
 
+import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.remote.api.AnthropicApi
 import com.warped.data.remote.dto.AnthropicChatRequest
 import com.warped.data.remote.dto.AnthropicMessage
@@ -9,6 +10,7 @@ import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.ModelInfo
 import com.warped.domain.model.ProviderType
+import com.warped.domain.model.Role
 import com.warped.domain.model.StreamToken
 import com.warped.domain.provider.LlmProvider
 import kotlinx.coroutines.Dispatchers
@@ -25,7 +27,8 @@ import java.util.concurrent.TimeUnit
 class AnthropicProvider(
     private val baseUrl: String,
     private val modelId: String,
-    apiKey: String?
+    apiKey: String?,
+    private val inputSanitizer: InputSanitizer
 ) : LlmProvider {
     override val type = ProviderType.ANTHROPIC
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -58,7 +61,10 @@ class AnthropicProvider(
         val systemMessage = request.messages.firstOrNull { it.role.name == "SYSTEM" }?.content
         val chatMessages = request.messages
             .filter { it.role.name != "SYSTEM" }
-            .map { AnthropicMessage(role = it.role.name.lowercase(), content = it.content) }
+            .map {
+                val content = if (it.role == Role.USER) inputSanitizer.sanitize(it.content) else it.content
+                AnthropicMessage(role = it.role.name.lowercase(), content = content)
+            }
 
         val body = AnthropicChatRequest(
             model = modelId,

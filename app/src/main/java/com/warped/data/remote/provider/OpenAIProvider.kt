@@ -1,5 +1,6 @@
 package com.warped.data.remote.provider
 
+import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.remote.api.OpenAiApi
 import com.warped.data.remote.dto.OpenAiChatRequest
 import com.warped.data.remote.dto.OpenAiCompletionsRequest
@@ -12,6 +13,7 @@ import com.warped.data.remote.network.asCompletionsSseFlow
 import com.warped.data.remote.network.asResponsesSseFlow
 import com.warped.data.remote.network.asSseFlow
 import com.warped.domain.model.ChatRequest
+import com.warped.domain.model.Role
 import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.ModelInfo
 import com.warped.domain.model.ProviderType
@@ -35,7 +37,8 @@ class OpenAIProvider(
     private val baseUrl: String,
     private val modelId: String,
     endpointId: Long,
-    apiKey: String? = null
+    apiKey: String? = null,
+    private val inputSanitizer: InputSanitizer
 ) : LlmProvider {
     override val type = ProviderType.OPENAI
     private val json = Json { ignoreUnknownKeys = true }
@@ -65,7 +68,8 @@ class OpenAIProvider(
 
     override fun chat(request: ChatRequest): Flow<StreamToken> = flow {
         val messages = request.messages.map {
-            OpenAiMessage(role = it.role.name.lowercase(), content = it.content)
+            val content = if (it.role == Role.USER) inputSanitizer.sanitize(it.content) else it.content
+            OpenAiMessage(role = it.role.name.lowercase(), content = content)
         }
         val body = OpenAiChatRequest(
             model = modelId,

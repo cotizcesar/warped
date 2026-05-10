@@ -1,5 +1,6 @@
 package com.warped.data.remote.provider
 
+import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.remote.api.LmStudioApi
 import com.warped.data.remote.dto.LmStudioChatRequest
 import com.warped.data.remote.dto.LmStudioDownloadRequest
@@ -30,7 +31,8 @@ import java.util.concurrent.TimeUnit
 class LMStudioProvider(
     private val baseUrl: String = "http://localhost:1234",
     private val modelId: String,
-    apiKey: String? = null
+    apiKey: String? = null,
+    private val inputSanitizer: InputSanitizer
 ) : LlmProvider {
     override val type = ProviderType.LM_STUDIO
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -64,7 +66,10 @@ class LMStudioProvider(
         val systemMessage = request.messages.firstOrNull { it.role == Role.SYSTEM }?.content
         val chatMessages = request.messages
             .filter { it.role != Role.SYSTEM }
-            .map { LmStudioInputItem(type = "text", content = it.content) }
+            .map {
+                val content = if (it.role == Role.USER) inputSanitizer.sanitize(it.content) else it.content
+                LmStudioInputItem(type = "text", content = content)
+            }
         
         val imageItems = request.images.map { LmStudioInputItem(type = "image", dataUrl = it) }
         val allInput = imageItems + chatMessages

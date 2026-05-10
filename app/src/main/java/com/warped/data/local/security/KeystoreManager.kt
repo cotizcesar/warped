@@ -32,9 +32,9 @@ class KeystoreManager @Inject constructor(
     fun put(key: String, value: String) {
         try {
             encryptedPrefs.edit().putString(key, value).commit()
-            Timber.d("KeystoreManager: put succeeded for key=$key")
+            Timber.d("KeystoreManager: put succeeded")
         } catch (e: Exception) {
-            Timber.e(e, "KeystoreManager: put failed for key=$key")
+            Timber.e(e, "KeystoreManager: put failed")
         }
     }
 
@@ -42,7 +42,7 @@ class KeystoreManager @Inject constructor(
         return try {
             encryptedPrefs.getString(key, null)
         } catch (e: Exception) {
-            Timber.e(e, "KeystoreManager: get failed for key=$key")
+            Timber.e(e, "KeystoreManager: get failed")
             null
         }
     }
@@ -51,7 +51,7 @@ class KeystoreManager @Inject constructor(
         try {
             encryptedPrefs.edit().remove(key).apply()
         } catch (e: Exception) {
-            Timber.e(e, "KeystoreManager: remove failed for key=$key")
+            Timber.e(e, "KeystoreManager: remove failed")
         }
     }
 

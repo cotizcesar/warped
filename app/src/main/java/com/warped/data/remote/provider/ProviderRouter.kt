@@ -1,5 +1,6 @@
 package com.warped.data.remote.provider
 
+import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.local.inference.LiteRTLmProvider
 import com.warped.data.local.inference.LocalLlmProvider
 import com.warped.data.local.security.ApiKeyStore
@@ -13,6 +14,7 @@ import javax.inject.Singleton
 @Singleton
 class ProviderRouter @Inject constructor(
     private val apiKeyStore: ApiKeyStore,
+    private val inputSanitizer: InputSanitizer,
     private val localLlmProvider: dagger.Lazy<LocalLlmProvider>,
     private val liteRTLmProvider: dagger.Lazy<LiteRTLmProvider>
 ) {
@@ -24,17 +26,25 @@ class ProviderRouter @Inject constructor(
                 baseUrl = endpoint.url,
                 modelId = modelId,
                 endpointId = endpoint.id,
-                apiKey = keyStr
+                apiKey = keyStr,
+                inputSanitizer = inputSanitizer
             )
-            ProviderType.ANTHROPIC -> AnthropicProvider(baseUrl = endpoint.url, modelId = modelId, apiKey = keyStr)
+            ProviderType.ANTHROPIC -> AnthropicProvider(
+                baseUrl = endpoint.url,
+                modelId = modelId,
+                apiKey = keyStr,
+                inputSanitizer = inputSanitizer
+            )
             ProviderType.OLLAMA -> OllamaProvider(
                 baseUrl = endpoint.url,
-                modelId = modelId
+                modelId = modelId,
+                inputSanitizer = inputSanitizer
             )
             ProviderType.LM_STUDIO -> LMStudioProvider(
                 baseUrl = endpoint.url,
                 modelId = modelId,
-                apiKey = keyStr
+                apiKey = keyStr,
+                inputSanitizer = inputSanitizer
             )
             ProviderType.CUSTOM -> CustomProvider(
                 baseUrl = endpoint.url,

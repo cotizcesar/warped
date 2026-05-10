@@ -1,5 +1,6 @@
 package com.warped.data.remote.provider
 
+import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.remote.api.OllamaApi
 import com.warped.data.remote.dto.OllamaChatRequest
 import com.warped.data.remote.dto.OllamaCreateRequest
@@ -16,6 +17,7 @@ import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.ModelInfo
 import com.warped.domain.model.ProviderType
+import com.warped.domain.model.Role
 import com.warped.domain.model.StreamToken
 import com.warped.domain.provider.LlmProvider
 import kotlinx.coroutines.Dispatchers
@@ -32,7 +34,8 @@ import java.util.concurrent.TimeUnit
 
 class OllamaProvider(
     private val baseUrl: String,
-    private val modelId: String
+    private val modelId: String,
+    private val inputSanitizer: InputSanitizer
 ) : LlmProvider {
     override val type = ProviderType.OLLAMA
     private val json = Json { ignoreUnknownKeys = true }
@@ -52,7 +55,8 @@ class OllamaProvider(
 
     override fun chat(request: ChatRequest): Flow<StreamToken> = flow {
         val messages = request.messages.map {
-            OllamaMessage(role = it.role.name.lowercase(), content = it.content)
+            val content = if (it.role == Role.USER) inputSanitizer.sanitize(it.content) else it.content
+            OllamaMessage(role = it.role.name.lowercase(), content = content)
         }
         val body = OllamaChatRequest(
             model = modelId,
@@ -73,7 +77,8 @@ class OllamaProvider(
     }.flowOn(Dispatchers.IO)
 
     fun generate(prompt: String): Flow<StreamToken> = flow {
-        val body = OllamaGenerateRequest(model = modelId, prompt = prompt, stream = true)
+        val sanitizedPrompt = inputSanitizer.sanitize(prompt)
+        val body = OllamaGenerateRequest(model = modelId, prompt = sanitizedPrompt, stream = true)
         try {
             val response = api.generate(body)
             if (response.isSuccessful) {

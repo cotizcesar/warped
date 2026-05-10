@@ -13,7 +13,7 @@ class HttpClientFactory @Inject constructor(
     private val apiKeyStore: ApiKeyStore
 ) {
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
+        level = if (com.warped.BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
     }
 
     fun create(): OkHttpClient = OkHttpClient.Builder()
