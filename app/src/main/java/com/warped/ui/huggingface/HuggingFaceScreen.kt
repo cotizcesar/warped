@@ -30,11 +30,9 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -90,7 +88,6 @@ fun HuggingFaceScreen(
             ModelDetailScreen(
                 model = uiState.selectedModel!!,
                 siblings = uiState.modelSiblings,
-                ggufFileDetails = uiState.ggufFileDetails,
                 isDownloading = uiState.isDownloading,
                 isDownloadPaused = uiState.isDownloadPaused,
                 downloadProgress = uiState.downloadProgress,
@@ -157,20 +154,6 @@ fun HuggingFaceScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            val formats = listOf("staffpicks" to "Staff Picks", "litertlm" to "LiteRT-LM")
-            val selectedTabIndex = formats.indexOfFirst { it.first == uiState.activeFormat }.coerceAtLeast(0)
-            PrimaryTabRow(selectedTabIndex = selectedTabIndex) {
-                formats.forEachIndexed { index, (formatValue, label) ->
-                    Tab(
-                        selected = selectedTabIndex == index,
-                        onClick = { viewModel.setActiveFormat(formatValue) },
-                        text = { Text(label) }
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(4.dp))
-
             if (uiState.isLoading) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
@@ -180,7 +163,6 @@ fun HuggingFaceScreen(
                     items(uiState.searchResults) { model ->
                         ModelSearchResultCard(
                             model = model,
-                            activeFormat = uiState.activeFormat,
                             onClick = { viewModel.selectModel(model) }
                         )
                     }
@@ -223,7 +205,6 @@ fun HuggingFaceScreen(
 @Composable
 private fun ModelSearchResultCard(
     model: com.warped.data.remote.dto.HuggingFaceModel,
-    activeFormat: String,
     onClick: () -> Unit
 ) {
     Card(
@@ -261,7 +242,7 @@ private fun ModelSearchResultCard(
             )
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FormatBadge(activeFormat)
+                FormatBadge()
                 AssistInfoChip(text = "${model.downloads} downloads")
                 AssistInfoChip(text = "${model.likes} likes")
                 model.tags.firstOrNull()?.let { tag ->
@@ -273,18 +254,15 @@ private fun ModelSearchResultCard(
 }
 
 @Composable
-private fun FormatBadge(format: String) {
-    val (color, label) = when {
-        format.equals("litertlm", ignoreCase = true) || format.equals("staffpicks", ignoreCase = true) -> Color(0xFF4CAF50) to "LiteRT-LM"
-        else -> MaterialTheme.colorScheme.outline to format
-    }
+private fun FormatBadge() {
+    val color = Color(0xFF4CAF50) // green for LiteRT-LM
     Surface(
         shape = MaterialTheme.shapes.extraSmall,
         color = color.copy(alpha = 0.15f),
         contentColor = color
     ) {
         Text(
-            text = label,
+            text = "LiteRT-LM",
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
             style = MaterialTheme.typography.labelSmall,
             maxLines = 1
@@ -311,7 +289,6 @@ private fun AssistInfoChip(text: String) {
 @Composable
 private fun SiblingFileCard(
     sibling: com.warped.data.remote.dto.HuggingFaceSibling,
-    ggufDetail: GgufFileDetail?,
     modelDownloads: Int,
     isDownloading: Boolean,
     onDownload: () -> Unit
@@ -366,40 +343,11 @@ private fun SiblingFileCard(
     }
 }
 
-@Composable
-private fun QuantizationBadge(quantization: String) {
-    val color = when {
-        quantization.startsWith("Q2", ignoreCase = true) -> Color(0xFFE53935) // red for low quant
-        quantization.startsWith("Q3", ignoreCase = true) -> Color(0xFFFB8C00) // orange
-        quantization.startsWith("Q4", ignoreCase = true) -> Color(0xFF43A047) // green
-        quantization.startsWith("Q5", ignoreCase = true) -> Color(0xFF1E88E5) // blue
-        quantization.startsWith("Q6", ignoreCase = true) -> Color(0xFF8E24AA) // purple
-        quantization.startsWith("Q8", ignoreCase = true) -> Color(0xFF00897B) // teal
-        quantization.startsWith("F", ignoreCase = true) -> Color(0xFFFFB300) // amber for fp16/fp32
-        quantization.startsWith("IQ", ignoreCase = true) -> Color(0xFF00ACC1) // cyan for IQ
-        quantization.startsWith("TQ", ignoreCase = true) -> Color(0xFF7CB342) // light green for TQ
-        else -> MaterialTheme.colorScheme.primary
-    }
-    Surface(
-        shape = MaterialTheme.shapes.extraSmall,
-        color = color.copy(alpha = 0.15f),
-        contentColor = color
-    ) {
-        Text(
-            text = quantization,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-            style = MaterialTheme.typography.labelSmall,
-            maxLines = 1
-        )
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ModelDetailScreen(
     model: com.warped.data.remote.dto.HuggingFaceModelDetail,
     siblings: List<com.warped.data.remote.dto.HuggingFaceSibling>,
-    ggufFileDetails: Map<String, GgufFileDetail>,
     isDownloading: Boolean,
     isDownloadPaused: Boolean,
     downloadProgress: Float,
@@ -544,10 +492,8 @@ private fun ModelDetailScreen(
 
                 items(siblings) { sibling ->
                     val effectiveSize = sibling.size.takeIf { it > 0 } ?: sibling.lfs?.size ?: 0L
-                    val detail = ggufFileDetails[sibling.rfilename]
                     SiblingFileCard(
                         sibling = sibling,
-                        ggufDetail = detail,
                         modelDownloads = model.downloads,
                         isDownloading = isDownloading || isDownloadPaused,
                         onDownload = { onDownload(sibling.rfilename, effectiveSize) }
