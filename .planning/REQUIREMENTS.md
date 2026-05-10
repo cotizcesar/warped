@@ -50,13 +50,13 @@ Requirements for the Bug Hunt, Cleanup & Hardening milestone. Each maps to a roa
 
 ### GGUF Removal (GGUF)
 
-- [ ] **GGUF-01**: Native/NDK code deleted — cpp/ tree, CMakeLists.txt, .gitmodules llama.cpp submodule removed; ndk and externalNativeBuild blocks removed from build.gradle.kts
-- [ ] **GGUF-02**: Kotlin engine files deleted — LlamaEngine.kt, LlamaLoadError.kt, GgufMetadataParser.kt, GgufQuantizationParser.kt removed; InferenceModule.kt updated
-- [ ] **GGUF-03**: EngineManager simplified — LLAMA_CPP enum value removed, switchToLlama(), probeVulkan(), getLlamaEngine() removed; only LiteRT-LM path remains
-- [ ] **GGUF-04**: Data model updated — LocalModel.modelFormat default → "LITERTLM", LocalModelEntity column default → "LITERTLM", ProviderType.LOCAL deprecated, Migrations MIGRATION_6_7 updated
-- [ ] **GGUF-05**: UI GGUF references removed — "GGUF" format pills/badges removed from ChatScreen, ModelsScreen, HelpScreen
-- [ ] **GGUF-06**: String resources cleaned — GGUF, llama.cpp, .gguf references removed from strings.xml (en + es)
-- [ ] **GGUF-07**: Download/Import cleaned — GGUF validation/header check removed from ModelDownloadWorker; .gguf default and GgufMetadataParser removed from ModelImportManager
+- [x] **GGUF-01**: Native/NDK code deleted — cpp/ tree, CMakeLists.txt, .gitmodules llama.cpp submodule removed; ndk and externalNativeBuild blocks removed from build.gradle.kts
+- [x] **GGUF-02**: Kotlin engine files deleted — LlamaEngine.kt, LlamaLoadError.kt, GgufMetadataParser.kt, GgufQuantizationParser.kt removed; InferenceModule.kt updated
+- [x] **GGUF-03**: EngineManager simplified — LLAMA_CPP enum value removed, switchToLlama(), probeVulkan(), getLlamaEngine() removed; only LiteRT-LM path remains
+- [x] **GGUF-04**: Data model updated — LocalModel.modelFormat default → "LITERTLM", LocalModelEntity column default → "LITERTLM", ProviderType.LOCAL deprecated, Migrations MIGRATION_6_7 updated
+- [x] **GGUF-05**: UI GGUF references removed — "GGUF" format pills/badges removed from ChatScreen, ModelsScreen, HelpScreen
+- [x] **GGUF-06**: String resources cleaned — GGUF, llama.cpp, .gguf references removed from strings.xml (en + es)
+- [x] **GGUF-07**: Download/Import cleaned — GGUF validation/header check removed from ModelDownloadWorker; .gguf default and GgufMetadataParser removed from ModelImportManager
 
 ### Search Simplification (SRCH)
 
@@ -107,13 +107,13 @@ Requirements for the Bug Hunt, Cleanup & Hardening milestone. Each maps to a roa
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| GGUF-01 | Phase 23 | Pending |
-| GGUF-02 | Phase 23 | Pending |
-| GGUF-03 | Phase 23 | Pending |
-| GGUF-04 | Phase 23 | Pending |
-| GGUF-05 | Phase 23 | Pending |
-| GGUF-06 | Phase 23 | Pending |
-| GGUF-07 | Phase 23 | Pending |
+| GGUF-01 | Phase 23 | ✅ Complete |
+| GGUF-02 | Phase 23 | ✅ Complete |
+| GGUF-03 | Phase 23 | ✅ Complete |
+| GGUF-04 | Phase 23 | ✅ Complete |
+| GGUF-05 | Phase 23 | ✅ Complete |
+| GGUF-06 | Phase 23 | ✅ Complete |
+| GGUF-07 | Phase 23 | ✅ Complete |
 | SRCH-01 | Phase 24 | Pending |
 | SRCH-02 | Phase 24 | Pending |
 | SRCH-03 | Phase 24 | Pending |

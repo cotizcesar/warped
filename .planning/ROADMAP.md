@@ -61,7 +61,7 @@
 **Plans:** 1 plan
 
 Plans:
-- [ ] 23-01-PLAN.md — Delete native code + engine files, simplify EngineManager/DI, clean data model/UI/strings/download
+- [x] 23-01-PLAN.md — Delete native code + engine files, simplify EngineManager/DI, clean data model/UI/strings/download
 
 ---
 

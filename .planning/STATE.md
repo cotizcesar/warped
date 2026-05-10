@@ -2,48 +2,40 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Bug Hunt, Cleanup & Hardening Pre-Prod
-status: planning
-last_updated: "2026-05-10T02:30:40.013Z"
-last_activity: 2026-05-10
+status: Defining requirements
+stopped_at: Completed Phase 23 (GGUF Removal) — 1 plan, 3 tasks, 7 requirements
+last_updated: "2026-05-10T03:41:32.000Z"
+last_activity: 2026-05-10 — Phase 23 complete
 progress:
-  total_phases: 0
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_phases: 5
+  completed_phases: 1
+  total_plans: 5
+  completed_plans: 1
+  percent: 20
 ---
 
 # Project State: Warped
 
-**Last updated:** 2026-05-09
-**Last activity:** 2026-05-09 — Milestone v1.4 completed
-
-See: .planning/PROJECT.md
-
-## Project Reference
-
-**Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** v1.4 complete — next milestone pending
-**Milestone:** v1.4 Onboarding Wizard — COMPLETE ✅
+**Last updated:** 2026-05-10
+**Last activity:** 2026-05-10 — Phase 23 complete
+**Milestone:** v1.5 Bug Hunt, Cleanup & Hardening Pre-Prod — In Progress
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-05-10 — Milestone v1.5 started
+Phase: 23-gguf-removal
+Plan: 01 — COMPLETE ✅
+Status: Ready for Phase 24 (Search Simplification)
+Last activity: 2026-05-10 — Phase 23 GGUF Removal completed
 
 ## Phase Structure
 
 | Phase | Name | Requirements | Status | Depends On |
 |-------|------|--------------|--------|------------|
-| 16 | Provider UI & API Key Auth | PROV-01..04, AUTH-01..03 (7) | ✅ Complete | — |
-| 17 | OpenAI + Anthropic Endpoints | OPAI-01..05, ANTH-01..02 (7) | ✅ Complete | Phase 16 |
-| 18 | Ollama Full API | OLLM-01..09 (9) | ✅ Complete | Phase 16 |
-| 19 | LM Studio Validation & MCP | LMST-01..08 (8) | ✅ Complete | Phase 16 |
-| 20 | Foundation & Flow | WZFL-01..08, WZCT-03 (9) | ✅ Complete | — |
-| 21 | Step Content & Context | WZST-01..11, WZCT-01, WZCT-02 (13) | ✅ Complete | Phase 20 |
-| 22 | Integration & Accessibility | WZAC-01..03 (3) | ✅ Complete | Phase 20, 21 |
+| 23 | GGUF Removal | GGUF-01..07 (7) | ✅ Complete | — |
+| 24 | Search Simplification | SRCH-01..04 (4) | ⏳ Pending | Phase 23 |
+| 25 | Bug Fixes | BUG-01..04 (4) | ⏳ Pending | Phase 23 |
+| 26 | Security Hardening | SEC-01..08 (8) | ⏳ Pending | — |
+| 27 | Wizard Update | WZRD-01..03 (3) | ⏳ Pending | Phase 23 |
 
 ## Completed
 
@@ -116,6 +108,9 @@ Last activity: 2026-05-10 — Milestone v1.5 started
 - [v1.4]: Context-aware step content with count badges and adapted descriptions
 - [v1.4]: Re-entry review mode with isReEntry flag, "Close wizard"/"Revisar" labels
 - [v1.4]: Back navigation: exit dialog on first launch page 0, back to Settings on re-entry
+- [23-01]: MemoryChecker retained in ChatViewModel — removing it alongside LlamaEngine would break non-GGUF memory checks (shouldWarn, canLoadModel, getMemoryInfo still used)
+- [23-01]: LocalLlmProvider deprecated as no-op stub instead of deleted — backward compatibility with existing injection points
+- [23-01]: Wizard files NOT modified per CONTEXT.md deferral to Phase 27
 
 ### Pending Todos
 
@@ -136,6 +131,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-09
-Stopped at: Milestone v1.4 completed — 3 phases, 25 requirements, audit passed
-Resume file: .planning/milestones/v1.4-ROADMAP.md
+Last session: 2026-05-10
+Stopped at: Completed 23-01-PLAN.md (GGUF Removal)
+Resume file: None
