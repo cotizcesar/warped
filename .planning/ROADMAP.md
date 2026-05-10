@@ -58,6 +58,11 @@
 - Update `ChatViewModel.kt`: remove `LlamaEngine`/`LlamaLoadError` imports and `llamaEngine` field
 - Update `LocalLlmProvider.kt`: remove llamaEngine dependency; handle only LiteRT-LM path
 
+**Plans:** 1 plan
+
+Plans:
+- [ ] 23-01-PLAN.md — Delete native code + engine files, simplify EngineManager/DI, clean data model/UI/strings/download
+
 ---
 
 ## Phase 24: Search Simplification
