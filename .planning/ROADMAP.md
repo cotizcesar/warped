@@ -97,6 +97,11 @@ Plans:
 - Update `HuggingFaceRepository.searchModels()` — remove `format` default param, hardcode `library = "litert"`
 - Update `HuggingFaceApi.searchModels()` — remove `library` default of `"gguf"`
 
+**Plans:** 1 plan
+
+Plans:
+- [ ] 24-01-PLAN.md — Delete Staff Picks DTOs/API/Repository, hardcode litert search, remove tabs and activeFormat from UI state and screen
+
 ---
 
 ## Phase 25: Bug Fixes
