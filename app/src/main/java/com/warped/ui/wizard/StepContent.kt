@@ -95,14 +95,6 @@ fun StepContent(
 @Composable
 private fun ContextBadge(step: WizardStep, contextData: WizardContextData) {
     val text = when (step) {
-        WizardStep.GGUF_DOWNLOAD -> {
-            if (contextData.ggufModelCount > 0) {
-                val pluralRes = if (contextData.ggufModelCount == 1) R.string.wizard_model_singular else R.string.wizard_model_plural
-                stringResource(R.string.wizard_badge_has_gguf, contextData.ggufModelCount, stringResource(pluralRes))
-            } else {
-                stringResource(R.string.wizard_badge_no_gguf)
-            }
-        }
         WizardStep.LITERT_LM -> {
             if (contextData.litertlmModelCount > 0) {
                 val pluralRes = if (contextData.litertlmModelCount == 1) R.string.wizard_litertlm_singular else R.string.wizard_litertlm_plural
@@ -138,16 +130,15 @@ private fun ContextBadge(step: WizardStep, contextData: WizardContextData) {
         else -> ""
     }
     if (text.isNotEmpty()) {
-        val isPositive = text.contains(stringResource(R.string.wizard_badge_has_gguf).take(2))
         Surface(
             shape = RoundedCornerShape(8.dp),
-            color = if (contextData.ggufModelCount > 0 || contextData.litertlmModelCount > 0 ||
+            color = if (contextData.litertlmModelCount > 0 ||
                 contextData.endpointCount > 0 || contextData.presetCount > 0 || contextData.chatCount > 0
             ) Accent.copy(alpha = 0.15f) else TextSecondary.copy(alpha = 0.1f)
         ) {
             Text(
                 text = text,
-                color = if (contextData.ggufModelCount > 0 || contextData.litertlmModelCount > 0 ||
+                color = if (contextData.litertlmModelCount > 0 ||
                     contextData.endpointCount > 0 || contextData.presetCount > 0 || contextData.chatCount > 0
                 ) Accent else TextSecondary,
                 fontSize = 13.sp,
@@ -163,14 +154,6 @@ private fun contextDescription(step: WizardStep, contextData: WizardContextData?
     if (contextData == null) return stringResource(step.descriptionRes)
 
     return when (step) {
-        WizardStep.GGUF_DOWNLOAD -> {
-            if (contextData.ggufModelCount > 0) {
-                val pluralRes = if (contextData.ggufModelCount == 1) R.string.wizard_model_singular else R.string.wizard_model_plural
-                stringResource(R.string.wizard_step_3_desc_has, contextData.ggufModelCount, stringResource(pluralRes))
-            } else {
-                stringResource(R.string.wizard_step_3_desc_no)
-            }
-        }
         WizardStep.LITERT_LM -> {
             if (contextData.litertlmModelCount > 0) {
                 val pluralRes = if (contextData.litertlmModelCount == 1) R.string.wizard_litertlm_singular else R.string.wizard_litertlm_plural

@@ -114,7 +114,6 @@
     <!-- Wizard step titles -->
     <string name="wizard_step_1_title">Bienvenida a Warped</string>
     <string name="wizard_step_2_title">Motores locales</string>
-    <string name="wizard_step_3_title">Modelos GGUF</string>
     <string name="wizard_step_4_title">Modelos LiteRT-LM</string>
     <string name="wizard_step_5_title">Chat local</string>
     <string name="wizard_step_6_title">Proveedores remotos</string>
@@ -124,8 +123,7 @@
 
     <!-- Wizard step descriptions (context-free) -->
     <string name="wizard_step_1_desc">Warped te permite ejecutar modelos de lenguaje (LLMs) directamente en tu dispositivo, sin conexión a internet. También puedes conectarte a proveedores como OpenAI, Anthropic, Ollama y LM Studio. Todo desde una sola app.</string>
-    <string name="wizard_step_2_desc">Warped usa dos motores para ejecutar modelos localmente: llama.cpp para modelos GGUF (el estándar más usado) y LiteRT-LM de Google para modelos .litertlm optimizados para Android. Puedes elegir el que mejor funcione en tu dispositivo.</string>
-    <string name="wizard_step_3_desc">Los modelos GGUF son el formato estándar para LLMs locales. Puedes buscar y descargar modelos desde Hugging Face directamente en la app, con pausa y reanudación de descargas.</string>
+    <string name="wizard_step_2_desc">Warped usa LiteRT-LM de Google para ejecutar modelos localmente en tu dispositivo. LiteRT-LM está optimizado para Android con aceleración por GPU, ofreciendo inferencia rápida para modelos .litertlm descargados desde Hugging Face.</string>
     <string name="wizard_step_4_desc">LiteRT-LM es el motor de inferencia de Google, optimizado para Android. Usa modelos en formato .litertlm con aceleración por GPU y NPU en dispositivos compatibles. Importa tus modelos desde el almacenamiento del dispositivo.</string>
     <string name="wizard_step_5_desc">Carga un modelo local, ajusta los parámetros de generación como temperatura y contexto, y chatea con respuestas en tiempo real. Todo funciona sin conexión a internet: tus conversaciones son privadas y se quedan en tu dispositivo.</string>
     <string name="wizard_step_6_desc">Conecta Warped a servicios en la nube como OpenAI, Anthropic, Ollama y LM Studio. También puedes agregar servidores personalizados compatibles con la API de OpenAI. Tú traes tus propias API keys, nosotros las guardamos seguras.</string>
@@ -136,7 +134,6 @@
     <!-- Wizard step CTA labels -->
     <string name="wizard_step_1_cta">Comenzar</string>
     <string name="wizard_step_2_cta">Ver modelos</string>
-    <string name="wizard_step_3_cta">Explorar modelos</string>
     <string name="wizard_step_4_cta">Importar modelo</string>
     <string name="wizard_step_5_cta">Ir al chat</string>
     <string name="wizard_step_6_cta">Configurar endpoints</string>
@@ -145,8 +142,6 @@
     <string name="wizard_step_9_cta">Ver historial</string>
 
     <!-- Wizard context-aware descriptions (has data) -->
-    <string name="wizard_step_3_desc_has">Ya tienes %1$d %2$s GGUF descargados. ¡Explora el catálogo de Hugging Face para encontrar más modelos!</string>
-    <string name="wizard_step_3_desc_no">Descarga tu primer modelo GGUF desde Hugging Face. Hay miles de modelos disponibles: desde 1B hasta 70B parámetros.</string>
     <string name="wizard_step_4_desc_has">Ya tienes %1$d %2$s LiteRT-LM importados. Puedes importar más desde el almacenamiento de tu dispositivo.</string>
     <string name="wizard_step_4_desc_no">Importa tu primer modelo .litertlm desde el almacenamiento de tu dispositivo. LiteRT-LM está optimizado para Android con aceleración por GPU.</string>
     <string name="wizard_step_6_desc_has">Ya tienes %1$d %2$s configurados. ¡Conéctate a más proveedores o administra los existentes!</string>
@@ -157,8 +152,6 @@
     <string name="wizard_step_9_desc_no">Tu historial de conversaciones aparecerá aquí. Cada chat se guarda automáticamente para que puedas retomarlo cuando quieras.</string>
 
     <!-- Wizard context badges -->
-    <string name="wizard_badge_has_gguf">Tienes %1$d %2$s GGUF descargados</string>
-    <string name="wizard_badge_no_gguf">Aún no tienes modelos GGUF</string>
     <string name="wizard_badge_has_litertlm">Tienes %1$d %2$s LiteRT-LM importados</string>
     <string name="wizard_badge_no_litertlm">Aún no tienes modelos LiteRT-LM</string>
     <string name="wizard_badge_has_endpoints">Tienes %1$d %2$s configurados</string>
@@ -169,8 +162,6 @@
     <string name="wizard_badge_no_chats">Aún no tienes conversaciones</string>
 
     <!-- Wizard plurals -->
-    <string name="wizard_model_singular">modelo</string>
-    <string name="wizard_model_plural">modelos</string>
     <string name="wizard_litertlm_singular">modelo</string>
     <string name="wizard_litertlm_plural">modelos</string>
     <string name="wizard_endpoint_singular">endpoint</string>
