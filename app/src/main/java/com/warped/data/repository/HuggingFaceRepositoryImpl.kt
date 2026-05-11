@@ -38,7 +38,7 @@ class HuggingFaceRepositoryImpl @Inject constructor(
 
     override suspend fun searchModels(query: String?, author: String?, limit: Int): Result<List<HuggingFaceModel>> {
         return try {
-            val response = api.searchModels(query = query, library = "litert", author = author, limit = limit)
+            val response = api.searchModels(query = query, library = null, author = author, limit = limit)
             if (response.isSuccessful) {
                 val body = response.body() ?: emptyList()
                 Result.success(body)
