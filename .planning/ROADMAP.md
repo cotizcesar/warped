@@ -188,17 +188,10 @@ Plans:
 2. Engine step describes only LiteRT-LM; download step describes only .litertlm models
 3. Re-opening wizard from Settings shows updated content with correct model counts
 
-### Tasks
+**Plans:** 1 plan
 
-- Remove `GGUF_DOWNLOAD` from `WizardStep.kt` enum; renumber subsequent steps if needed
-- Remove `ggufModelCount` from `WizardContextData` in `WizardUiState.kt`
-- Remove GGUF count logic from `WizardViewModel.kt` (line 57)
-- Remove GGUF badge text from `StepContent.kt` (lines 98-104)
-- Remove GGUF description block from `StepContent.kt` (lines 166-172)
-- Update Step 2 (Motores locales): remove GGUF/llama.cpp comparison; explain only LiteRT-LM
-- Update Step 3 (Descargar modelos): consolidate GGUF + LiteRT-LM download steps; describe only .litertlm
-- Update `WizardStep.kt` step count references; update `PageIndicator` max dots to 8
-- Update string resources for wizard GGUF references in `strings.xml` (en + es)
+Plans:
+- [ ] 27-01-PLAN.md — Remove GGUF_DOWNLOAD enum, simplify state model (WizardStep/UiState/ViewModel), clean StepContent GGUF badges/descriptions, update wizard_step_2_desc and remove GGUF strings in en + es
 
 ---
 
