@@ -60,7 +60,6 @@ class WizardViewModel @Inject constructor(
         val chats = chatRepository.observeConversations().first()
         val presets = presetRepository.observePresets().first()
 
-        val ggufCount = models.count { it.modelFormat == "GGUF" || it.modelFormat == "gguf" }
         val litertlmCount = models.count {
             it.modelFormat.equals("LITERTLM", ignoreCase = true) ||
                     it.modelFormat.equals("litertlm", ignoreCase = true)
@@ -69,7 +68,6 @@ class WizardViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 contextData = WizardContextData(
-                    ggufModelCount = ggufCount,
                     litertlmModelCount = litertlmCount,
                     endpointCount = endpoints.size,
                     chatCount = chats.size,

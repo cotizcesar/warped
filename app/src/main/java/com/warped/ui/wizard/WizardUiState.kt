@@ -11,7 +11,6 @@ data class WizardUiState(
 )
 
 data class WizardContextData(
-    val ggufModelCount: Int = 0,
     val litertlmModelCount: Int = 0,
     val endpointCount: Int = 0,
     val chatCount: Int = 0,

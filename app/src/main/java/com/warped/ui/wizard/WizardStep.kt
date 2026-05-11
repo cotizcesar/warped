@@ -6,7 +6,6 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Memory
@@ -35,13 +34,6 @@ enum class WizardStep(
         ctaLabelRes = R.string.wizard_step_2_cta,
         icon = Icons.Filled.Memory,
         ctaRoute = Screen.Models.route
-    ),
-    GGUF_DOWNLOAD(
-        titleRes = R.string.wizard_step_3_title,
-        descriptionRes = R.string.wizard_step_3_desc,
-        ctaLabelRes = R.string.wizard_step_3_cta,
-        icon = Icons.Filled.CloudDownload,
-        ctaRoute = Screen.HuggingFace.route
     ),
     LITERT_LM(
         titleRes = R.string.wizard_step_4_title,
