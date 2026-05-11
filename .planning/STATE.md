@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Bug Hunt, Cleanup & Hardening Pre-Prod
-status: Phase 26 complete — ready for Phase 27 (Wizard Update)
-stopped_at: Completed 26-01-PLAN.md (Security Hardening)
-last_updated: "2026-05-10T05:39:26Z"
-last_activity: 2026-05-10 — Phase 26 complete
+status: v1.5 Complete ✅ — All 6 phases done
+stopped_at: Completed 27-01-PLAN.md (Wizard Update)
+last_updated: "2026-05-11T00:14:46Z"
+last_activity: 2026-05-11 — Phase 27 (Wizard Update) complete
 progress:
   total_phases: 5
   completed_phases: 5
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 6
+  completed_plans: 6
   percent: 100
 ---
 
@@ -22,10 +22,11 @@ progress:
 
 ## Current Position
 
-Phase: 26-security-hardening
+Phase: 27-wizard-update
 Plan: 01 — COMPLETE ✅
-Status: Ready for Phase 27 (Wizard Update)
-Last activity: 2026-05-10 — Security hardening completed (8 requirements, 3 tasks, 32 files)
+Status: v1.5 Complete ✅ — All 6 phases done
+Next: Ready for v1.6 milestone planning
+Last activity: 2026-05-11 — Wizard updated (GGUF references removed, LiteRT-LM-only engine description)
 
 ## Phase Structure
 
@@ -35,7 +36,7 @@ Last activity: 2026-05-10 — Security hardening completed (8 requirements, 3 ta
 | 24 | Search Simplification | SRCH-01..04 (4) | ✅ Complete | Phase 23 |
 | 25 | Bug Fixes | BUG-01..04 (4) | ✅ Complete | Phase 23 |
 | 26 | Security Hardening | SEC-01..08 (8) | ✅ Complete | — |
-| 27 | Wizard Update | WZRD-01..03 (3) | ⏳ Pending | Phase 23 |
+| 27 | Wizard Update | WZRD-01..03 (3) | ✅ Complete | Phase 23 |
 
 ## Completed
 
@@ -115,6 +116,7 @@ Last activity: 2026-05-10 — Security hardening completed (8 requirements, 3 ta
 - [24-01]: Removed library default from HuggingFaceApi.searchModels() — all callers pass explicit library value
 - [24-01]: FormatBadge simplified to parameterless composable — always green 0xFF4CAF50 for LiteRT-LM
 - [25-01]: Filter deleteMessage by it.id != messageId.toString() because ChatMessage.id is String (derived from MessageEntity Long ID via .toString()), not Long
+- [27-01]: WizardStep reduced from 9 to 8 values; GGUF_DOWNLOAD removed; all GGUF wizard strings deleted; wizard_step_2_desc updated to LiteRT-LM-only in both en/es
 
 ### Pending Todos
 
@@ -135,6 +137,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-10T05:39:26Z
-Stopped at: Completed 26-01-PLAN.md (Security Hardening)
+Last session: 2026-05-11T00:14:46Z
+Stopped at: Completed 27-01-PLAN.md (Wizard Update)
 Resume file: None

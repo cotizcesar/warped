@@ -85,9 +85,9 @@ Requirements for the Bug Hunt, Cleanup & Hardening milestone. Each maps to a roa
 
 ### Wizard Update (WZRD)
 
-- [ ] **WZRD-01**: Wizard steps updated — GGUF_DOWNLOAD step removed; model download steps consolidated; step count reduced from 9 to 8; step descriptions updated to reflect LiteRT-LM-only engine
-- [ ] **WZRD-02**: Wizard state simplified — ggufModelCount removed from WizardUiState; WizardViewModel GGUF count logic removed; context badges updated
-- [ ] **WZRD-03**: Step content updated — GGUF-specific badges and descriptions removed from StepContent; engine comparison step simplified to LiteRT-LM-only explanation
+- [x] **WZRD-01**: Wizard steps updated — GGUF_DOWNLOAD step removed; model download steps consolidated; step count reduced from 9 to 8; step descriptions updated to reflect LiteRT-LM-only engine
+- [x] **WZRD-02**: Wizard state simplified — ggufModelCount removed from WizardUiState; WizardViewModel GGUF count logic removed; context badges updated
+- [x] **WZRD-03**: Step content updated — GGUF-specific badges and descriptions removed from StepContent; engine comparison step simplified to LiteRT-LM-only explanation
 
 ## Out of Scope
 
@@ -130,9 +130,9 @@ Requirements for the Bug Hunt, Cleanup & Hardening milestone. Each maps to a roa
 | SEC-06 | Phase 26 | Complete |
 | SEC-07 | Phase 26 | Complete |
 | SEC-08 | Phase 26 | Complete |
-| WZRD-01 | Phase 27 | Pending |
-| WZRD-02 | Phase 27 | Pending |
-| WZRD-03 | Phase 27 | Pending |
+| WZRD-01 | Phase 27 | Complete |
+| WZRD-02 | Phase 27 | Complete |
+| WZRD-03 | Phase 27 | Complete |
 
 **Coverage:**
 - v1.5 requirements: 26 total

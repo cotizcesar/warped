@@ -13,7 +13,7 @@
 | 24 | Search Simplification | Remove tabs, hardcode litert search, delete Staff Picks | SRCH-01..04 (4) | 4 |
 | 25 | Bug Fixes | 1/1 | Complete   | 2026-05-10 |
 | 26 | Security Hardening | 1/1 | Complete   | 2026-05-10 |
-| 27 | Wizard Update | Update onboarding wizard for LiteRT-LM-only engine | WZRD-01..03 (3) | 3 |
+| 27 | Wizard Update | 1/1 | Complete   | 2026-05-11 |
 
 **26 requirements | 5 phases | All covered ✓**
 
@@ -191,7 +191,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 27-01-PLAN.md — Remove GGUF_DOWNLOAD enum, simplify state model (WizardStep/UiState/ViewModel), clean StepContent GGUF badges/descriptions, update wizard_step_2_desc and remove GGUF strings in en + es
+- [x] 27-01-PLAN.md — Remove GGUF_DOWNLOAD enum, simplify state model (WizardStep/UiState/ViewModel), clean StepContent GGUF badges/descriptions, update wizard_step_2_desc and remove GGUF strings in en + es
 
 ---
 
