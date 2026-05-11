@@ -2,22 +2,45 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Bug Hunt, Cleanup & Hardening Pre-Prod
-status: v1.5 Complete ✅ — All 6 phases done
-stopped_at: Completed 27-01-PLAN.md (Wizard Update)
-last_updated: "2026-05-11T00:14:46Z"
-last_activity: 2026-05-11 — Phase 27 (Wizard Update) complete
+status: Complete ✅
+stopped_at: Milestone v1.5 complete — audit passed, archived
+last_updated: "2026-05-09T23:59:59Z"
+last_activity: 2026-05-09 — Milestone v1.5 completed
 progress:
   total_phases: 5
   completed_phases: 5
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 5
+  completed_plans: 5
   percent: 100
 ---
 
 # Project State: Warped
 
-**Last updated:** 2026-05-10
-**Last activity:** 2026-05-10 — Phase 26 complete
+**Last updated:** 2026-05-09
+**Last activity:** 2026-05-09 — Milestone v1.5 completed and archived
+
+## Completed
+
+- ✅ v1.0 MVP — 5 phases, 30 requirements
+- ✅ v1.1 LiteRT-LM Integration — 5 phases, 26 requirements
+- ✅ v1.2 GGUF Native Inference — 5 phases, 27 requirements
+- ✅ v1.3 Remote Provider Endpoints & UX — 4 phases, 31 requirements
+- ✅ v1.4 Onboarding Wizard — 3 phases, 25 requirements
+- ✅ v1.5 Bug Hunt, Cleanup & Hardening — 5 phases, 26 requirements
+
+**Total across all milestones:** 27 phases, 165 requirements
+
+## v1.5 Deliverables
+
+- GGUF/llama.cpp completely removed (native code, JNI, CMake, 4 engine files, 30+ source files)
+- Model search simplified to single bar (library=litert hardcoded, no tabs, no Staff Picks)
+- 4 chat bugs fixed (code streaming, model reload, conversation tracking, ghost messages)
+- 8 security hardening measures (ProGuard, input sanitization, crash handler, network lockdown, logging, credentials, SQLCipher)
+- Wizard updated (9→8 steps, GGUF_DOWNLOAD removed, LiteRT-LM-only descriptions)
+
+## Next: Ready for next milestone
+
+Run `/gsd-new-milestone` to define the next version.
 **Milestone:** v1.5 Bug Hunt, Cleanup & Hardening Pre-Prod — Complete ✅
 
 ## Current Position

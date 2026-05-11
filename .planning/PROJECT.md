@@ -8,9 +8,11 @@ An Android application equivalent to LM Studio for mobile, enabling users to run
 
 Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
 
-## Current Milestone: v1.5 Bug Hunt, Cleanup & Hardening Pre-Prod
+## Current Milestone: v1.5 Bug Hunt, Cleanup & Hardening Pre-Prod — COMPLETE ✅
 
-**Goal:** Eliminate GGUF/llama.cpp support entirely, simplify model search to litertlm-community only, fix 4 critical chat bugs (code rendering, model reload, active message tracking, ghost delete), and harden the app for production release (ProGuard/R8, input validation, error handling, secure storage, network security).
+**Archived:** 2026-05-09 | [Archive →](.planning/milestones/v1.5-ROADMAP.md)
+
+5 phases, 26 requirements completed. GGUF/llama.cpp fully removed. LiteRT-LM sole local engine. Model search simplified. 4 chat bugs fixed. 8 security hardening measures applied. Wizard updated.
 
 **Target features:**
 - Complete removal of GGUF engine: llama.cpp JNI, CMake, Vulkan backend, GGUF downloads, GGUF data model, related ProGuard rules
