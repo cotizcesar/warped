@@ -23,6 +23,7 @@ import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.util.concurrent.TimeUnit
+import timber.log.Timber
 
 class AnthropicProvider(
     private val baseUrl: String,

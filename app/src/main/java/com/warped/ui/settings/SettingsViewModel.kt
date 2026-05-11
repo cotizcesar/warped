@@ -21,6 +21,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 
 import javax.inject.Inject
+import timber.log.Timber
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -37,7 +38,7 @@ class SettingsViewModel @Inject constructor(
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
-        timber.log.Timber.e(throwable, "Unhandled coroutine exception")
+        Timber.e(throwable, "Unhandled coroutine exception")
     }
 
     init {

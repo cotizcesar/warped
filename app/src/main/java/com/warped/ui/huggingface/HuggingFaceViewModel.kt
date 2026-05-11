@@ -16,6 +16,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 
 import javax.inject.Inject
+import timber.log.Timber
 
 @HiltViewModel
 class HuggingFaceViewModel @Inject constructor(

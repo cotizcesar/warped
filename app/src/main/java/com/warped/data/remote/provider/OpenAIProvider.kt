@@ -32,6 +32,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import timber.log.Timber
 
 class OpenAIProvider(
     private val baseUrl: String,

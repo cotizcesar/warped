@@ -13,6 +13,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 
 import javax.inject.Inject
+import timber.log.Timber
 
 data class ToolSettingsUiState(
     val toolStates: List<ToolState> = ToolDefinitions.all.map {

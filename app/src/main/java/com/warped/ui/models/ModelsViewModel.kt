@@ -8,6 +8,7 @@ import com.warped.data.local.download.ModelDownloadManager
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.inference.ModelImportManager
 import com.warped.data.local.security.ApiKeyStore
+import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.remote.provider.LMStudioProvider
 import com.warped.data.remote.provider.ProviderRouter
 import com.warped.domain.model.ActiveModelSelection
@@ -25,6 +26,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 
 import javax.inject.Inject
+import timber.log.Timber
 
 @HiltViewModel
 class ModelsViewModel @Inject constructor(
@@ -35,7 +37,8 @@ class ModelsViewModel @Inject constructor(
     private val modelDownloadManager: ModelDownloadManager,
     private val memoryChecker: MemoryChecker,
     private val apiKeyStore: ApiKeyStore,
-    private val providerRouter: ProviderRouter
+    private val providerRouter: ProviderRouter,
+    private val inputSanitizer: InputSanitizer
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ModelsUiState())
@@ -277,7 +280,7 @@ class ModelsViewModel @Inject constructor(
             _uiState.update { it.copy(isFetchingEndpointModels = true, availableEndpointModels = emptyList(), availableEndpointModelsData = emptyList()) }
             try {
                 val provider = if (apiType == ProviderType.ANTHROPIC) {
-                    LMStudioProvider(baseUrl = url, modelId = "fetch")
+                    LMStudioProvider(baseUrl = url, modelId = "fetch", inputSanitizer = inputSanitizer)
                 } else {
                     providerRouter.resolve(tempEndpoint, "fetch")
                 }

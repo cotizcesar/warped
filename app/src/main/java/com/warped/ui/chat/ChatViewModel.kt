@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.warped.data.local.inference.BackendType
 import com.warped.data.local.inference.EngineManager
+import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.remote.provider.ProviderRouter
 import com.warped.domain.model.*
@@ -38,6 +39,7 @@ class ChatViewModel @Inject constructor(
     private val parameterStore: ParameterStore,
     private val engineManager: EngineManager,
     private val memoryChecker: MemoryChecker,
+    private val inputSanitizer: InputSanitizer,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -449,7 +451,7 @@ class ChatViewModel @Inject constructor(
                         try {
                             val endpoint = endpointRepository.getActive()
                             if (endpoint != null) {
-                                val provider = com.warped.data.remote.provider.LMStudioProvider(endpoint.url, oldModelId)
+                                val provider = com.warped.data.remote.provider.LMStudioProvider(endpoint.url, oldModelId, inputSanitizer = inputSanitizer)
                                 provider.unloadModel(oldInstance)
                             }
                         } catch (e: Exception) { Timber.e(e, "Chat: LMStudio unload failed") }
@@ -472,7 +474,7 @@ class ChatViewModel @Inject constructor(
                         _uiState.update { it.copy(loadedInstanceId = null) }
                         val endpoint = endpointRepository.getActive()
                         if (endpoint != null) {
-                            val provider = com.warped.data.remote.provider.LMStudioProvider(endpoint.url, modelId)
+                            val provider = com.warped.data.remote.provider.LMStudioProvider(endpoint.url, modelId, inputSanitizer = inputSanitizer)
                             val result = provider.loadModel(modelId)
                             result.onSuccess { instanceId ->
                                 _uiState.update { it.copy(loadedInstanceId = instanceId) }
