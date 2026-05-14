@@ -169,6 +169,10 @@ dependencies {
     androidTestImplementation(libs.compose.ui.test)
 }
 
+tasks.withType<Test> {
+    useJUnitPlatform()
+}
+
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
