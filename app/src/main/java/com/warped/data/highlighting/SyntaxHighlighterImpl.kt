@@ -7,6 +7,8 @@ import com.warped.domain.model.TokenType
 import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.SyntaxThemes
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import javax.inject.Inject
@@ -17,6 +19,7 @@ class SyntaxHighlighterImpl @Inject constructor(
     private val languageDetector: LanguageDetector,
 ) : SyntaxHighlighter {
 
+    private val cacheMutex = Mutex()
     private val cache = object : LinkedHashMap<Int, List<SyntaxToken>>(50, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, List<SyntaxToken>>?): Boolean {
             return size > 50
@@ -31,7 +34,8 @@ class SyntaxHighlighterImpl @Inject constructor(
             return listOf(SyntaxToken(0, code.length, TokenType.PLAIN, code))
         }
         val key = cacheKey(code, language)
-        cache[key]?.let { return it }
+        val cached = cacheMutex.withLock { cache[key] }
+        if (cached != null) return cached
         return withContext(Dispatchers.Default) {
             val syntaxLanguage = languageDetector.resolveSyntaxLanguage(language)
             val highlights = Highlights.Builder()
@@ -41,7 +45,7 @@ class SyntaxHighlighterImpl @Inject constructor(
                 .build()
             val structure = highlights.getCodeStructure()
             val tokens = TypeMapper.map(structure, code)
-            cache[key] = tokens
+            cacheMutex.withLock { cache[key] = tokens }
             tokens
         }
     }
