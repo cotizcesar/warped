@@ -8,6 +8,111 @@ import org.junit.jupiter.api.Test
 
 class TypeMapperTest {
 
+    // === Core Mapping Tests ===
+
+    @Test
+    fun `maps keywords to KEYWORD type`() {
+        val code = "public class Foo {}"
+        val structure = CodeStructure(
+            marks = setOf(PhraseLocation(16, 17), PhraseLocation(18, 19)),
+            punctuations = emptySet(),
+            keywords = setOf(PhraseLocation(0, 6), PhraseLocation(7, 12)),
+            strings = emptySet(),
+            literals = emptySet(),
+            comments = emptySet(),
+            multilineComments = emptySet(),
+            annotations = emptySet(),
+            incremental = false,
+        )
+        val tokens = TypeMapper.map(structure, code)
+        val keywordTokens = tokens.filter { it.type == TokenType.KEYWORD }
+        assertThat(keywordTokens).hasSize(2)
+        assertThat(keywordTokens[0].text).isEqualTo("public")
+        assertThat(keywordTokens[1].text).isEqualTo("class")
+    }
+
+    @Test
+    fun `maps strings to STRING type`() {
+        val code = "val x = \"hello world\""
+        val structure = CodeStructure(
+            marks = emptySet(),
+            punctuations = setOf(PhraseLocation(6, 7)),
+            keywords = setOf(PhraseLocation(0, 3)),
+            strings = setOf(PhraseLocation(8, 21)),
+            literals = emptySet(),
+            comments = emptySet(),
+            multilineComments = emptySet(),
+            annotations = emptySet(),
+            incremental = false,
+        )
+        val tokens = TypeMapper.map(structure, code)
+        val stringTokens = tokens.filter { it.type == TokenType.STRING }
+        assertThat(stringTokens).hasSize(1)
+        assertThat(stringTokens[0].text).isEqualTo("\"hello world\"")
+    }
+
+    @Test
+    fun `maps comments to COMMENT type`() {
+        val code = "// this is a comment\nval x = 1"
+        val structure = CodeStructure(
+            marks = emptySet(),
+            punctuations = setOf(PhraseLocation(26, 27)),
+            keywords = setOf(PhraseLocation(20, 23)),
+            strings = emptySet(),
+            literals = setOf(PhraseLocation(28, 29)),
+            comments = setOf(PhraseLocation(0, 19)),
+            multilineComments = emptySet(),
+            annotations = emptySet(),
+            incremental = false,
+        )
+        val tokens = TypeMapper.map(structure, code)
+        val commentTokens = tokens.filter { it.type == TokenType.COMMENT }
+        assertThat(commentTokens).hasSize(1)
+        assertThat(commentTokens[0].text).startsWith("//")
+    }
+
+    @Test
+    fun `maps multiline comments to COMMENT type`() {
+        val code = "/* block comment */\nval x = 1"
+        val structure = CodeStructure(
+            marks = emptySet(),
+            punctuations = setOf(PhraseLocation(26, 27)),
+            keywords = setOf(PhraseLocation(20, 23)),
+            strings = emptySet(),
+            literals = setOf(PhraseLocation(28, 29)),
+            comments = emptySet(),
+            multilineComments = setOf(PhraseLocation(0, 19)),
+            annotations = emptySet(),
+            incremental = false,
+        )
+        val tokens = TypeMapper.map(structure, code)
+        val commentTokens = tokens.filter { it.type == TokenType.COMMENT }
+        assertThat(commentTokens).hasSize(1)
+        assertThat(commentTokens[0].text).isEqualTo("/* block comment */")
+    }
+
+    @Test
+    fun `maps annotations to PROPERTY type`() {
+        val code = "@Override\npublic void foo() {}"
+        val structure = CodeStructure(
+            marks = setOf(PhraseLocation(25, 26), PhraseLocation(26, 27)),
+            punctuations = emptySet(),
+            keywords = setOf(PhraseLocation(10, 16), PhraseLocation(17, 21)),
+            strings = emptySet(),
+            literals = emptySet(),
+            comments = emptySet(),
+            multilineComments = emptySet(),
+            annotations = setOf(PhraseLocation(0, 9)),
+            incremental = false,
+        )
+        val tokens = TypeMapper.map(structure, code)
+        val propertyTokens = tokens.filter { it.type == TokenType.PROPERTY }
+        assertThat(propertyTokens).hasSize(1)
+        assertThat(propertyTokens[0].text).isEqualTo("@Override")
+    }
+
+    // === Integration: Full Java snippet ===
+
     @Test
     fun `map should return tokens with correct types for Java snippet`() {
         val code = "public class Foo { int x = 42; }"
@@ -124,5 +229,60 @@ class TypeMapperTest {
 
         val plainTokens = tokens.filter { it.type == TokenType.PLAIN }
         assertThat(plainTokens.map { it.text }.joinToString("")).contains("x")
+    }
+
+    // === Edge Cases ===
+
+    @Test
+    fun `handles empty code gracefully`() {
+        val code = ""
+        val structure = CodeStructure(
+            marks = emptySet(), punctuations = emptySet(), keywords = emptySet(),
+            strings = emptySet(), literals = emptySet(), comments = emptySet(),
+            multilineComments = emptySet(), annotations = emptySet(), incremental = false,
+        )
+        val tokens = TypeMapper.map(structure, code)
+        assertThat(tokens).isEmpty()
+    }
+
+    @Test
+    fun `handles single character code`() {
+        val code = "x"
+        val structure = CodeStructure(
+            marks = emptySet(), punctuations = emptySet(), keywords = emptySet(),
+            strings = emptySet(), literals = emptySet(), comments = emptySet(),
+            multilineComments = emptySet(), annotations = emptySet(), incremental = false,
+        )
+        val tokens = TypeMapper.map(structure, code)
+        assertThat(tokens).hasSize(1)
+        assertThat(tokens[0].type).isEqualTo(TokenType.PLAIN)
+        assertThat(tokens[0].text).isEqualTo("x")
+    }
+
+    @Test
+    fun `splits punctuations into OPERATOR and PUNCTUATION including parens`() {
+        val code = "x = (a + b) * c"
+        val structure = CodeStructure(
+            marks = emptySet(),
+            punctuations = setOf(
+                PhraseLocation(2, 3),
+                PhraseLocation(4, 5),
+                PhraseLocation(7, 8),
+                PhraseLocation(10, 11),
+                PhraseLocation(12, 13),
+            ),
+            keywords = emptySet(),
+            strings = emptySet(),
+            literals = emptySet(),
+            comments = emptySet(),
+            multilineComments = emptySet(),
+            annotations = emptySet(),
+            incremental = false,
+        )
+        val tokens = TypeMapper.map(structure, code)
+        val operatorTokens = tokens.filter { it.type == TokenType.OPERATOR }
+        val punctuationTokens = tokens.filter { it.type == TokenType.PUNCTUATION }
+        assertThat(operatorTokens.map { it.text }).containsExactly("=", "+", "*")
+        assertThat(punctuationTokens.map { it.text }).containsExactly("(", ")")
     }
 }
