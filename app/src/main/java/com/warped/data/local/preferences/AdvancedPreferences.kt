@@ -15,6 +15,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -83,6 +84,21 @@ class AdvancedPreferences @Inject constructor(
         }
     }
 
+    /**
+     * Perform a one-time migration from legacy CodeTheme enum names
+     * to SyntaxTheme keys. Safe to call multiple times — only writes
+     * when a legacy value is detected in the DataStore.
+     */
+    suspend fun migrateCodeThemeIfNeeded() {
+        context.advancedPreferencesStore.edit { prefs ->
+            val stored = prefs[KEY_CODE_THEME] ?: return
+            val migrated = migrateCodeTheme(stored)
+            if (migrated.key != stored) {
+                prefs[KEY_CODE_THEME] = migrated.key
+            }
+        }
+    }
+
     private fun migrateCodeTheme(oldName: String): SyntaxTheme = when (oldName) {
         "MONOKAI" -> SyntaxTheme.MONOKAI
         "DRACULA" -> SyntaxTheme.DRACULA
@@ -96,20 +112,22 @@ class AdvancedPreferences @Inject constructor(
         }
     }
 
-    val syntaxTheme: Flow<SyntaxTheme> = context.advancedPreferencesStore.data.map { prefs ->
-        val storedKey = prefs[KEY_CODE_THEME]
-        when (storedKey) {
-            null -> SyntaxTheme.MONOKAI
-            "monokai", "one_dark", "github", "dracula" -> SyntaxTheme.fromKey(storedKey)
-            "MONOKAI", "DRACULA", "NORD", "ONE_DARK", "GITHUB", "SOLARIZED_DARK" -> {
-                val migrated = migrateCodeTheme(storedKey)
-                Timber.w("AdvancedPreferences: migrating legacy CodeTheme '%s' -> SyntaxTheme '%s'", storedKey, migrated.key)
-                context.advancedPreferencesStore.edit { it[KEY_CODE_THEME] = migrated.key }
-                migrated
+    val syntaxTheme: Flow<SyntaxTheme> = context.advancedPreferencesStore.data
+        .onStart { migrateCodeThemeIfNeeded() }
+        .map { prefs ->
+            val storedKey = prefs[KEY_CODE_THEME]
+            when (storedKey) {
+                null -> SyntaxTheme.MONOKAI
+                "monokai", "one_dark", "github", "dracula" -> SyntaxTheme.fromKey(storedKey)
+                "MONOKAI", "DRACULA", "NORD", "ONE_DARK", "GITHUB", "SOLARIZED_DARK" -> {
+                    val migrated = migrateCodeTheme(storedKey)
+                    Timber.w("AdvancedPreferences: resolved legacy CodeTheme '%s' -> SyntaxTheme '%s' (migrated in onStart)", storedKey, migrated.key)
+                    migrated
+                }
+                else -> SyntaxTheme.MONOKAI
             }
-            else -> SyntaxTheme.MONOKAI
         }
-    }.distinctUntilChanged()
+        .distinctUntilChanged()
 
     suspend fun setSyntaxTheme(theme: SyntaxTheme) {
         context.advancedPreferencesStore.edit { prefs ->
