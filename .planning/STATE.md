@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.5
-milestone_name: Bug Hunt, Cleanup & Hardening Pre-Prod
-status: Complete ✅
-stopped_at: Milestone v1.5 complete — audit passed, archived
-last_updated: "2026-05-09T23:59:59Z"
-last_activity: 2026-05-09 — Milestone v1.5 completed
+milestone: v1.6
+milestone_name: Code Syntax Highlighting
+status: planning
+last_updated: "2026-05-14T21:07:40.003Z"
+last_activity: 2026-05-14
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 5
-  completed_plans: 5
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State: Warped
@@ -45,11 +44,10 @@ Run `/gsd-new-milestone` to define the next version.
 
 ## Current Position
 
-Phase: 27-wizard-update
-Plan: 01 — COMPLETE ✅
-Status: v1.5 Complete ✅ — All 6 phases done
-Next: Ready for v1.6 milestone planning
-Last activity: 2026-05-11 — Wizard updated (GGUF references removed, LiteRT-LM-only engine description)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-14 — Milestone v1.6 started
 
 ## Phase Structure
 

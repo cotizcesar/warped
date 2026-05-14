@@ -8,25 +8,23 @@ An Android application equivalent to LM Studio for mobile, enabling users to run
 
 Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
 
-## Current Milestone: v1.5 Bug Hunt, Cleanup & Hardening Pre-Prod — COMPLETE ✅
+## Current Milestone: v1.6 Code Syntax Highlighting
+
+**Goal:** Code blocks in AI responses and throughout the app render with language-aware syntax highlighting using popular preset themes that auto-adapt to light/dark mode.
+
+**Target features:**
+- Syntax highlighting with auto-detected language for code blocks
+- Language header bar showing detected language name on each code block
+- Preset themes (Monokai, One Dark, GitHub, Dracula) selectable in Settings
+- Light/dark theme auto-adaptation per preset
+- Copy-to-clipboard button on each code block
+- Applied everywhere code blocks appear (chat, model cards, readmes, etc.)
+
+### Previous Milestone: v1.5 Bug Hunt, Cleanup & Hardening Pre-Prod — COMPLETE ✅
 
 **Archived:** 2026-05-09 | [Archive →](.planning/milestones/v1.5-ROADMAP.md)
 
-5 phases, 26 requirements completed. GGUF/llama.cpp fully removed. LiteRT-LM sole local engine. Model search simplified. 4 chat bugs fixed. 8 security hardening measures applied. Wizard updated.
-
-**Target features:**
-- Complete removal of GGUF engine: llama.cpp JNI, CMake, Vulkan backend, GGUF downloads, GGUF data model, related ProGuard rules
-- Remove all tabs from model search — single search bar filtering only litertlm-community organization
-- Fix code/markdown rendering in chat messages
-- Fix model reload warning when re-entering an active chat
-- Fix active message/conversation tracking in conversation list
-- Fix ghost message rendering after message deletion
-- Aggressive ProGuard/R8 obfuscation and shrinking
-- Input validation and sanitization across all user inputs
-- Global error handling and crash resilience
-- Audit secure storage (all API keys in EncryptedSharedPreferences)
-- Network security config: block cleartext in release
-- Update onboarding wizard to reflect LiteRT-LM-only local engine
+5 phases, 26 requirements completed.
 
 ## Requirements
 
@@ -87,6 +85,8 @@ v1.3 expande los endpoints de red: el ProviderType enum ya tiene OPENAI, ANTHROP
 
 **v1.5:** Pivote a LiteRT-LM como único motor local. Se elimina completamente llama.cpp/GGUF (JNI, CMake, Vulkan). El buscador de modelos se simplifica a una sola barra filtrando `litertlm-community`. Hardening pre-producción (ProGuard, validación, crash resilience, network security). Corrección de 4 bugs de chat (code rendering, model reload, active tracking, ghost delete).
 
+**v1.6:** Code syntax highlighting in chat messages and throughout the app. Language auto-detection, preset themes (Monokai, One Dark, GitHub, Dracula) with light/dark variants, copy button, and language header bar on every code block. Settings page for theme selection.
+
 ## Constraints
 
 - **Platform**: Android only (no iOS, no desktop)
@@ -129,4 +129,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-09 after milestone v1.5 start*
+*Last updated: 2026-05-14 after milestone v1.6 start*
