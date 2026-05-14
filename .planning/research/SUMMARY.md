@@ -1,282 +1,208 @@
 # Project Research Summary
 
-**Project:** Warped (v1.2 — GGUF Native Inference)
-**Domain:** Android local LLM inference via llama.cpp JNI/NDK
-**Researched:** 2026-05-05
+**Project:** Warped — Android LM-Studio-equivalent LLM chat app
+**Domain:** Code syntax highlighting in Android/Compose AI chat application
+**Researched:** 2026-05-14
 **Confidence:** HIGH
 
 ## Executive Summary
 
-Warped v1.2 adds real GGUF/llama.cpp inference to an existing Android app that already has a functional multi-engine architecture (LiteRT-LM + Remote providers). The existing codebase is **architecturally ready**: `LlamaEngine` wraps a JNI bridge to native C++, `EngineManager` coordinates engine lifecycle, `LocalLlmProvider` handles the chat pipeline, and `GgufMetadataParser` reads GGUF headers — but all native code is currently stubs. This milestone is about replacing stubs with real llama.cpp API calls compiled from source.
+Warped is an Android chat application for running and chatting with LLMs locally and remotely. The v1.6 milestone adds language-aware syntax highlighting to code blocks in AI responses — transforming flat monospace rendering into colored, token-aware display with language header bars, copy buttons, and 4 preset themes that auto-adapt to system light/dark mode.
 
-The integration requires **zero new Kotlin/Java Maven dependencies**. The entire native layer is added via CMake: source-include llama.cpp (pinned to tag `b9030`), compile it alongside the existing JNI bridge, and wire the real `llama.h` C API into `jni_bridge.cpp`. Optionally compile with `GGML_VULKAN=ON` for GPU acceleration on Snapdragon 8 Gen 2+ devices, with automatic CPU fallback on devices without Vulkan support.
+The recommended approach is to **integrate the `dev.snipme:highlights:1.1.0` library as the tokenization engine**, wrapped behind a Clean Architecture `SyntaxHighlighter` domain interface. This resolves a key research conflict: STACK.md identified Highlights as the best library option (183 GitHub stars, 26 Maven Central dependents, pure Kotlin, actively maintained), while FEATURES/ARCHITECTURE/PITFALLS conducted library surveys that either missed or cursorily dismissed Highlights and defaulted to a fully custom regex tokenizer. Using Highlights eliminates ~750–1,400 lines of hand-written regex definitions across 15 languages while maintaining all Clean Architecture benefits via the domain interface — if Highlights ever becomes unmaintained, a single implementation swap suffices. The theme system, language auto-detector, and CodeBlock composable must be custom-built regardless (Highlights only provides 2 themes, no auto-detection, and no Compose rendering).
 
-**Key risks** center on memory and threading. A 7B Q4_K_M model needs ~6 GB RAM (1.3× file size for KV cache overhead), and Android's Low Memory Killer can kill the process during inference if `mmap` inflates RSS metrics. Thread safety between Java monitors (`@Synchronized`) and native code (`std::mutex`, `std::atomic<bool>`) requires careful design — particularly JNI global reference lifecycle, stop/unload sequencing to prevent SIGSEGV on freed memory, and Vulkan driver fragmentation across GPU vendors. Mitigations: pre-load memory checks with `ActivityManager.MemoryInfo`, dual-layer synchronization (Kotlin `@Synchronized` + C++ `std::mutex`), Vulkan runtime capability probing with automatic CPU fallback, and GGUF file validation before native load.
+The two critical risks are: (1) **streaming performance** — re-tokenizing code on every ~50ms streaming token causes O(n²) jank, mitigated by deferring syntax highlighting until the closing ` ``` ` fence arrives (render flat monospace mid-stream, then apply full highlighting once); and (2) **recomposition thrashing** — `buildAnnotatedString` running on every `StateFlow` emission, mitigated by `remember(text, theme)` caching. The existing `MarkdownText` composable must be restructured from a single `Text(AnnotatedString)` to a block-based `Column` of composable blocks so code blocks can host a language header bar and copy button — elements that cannot exist inside an `AnnotatedString`.
 
 ## Key Findings
 
-### Stack Additions
+### Recommended Stack (from STACK.md)
 
-From [STACK.md](./STACK.md) — **no new Kotlin/Java dependencies required.** The entire llama.cpp integration is native C++.
+The syntax highlighting pipeline consists of four components, only one of which is a new external dependency:
 
-**Core technologies:**
+| Component | Choice | Reason |
+|-----------|--------|--------|
+| **Tokenization engine** | `dev.snipme:highlights:1.1.0` | Most mature pure-Kotlin syntax highlighter for Android. 183 stars, 26 Maven Central dependents. Supports 17 languages covering 95%+ of LLM output. Hand-written regex — zero native deps, zero JS interop. Apache 2.0 license. Version-compatible with project's Kotlin 2.3.20, coroutines 1.9.0, and kotlinx-serialization 1.7.x. |
+| **AnnotatedString bridge** | Custom adapter (~50 lines) | Maps Highlights' `CodeHighlight` token types to Compose `SpanStyle` with per-token colors from the active theme palette. Integrates with the existing `buildAnnotatedString` pattern in `MarkdownText.kt`. |
+| **Syntax color schemes** | Custom `SyntaxTheme` data classes | 4 themes × 2 variants (light/dark) × 12 token types = 96 color values defined as pure Kotlin. Highlights only provides Monokai and Atom One — One Dark, GitHub, and Dracula must be custom-defined regardless of engine choice. |
+| **Language detector** | Custom two-tier heuristic | (1) Parse markdown fence ` ```python ` covering ~90% of LLM output; (2) Keyword-frequency heuristics for unspecified languages. No mature JVM language-detection library exists — this is custom regardless of engine choice. |
 
-| Technology | Purpose | Rationale |
-|------------|---------|-----------|
-| llama.cpp source (tag `b9030`) | GGUF inference engine | Build from source via CMake+NDK to ensure ABI consistency with the host project. Pre-built `.so` binaries risk NDK/STL version mismatches causing `UnsatisfiedLinkError`. |
-| `GGML_VULKAN=ON` (CMake option) | GPU-accelerated inference on Android | 2-4× speedup on flagship phones. Separate build variant from CPU-only; runtime Vulkan probing with automatic fallback. |
-| `c++_static` STL | Eliminate `libc++_shared` ABI conflicts | Prevents crashes when multiple native libraries (llama.cpp + LiteRT-LM) link against different NDK versions of the same shared STL. |
-| `std::atomic<bool>` + `std::mutex` | Thread safety for native state | Replaces plain `bool shouldStop` in JNI bridge; prevents data races and SIGSEGV during stop/unload. |
+**Rejected alternatives:**
+- **Custom regex tokenizer (recommended by FEATURES/ARCHITECTURE/PITFALLS):** Writing 12–15 language grammars from scratch (~750–1,400 lines) is unnecessary when Highlights provides the same regex-based tokenization with proven accuracy across its 26 Maven Central dependents. Both approaches need the same custom theme system, language detector, and Composables. The `SyntaxHighlighter` domain interface makes the engine swappable — start with Highlights, swap later if needed.
+- **Prism4j:** Archived July 2023. Dead dependency.
+- **kotlin-textmate:** v0.1.0 released today (May 14, 2026). 12 stars. Known limitations (no injection grammars, Joni regex fallback, not thread-safe). Too new for production.
+- **WebView + highlight.js:** Destroys scroll performance, breaks Compose text selection, adds memory pressure.
 
-**What was researched but rejected:**
+### Expected Features (from FEATURES.md)
 
-- Pre-built `.so` from llama.cpp releases (ABI mismatch risk)
-- `java-llama.cpp` wrapper library (duplicates existing JNI bridge architecture)
-- Hexagon NPU backend (experimental, Snapdragon 8 Gen 3+ only)
-- OpenCL backend (deprecated on Android 14+)
-- Any new Kotlin/Java Maven dependency (none needed)
+**Must have — P1 (table stakes):**
+- **Language-aware syntax coloring** — colored keywords, strings, comments, numbers, functions, types, operators via tokenized `AnnotatedString`. This is what differentiates "code rendering" from "syntax highlighting."
+- **Fence language detection** — parse ` ```python ` specifiers with alias mapping (`py` → `python`, `js` → `javascript`). Covers ~90% of LLM cases.
+- **4 preset themes** — Monokai, One Dark, GitHub, Dracula, each with light and dark variants. Theme selection persists via existing DataStore flow.
+- **Light/dark auto-adaptation** — selects variant matching system `isSystemInDarkTheme()`. Rare in mobile chat apps — competitive differentiator.
+- **Language header bar** — shows detected language name above each code block.
+- **Copy-to-clipboard button** — in header bar, copies raw code text (not `AnnotatedString`). Table stakes — every major chat app has this.
+- **Applied in chat messages** — syntax highlighting visible during and after streaming.
 
-### Expected Features
+**Should have — P2 (differentiators, can slip to v1.7):**
+- **Heuristic auto-detection** — detect language from code content when fence specifier is missing. Adds polish but LLMs specify language >90% of the time.
+- **Applied everywhere** — extend to model card descriptions, README previews, onboarding content.
 
-From [FEATURES.md](./FEATURES.md) — feature landscape for GGUF inference across v1.2, v1.3, and v2+.
+**Anti-features (not in scope):**
+- WebView-based rendering (performance killer)
+- 190+ language support (maintenance burden; 15 covers >95% of LLM output)
+- Line numbers (wastes narrow mobile screen space)
+- Custom theme builder/editor (massive UX complexity for marginal value)
+- Syntax error highlighting (misleading for LLM-generated code; requires full parsers)
 
-**Must have (v1.2 — table stakes):**
+### Architecture Approach (from ARCHITECTURE.md)
 
-| Feature | Complexity | Status |
-|---------|------------|--------|
-| GGUF file browsing on HF (siblings with `.gguf` filtering) | MEDIUM | HF API integration exists; need siblings filtering |
-| GGUF download with progress (WorkManager + OkHttp) | LOW | `ModelDownloadWorker` already handles downloads |
-| GGUF model loading via JNI (real llama.cpp) | HIGH | Stubs exist; need native implementation |
-| Streaming token generation (`callbackFlow` → Chat UI) | MEDIUM | Pattern exists; need real native callback |
-| Basic generation parameters (temperature, threads, max_tokens) | LOW | Presets system exists; need JNI parameter passing |
-| Memory check before loading (RAM vs model size + 30% overhead) | HIGH | `MemoryChecker` exists; needs `ActivityManager.MemoryInfo` integration |
-| Model file management (view/delete) | LOW | `ModelsScreen` already handles this |
-| CPU inference (works on all arm64 devices) | MEDIUM | Baseline — must work before GPU |
+The integration follows Clean Architecture with a new `domain/highlighting/` package for interfaces and models, and `data/highlighting/` for implementations:
 
-**Should have (v1.3 — differentiators):**
+**Major components:**
 
-| Feature | Complexity | Differentiation |
-|---------|------------|----------------|
-| Vulkan GPU backend with auto CPU fallback | HIGH | PocketPal has limited GPU support |
-| Rich GGUF metadata display (arch, params, context, license) | MEDIUM | `GgufMetadataParser` exists; needs enrichment |
-| Quantization-aware recommendations ("Q4_K_M fits your device") | MEDIUM | No competitor does this on mobile |
-| Stop generation button | LOW | `nativeStop` declared; needs UI |
-| Token-per-second display | LOW | Already works for LiteRT-LM |
-| Context size configuration | LOW | JNI `n_ctx` parameter |
+1. **`SyntaxHighlighter` (domain interface)** — `fun highlight(code, language, theme): AnnotatedString`. Pure Kotlin, zero Android/Compose deps. Implemented by `RegexSyntaxHighlighter` wrapping Highlights.
 
-**Defer (v2+):**
+2. **`LanguageDetector` (data utility)** — heuristic detection with priority chain: fence specifier → shebang → keyword frequency → "text" fallback. "text" (no highlighting) is better than wrong highlighting.
 
-- Multimodal models (LLaVA, image pipelines)
-- Speculative decoding (draft model acceleration)
-- Cross-engine chat (switch GGUF ↔ Remote mid-conversation)
-- Progressive download (chat before download completes)
-- Model sharding (multi-file GGUF)
-- LoRA adapter merging on-device
+3. **`CodeTheme` enum → `SyntaxTheme` bridge** — enum persists via DataStore (unchanged key); maps to rich `SyntaxTheme` objects with 12 token-type colors per variant. Migration-safe: old enum names map to new theme objects.
 
-### Architecture Approach
+4. **`CodeBlock` composable (new)** — replaces inline code rendering in `MarkdownText`. Renders a `Surface` with language header bar, copy button, and syntax-highlighted `AnnotatedString`. Allows UI elements that can't exist inside `buildAnnotatedString`.
 
-From [ARCHITECTURE.md](./ARCHITECTURE.md) — the existing Clean Architecture is sound; integration points are stubs awaiting real native code.
+5. **`MarkdownText` (refactored)** — detects code fences as before but delegates content + language hint to `CodeBlock` composable instead of rendering inline. Inline code (single backticks) unchanged.
 
-**Integration architecture:**
+**What does NOT change:** `ChatUiState`, `ChatViewModel`, `ChatRepository`, Room database, Retrofit APIs, `MessageBubble` (passes `codeTheme` through as before), `NavGraph`, `SelectionContainer`.
 
-```
-ChatViewModel → ProviderRouter → LocalLlmProvider → LlamaEngine (Kotlin/JNI)
-                                                         │
-                                           jni_bridge.cpp (C++ glue)
-                                                         │
-                                              llama.cpp (native engine)
-                                              ├─ GGML CPU backend (always)
-                                              └─ GGML Vulkan backend (optional)
-```
+**Suggested wave structure** (8 waves in ARCHITECTURE.md) consolidates into 3 roadmap phases (see Roadmap Implications below).
 
-**Major components and their changes:**
+### Critical Pitfalls (from PITFALLS.md)
 
-1. **JNI Bridge (`jni_bridge.cpp` + `LlamaEngine.kt`)** — Replace stubs with real `llama_model_load_from_file()`, `llama_decode()`, `llama_sampler_sample()` calls. Add `@Synchronized` on `generate()`, `.buffer(Channel.BUFFERED)` on `callbackFlow`, Vulkan params to `loadModel()`, and JNI global reference management (`NewGlobalRef`/`DeleteGlobalRef`).
+1. **Streaming O(n²) jank (Pitfall #2):** Re-tokenizing the entire code block on every ~50ms streaming token. **Prevention:** Defer syntax highlighting until closing ` ``` ` fence arrives. Render flat monospace mid-stream, apply full highlighting once. This matches how ChatGPT and LM Studio behave.
 
-2. **EngineManager** — Pass Vulkan backend params (`nGpuLayers`, `useVulkan`) through `switchToLlama()`. Populate `ActiveEngine.backend` from `BackendDetector`. Enforce stop→wait→unload sequencing.
+2. **Recomposition thrashing (Pitfall #6):** `buildAnnotatedString` runs on every `StateFlow` emission, not just when text changes. **Prevention:** `remember(text, theme) { buildAnnotatedString { ... } }` — only recompute when inputs actually change.
 
-3. **Memory Management** — Replace file-size-only check with `ActivityManager.MemoryInfo` + 1.3× overhead multiplier. Add `android:largeHeap="true"` to manifest. Catch `OutOfMemoryError` in `preloadLocalModel()`.
+3. **Theme data model gap (Pitfall #3):** Existing `CodeTheme` enum has only 2 colors (`bgCode`, `bgInline`). Syntax highlighting needs 12 token-type colors per theme. **Prevention:** Expand to `SyntaxTheme` data class with `tokenColors: Map<TokenType, Color>` maps. Use existing DataStore key — `CodeTheme` enum name maps to new `SyntaxTheme` objects.
 
-4. **BackendDetector** — Add `isVulkanAvailable()` (probe `System.loadLibrary("vulkan")`). Prioritize Vulkan over OpenCL for llama.cpp path. Add `VulkanInfo` JNI query for device capabilities.
+4. **Language detection inconsistency (Pitfall #5):** Wrong detection = wrong colors = user confusion. **Prevention:** Fence info is authoritative. Content-based detection only when fence is absent. Always show detected language in header bar so the user can verify. "Plain text" fallback is better than wrong highlighting.
 
-5. **GGUF Metadata Pipeline** — Complete `mapQuantization()` table for GGUF v3 quant types. Add post-download validation (magic bytes, architecture check). Use `llama_model_desc()` after load for accurate metadata.
-
-6. **Chat Template Formatting** — Replace hardcoded ChatML template with `llama_chat_apply_template()` via JNI, reading the model's built-in template from GGUF metadata.
-
-**Unchanged components:** `ProviderRouter` (routing already correct), `ChatRepository` (storage agnostic), `ChatScreen` (UI consumes `Flow<String>` regardless of provider), `HuggingFaceApi` (API unchanged), `LiteRTLmEngine` (independent path).
-
-### Critical Pitfalls
-
-From [PITFALLS.md](./PITFALLS.md) — top 5 of 10 documented pitfalls:
-
-1. **JNI Thread Attachment Crash (SIGSEGV):** Capturing `JNIEnv*` in callbacks that may execute on different native threads (Vulkan compute, worker pools) causes stale-pointer crashes. **Mitigation:** Store `JavaVM*` at init; call `AttachCurrentThread`/`DetachCurrentThread` in every callback. Use `NewGlobalRef` for `jobject` callbacks.
-
-2. **`callbackFlow` Buffer Overrun Kills Streaming Silently:** Default `Channel.RENDEZVOUS` (0 buffer) causes `trySend()` to silently drop tokens when the UI thread can't keep up with 50-100 tok/s output. **Mitigation:** Use `.buffer(Channel.BUFFERED)` or `trySendBlocking()`.
-
-3. **Vulkan GPU Driver Fragmentation:** Qualcomm Adreno 7xx has buggy 16-bit storage; Mali SPIR-V compilers crash on certain shader patterns; Samsung Xclipse has unreliable `8bit_storage`. **Mitigation:** Build CPU-first, add Vulkan as optional separate variant, runtime capability probing, automatic CPU fallback on any Vulkan failure.
-
-4. **mmap + Android LMK = SIGBUS:** Memory-mapped GGUF files inflate RSS, causing Android's Low Memory Killer to kill the process. If file is on removable storage and card disconnects, page fault triggers uncatchable SIGBUS. **Mitigation:** Store models exclusively in `context.filesDir/models/`. Add post-load memory verification. Consider `use_mmap=false` on <8GB devices.
-
-5. **`shouldStop` Data Race:** Plain `bool shouldStop` without atomics is undefined behavior in C++. The compiler may hoist the read into a register, ignoring the `stop()` signal. **Mitigation:** Use `std::atomic<bool> shouldStop` with `memory_order_relaxed`.
-
-**Additional critical pitfalls:** unloading engine during active generation (SIGSEGV on freed memory), ProGuard/R8 stripping JNI callback methods (release-only crash), `libc++_shared` STL conflict with LiteRT-LM native libs, `@Synchronized` not protecting native state, and missing GGUF validation causing crashes on corrupted files.
+5. **Code block flicker during streaming (Pitfall #7):** Gray monospace → colored tokens transition when closing fence arrives. **Prevention:** Keep background color consistent during transition. Use `animateColorAsState()` on token text colors for smooth fade.
 
 ## Implications for Roadmap
 
-Based on combined research across all four dimensions, here is the recommended phase structure:
+Based on combined research, the build order from ARCHITECTURE.md (8 waves) and the pitfall-to-phase mapping from PITFALLS.md consolidate naturally into 3 roadmap phases:
 
-### Phase 1: Native Foundation — CMake Build + Model Loading
+### Phase 1: Tokenization Engine & Theme System
 
-**Rationale:** This is the prerequisite for everything. Without llama.cpp compiled and models loading successfully, no other phase can proceed. The CMake integration must be correct before any JNI code is written. Early detection of NDK/STL/ABI issues saves rewrites. ProGuard rules must be in place before release testing.
-
-**Delivers:**
-- llama.cpp compiled from source (tag `b9030`) via CMake+NDK for `arm64-v8a` and `x86_64`
-- `libwarped_llama.so` with real llama.cpp symbols (not stubs)
-- `jni_bridge.cpp` implements `nativeLoadModel`, `nativeUnload`, `nativeIsLoaded`, `nativeGetModelInfo`
-- `LlamaEngine.kt` extended with `nGpuLayers`, `useVulkan` params
-- `GgufMetadataParser` quantization map completed for GGUF v3
-- `android:largeHeap="true"` in AndroidManifest
-- ProGuard/R8 keep rules for all JNI callback methods
-- `c++_static` STL strategy decided and verified
-
-**Features from FEATURES.md:** GGUF model loading, model file management
-**Avoids pitfalls:** #1 (JNI threading design decided before write), #7 (ProGuard rules), #8 (STL strategy), #10 (GGUF validation pre-load)
-
-### Phase 2: Inference Core — Token Generation + Streaming
-
-**Rationale:** Once models load, the next dependency is generating tokens and streaming them to the UI. This is the user-visible value proposition. The `callbackFlow` pattern and thread safety model must be proven here before adding GPU complexity.
+**Rationale:** Everything depends on the tokenizer and theme data model. Language definitions, token types, and theme color maps must exist before any UI can render them. This phase is pure Kotlin (zero Compose/Android deps) — fully unit-testable without emulator.
 
 **Delivers:**
-- `nativeGenerate` with real `llama_tokenize` → `llama_decode` loop → `llama_sampler_sample`
-- `callbackFlow` with `.buffer(Channel.BUFFERED)` for reliable token delivery
-- `nativeStop` with `std::atomic<bool> shouldStop`
-- `nativeSetGenerationParams` — temperature, topP, topK, repeatPenalty, maxTokens, seed
-- First-token latency tracking, TPS counter
-- `@Synchronized` on `LlamaEngine.generate()`, native `std::mutex` for generate state
-- JNI global ref management (`NewGlobalRef`/`DeleteGlobalRef` on callback object)
-- Stop → wait → unload sequencing in `EngineManager`
+- `domain/highlighting/` — `CodeToken` sealed class, `Language` enum, `LanguageDefinition` data class, `SyntaxHighlighter` interface
+- `data/highlighting/definitions/` — 12 language definition files with Highlights-compatible token patterns
+- `data/highlighting/theme/` — `HighlightingTheme` interface + 4 theme implementations (Monokai, One Dark, GitHub, Dracula) with light/dark variants
+- `data/highlighting/RegexSyntaxHighlighter.kt` — implementation wrapping Highlights engine via `SyntaxHighlighter` interface
+- `data/highlighting/LanguageDetector.kt` — priority-chain language detection (fence → shebang → keyword heuristics → plain)
+- `ui/theme/CodeTheme.kt` — migrated + expanded enum with `toHighlightingTheme()` bridge and `previewColor`
+- Import updates across `MarkdownText.kt`, `ChatUiState.kt`, `ChatViewModel.kt`, `AdvancedPreferences.kt`, `SettingsScreen.kt`, `MessageBubble.kt`
 
-**Features from FEATURES.md:** Streaming token generation, generation parameters, stop button
-**Avoids pitfalls:** #1 (JNI threading), #2 (callbackFlow buffer), #5 (shouldStop atomic), #6 (unload during generation), #9 (native mutex)
+**Features from FEATURES.md:** Fence language detection, syntax-highlighted code blocks (engine only), 4 preset themes (data), light/dark auto-adaptation (data)
 
-### Phase 3: Memory & Stability Hardening
+**Pitfalls avoided:** #1 (no Prism4j — using Highlights), #3 (theme data model expanded), #5 (language detection priority chain)
 
-**Rationale:** Memory management and validation are critical for production quality. Users will load models that are too large, import corrupted files, and background the app during inference. This phase prevents the #1 cause of bad reviews for mobile LLM apps: crashes under memory pressure.
+**Research needed:** MEDIUM — Highlights API exploration for language definition format and `CodeHighlight` token type mapping. Plan for `/gsd-research-phase` if token type mapping proves complex.
 
-**Delivers:**
-- `ActivityManager.MemoryInfo` integration with 1.3× RAM overhead estimate
-- Pre-load memory warning dialog ("model needs X GB, you have Y GB")
-- `OutOfMemoryError` catch in `preloadLocalModel` with user-friendly message
-- GGUF validation in `ModelDownloadWorker` + `ModelImportManager` (magic bytes, architecture check, size vs HF metadata)
-- `handleTrimMemory` integration — unload on critical pressure, verify model state on return
-- Post-load memory verification (if RSS > 85% of total RAM, warn user)
-- `n_batch` adaptive sizing for 8GB vs 12GB+ devices
+### Phase 2: UI Components & MarkdownText Refactoring
 
-**Features from FEATURES.md:** Memory check before loading, offline chat stability
-**Avoids pitfalls:** #4 (mmap + LMK), #10 (GGUF validation)
-
-### Phase 4: GPU Acceleration — Vulkan Backend
-
-**Rationale:** GPU acceleration is a differentiator but depends on the stability of CPU inference (Phase 1-3). Adding Vulkan before memory and threading are hardened multiplies debugging complexity. Vulkan driver fragmentation means this needs dedicated testing on physical devices.
+**Rationale:** The rendering pipeline needs to shift from a single `Text(AnnotatedString)` to a block-based `Column` of composable blocks. The `CodeBlock` composable cannot be built until the tokenization engine exists (Phase 1). This is the largest user-facing change — the composable block model unlocks the language header bar and copy button that differentiate Warped from competitors.
 
 **Delivers:**
-- `GGML_VULKAN=ON` CMake build variant (separate `.so`, not default)
-- `BackendDetector.isVulkanAvailable()` — `System.loadLibrary("vulkan")` probe
-- `VulkanInfo` JNI query (device name, API version, compute memory, shading features)
-- Runtime Vulkan capability probing (`VkPhysicalDeviceFeatures2` for `shaderFloat16`, `shaderInt8`, `16BitStorage`)
-- Automatic CPU fallback on any Vulkan initialization failure
-- `nGpuLayers` parameter pass-through (0 = CPU, 99 = all GPU, N = partial)
-- User-facing backend indicator ("Running on Vulkan GPU" / "Running on CPU")
-- Vulkan variant verified on 5+ physical devices across GPU vendors
+- `ui/chat/components/CodeBlock.kt` — new composable: language header bar + copy button + syntax-highlighted `AnnotatedString` rendering
+- `ui/chat/components/MarkdownText.kt` — refactored: code fence detection delegates to `CodeBlock`; inline code and other markdown unchanged
+- `ui/settings/SettingsScreen.kt` — updated theme dropdown with preview color swatch
+- `di/HighlightingModule.kt` — Hilt `@Module` providing `SyntaxHighlighter` and `LanguageDetector` as `@Singleton`
 
-**Features from FEATURES.md:** Vulkan GPU backend, backend selection UX
-**Avoids pitfalls:** #3 (Vulkan driver fragmentation), #1 (Vulkan compute threads + JNI)
+**Features from FEATURES.md:** Language header bar, copy-to-clipboard button, applied in chat messages, composable block rendering
 
-### Phase 5: UX Polish — Metadata, Recommendations & Engine Transparency
+**Uses from STACK.md:** Highlights 1.1.0 (via `RegexSyntaxHighlighter`), Compose `buildAnnotatedString`, `LocalClipboardManager`, custom `AnnotatedString` bridge, custom `SyntaxTheme` color schemes
 
-**Rationale:** With the core engine working end-to-end, this phase adds the competitive differentiators that make Warped feel like a premium product. Rich metadata display, quantization recommendations, and seamless engine switching are what set Warped apart from PocketPal AI.
+**Pitfalls avoided:** #4 (copy raw text, not `AnnotatedString` spans), #8 (code blocks extracted as separate composables, not inline in `buildAnnotatedString`)
+
+**Research needed:** LOW — standard Compose patterns, well-documented. Skip `/gsd-research-phase`. May benefit from `/gsd-ui-phase` for the CodeBlock design contract.
+
+### Phase 3: Streaming Integration & Performance
+
+**Rationale:** The core streaming pitfall (#2) must be addressed before the feature ships — highlighting during streaming causes O(n²) jank. This phase is intentionally last because it validates Phase 1 + 2 together under streaming conditions. Deferred highlighting (flat monospace mid-stream → colored on block completion) is the recommended strategy for v1.6.
 
 **Delivers:**
-- Full GGUF metadata display from header (architecture, param count, context length, tokenizer info, license)
-- Quantization-aware recommendations: "Q4_K_M (4.6 GB) — recommended for your 8 GB device"
-- Color-coded quant badges (green/yellow/red based on device RAM)
-- `llama_chat_apply_template()` via JNI for correct per-model prompt formatting
-- Parameter normalization layer (llama.cpp ↔ LiteRT-LM ↔ Remote param mapping)
-- Enhanced model detail screen with pre-download metadata from HF API `config.json`
-- Download integrity verification (SHA256 from HF API headers)
+- Streaming-aware code block rendering: flat monospace while ` ``` ` fence is open, syntax highlighting applied once fence closes
+- `remember(text, theme)` caching around `buildAnnotatedString` to prevent recomputation on unrelated `StateFlow` emissions
+- Language detection cached via `remember(codeBlockContent)` to avoid re-detection on every recomposition
+- Smooth color transition from flat monospace to highlighted via `animateColorAsState()`
+- Performance validation: < 2ms `SyntaxHighlighter.highlight()` for 50-line code blocks
+- Streaming validation: no flicker during recomposition, no frame drops during streaming
+- Edge case handling: malformed code, empty blocks, code with only special characters, partial language specifiers
 
-**Features from FEATURES.md:** Rich metadata display, quantization recommendations, transparent UX across engines, chat template formatting
-**Implements from ARCHITECTURE.md:** Chat template formatting, metadata enrichment, parameter normalization
+**Features from FEATURES.md:** Streaming-aware rendering (completes chat message integration)
+
+**Pitfalls avoided:** #2 (O(n²) streaming — deferred highlighting), #6 (recomposition thrashing — `remember` caching), #7 (code block flicker — consistent background + `animateColorAsState`)
+
+**Research needed:** LOW — performance optimization patterns are well-understood. Skip `/gsd-research-phase`. Focus on measurement and validation.
 
 ### Phase Ordering Rationale
 
-The dependency chain uncovered by research is:
-
-```
-CMake build (Phase 1)
-  └── Model loading (Phase 1)
-       └── Token generation (Phase 2)
-            ├── Memory hardening (Phase 3) — can parallelize with Phase 2 after basic generation works
-            ├── GPU acceleration (Phase 4) — depends on stable CPU inference (Phase 2+3)
-            └── UX polish (Phase 5) — depends on all engine features working
-```
-
-Phase 3 (memory hardening) can partially overlap with Phase 2 once basic token generation is verified — but should not be deferred past Phase 4 since Vulkan GPU debugging with untested memory management is exponentially harder.
+- **Phase 1 must come first** — all rendering depends on the tokenizer, language detector, and theme definitions. These are pure Kotlin with no UI deps, enabling fast unit testing.
+- **Phase 2 must follow Phase 1** — the `CodeBlock` composable needs `SyntaxHighlighter`, `LanguageDetector`, and `SyntaxTheme` to render anything. The composable block model is a prerequisite for the language header bar and copy button.
+- **Phase 3 is intentionally last** — it validates Phase 1 + 2 together under real streaming conditions. Deferred highlighting is the performance strategy; it can only be verified after the rendering pipeline works.
+- This ordering also follows Clean Architecture: domain → data → UI, with integration validation at the end.
 
 ### Research Flags
 
 **Phases likely needing deeper research during planning:**
-- **Phase 3 (Memory & Stability):** Android LMK behavior with mmap-backed models varies by device manufacturer (Samsung, Xiaomi, Pixel). May need device-specific tuning of `n_batch` and `use_mmap` settings. Research: `/gsd-research-phase` on Android memory management patterns for large native allocations.
-- **Phase 4 (Vulkan Backend):** llama.cpp Vulkan backend documentation is sparse for Android. Need to verify shader compilation works for `arm64-v8a` target. May need to research specific GPU/driver combos for known crashes. Research: Vulkan capability probing strategy and device denylist architecture.
-- **Phase 5 (Chat Templates):** `llama_chat_apply_template()` behavior varies across llama.cpp versions. Need to verify template extraction from GGUF metadata works for all target model architectures. Research: test with Llama 3, Mistral, Gemma, Phi, DeepSeek, Qwen GGUF files.
+- **Phase 1:** Highlights API integration — the `CodeHighlight` token type system must be mapped to our `CodeToken` sealed class. If the mapping is complex or Highlights' internal token types don't align with the 12-token taxonomy from FEATURES.md, a `/gsd-research-phase` spike is warranted before planning.
 
-**Phases with well-documented patterns (skip research-phase):**
-- **Phase 1 (CMake Build):** Well-documented by llama.cpp official `docs/android.md` and existing project STACK.md. Standard NDK cross-compilation.
-- **Phase 2 (Inference Core):** llama.cpp C API is extensively documented. `callbackFlow` pattern is standard Kotlin coroutine practice. JNI global refs documented in Android NDK guides.
+**Phases with standard, well-documented patterns (skip `/gsd-research-phase`):**
+- **Phase 2:** Standard Compose patterns — `Surface`, `Row`, `IconButton`, `buildAnnotatedString`, `LocalClipboardManager`. May benefit from `/gsd-ui-phase` for the CodeBlock visual design contract.
+- **Phase 3:** Performance optimization with `remember`, `derivedStateOf`, and `animateColorAsState` — all well-documented Compose APIs.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | **HIGH** | llama.cpp release tag b9030 verified (2026-05-05). Android arm64 binaries confirmed. CMake build flags confirmed from official `docs/android.md`. Zero new Maven dependencies confirmed by codebase analysis. |
-| Features | **HIGH** | Feature landscape mapped against PocketPal AI and LM Studio. Dependency graph derived from existing codebase. Prioritization grounded in user value and implementation cost. Hugging Face API endpoints verified. |
-| Architecture | **HIGH** | Based on direct codebase analysis of all 15+ relevant files (`LlamaEngine.kt`, `jni_bridge.cpp`, `EngineManager.kt`, etc.). Integration points and stubs identified with line-level precision. |
-| Pitfalls | **HIGH** | Pitfalls identified from llama.cpp official docs, Android NDK JNI threading docs, Khronos Vulkan hardware database, Android LMK source documentation, and Kotlin coroutine docs. Recovery strategies mapped to each pitfall. |
+| Stack | **HIGH** | Highlights 1.1.0 confirmed via Maven Central POM inspection — version, transitive deps, and Kotlin compatibility verified. All version compatibility checks passed against project's version catalog. Custom theme/language-detector/adapter need is unambiguous. |
+| Features | **HIGH** | Competitive analysis done against ChatGPT Android, Claude Android, and LM Studio Desktop. Token taxonomy sourced from Prism.js industry standard. Library survey (Prism4j archived status, Sora Editor overkill, kotlin-textmate immaturity) independently verified. MVP definition clear with P1/P2/P3 priorities. |
+| Architecture | **HIGH** | Existing codebase inspected directly (`MarkdownText.kt`, `MessageBubble.kt`, `ChatViewModel.kt`, `ChatUiState.kt`, `AdvancedPreferences.kt`, `SettingsScreen.kt`). Integration points mapped precisely — every component's change status (new/refactored/unchanged) documented. 8-wave build order provides granular sequencing. |
+| Pitfalls | **HIGH** | Each pitfall grounded in existing code patterns (e.g., `buildAnnotatedString` in composable body without `remember` is observable in current `MarkdownText.kt` line 45). Streaming pitfalls verified against `ChatViewModel.kt` 50ms emission interval. Prevention strategies are concrete Kotlin snippets, not abstract advice. |
 
-**Overall confidence: HIGH** — all research dimensions verified against authoritative sources and direct codebase analysis. The Warped codebase is well-structured with clear integration points; the primary work is replacing stubs with real implementations, not redesigning the architecture.
+**Overall confidence:** HIGH — all four research files drew from primary sources (Maven Central, GitHub repos, direct codebase inspection, official Android documentation). No findings depend on inference or single sources.
 
 ### Gaps to Address
 
-- **Hugging Face API siblings in search results:** The search endpoint may or may not include `siblings[]` per result. If it doesn't, loading the model detail screen requires a per-result detail API call. Handle during Phase 1 feature implementation.
+- **Highlights `CodeHighlight` → `CodeToken` mapping:** The exact token type taxonomy of Highlights needs verification during Phase 1 planning. If Highlights uses fewer token types than the 12 defined in FEATURES.md, a mapping layer is straightforward. If it uses more, some types may collapse. **Handle during:** Phase 1 plan discussion or a `/gsd-spike` before planning.
 
-- **`n_gpu_layers` optimal value per device:** llama.cpp's Vulkan backend on Android is relatively new. The ideal number of GPU-offloaded layers varies by device RAM, VRAM, and model size. Plan for a user-configurable setting with a "recommended" default derived from `VulkanInfo.maxComputeSharedMemorySize`.
+- **Language auto-detection accuracy:** The keyword-frequency heuristic for 15 languages has not been benchmarked against real LLM code block output. The 90% fence-coverage claim (LLMs specify language in fence >90% of the time) is a reasonable estimate but unverified. **Handle during:** Phase 2 or 3 — auto-detection is a P2 feature. If accuracy proves low during testing, defer fully to v1.7.
 
-- **Device testing coverage:** Vulkan GPU fragmentation requires testing on physical devices across GPU vendors (Adreno 6xx/7xx, Mali-G, Xclipse, PowerVR). Emulator Vulkan (Swiftshader) is not representative. Budget for device lab testing or beta program during Phase 4.
+- **Long code block performance (>500 lines):** Highlights' regex tokenizer performance on large code blocks has not been benchmarked on representative Android hardware. The `remember` caching mitigates recomposition but initial tokenization cost is unknown. **Handle during:** Phase 3 performance validation. Cap rendering at 200 lines with "Show all" expander if latency exceeds 16ms.
 
-- **`llama_chat_apply_template()` API stability:** The function signature and behavior may change between llama.cpp versions. Our pinned tag (b9030) freezes the API, but future upgrades need regression testing against all supported model architectures.
-
-- **LiteRT-LM + llama.cpp coexistence in same process:** Both engines load native `.so` files. Verify no symbol conflicts (both may link ggml). Check with `readelf -s` on all `.so` files before Phase 1 build finalization.
+- **Data migration: old `CodeTheme` enum → new `SyntaxTheme`:** The migration path (store enum name, map to new theme objects) is conceptually sound but the exact migration code needs validation against the current `KEY_CODE_THEME` DataStore key and existing user data. **Handle during:** Phase 1 — test with a pre-migration DataStore snapshot.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- [llama.cpp official repository](https://github.com/ggml-org/llama.cpp) — Android build docs, C API, Vulkan backend, releases with Android arm64 binaries
-- [llama.cpp Android build guide](https://github.com/ggml-org/llama.cpp/blob/master/docs/android.md) — CMake flags, NDK cross-compilation, Vulkan configuration
-- [GGUF format specification](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md) — Header structure, magic number, KV metadata pairs, quantization types
-- [Hugging Face Hub API](https://huggingface.co/docs/hub/en/api) — Model search, detail endpoint, siblings listing, SHA256 verification
-- [Android NDK JNI documentation](https://developer.android.com/training/articles/perf-jni) — `JNIEnv*` thread-locality, `JavaVM*` + `AttachCurrentThread`, global vs local references
-- **Warped codebase** (2026-05-05) — Direct analysis of `LlamaEngine.kt`, `jni_bridge.cpp/h`, `EngineManager.kt`, `BackendDetector.kt`, `LocalLlmProvider.kt`, `ChatViewModel.kt`, `CMakeLists.txt`, `GgufMetadataParser.kt`, `ModelDownloadWorker.kt`, `ModelImportManager.kt`, `gradle/libs.versions.toml`, `app/build.gradle.kts`
+- **Highlights GitHub** (SnipMeDev/Highlights) — 183 stars, 26 dependents, version 1.1.0, 17 languages, Apache 2.0 license. Repository README, sample code, language list, theme documentation.
+- **Highlights Maven Central** — Version 1.1.0 confirmed with POM showing kotlin-stdlib 2.2.0, kotlinx-coroutines 1.9.0, kotlinx-serialization-json 1.7.1.
+- **Prism4j GitHub** (noties/Prism4j) — Confirmed ARCHIVED July 2023. Last release June 2019. Read-only repository.
+- **kotlin-textmate GitHub** (ivan-magda/kotlin-textmate) — v0.1.0 released 2026-05-14. 12 stars. Known limitations documented in README.
+- **Warped codebase** — Direct inspection of `MarkdownText.kt`, `MessageBubble.kt`, `ChatViewModel.kt`, `ChatUiState.kt`, `AdvancedPreferences.kt`, `SettingsScreen.kt`, `ChatMessage.kt`. Current `CodeTheme` enum structure, DataStore persistence, Compose rendering approach, and streaming at 50ms intervals confirmed.
+- **Prism.js token documentation** (prismjs.com/tokens.html) — Industry-standard token type taxonomy: keyword, string, number, comment, function, type, operator, punctuation, boolean, builtin, variable, constant, plain.
+- **Jetpack Compose official docs** — `buildAnnotatedString`, `LocalClipboardManager`, performance/stability guidance (stability, `remember`, recomposition skipping).
 
 ### Secondary (MEDIUM confidence)
-- [PocketPal AI](https://github.com/a-ghorbani/pocketpal-ai) — Reference Android GGUF app using llama.rn; compared feature set, GPU support limitations
-- [Khronos Vulkan Hardware Database](https://vulkan.gpuinfo.org/) — GPU capability matrix for Android devices; driver fragmentation patterns
-- [Qualcomm OpenCL deprecation announcement](https://developer.qualcomm.com/) — Confirmed OpenCL removed from Android 12+ drivers
+- **Sora Editor** (rosemoe/sora-editor) — Context7 docs confirming TextMate/TreeSitter approach exists for Android, but designed for code editors, not read-only rendering.
+- **Highlight.js auto-detection** (highlightjs.org) — Reference for Bayesian classifier + keyword matching approach. Adaptation simplified for mobile (heuristic-only).
+- **Competitive analysis** — ChatGPT Android (WebView, language header, copy button, dark-only), Claude Android (copy button, no language header, dark-only), LM Studio Desktop (language header, copy button, follows app theme). Based on personal usage observation.
 
-### Tertiary (LOW confidence — needs validation)
-- Vulkan `VK_KHR_16bit_storage` reliability on Adreno 7xx — community reports of bugs; needs physical device testing
-- Mali SPIR-V compiler crashes on specific shader patterns — reported in llama.cpp GitHub issues; needs verification on target devices
+### Tertiary (LOW confidence)
+- **Android syntax highlighting library landscape** — Secondary search of Maven Central may surface niche alternatives beyond those evaluated. Likelihood of finding a better fit: LOW. This is a genuinely underserved niche on Android.
 
 ---
 
-*Research completed: 2026-05-05*
+*Research completed: 2026-05-14*
 *Ready for roadmap: yes*

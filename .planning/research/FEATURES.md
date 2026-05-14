@@ -1,213 +1,239 @@
-# Feature Research: GGUF Native Inference on Android
+# Feature Research: Code Syntax Highlighting for Android Chat App
 
-**Domain:** Mobile LLM inference via llama.cpp/GGUF on Android
-**Researched:** 2026-05-05
+**Domain:** Code syntax highlighting in an Android AI chat application (Warped)
+**Researched:** 2026-05-14
 **Confidence:** HIGH
-
----
 
 ## Feature Landscape
 
 ### Table Stakes (Users Expect These)
 
-Features users assume exist in any GGUF-capable Android app. Missing any = product feels broken or incomplete.
+Features users assume exist. Missing these = product feels incomplete.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| **Download GGUF from HF Hub** | Every GGUF app (LM Studio, PocketPal, Jan) downloads from HF. Users expect to paste a repo URL or browse models and download `.gguf` files. | MEDIUM | **Already partially built:** HuggingFaceApi exists, HuggingFaceScreen lists models, ModelDownloadWorker handles downloads. What's missing: listing `.gguf` siblings per model so users see quant files, not just model cards. The HF API returns `siblings[]` on `/api/models/{model_id}` — filter by `.gguf` extension. |
-| **Browse GGUF quantizations (Q4_K_M, Q5_K_M, etc.)** | GGUF repos contain multiple quantization files (F16, Q8_0, Q6_K, Q5_K_M, Q4_K_M, IQ4_XS, etc.). Users must choose the right quant for their device's RAM. LM Studio, PocketPal, and Ollama all show quant options. | MEDIUM | When drilling into a model repo, list all `.gguf` siblings with their file size. Parse the quant type from filename (e.g., `Q4_K_M` from `model-Q4_K_M.gguf`) or from GGUF header metadata. Show estimated RAM requirement: `file_size * 1.2` for KV cache overhead. |
-| **Show model metadata (arch, param count, context length)** | Users need to see architecture (llama, gemma, qwen), parameter count (1B, 7B, 8B), and context length before downloading/loading. Every GGUF tool displays this. | LOW | **Already partially built:** `GgufMetadataParser` reads `general.name`, `general.architecture`, `general.file_type`, and `llama.context_length` from GGUF headers. **Gap:** parameter count estimation is inaccurate (divides block_count by 1000). Fix: parse `general.size_label` ("8B") or estimate from tensor dimensions. Metadata can be parsed from downloaded file OR from HF API `config.json` if available. |
-| **Load GGUF model into memory** | Core function: tap "Load" → llama.cpp loads model weights into RAM → ready for chat. Expected to work within seconds for small models. | HIGH | **Already built:** `LlamaEngine.loadModel()` calls `nativeLoadModel(path, nThreads, nCtx)` via JNI. `EngineManager.switchToLlama()` coordinates unloading current engine first. **Gap:** `nativeLoadModel` returns Boolean but no error details. Need richer failure info (OOM? corrupt file? unsupported arch?). |
-| **Stream token generation to chat UI** | Tokens appear incrementally as they're generated. Same UX as remote providers and LiteRT-LM. Users expect this from any LLM chat. | MEDIUM | **Already built:** `LlamaEngine.generate()` wraps JNI callback in `callbackFlow<String>`. Chat UI collects tokens via Flow. **Gap:** Need to verify the JNI implementation actually works — `nativeGenerate` is declared as external but C++ implementation was noted as not fully built in the milestone description ("llama not implemented"). |
-| **Generation parameter support (temp, top_p, etc.)** | Users expect to tweak generation params. The existing Presets system already provides this for remote and LiteRT-LM. | LOW | **Already built:** Presets screen, `ParameterStore`, `Preset` domain model. LlamaEngine's `nativeGenerate` signature currently takes only `prompt` and `callback` — need to extend JNI to pass sampler params (temperature, top_p, top_k, repeat_penalty, max_tokens, seed) to llama.cpp's `llama_sample_*` functions. |
-| **Model file management (view, delete)** | Users accumulate multiple GGUF files (5-20 GB each). Need to see what's downloaded and delete to free space. | LOW | **Already built:** `ModelsScreen` shows downloaded models. Room `models` table tracks file paths. Delete should remove file + Room record + any associated conversations. |
-| **Memory pressure handling (OOM graceful)** | Android can kill the app if RAM runs out. Users expect graceful degradation: warn if insufficient RAM before loading, unload on background, never crash-during-inference. | HIGH | **Already partially built:** `MemoryChecker` exists, `EngineManager.handleTrimMemory()` unloads engine on critical pressure. **Gaps:** No pre-load memory check ("this model needs 5GB, you have 3GB free — continue?"). No progressive memory warning during long generations. LLM inference can't be paused mid-token. |
-| **Import GGUF from device storage** | Users may download GGUF files outside the app (browser, file transfer). Must be able to pick a `.gguf` file and register it. | LOW | **Already built:** `ModelImportManager` handles file picker + copy to app storage. |
-| **Offline chat with loaded model** | Once model is loaded, chat works without internet. Core value proposition of local inference. | LOW | Already inherits from existing offline-first architecture. No remote calls needed once model is in memory. |
+| **Language-aware syntax coloring** | Users see ````python` fences and expect colored keywords, strings, comments — not monochrome monospace text. This is what differentiates "code rendering" from "syntax highlighting." Every LLM chat app (ChatGPT, Claude, LM Studio) does this. | MEDIUM | Requires custom tokenizer — no maintained Android library exists. Build regex-based tokenizer for 10–15 most common languages. |
+| **Fence language detection** | When an LLM writes ````python`, users expect the Python code to be highlighted as Python. The fence specifier is the primary language source (covers ~90% of LLM responses). | LOW | Parse the string after ` ``` ` on the opening fence line. Alias mapping needed (e.g., `js` → `javascript`, `py` → `python`, `sh` → `bash`). |
+| **Monospace font for code** | Already exists in current `MarkdownText`. Must be preserved. Non-negotiable for code readability. | LOW | `FontFamily.Monospace` on code spans. Already implemented as `SpanStyle(fontFamily = FontFamily.Monospace)`. |
+| **Distinct code block visual separation** | Code blocks need background color, padding, and visual distinction from surrounding markdown text. Users expect a "card" feel for code blocks. | LOW | Already partially implemented via `codeTheme.bgCode` on `SpanStyle`. Needs upgrade to full `Surface`-based rendering. |
+| **Persistent theme selection** | The code theme setting must survive app restart. Users invest time choosing a theme and expect it to stick. | LOW | Already implemented: `AdvancedPreferences.setCodeTheme()` persists via DataStore, flows through `ChatViewModel`/`SettingsViewModel` to `ChatUiState.codeTheme`. |
 
 ### Differentiators (Competitive Advantage)
 
-Features that set Warped apart from PocketPal AI, LM Studio desktop, and other GGUF apps.
+Features that set Warped apart. Not universally expected, but valuable for a developer-focused LLM chat app.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| **Transparent UX across model formats (GGUF ↔ LiteRT-LM ↔ Remote)** | User doesn't care which engine is loaded — they just chat. The same chat UI, same conversation history, same presets work regardless of whether the model is GGUF, LiteRT-LM, or remote. No "this feature only works with engine X" surprises. LM Studio and PocketPal lack multi-engine transparency. | MEDIUM | **Already partially built:** `EngineManager` abstracts engine switching. Chat UI is format-agnostic (it just displays tokens). **Gap:** Need engine-aware preset application (llama.cpp needs `n_threads`, context_size, repeat_penalty; remote needs `max_tokens`; LiteRT-LM has `topK` not `top_k`). ParameterStore should normalize or the UI should show only relevant params per engine. |
-| **CPU + GPU backend selection with runtime detection** | llama.cpp supports Vulkan GPU acceleration on Android. Users with Snapdragon 8 Gen 2+ get 2-4x faster inference. Seamless fallback to CPU if Vulkan unavailable. PocketPal uses llama.rn which has limited GPU support. | HIGH | **Already partially built:** `BackendDetector` probes device capabilities. **Gap:** llama.cpp's Android JNI wrapper (`LlamaEngine`) doesn't currently expose backend selection. Need to build llama.cpp with `GGML_VULKAN=ON` and detect Vulkan runtime availability. Add backend selector to UI (CPU / Vulkan auto / Vulkan force). **Warning:** Vulkan on Android is device-dependent — some GPUs crash with certain models. Need try-catch + automatic CPU fallback. |
-| **Quantization-aware model browser with RAM estimation** | Show exactly which quantizations are available per model, file sizes, estimated RAM usage, and "best for your device" recommendations. Compares available RAM vs requirements. PocketPal shows quants but doesn't estimate RAM. | MEDIUM | Build on the existing HF model detail endpoint. Parse `.gguf` filenames for quant types. Cross-reference with `ActivityManager.MemoryInfo`. Recommend: "Q4_K_M (4.6 GB) — fits your 8 GB device" or "Q8_0 (8.0 GB) — too large for your device". |
-| **GGUF metadata display without loading** | Show model architecture, parameter count, context length, tokenizer info, license — all from GGUF header without loading the full model into RAM. Fast (<1s). LM Studio does this well; PocketPal doesn't. | MEDIUM | **Already partially built:** `GgufMetadataParser` reads GGUF headers. **Gaps:** Parser misses many standardized metadata keys (`general.size_label`, `general.license`, `tokenizer.ggml.bos_token_id`, `[arch].attention.head_count`, `[arch].expert_count`). Fix the parser and display the info on model detail screen. For remote models (not yet downloaded), use HF API `config.json` and model card metadata as fallback. |
-| **Chat across engines in same conversation** | Most apps lock you to one engine per chat. Warped already has `engine_type` on conversations — could allow switching a conversation mid-stream (e.g., start with fast local model, switch to powerful remote model for complex query). | HIGH | This is a stretch differentiator for v1.3+. Requires: conversation history serialization between engines, prompt template translation, context window management during engine swap. Out of scope for v1.2. |
-| **Progressive download: chat earlier with partial model** | llama.cpp supports loading models as they download (mmap-based). User could start chatting before download completes. No competitor does this on mobile. | VERY HIGH | This is research-grade. Requires: mmap the download target, llama.cpp must tolerate incomplete files, tokenizer must be in early bytes of GGUF. Unclear if HF CDN supports byte-range serving for this pattern. Defer to v2+. |
+| **Language header bar on every code block** | Shows the detected language name (e.g., "Python", "JavaScript") in a small header above each code block. Surfaces what the LLM intended. ChatGPT's Android app does this; many third-party apps don't. | MEDIUM | Requires restructuring from single `Text(AnnotatedString)` to composable block model. Header is a `Row` with language label inside the code block `Surface`. |
+| **Copy-to-clipboard button per code block** | One-tap copy of the entire code block content. Essential developer workflow — copying generated code is a primary action. ChatGPT, Claude, and LM Studio all have this. | LOW | Android `ClipboardManager` API. Button placed in the language header bar. `contentResolver` not needed — just `ClipboardManager.setText()`. |
+| **Auto language detection when fence is blank** | When an LLM writes ```` ` without a language specifier, the app heuristically detects the language from the code content. Few chat apps do this; most just render unstyled. | MEDIUM | Heuristic pattern matching on first 5–10 lines: check for shebangs, language-specific keywords (`def`, `function`, `class`, `import`), and syntax patterns. Fallback to "plain text" if confidence low. |
+| **Light/dark theme auto-adaptation** | Each preset theme (Monokai, One Dark, GitHub, Dracula) has both light and dark variants. The app selects the variant matching the system theme. This means GitHub theme looks correct in light mode and dark mode — not just one or the other. Most desktop apps (VS Code, IntelliJ) do this; mobile chat apps rarely bother. | MEDIUM | Each theme stores two color maps (light + dark). Detect via `isSystemInDarkTheme()` at the composable level. GitHub theme's light variant is the authentic GitHub light background (#FFFFFF); dark variant is GitHub dark (#0D1117). |
+| **4 curated preset themes** | Monokai, One Dark, GitHub, and Dracula cover the most popular code editor themes. Users recognize these from VS Code, IntelliJ, and Sublime Text — immediate familiarity. | LOW (existing enum extended) | Extend `CodeTheme` enum from 2 color fields to full token-color maps. Remove NORD and SOLARIZED_DARK (not in user's requested set of 4). Each theme defines ~12 token-type colors. |
+| **Applied everywhere code blocks appear** | Chat messages, model card descriptions, README previews, onboarding content — any rendered markdown with code fences gets syntax highlighting. Consistency across the app. | MEDIUM | Requires `MarkdownText` (or its replacement) to be reusable anywhere. The current `MarkdownText` is only used in `MessageBubble.kt`. Need to ensure it works in `LazyColumn` items (chat, model list) and `Column` layouts (readmes, cards). |
+| **Streaming-aware rendering** | During LLM streaming, code blocks are incomplete. The renderer handles partial fences (e.g., ````pyt` mid-token) gracefully without crashing or flickering. | MEDIUM | The current `MarkdownText` already handles unterminated code fences (flushes buffer at end). Extend to handle partial language specifiers and incremental tokenization with debouncing. |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
-Features that seem good but create maintenance nightmares or degrade UX.
+Features that seem good but would create problems for this milestone.
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| **Auto-download latest quant** | "Just pick the best quant for me" | "Best" depends on user priorities (speed vs quality vs RAM). Q4_K_M is the community default but some users want Q8_0 for quality or IQ3_M for smaller footprint. Auto-selection leads to "why did you download 8GB when I have 4GB RAM?" | Show a recommended quant (Q4_K_M for balance, IQ4_XS for tight RAM) with explanation, but let user choose. Highlight the recommended one. |
-| **Quantize models on-device** | "I want to convert my FP16 model to Q4_K_M on my phone" | llama.cpp's `llama-quantize` tool requires 2x RAM of the model (reads FP16, writes quant). A 7B FP16 model is ~14 GB — impossible on most phones. Even if technically possible (swap to disk), it would take hours and drain battery. This is a desktop operation. | Users download pre-quantized GGUF files from Hugging Face. There are thousands available. |
-| **Convert non-GGUF models to GGUF** | "I have a .safetensors model, convert it" | Same RAM problem as quantization (need full model in float32 memory). Conversion scripts are Python-based and don't run on Android. Even if ported to C++, the RAM limitation is fatal. | Download pre-converted GGUF from HF. Use HF's `GGUF-my-repo` space to convert models on the cloud via the web. |
-| **Run multiple GGUF models simultaneously** | "Compare model A vs B responses" | Two 7B Q4_K_M models = ~10 GB RAM. Only flagship phones with 16 GB RAM could do this, and Android would likely kill the app. llama.cpp doesn't support multi-model contexts well. | Users switch between models via EngineManager (unload A → load B). For comparison, show previous responses from chat history. |
-| **Auto-update models** | "Keep my models current" | GGUF models are static files — they don't "update" like apps. A new quant of the same model is a different file with a different hash. Auto-updating would re-download GBs of data unexpectedly, potentially on mobile data. | Notify users when the HF repo has a newer commit. Let them choose to re-download. Show model version in metadata. |
-| **Model sharing between apps** | "Other apps should use my downloaded models" | Android's scoped storage makes this complex. Sharing via content:// URIs is possible but llama.cpp needs file paths for mmap. Security risk: other apps could read model weights. | Users can manually share GGUF files via Android's share sheet. Warped's download folder is app-private for security. |
-| **Merge LoRA adapters on-device** | "Apply a LoRA to my model" | Same RAM problem: merging requires loading both model and adapter. LoRA merging tools are Python-based. On Android this is technically possible but the UX complexity (managing separate LoRA files, applying, verifying) outweighs the value for v1.2. | Defer to v2+. Until then, users download pre-merged models from HF. |
-| **Prompt template auto-detection from filename** | "The app should know this is a ChatML model from the filename" | GGUF filenames are non-standardized. Some models include chat template in GGUF metadata (`tokenizer.chat_template`), others don't. Auto-detection from filename is brittle and leads to silent failures (wrong template → garbled output). | Read `tokenizer.chat_template` from GGUF metadata when available. For models without it, let user select template or use llama.cpp's built-in auto-detection (`llama_chat_apply_template`). |
-
----
+| **WebView-based rendering (highlight.js in a WebView)** | "Just use highlight.js — it supports 190 languages and has themes built in." | WebView per code block is extremely heavy on Android (each WebView is a separate render process). Breaks Compose composition, causes scroll jank, creates memory pressure, and makes copy-paste unreliable. Also bloats APK with JS/CSS assets. | Custom Kotlin regex-based tokenizer rendering to Compose `Text` with colored `SpanStyle`. Fast, native, scroll-smooth. |
+| **Full 190+ language support** | "Support every language highlight.js supports." | Each language grammar requires regex patterns that must be tested. 190 languages would require ~200KB+ of regex definitions, massive test surface, and maintenance burden. Most LLM chats use 10–15 languages (Python, JavaScript, TypeScript, Java, Kotlin, C, C++, Go, Rust, Bash, SQL, JSON, YAML, HTML, CSS). | Support the 12–15 most common languages in chat contexts. Add languages incrementally based on actual usage data. |
+| **Line numbers in code blocks** | "Show line numbers like GitHub or VS Code." | Mobile screens are narrow (360–400dp). Line numbers consume ~40dp of horizontal space, leaving less room for code. Also adds layout complexity (two synchronized scroll columns). ChatGPT and Claude mobile apps don't show line numbers. | Skip line numbers. If needed later, add as a toggle in Settings. |
+| **Custom theme builder/editor** | "Let users create their own syntax color themes." | Massive UX complexity: color pickers, token-type mapping, preview, import/export. Users who want this use desktop IDEs. On mobile, preset themes cover 99% of needs. | Provide 4 high-quality preset themes that look great out of the box. |
+| **Syntax error highlighting (red squiggles)** | "Show syntax errors in red like an IDE." | Requires full language parsers (not just regex tokenizers), adds significant latency per code block, and is actively misleading for LLM-generated code (which often has minor syntax issues but is conceptually correct). | Just highlight the syntax that's there. Don't judge correctness. |
+| **Code folding (collapse/expand code blocks)** | "Let users collapse long code blocks." | Adds gesture handling, animation complexity, and state management per code block. LLM code blocks are typically short (10–50 lines in chat). Not worth the complexity for this use case. | Let code blocks scroll naturally. Users can scroll past them. |
+| **Per-language theme overrides** | "Let me use Monokai for Python but One Dark for JavaScript." | Configuration explosion. Settings UI becomes a matrix. Users don't think this granularly about code themes in a chat app. | One theme for all code blocks. Simple, predictable, sufficient. |
+| **Using Prism4j library directly** | "Prism4j is a Java port of Prism.js — use it." | Prism4j is **archived since July 2023** (repository is read-only). Last release was June 2019 (v2.0.0). No updates for 7 years. Uses old Java patterns, no Kotlin coroutine support, no Compose integration. Dead dependency. | Build a lightweight custom tokenizer inspired by Prism.js token types but written in idiomatic Kotlin. |
 
 ## Feature Dependencies
 
 ```
-GGUF Download from HF
-    └──requires──> HuggingFaceApi.siblings parsing (already exists, needs .gguf filtering)
-                        └──requires──> ModelDetail endpoint (already built)
+Syntax Highlighting (colored token spans)
+    └──requires──> Language Detection (what language to tokenize as?)
+                        ├──primary──> Fence specifier parsing (```python)
+                        └──fallback──> Heuristic auto-detection
 
-Quantization Browser (show file sizes, quant types)
-    └──requires──> GGUF Download from HF (above)
-    └──enhances──> Model Metadata Display (shows quant info pre-download)
+Syntax Highlighting
+    └──requires──> Theme System (which colors for which tokens?)
+                        └──requires──> Token Type → Color mapping per theme
+                                           ├──light variant (for light mode)
+                                           └──dark variant (for dark mode)
+                        └──requires──> Persistent theme selection (existing DataStore flow)
 
-GGUF Model Loading (llama.cpp JNI)
-    └──requires──> Native library compiled (llama.cpp CMake + NDK)
-    └──requires──> EngineManager.unloadCurrent() (already built)
-    └──requires──> MemoryChecker pre-load validation (needs enhancement)
-    └──enables──> Streaming Token Generation
+Code Block UI (header bar + copy button)
+    └──requires──> Composable block rendering model (not AnnotatedString)
+    └──enhances──> Syntax Highlighting (header shows detected language)
 
-Streaming Token Generation
-    └──requires──> GGUF Model Loading (above)
-    └──requires──> JNI callback → callbackFlow wrapper (declared, needs C++ implementation)
-    └──integrates──> Chat UI (already handles Flow<String> tokens)
+Copy-to-clipboard button
+    └──requires──> Android ClipboardManager API (platform)
+    └──requires──> Code block composable (to attach button)
 
-CPU vs GPU Backend Selection
-    └──requires──> Vulkan-compiled llama.cpp .so
-    └──requires──> BackendDetector Vulkan probes (needs implementation)
-    └──requires──> EngineManager backend parameter (currently only has type+path)
-
-Memory Pressure Handling (OOM Prevention)
-    └──requires──> MemoryChecker.preLoadCheck() (needs implementation)
-    └──requires──> ActivityManager.MemoryInfo integration (platform API, straightforward)
-    └──enhances──> All model loading paths
-
-Model Metadata Display (architecture, params, quant)
-    └──requires──> GgufMetadataParser (already exists, needs enrichment)
-    └──can-consume──> Downloaded GGUF file (parse header, don't load full model)
-    └──alternative──> HF API config.json + cardData (for remote browsing, pre-download)
-
-Generation Parameters (temp, top_p, etc.)
-    └──requires──> JNI extended to pass sampler params (needs C++ implementation)
-    └──integrates──> Presets system (already built)
-    └──notes──> Parameter names differ between engines; need normalization layer
-
-Transparent UX Across Engines
-    └──enhances──> All chat features
-    └──requires──> Parameter normalization (mapping between llama.cpp ↔ LiteRT-LM ↔ remote params)
-    └──notes──> Chat UI already format-agnostic; parameter normalization is the remaining work
+Streaming-aware rendering
+    └──enhances──> Syntax Highlighting (partial tokenization)
+    └──enhances──> Code Block UI (partial fences)
 ```
 
----
+### Dependency Notes
 
-## MVP Definition (v1.2 GGUF)
+- **Syntax Highlighting requires Language Detection:** You can't tokenize code without knowing the language grammar to apply. The fence specifier (` ```python `) is the primary source. Auto-detection is the fallback.
+- **Syntax Highlighting requires Theme System:** Token types (keyword, string, comment, etc.) must map to actual colors. This mapping is what a "theme" is. The existing `CodeTheme` enum only has background colors — it must be expanded to full token-color maps.
+- **Code Block UI requires Composable Blocks:** The current `MarkdownText` renders everything as a single `Text(annotatedString)`. A language header bar (`Row` with label) and copy button (`IconButton`) can't be embedded in `AnnotatedString`. The rendering must shift from a single `Text` to a `Column` of composable blocks (text paragraphs + code block surfaces).
+- **Copy-to-clipboard depends on Code Block UI:** The button needs a composable surface to live on. Can't exist on a raw `SpanStyle`.
+- **Streaming-aware rendering enhances everything:** LLM streaming means code blocks arrive token by token. The renderer must handle incomplete fences (` ``` ` opened but not closed), partial language specifiers, and incremental content growth without layout jumps or flicker.
 
-### Launch With (v1.2)
+### Existing System Dependencies
 
-Minimum required to claim GGUF inference works end-to-end:
+- **`CodeTheme` enum** (`MarkdownText.kt` line 21–28): Currently has only `bgCode` and `bgInline` color fields + `label`. Must be expanded to include `lightTokenColors: Map<TokenType, Color>` and `darkTokenColors: Map<TokenType, Color>`.
+- **`AdvancedPreferences`** (`AdvancedPreferences.kt` line 60–69): Persists `codeTheme` as a string name via DataStore. Flow-based observation already wired to `ChatViewModel` and `SettingsViewModel`. No changes needed — just extend the serialization scope.
+- **Settings code theme dropdown** (`SettingsScreen.kt` line 198–219): Already renders a dropdown with `CodeTheme.entries`. Will automatically pick up new/removed enum entries.
+- **`MarkdownText` composable** (`MarkdownText.kt` line 31–89): Must be significantly restructured. The line-by-line `AnnotatedString` builder becomes a block parser that emits a list of `MarkdownBlock` sealed classes (TextBlock, CodeBlock). CodeBlock gets rendered as a `Surface` with syntax-highlighted content.
+- **`MessageBubble`** (`MessageBubble.kt` line 166–175): Wraps `MarkdownText` in `SelectionContainer`. After restructuring, `SelectionContainer` must wrap only text blocks (not code blocks where the copy button handles selection).
+- **`ChatUiState.codeTheme`** (`ChatUiState.kt` line 36): Already flows from `ChatViewModel` → `ChatScreen` → `MessageBubble` → `MarkdownText`. No changes needed.
 
-- [ ] **GGUF file browsing on HF** — List `.gguf` files per model, show file sizes, parse quant type from filename — *this unblocks everything else; models must be findable before they can be downloaded*
-- [ ] **GGUF download with progress** — Download `.gguf` files via existing ModelDownloadWorker/WorkManager with progress notifications — *blocks model loading (need files on device)*
-- [ ] **GGUF model loading via JNI** — llama.cpp loads model into RAM, returns success/failure with error details — *core feature; without this there's no GGUF inference*
-- [ ] **Streaming token generation** — `callbackFlow<String>` from JNI → Chat UI renders tokens incrementally — *user-visible value; this is what they came for*
-- [ ] **Basic generation parameters** — At minimum: temperature, max_tokens, threads. Passed from existing presets to JNI — *users expect to control output style*
-- [ ] **Memory check before loading** — Warn if insufficient RAM; refuse to load instead of crashing — *OOM is the #1 cause of bad reviews for mobile LLM apps*
-- [ ] **Model file management** — View downloaded models, delete to free space — *users will download multiple models; need to manage storage*
-- [ ] **CPU inference** — Core path; works on all arm64 devices — *baseline that must work before GPU*
+## MVP Definition
 
-### Add After Validation (v1.3)
+### This Milestone Delivers (v1.6)
 
-Features to add once CPU inference is stable:
+Minimum viable syntax highlighting — what's needed to validate users actually value this feature.
 
-- [ ] **Vulkan GPU backend** — Build llama.cpp with GGML_VULKAN=ON, detect Vulkan at runtime, fallback to CPU
-- [ ] **Rich GGUF metadata display** — Parse full metadata from header: architecture, param count, context length, tokenizer info, license
-- [ ] **Quantization-aware recommendations** — "Q4_K_M recommended for your 8 GB device" based on available RAM
-- [ ] **Generation stop button** — Interrupt inference mid-generation (nativeStop already declared, needs UI button)
-- [ ] **Token-per-second display** — Real-time generation speed metric (already implemented for LiteRT-LM; add for llama.cpp)
-- [ ] **Context size configuration** — Allow users to increase/decrease context window (trade RAM for longer conversations)
+- [ ] **Fence language detection** — Parse ` ```language ` specifiers from code fences with alias mapping (10–15 languages)
+- [ ] **Syntax-highlighted code blocks** — Tokenized rendering with distinct colors for keywords, strings, comments, numbers, functions, types, operators, punctuation
+- [ ] **4 preset themes** — Monokai, One Dark, GitHub, Dracula — selectable in Settings. Each with light and dark variants.
+- [ ] **Light/dark auto-adaptation** — Theme variant selected based on system dark mode (`isSystemInDarkTheme()`)
+- [ ] **Language header bar** — Small header on each code block showing detected language name
+- [ ] **Copy-to-clipboard button** — In the header bar, copies entire code block content
+- [ ] **Applied in chat messages** — Syntax highlighting visible in AI responses during and after streaming
+- [ ] **Composable block rendering** — Restructured `MarkdownText` to support mixed text + code UI blocks
+
+**Supported languages for v1.6:** Python, JavaScript, TypeScript, Kotlin, Java, C, C++, Go, Rust, Bash/Shell, SQL, JSON, YAML, HTML/XML, CSS. (15 languages covering >95% of LLM chat code output.)
+
+### Deferred (v1.7+)
+
+Features that complement syntax highlighting but aren't required for the initial experience.
+
+- [ ] **Heuristic auto-detection** — Detect language from code content when fence specifier is missing. Adds noticeable polish but LLMs specify language >90% of the time.
+- [ ] **Applied everywhere** — Extend to model card descriptions, README previews, onboarding content. Chat messages are the 80/20 case.
+- [ ] **More languages** — Add Ruby, Swift, PHP, Dart, Lua, Makefile, Dockerfile, Markdown based on user feedback.
+- [ ] **Theme preview in Settings** — Show a sample code block with current theme colors so users can preview before selecting.
+- [ ] **Syntax highlight in user messages too** — Currently only AI messages get markdown rendering. User code blocks could also benefit.
 
 ### Future Consideration (v2+)
 
-Features to defer until product-market fit is established:
-
-- [ ] **Multimodal models (LLaVA, etc.)** — Add image understanding; requires image encoding pipeline, different model loading path
-- [ ] **Speculative decoding** — Draft model acceleration; adds complexity for marginal gain on mobile
-- [ ] **Split model across CPU+GPU** — Hybrid inference for large models; requires complex memory orchestration
-- [ ] **Model sharding (multi-file GGUF)** — Handle `00001-of-00005.gguf` sharded models; uncommon on mobile-sized models
-- [ ] **RPC backend (remote llama.cpp server)** — Treat a remote llama.cpp instance as a "local" engine; architecture overlap with remote providers
-
----
+- [ ] **Custom theme import** — Load TextMate `.tmTheme` or VS Code `.json` theme files
+- [ ] **Line numbers toggle** — Opt-in setting
+- [ ] **Per-language grammar extensibility** — Plugin system for community-contributed language definitions
 
 ## Feature Prioritization Matrix
 
-| Feature | User Value | Implementation Cost | Priority | Depends On |
-|---------|------------|---------------------|----------|------------|
-| GGUF file browsing on HF | HIGH | MEDIUM | P1 | HF API siblings parsing |
-| GGUF download with progress | HIGH | LOW (mostly exists) | P1 | ModelDownloadWorker |
-| GGUF model loading via JNI | CRITICAL | HIGH | P1 | llama.cpp NDK build |
-| Streaming token generation | CRITICAL | MEDIUM | P1 | JNI callback implementation |
-| Memory check before loading | HIGH | MEDIUM | P1 | MemoryChecker enhancement |
-| Basic generation params (temp, threads) | HIGH | LOW | P1 | JNI parameter passing |
-| Model file management (view/delete) | HIGH | LOW (exists) | P1 | ModelsScreen |
-| CPU backend | CRITICAL | MEDIUM | P1 | C++ CMake build |
-| Vulkan GPU backend | MEDIUM | HIGH | P2 | GGML_VULKAN build, detection |
-| Quantization recommendations | MEDIUM | MEDIUM | P2 | RAM estimation logic |
-| Rich GGUF metadata display | MEDIUM | MEDIUM | P2 | GgufMetadataParser enrichment |
-| Stop generation button | MEDIUM | LOW | P2 | UI button + nativeStop |
-| Token-per-second display | LOW | LOW | P2 | Token counting in callback |
-| Context size configuration | MEDIUM | LOW | P2 | JNI n_ctx parameter |
-| Transparent UX across engines | HIGH | MEDIUM | P3 | Parameter normalization |
-| Multimodal models | MEDIUM | VERY HIGH | P3 | Image pipeline |
-| Speculative decoding | LOW | VERY HIGH | P3 | Draft model management |
+| Feature | User Value | Implementation Cost | Priority |
+|---------|------------|---------------------|----------|
+| Fence language detection | HIGH | LOW | P1 |
+| Syntax-highlighted code blocks (colored tokens) | HIGH | MEDIUM | P1 |
+| 4 preset themes (Monokai, One Dark, GitHub, Dracula) | HIGH | MEDIUM | P1 |
+| Light/dark auto-adaptation | HIGH | MEDIUM | P1 |
+| Language header bar | MEDIUM | MEDIUM | P1 |
+| Copy-to-clipboard button | HIGH | LOW | P1 |
+| Applied in chat messages | HIGH | LOW | P1 |
+| Composable block rendering | HIGH | MEDIUM | P1 |
+| Heuristic auto-detection | MEDIUM | MEDIUM | P2 |
+| Applied everywhere (model cards, readmes) | MEDIUM | MEDIUM | P2 |
+| More languages (beyond 15) | LOW | LOW (incremental) | P3 |
+| Theme preview in Settings | LOW | LOW | P3 |
+| Syntax highlight in user messages | LOW | LOW | P3 |
 
 **Priority key:**
-- P1: Must have for v1.2 launch (GGUF inference end-to-end)
-- P2: Should have for v1.3 (polish + GPU)
-- P3: Nice to have, deferred to v2+
-
----
+- P1: Must ship in v1.6
+- P2: Ship if time allows; otherwise v1.7
+- P3: Defer to future milestone
 
 ## Competitor Feature Analysis
 
-| Feature | LM Studio (Desktop) | PocketPal AI (Android) | Warped (Our Approach) |
-|---------|---------------------|------------------------|----------------------|
-| GGUF download from HF | Full HF integration, shows all quants, download queue | HF search + quant selection, background download | Same HF API, sibling filtering for `.gguf`, WorkManager foreground download |
-| Quantization browser | Shows all quants with size, allows filtering | Lists quants per model, file size shown | Show quants + estimated RAM + "fits your device" recommendation |
-| Model metadata | Architecture, params, context, quant type, license | Basic model name + quant file size | Full GGUF header parse + HF card fallback for pre-download browsing |
-| CPU inference | Yes (default) | Yes (llama.rn) | Yes (JNI/NDK from source) |
-| GPU inference | Metal (Apple), CUDA, Vulkan | Limited (llama.rn Vulkan support varies) | Vulkan with runtime detection + auto CPU fallback |
-| Memory management | Shows VRAM/RAM usage | Auto offload on background | Pre-load RAM check + trimMemory handler + OOM graceful fail |
-| Multi-engine | Only llama.cpp | Only llama.cpp | llama.cpp + LiteRT-LM + Remote, same chat UI |
-| Generation params | Full sampler config | Temperature, BOS, system prompt | Full preset system with engine-aware normalization |
-| Streaming UX | Token-by-token display | Token-by-token display | Same `Flow<String>` pattern across all engines |
-| Offline chat | Yes | Yes | Yes (core value prop) |
-| Model file management | Delete, rename, reveal in finder | Delete, import local files | Delete, import via file picker, Room-tracked metadata |
+| Feature | ChatGPT Android | Claude Android | LM Studio Desktop | Warped v1.6 Target |
+|---------|----------------|----------------|-------------------|---------------------|
+| Syntax highlighting | Yes (highlight.js-based) | Yes | Yes | Yes (custom Kotlin tokenizer) |
+| Language header bar | Yes ("Python" label) | No (just copy button) | Yes (language label in header) | Yes |
+| Copy button per block | Yes (top-right header) | Yes (top-right) | Yes (header bar) | Yes (header bar, right-aligned) |
+| Theme selection | No (one dark theme) | No (one theme) | No (follows app theme) | Yes (4 preset themes) |
+| Light/dark adaptation | No (dark only) | No (dark only) | Yes | Yes |
+| Auto language detection | Yes (highlight.js auto) | Unknown | No (fence-only) | P2 |
+| Line numbers | No | No | No | No (anti-feature) |
+| Streaming resilience | Yes | Yes | Yes | Yes (required) |
+| Rendering approach | WebView (React Native WebView) | Native? | Qt/C++ custom | Compose native (Column of blocks) |
 
----
+### Key Competitive Insights
+
+1. **No chat app offers theme selection on mobile.** ChatGPT and Claude use a single hardcoded dark theme. Warped's 4-theme selector is a genuine differentiator for developers who have strong theme preferences from their IDEs.
+
+2. **Language header bar is inconsistent.** ChatGPT shows it; Claude doesn't. LM Studio shows it. Warped showing it puts us in the "polished" camp.
+
+3. **Copy button is table stakes.** Every major chat app has it. Not having it would feel broken.
+
+4. **Light/dark adaptation is rare.** Most chat apps are dark-only on mobile. Warped adapting to system theme is a quality-of-life differentiator.
+
+5. **Native rendering (Compose) vs WebView.** ChatGPT's Android app uses React Native WebView for markdown rendering — this is why scrolling feels slightly janky in long code blocks. Warped's native Compose approach should deliver smoother scrolling.
+
+## Technical Architecture Decisions
+
+### Why Custom Tokenizer Instead of a Library
+
+The research found no maintained Android syntax highlighting library:
+
+| Candidate | Status | Verdict |
+|-----------|--------|---------|
+| **Prism4j** | Archived July 2023. Last release June 2019. README explicitly says "no themes, no rendering." | ❌ Dead dependency |
+| **Sora Editor** | Active Android code editor. Uses TextMate grammars (.tmLanguage JSON) and TreeSitter. | ❌ Full code editor, overkill for read-only rendering. Adds MBs of native .so files. |
+| **highlight.js in WebView** | Full-featured, 190 languages, themes built in. | ❌ WebView per code block = heavy, janky, breaks Compose. |
+| **Chaquopy + Pygments** | Python on Android via Chaquopy. | ❌ ~50MB APK increase for Python runtime. |
+| **Custom regex tokenizer** | Lightweight, Kotlin-native, Compose-friendly. | ✅ Best fit. ~30KB of regex definitions for 15 languages. |
+
+### Token Type Taxonomy
+
+Based on Prism.js standard tokens (industry consensus):
+
+| Token Type | What It Covers | Example |
+|-----------|----------------|---------|
+| `keyword` | Reserved words | `def`, `class`, `if`, `return`, `import`, `fun`, `val` |
+| `string` | String literals | `"hello world"`, `'single'`, `` `template` `` |
+| `number` | Numeric literals | `42`, `3.14`, `0xFF`, `1e10` |
+| `comment` | Single/multi-line comments | `// line`, `/* block */`, `# hash` |
+| `function` | Function/method names | `def **foo**():`, `function **bar**()` |
+| `type` | Class/type names | `class **Foo**`, `List<String>`, `interface **Bar**` |
+| `operator` | Operators | `+`, `-`, `*`, `/`, `=`, `==`, `->`, `::` |
+| `punctuation` | Brackets, parens, commas | `{ } [ ] ( ) , ; . :` |
+| `boolean` | Boolean literals | `true`, `false`, `True`, `False` |
+| `builtin` | Built-in functions/types | `print`, `len`, `console.log`, `println` |
+| `variable` | Special variables | `this`, `self`, `super`, `$VAR` |
+| `constant` | Constants | `PI`, `MAX_SIZE`, `NULL`, `None` |
+| `plain` | Unmatched text | Everything else |
+
+### Per-Thene Token Colors
+
+Each of the 4 themes maps the 12 token types to colors for both light and dark variants. This is ~96 color values total (4 themes × 12 token types × 2 variants). Brightness and contrast tested for WCAG AA readability on mobile.
+
+Colors sourced from the canonical theme definitions (Monokai from TextMate, One Dark from Atom, GitHub from Primer Design, Dracula from dracula-theme).
 
 ## Sources
 
-| Source | URL | Confidence |
-|--------|-----|------------|
-| llama.cpp README (backends, features, build) | https://github.com/ggml-org/llama.cpp | HIGH |
-| llama.cpp Android build guide | https://github.com/ggml-org/llama.cpp/blob/master/docs/android.md | HIGH |
-| GGUF format specification | https://github.com/ggml-org/ggml/blob/master/docs/gguf.md | HIGH |
-| llama.cpp quantization guide | https://github.com/ggml-org/llama.cpp/blob/master/tools/quantize/README.md | HIGH |
-| PocketPal AI (reference Android GGUF app) | https://github.com/a-ghorbani/pocketpal-ai | HIGH |
-| HF Hub API (models, siblings, search) | https://huggingface.co/docs/hub/en/api | HIGH |
-| HF GGUF model library (174k+ models) | https://huggingface.co/models?library=gguf&sort=downloads | HIGH |
-| Existing Warped codebase | `app/src/main/java/com/warped/` (v1.1 shipped code) | HIGH |
-| LlamaEngine.kt (JNI declarations) | `app/.../inference/LlamaEngine.kt` | HIGH |
-| EngineManager.kt (engine switching) | `app/.../inference/EngineManager.kt` | HIGH |
-| GgufMetadataParser.kt (header parser) | `app/.../inference/GgufMetadataParser.kt` | HIGH |
-| HuggingFaceApi.kt (HF REST client) | `app/.../api/HuggingFaceApi.kt` | HIGH |
+### Primary (HIGH confidence)
+- **Prism.js token documentation:** https://prismjs.com/tokens.html — Standard token types, the industry consensus for syntax highlighting token taxonomy.
+- **Prism4j GitHub (archived):** https://github.com/noties/Prism4j — Confirmed archived since July 2023. Last release June 2019. Read-only repository.
+- **Warped codebase inspection:** `MarkdownText.kt`, `MessageBubble.kt`, `AdvancedPreferences.kt`, `SettingsScreen.kt` — Confirmed existing `CodeTheme` enum structure, DataStore persistence, Compose rendering approach.
+
+### Secondary (MEDIUM confidence)
+- **Sora Editor (rosemoe/sora-editor):** Context7 docs — Confirmed TextMate/TreeSitter approach exists for Android but is designed for code editors, not read-only rendering. Overkill for chat app code blocks.
+- **Highlight.js auto-detection:** https://highlightjs.org/ — Industry-standard language detection approach. Uses Bayesian classifier + keyword matching. Adaptation simplified for mobile (heuristic-only, no ML).
+
+### Competitive Analysis (MEDIUM confidence)
+- **ChatGPT Android app** — Observed: WebView-based rendering, language header bar, copy button, dark-only theme. Source: personal usage.
+- **Claude Android app** — Observed: Copy button but no language header bar, dark-only theme. Source: personal usage.
+- **LM Studio desktop** — Observed: Language header bar, copy button, follows app theme. Source: personal usage.
+
+### LOW confidence (needs validation)
+- **Android syntax highlighting library landscape** — No maintained library found via Context7, GitHub topics, or web search. A deeper search of Maven Central may surface niche alternatives. Likelihood of finding one: LOW (this is a genuinely underserved niche on Android).
 
 ---
 
-*Feature research for: GGUF native inference on Android (Warped v1.2)*
-*Researched: 2026-05-05*
+*Feature research for: Warped v1.6 code syntax highlighting*
+*Researched: 2026-05-14*

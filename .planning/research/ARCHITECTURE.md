@@ -1,765 +1,547 @@
-# Architecture Research: GGUF Native Inference Integration
+# Architecture Research: Code Syntax Highlighting Integration
 
-**Domain:** Android local LLM inference via llama.cpp JNI/NDK
-**Researched:** 2026-05-05
+**Domain:** Android chat app (Warped — LM Studio equivalent)
+**Researched:** 2026-05-14
 **Confidence:** HIGH
 
 ## Executive Summary
 
-The Warped app's existing Clean Architecture (UI → Domain → Data) already has stubs and integration points for GGUF/llama.cpp: `LlamaEngine` wraps a JNI bridge to native C++, `EngineManager` coordinates engine lifecycle, `LocalLlmProvider` implements `LlmProvider` for the chat pipeline, `ProviderRouter` dispatches `ProviderType.LOCAL` to llama.cpp, and `ModelDownloadWorker`/`ModelImportManager` parse GGUF metadata on download/import. The architecture is sound and the integration points are correctly placed — what's missing is the real native implementation (llama.cpp compiled from source) and production-hardening of memory management, Vulkan probing, token streaming, and thread safety.
+Integration of syntax highlighting into Warped's existing Compose chat rendering requires a **custom regex-based tokenizer** built specifically for LLM code block rendering. No well-established, production-ready Compose-native syntax highlighting library exists for Android — the available options are either archived (Prism4j, 2019), View-based (CodeView-Android, 2022), or too new and unproven (kotlin-textmate, 12 stars, updated today).
 
-This document describes the NEW patterns needed for the GGUF pipeline and how they integrate with existing code.
+The custom tokenizer approach is the **correct architectural choice** because:
+1. The rendering target is `AnnotatedString` (Compose-native, no bridging needed)
+2. LLM output code blocks are small (10–100 lines, not full files)
+3. The existing `MarkdownText` component already uses `buildAnnotatedString` — the tokenizer extends this pattern
+4. Zero external dependencies (fits clean architecture, no NDK, no JNI, no JS interop)
+5. Streaming-compatible: tokenize incrementally as LLM emits tokens
 
-## Integration Architecture Overview
+## Standard Architecture
+
+### System Overview
 
 ```
-┌──────────────────────────────────────────────────────────────────────────┐
-│  EXISTING (unchanged)                                                     │
-│  ┌─────────────────┐    ┌──────────────────┐    ┌──────────────────┐     │
-│  │ ChatViewModel    │    │ ProviderRouter    │    │ EngineManager     │     │
-│  │ preloadLocalModel│───▶│ resolveLocal(     │───▶│ switchToLlama()   │     │
-│  │ sendMessage()    │    │ LOCAL, modelId)   │    │ getLlamaEngine()  │     │
-│  └─────────────────┘    └──────────────────┘    └────────┬─────────┘     │
-│                                                          │               │
-│  MODIFIED (production-hardened)                          │               │
-│  ┌─────────────────┐    ┌──────────────────┐    ┌───────▼──────────┐    │
-│  │ LocalLlmProvider │───▶│ LlamaEngine       │    │ BackendDetector  │    │
-│  │ (chat streaming) │    │ (JNI wrapper)     │    │ (+ Vulkan probe) │    │
-│  └─────────────────┘    └────────┬─────────┘    └──────────────────┘    │
-│                                  │                                       │
-│  NEW (native layer)              │                                       │
-│                         ┌───────▼──────────────────────────┐            │
-│                         │ libwarped_llama.so (NDK)          │            │
-│                         │  ├─ jni_bridge.cpp (JNI glue)    │            │
-│                         │  ├─ LlamaEngine (C++ singleton)  │            │
-│                         │  ├─ llama.cpp (compiled from src)│            │
-│                         │  ├─ GGML Vulkan backend (.so)    │            │
-│                         │  └─ GGML CPU backend (always)    │            │
-│                         └──────────────────────────────────┘            │
-└──────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                         UI Layer (Compose)                             │
+│                                                                        │
+│  ChatScreen ──── collects uiState.codeTheme                            │
+│    │                                                                   │
+│    ├─ MessageBubble (EXISTING — modified)                              │
+│    │    │                                                               │
+│    │    ├─ SelectionContainer                                          │
+│    │    │    └─ MarkdownText (EXISTING — refactored)                    │
+│    │    │         │                                                     │
+│    │    │         ├─ parseInlineMarkdown() ─ unchanged                  │
+│    │    │         ├─ parseInlineStyles() ─ unchanged                    │
+│    │    │         └─ code block fence ──► CodeBlock (NEW)              │
+│    │    │              │                                               │
+│    │    │              ├─ LanguageDetector.detect(code) (NEW)          │
+│    │    │              ├─ SyntaxHighlighter.highlight(code, lang,       │
+│    │    │              │       theme) → AnnotatedString (NEW)          │
+│    │    │              ├─ LanguageHeaderBar (NEW)                       │
+│    │    │              └─ CopyButton (NEW)                              │
+│    │    │                                                               │
+│    │    └─ Reasoning block ─ uses MarkdownText (unchanged)              │
+│    │                                                                   │
+│  SettingsScreen ──── code theme dropdown (EXISTING — modified)         │
+│    └─ SettingsViewModel.setCodeTheme() ─ unchanged                     │
+│                                                                        │
+├──────────────────────────────────────────────────────────────────────┤
+│                      Domain Layer (NEW components)                     │
+│                                                                        │
+│  domain/highlighting/                                                  │
+│    ├─ SyntaxHighlighter.kt          (interface)                        │
+│    ├─ CodeToken.kt                  (sealed class: token types)        │
+│    └─ Language.kt                   (enum: supported languages)        │
+│                                                                        │
+├──────────────────────────────────────────────────────────────────────┤
+│                       Data Layer (NEW components)                      │
+│                                                                        │
+│  data/highlighting/                                                    │
+│    ├─ RegexSyntaxHighlighter.kt     (interface implementation)         │
+│    ├─ LanguageDetector.kt           (heuristic language detection)     │
+│    ├─ definitions/                  (token patterns per language)      │
+│    │   ├─ PythonDefinitions.kt                                        │
+│    │   ├─ JavaScriptDefinitions.kt                                    │
+│    │   ├─ TypeScriptDefinitions.kt                                     │
+│    │   ├─ BashDefinitions.kt                                          │
+│    │   ├─ JsonDefinitions.kt                                           │
+│    │   ├─ YamlDefinitions.kt                                           │
+│    │   ├─ GoDefinitions.kt                                            │
+│    │   ├─ RustDefinitions.kt                                           │
+│    │   ├─ JavaDefinitions.kt                                          │
+│    │   ├─ CppDefinitions.kt                                            │
+│    │   ├─ SqlDefinitions.kt                                            │
+│    │   └─ ShellDefinitions.kt                                          │
+│    └─ theme/                                                           │
+│        ├─ HighlightingTheme.kt      (Color scheme per token type)      │
+│        ├─ MonokaiTheme.kt                                             │
+│        ├─ OneDarkTheme.kt                                              │
+│        ├─ GitHubTheme.kt                                              │
+│        └─ DraculaTheme.kt                                             │
+│                                                                        │
+├──────────────────────────────────────────────────────────────────────┤
+│                    Existing Infrastructure (modified)                  │
+│                                                                        │
+│  data/local/preferences/AdvancedPreferences.kt  — CodeTheme enum      │
+│  ui/chat/components/MarkdownText.kt             — code block handling  │
+│  ui/chat/components/CodeTheme                    — MOVED + expanded    │
+│  ui/chat/ChatUiState.kt                          — unchanged           │
+│  ui/chat/ChatViewModel.kt                        — unchanged           │
+│  ui/settings/SettingsScreen.kt                   — dropdown labels     │
+│  ui/settings/SettingsUiState.kt                   — unchanged           │
+│  ui/settings/SettingsViewModel.kt                 — unchanged           │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-## Component Boundaries
+### Component Responsibilities
 
-### 1. JNI Bridge Layer — `jni_bridge.cpp` / `LlamaEngine.kt`
+| Component | Status | Responsibility | File(s) |
+|-----------|--------|----------------|---------|
+| `CodeTheme` enum | **MOVED + EXPANDED** | Currently in `MarkdownText.kt`; moves to `ui/theme/` or `data/highlighting/theme/`. Gains token color maps, light/dark variant support, and `toHighlightingTheme()` mapping. | `CodeTheme.kt` |
+| `MarkdownText` | **REFACTORED** | Stays the outer markdown parser. Code block fence detection unchanged. Instead of rendering code blocks inline, delegates to new `CodeBlock` composable. Inline code (`backticks`) continues to use bg color only. | `MarkdownText.kt` |
+| `CodeBlock` | **NEW** | Composable that takes raw code text + codeTheme. Orchestrates: language detection → syntax highlighting → AnnotatedString rendering → language header bar → copy button. Replaces lines 56–85 of current MarkdownText. | `ui/chat/components/CodeBlock.kt` |
+| `SyntaxHighlighter` | **NEW (interface)** | Domain-layer interface: `fun highlight(code: String, language: Language, theme: HighlightingTheme): AnnotatedString`. Pure Kotlin, no Android/Compose dependency — lives in `domain/highlighting/`. | `domain/highlighting/SyntaxHighlighter.kt` |
+| `RegexSyntaxHighlighter` | **NEW (impl)** | Data-layer implementation. Applies regex token patterns to split code into `CodeToken` sealed types, then maps each token to `SpanStyle` from the theme. Returns `AnnotatedString`. | `data/highlighting/RegexSyntaxHighlighter.kt` |
+| `LanguageDetector` | **NEW** | Heuristic language detection from raw code text. Uses keyword frequency scoring (not full parsing). Reads the markdown fence language hint (e.g., `\`\`\`python`) as the primary signal, falls back to content-based detection. | `data/highlighting/LanguageDetector.kt` |
+| `Language` enum | **NEW** | Enum of supported languages. Each variant maps to a `LanguageDefinition` containing regex token patterns. | `domain/highlighting/Language.kt` |
+| `CodeToken` | **NEW** | Sealed class for token types: `Keyword`, `String`, `Number`, `Comment`, `Function`, `Type`, `Operator`, `Punctuation`, `Plain`. Mirror of standard code token categories from TextMate/Pygments. | `domain/highlighting/CodeToken.kt` |
+| `HighlightingTheme` | **NEW** | Interface mapping `CodeToken` → `SpanStyle` (color, bold, italic). Each theme (Monokai, One Dark, GitHub, Dracula) provides light and dark mode `SpanStyle` maps. | `data/highlighting/theme/HighlightingTheme.kt` |
+| `LanguageHeaderBar` | **NEW (inline in CodeBlock)** | Small bar above code block showing detected language name. No separate file needed — it's a `@Composable` function inside `CodeBlock.kt`. | In `CodeBlock.kt` |
+| `CopyButton` | **NEW (inline in CodeBlock)** | Icon button that copies code content to clipboard. Uses `LocalClipboardManager`. | In `CodeBlock.kt` |
+| `MessageBubble` | **UNCHANGED** | Passes `codeTheme` through to `MarkdownText` as before. No structural changes needed — `CodeBlock` lives inside `MarkdownText`'s rendering. | `MessageBubble.kt` |
+| `ChatUiState` | **UNCHANGED** | `codeTheme: CodeTheme` field remains. Type changes from old enum to new one but data class structure identical. | `ChatUiState.kt` |
+| `ChatViewModel` | **UNCHANGED** | `advancedPreferences.codeTheme.collect { ... }` unchanged. Data flow identical. | `ChatViewModel.kt` |
+| `AdvancedPreferences` | **MINIMALLY CHANGED** | Stores `CodeTheme.name` as string. Schema unchanged. The `CodeTheme.valueOf(name)` call works with the new enum. | `AdvancedPreferences.kt` |
+| `SettingsScreen` | **MINIMALLY CHANGED** | Code theme dropdown labels update to show preview colors alongside theme name. Dropdown `CodeTheme.entries.forEach` unchanged. | `SettingsScreen.kt` |
+| `SettingsViewModel` | **UNCHANGED** | `setCodeTheme()` and `codeTheme` collection unchanged. | `SettingsViewModel.kt` |
+| `SettingsUiState` | **UNCHANGED** | `codeTheme: CodeTheme` field remains. | `SettingsUiState.kt` |
 
-**What exists:**
-- `jni_bridge.cpp` has stub implementations (`loadModel` returns `true` always, `generate` emits placeholder text)
-- `LlamaEngine.kt` has correct JNI declarations, `callbackFlow` wrapping native callbacks
-- `CMakeLists.txt` compiles only `jni_bridge.cpp` — no llama.cpp source linked yet
-- Declares compile definitions `GGML_USE_CPU=1`, `GGML_USE_CPU_AARCH64=1` but doesn't use them
+## Recommended Project Structure
 
-**What must change:**
+```
+app/src/main/java/com/warped/
+│
+├── domain/
+│   └── highlighting/                    # NEW — pure Kotlin, zero Android deps
+│       ├── SyntaxHighlighter.kt         # interface: highlight(code, lang, theme) → AnnotatedString
+│       ├── CodeToken.kt                 # sealed class: Keyword, String, Number, Comment, Function, Type, Operator, Punctuation, Plain
+│       ├── Language.kt                  # enum: PYTHON, JAVASCRIPT, TYPESCRIPT, BASH, JSON, YAML, GO, RUST, JAVA, CPP, SQL, UNKNOWN
+│       └── LanguageDefinition.kt        # data class: List<TokenPattern> per language
+│
+├── data/
+│   └── highlighting/                    # NEW — implements domain interfaces
+│       ├── RegexSyntaxHighlighter.kt   # impl of SyntaxHighlighter, regex-based tokenizer
+│       ├── LanguageDetector.kt         # keyword frequency scoring + fence info detection
+│       ├── definitions/                # token pattern definitions per language
+│       │   ├── PythonDefinitions.kt    # Python keyword/string/comment/number patterns
+│       │   ├── JavaScriptDefinitions.kt
+│       │   ├── TypeScriptDefinitions.kt
+│       │   ├── BashDefinitions.kt
+│       │   ├── JsonDefinitions.kt
+│       │   ├── YamlDefinitions.kt
+│       │   ├── GoDefinitions.kt
+│       │   ├── RustDefinitions.kt
+│       │   ├── JavaDefinitions.kt
+│       │   ├── CppDefinitions.kt
+│       │   ├── SqlDefinitions.kt
+│       │   └── ShellDefinitions.kt
+│       └── theme/                      # color themes with light/dark variants
+│           ├── HighlightingTheme.kt    # interface: Map<CodeToken, LightDark<SpanStyle>>
+│           ├── MonokaiTheme.kt
+│           ├── OneDarkTheme.kt
+│           ├── GitHubTheme.kt
+│           └── DraculaTheme.kt
+│
+├── ui/
+│   ├── chat/
+│   │   └── components/
+│   │       ├── MarkdownText.kt         # REFACTORED — delegate code blocks to CodeBlock
+│   │       ├── CodeBlock.kt            # NEW — orchestration composable
+│   │       └── MessageBubble.kt        # UNCHANGED
+│   ├── settings/
+│   │   └── SettingsScreen.kt           # MODIFIED — dropdown shows theme preview colors
+│   └── theme/
+│       └── CodeTheme.kt                # MOVED from chat/components/ + EXPANDED
+│
+└── di/
+    └── HighlightingModule.kt           # NEW — Hilt module providing SyntaxHighlighter + LanguageDetector
+```
 
-| File | Change | Why |
-|------|--------|-----|
-| `CMakeLists.txt` | Add llama.cpp source files, GGML subdirectories, Vulkan backend | Must compile real inference engine |
-| `jni_bridge.cpp` | Implement real `loadModel`, `generate`, `stop`, `unload` using llama.cpp API | Core inference loop |
-| `jni_bridge.h` | Add Vulkan backend params, model metadata struct | Need GPU backend and metadata |
-| `LlamaEngine.kt` | Add `loadModel(path, backend, nGpuLayers)`, add `nativeGetVulkanInfo()`, add `nativeGetContextSize()` | Vulkan backend selection, metadata extraction |
-| `LlamaEngine.kt` | Add `generate(prompt, params: GenerationParameters)` — thread count, temp, topK, topP, seed | Per-request parameter pass-through |
+### Structure Rationale
 
-**Key JNI design decisions:**
+- **`domain/highlighting/`** — Pure Kotlin interfaces and models. Follows existing Clean Architecture pattern (like `domain/model/`, `domain/repository/`). Zero Android dependencies enable fast unit testing.
+- **`data/highlighting/`** — Concrete implementations. `RegexSyntaxHighlighter` implements `SyntaxHighlighter`. `LanguageDetector` is a standalone class (no interface needed — it's a utility, not a swappable dependency). Follows existing pattern (like `data/repository/` implements `domain/repository/`).
+- **`data/highlighting/definitions/`** — One file per language with `List<TokenPattern>`. Keeps definitions self-contained and easy to contribute. Follows single-responsibility: changing Python highlighting doesn't risk breaking JavaScript.
+- **`data/highlighting/theme/`** — Theme definitions separated from the `CodeTheme` enum (which stays in `ui/theme/` for the preferences bridge). The enum maps to theme objects, keeping the UI preferences layer simple.
+- **`ui/chat/components/CodeBlock.kt`** — New composable in the existing chat components package. Co-located with `MarkdownText.kt` since they're tightly coupled (MarkdownText creates CodeBlock instances).
+- **`di/HighlightingModule.kt`** — Hilt `@Module` providing `SyntaxHighlighter` as singleton. Follows existing DI pattern (`RepositoryModule.kt`, `ProviderModule.kt`, etc.).
 
+## Architectural Patterns
+
+### Pattern 1: Strategy Pattern for Syntax Highlighting
+
+**What:** `SyntaxHighlighter` interface with a single implementation (`RegexSyntaxHighlighter`). Language-specific token patterns are injected via `LanguageDefinition` data objects.
+
+**When to use:** When the highlighting engine could be swapped later (e.g., to a TextMate grammar engine like `kotlin-textmate` once it matures). The interface boundary makes this zero-cost future-proofing.
+
+**Trade-offs:** One extra interface indirection, but this is standard Clean Architecture practice. The `LanguageDetector` intentionally has NO interface — it's a utility, not a swappable strategy.
+
+**Example:**
 ```kotlin
-// LlamaEngine.kt — NEW API surface
-class LlamaEngine @Inject constructor() {
-    // EXISTING — unchanged
-    fun generate(prompt: String): Flow<String>
-
-    // MODIFIED — new params
-    fun loadModel(
-        path: String,
-        nThreads: Int = 4,
-        nCtx: Int = 4096,
-        nGpuLayers: Int = 0,  // NEW: 0=CPU-only, >0=offload layers to GPU
-        useVulkan: Boolean = false  // NEW: Vulkan backend toggle
-    ): Boolean
-
-    // NEW
-    fun generate(prompt: String, params: GenerationParameters): Flow<String>
-    fun getVulkanInfo(): VulkanInfo  // adapter name, VRAM, compute queue count
-    fun getContextSize(): Int
-    fun getModelArchitecture(): String  // from GGUF header via native
+// domain/highlighting/SyntaxHighlighter.kt
+interface SyntaxHighlighter {
+    fun highlight(
+        code: String,
+        language: Language,
+        theme: HighlightingTheme
+    ): AnnotatedString
 }
-```
 
-**The `callbackFlow` pattern (already correct, needs hardening):**
-
-```kotlin
-// The callback is invoked from the JNI thread — NOT the Kotlin coroutine thread.
-// callbackFlow handles this correctly: trySend() is thread-safe and buffered.
-fun generate(prompt: String): Flow<String> = callbackFlow {
-    val callback = object : TokenCallback {
-        override fun onToken(token: String, done: Boolean) {
-            if (done) close()
-            else if (token.isNotEmpty()) trySend(token)
-        }
-    }
-    nativeGenerate(prompt, callback)
-    awaitClose { nativeStop() }
-}.flowOn(Dispatchers.Default)  // CPU-bound inference moves off Main
-```
-
-**Critical JNI concern: Global Reference lifecycle**
-
-The JNI `nativeGenerate` receives a `jobject callback` parameter. This is a **local reference** valid only for the duration of the JNI call. Since `nativeGenerate` is blocking (runs the entire generation loop), the local reference outlives the method scope — this is technically valid but fragile. **Mitigation:**
-```cpp
-// In nativeGenerate JNI function
-jobject globalCallback = env->NewGlobalRef(callback);
-// ... generate loop uses globalCallback ...
-env->DeleteGlobalRef(globalCallback);
-```
-
-The current stub doesn't convert to global ref — the real implementation must. This is the #1 cause of JNI crashes ("JNI local reference table overflow" or "use of deleted local reference").
-
-### 2. EngineManager Integration
-
-**What exists:**
-- `switchToLlama(modelPath)` calls `llamaEngine.loadModel(modelPath)` synchronously
-- `unloadCurrent()` calls `llamaEngine.stop()` then `llamaEngine.unload()`
-- `@Synchronized` on all public methods for mutual exclusion
-- `ActiveEngine` tracks `type`, `modelPath`, `backend`
-
-**What must change:**
-
-```kotlin
-// EngineManager.kt — MODIFIED switchToLlama
-@Synchronized
-fun switchToLlama(modelPath: String, nGpuLayers: Int = 0) {
-    val backend = backendDetector.probeBackend()  // now includes Vulkan
-    val useVulkan = backend == BackendType.GPU
-    val target = ActiveEngine(
-        type = EngineType.LLAMA_CPP,
-        modelPath = modelPath,
-        backend = backend  // NEW: was null, now populated
-    )
-    if (activeEngine == target) return
-    unloadCurrent()
-
-    // Load is a blocking call — caller (ChatViewModel) dispatches on Dispatchers.Default
-    val loaded = llamaEngine.loadModel(
-        path = modelPath,
-        nThreads = Runtime.getRuntime().availableProcessors(),
-        nCtx = 4096,
-        nGpuLayers = if (useVulkan) nGpuLayers else 0,
-        useVulkan = useVulkan
-    )
-    if (!loaded) throw IllegalStateException("Failed to load GGUF model: $modelPath")
-    activeEngine = target
-}
-```
-
-**Lifecycle state machine:**
-```
-UNLOADED ──loadModel()──▶ LOADED ──generate()──▶ GENERATING
-   ▲                         │                       │
-   │                         │                       │ stop()
-   │                         ◀───────────────────────┘
-   │                         │
-   └───unload()◀────────────┘
-         (or process death)
-```
-
-**Key constraint:** Only one engine loaded at a time (unchanged). EngineManager enforces this via `@Synchronized`. The native C++ `LlamaEngine` singleton also enforces it — `loadModel` unloads previous model first. This dual-layer enforcement prevents accidental double-load.
-
-### 3. Memory Management Across Layers
-
-**The critical numbers:**
-| Model Size | GGUF File | RAM Needed (inference) | Example |
-|-----------|-----------|----------------------|---------|
-| 1B Q4_K_M | ~600 MB | ~1.2 GB | TinyLlama |
-| 3B Q4_K_M | ~2 GB | ~3.5 GB | Phi-3-mini |
-| 7B Q4_K_M | ~4.5 GB | ~6 GB | Mistral-7B, Llama-3.2-3B |
-| 8B Q4_K_M | ~5 GB | ~7 GB | Llama-3.1-8B |
-| 13B Q4_K_M | ~8 GB | ~10 GB | (top-end flagships only) |
-
-**RAM needed ≈ GGUF file size × 1.3** (model weights + KV cache + context buffers). A 4.5 GB GGUF needs ~6 GB free RAM.
-
-**What exists:**
-- `MemoryChecker` with `canLoadModel()`, `shouldWarn()`, `getMemoryInfo()`
-- 80% available RAM threshold for `canLoadModel`
-- 60% threshold for warning
-- `ChatViewModel.preloadLocalModel()` checks `canLoadModel()` before loading
-- `ChatViewModel.launchModelSelection()` shows warning dialog via `shouldWarn()`
-
-**What must change:**
-
-1. **Tighter memory check in `preloadLocalModel`** — currently checks `canLoadModel` but doesn't use `ActivityManager.MemoryInfo` for the actual memory state. Must switch to `ActivityManager.getMemoryInfo()` which reflects the *current process* memory situation, not just the system-wide available RAM.
-
-2. **OOM recovery** — `llamaEngine.loadModel()` can throw `OutOfMemoryError` for large models on constrained devices. Must catch in `preloadLocalModel()` and surface a user-friendly error ("Model needs X MB but only Y MB available" — already partially done).
-
-3. **`android:largeHeap="true"`** — Not yet in AndroidManifest. Required for models >256MB. Without it, Android enforces a lower heap limit (~256-512MB depending on device).
-
-4. **No artificial size limit** — Per PROJECT.md requirements, must not hard-cap model size. Some flagship phones (16GB RAM) can run 13B models. Let the memory check (80% of available) be the only gate.
-
-```kotlin
-// ChatViewModel.kt — MODIFIED preloadLocalModel
-private suspend fun preloadLocalModel(filePath: String) {
-    val model = _uiState.value.localModels.firstOrNull { it.filePath == filePath }
-    if (model != null) {
-        // NEW: Check ActivityManager actual process memory, not just system-wide
-        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val memInfo = ActivityManager.MemoryInfo()
-        activityManager.getMemoryInfo(memInfo)
-
-        val modelSizeBytes = model.sizeBytes
-        val estimatedRamNeeded = (modelSizeBytes * 1.3).toLong()  // 30% overhead for KV cache + context
-        val availableForProcess = memInfo.availMem
-
-        if (estimatedRamNeeded > availableForProcess * 0.8) {
-            val modelMB = modelSizeBytes / (1024 * 1024)
-            val availMB = availableForProcess / (1024 * 1024)
-            _uiState.update {
-                it.copy(modelLoadError = "Not enough memory: model needs ~${modelMB} MB RAM but only ${availMB} MB available.")
-            }
-            return
-        }
-    }
-
-    // ... existing load logic (unchanged) ...
-    try {
-        withContext(Dispatchers.Default) {
-            if (isLitertlm) {
-                engineManager.switchToLiteRT(filePath)
-            } else {
-                val loaded = llamaEngine.loadModel(filePath, ...)
-                if (!loaded) throw IllegalStateException("Failed to load GGUF model")
+// data/highlighting/RegexSyntaxHighlighter.kt (simplified)
+class RegexSyntaxHighlighter @Inject constructor() : SyntaxHighlighter {
+    override fun highlight(code: String, language: Language, theme: HighlightingTheme): AnnotatedString {
+        val definitions = language.definitions
+        return buildAnnotatedString {
+            var remaining = code
+            while (remaining.isNotEmpty()) {
+                val match = findFirstMatch(remaining, definitions)
+                if (match != null) {
+                    append(match.before) // plain text
+                    withStyle(theme.spanStyleFor(match.tokenType)) {
+                        append(match.text)
+                    }
+                    remaining = match.after
+                } else {
+                    append(remaining)
+                    remaining = ""
+                }
             }
         }
-    } catch (e: OutOfMemoryError) {
-        // NEW: explicit OOM handling
-        _uiState.update {
-            it.copy(modelLoadError = "Out of memory. Close other apps or use a smaller quantization.")
-        }
-    } catch (e: Exception) {
-        _uiState.update { it.copy(modelLoadError = e.message) }
     }
 }
 ```
 
-**Memory cleanup lifecycle:**
-```
-EngineManager.handleTrimMemory(level)
-  level >= TRIM_MEMORY_RUNNING_CRITICAL
-    → unloadCurrent()  (calls llamaEngine.unload())
-    → clear LiteRT-LM cache dir
-```
+### Pattern 2: Theme as Enum-to-Object Bridge
 
-Already implemented correctly. No changes needed for GGUF path.
+**What:** `CodeTheme` enum (for DataStore persistence and dropdown UI) maps to `HighlightingTheme` objects (for token-level coloring). The enum stays the persistence key; theme objects hold the actual color data.
 
-### 4. GGUF Metadata Extraction (Header Parsing)
+**When to use:** When preferences need simple serialization (enum name as string) but rendering needs rich color data (per-token `SpanStyle` maps).
 
-**What exists:**
-- `GgufMetadataParser` — reads GGUF header (magic "GGUF", version, tensor count, KV count, then iterates KV pairs)
-- Parses: `general.name`, `general.architecture`, `general.file_type` → quantization, `*.block_count` → param count, `llama.context_length`
-- `mapQuantization()` maps integer file_type to human-readable name (Q4_K_M, Q8_0, etc.)
-- Used in: `ModelDownloadWorker` (post-download), `ModelImportManager` (post-import)
+**Trade-offs:** Two representations of "theme" (enum + object). Acceptable because serialization and rendering have different requirements.
 
-**What must change:**
-
-1. **Complete the quantization map** — Current map is missing many GGUF v3 quantizations: Q4_K_M (15), IQ quantizations (IQ2_XXS=26, IQ2_XS=27, IQ3_XXS=28, IQ3_S=29, IQ4_XS=31, IQ4_NL=33), and newer types. The `file_type` mapping has changed across GGUF versions — the parser must handle GGUF v2 and v3.
-
-2. **Pass metadata through the load pipeline** — Currently `LlamaEngine.getModelInfo()` returns a stub JSON string. The JNI layer should extract metadata from the loaded model's GGUF header (or from `llama_model_desc()` / `llama_model_meta()` which is more reliable than raw header parsing). This gives: actual context size, architecture string, quantization used, model size in parameters.
-
-3. **Use metadata at download time for the ModelsScreen** — When a GGUF file downloads, `ModelDownloadWorker` parses metadata via `GgufMetadataParser` and saves it to `LocalModel` in Room. The ModelsScreen already displays `quantization`, `parameterCount`, `architecture` from Room — this works end-to-end already. Validation point: ensure the parser handles all GGUF variants (v1, v2, v3) correctly.
-
-4. **Native metadata extraction (NEW)** — After model is loaded into llama.cpp, extract richer metadata:
-
-```cpp
-// jni_bridge.cpp — NEW native functions
-JNIEXPORT jstring JNICALL Java_..._nativeGetModelArchitecture(JNIEnv* env, jobject) {
-    auto& engine = LlamaEngine::getInstance();
-    if (!engine.isLoaded()) return env->NewStringUTF("");
-    // llama.cpp API (version-dependent):
-    // const char* arch = llama_model_desc(engine.getModel());
-    // or from metadata: llama_model_meta_val_str(model, "general.architecture", buf, sizeof(buf));
-    return env->NewStringUTF(engine.getArchitecture().c_str());
-}
-
-JNIEXPORT jint JNICALL Java_..._nativeGetContextSize(JNIEnv* env, jobject) {
-    auto& engine = LlamaEngine::getInstance();
-    if (!engine.isLoaded()) return 0;
-    // return llama_n_ctx(engine.getContext());
-    return engine.getContextSize();
-}
-```
-
-### 5. Download-to-Load Pipeline
-
-**Current flow (already correct, needs file listing fix):**
-
-```
-User searches HF → HuggingFaceScreen
-  → huggingFaceRepository.searchModels(query, library="gguf")
-  → HuggingFaceApi GET /api/models?search=...&library=gguf&sort=downloads
-  → Returns List<HuggingFaceModel>
-
-User selects model → selectModel(model)
-  → huggingFaceRepository.getModelDetail(modelId)
-  → HuggingFaceApi GET /api/models/{modelId}
-  → Returns HuggingFaceModelDetail with siblings list
-  → HuggingFaceViewModel filters siblings to .gguf files only
-  → Shows sorted file list (by size)
-
-User downloads → downloadFile(modelId, fileName, fileSize)
-  → ModelDownloadManager.startDownload(downloadId, fileName, fileUrl, fileSizeBytes)
-  → WorkManager enqueues ModelDownloadWorker
-
-ModelDownloadWorker.doWork():
-  1. Restore checkpoint from Room (DownloadCheckpointDao)
-  2. OkHttp GET with Range header for resume
-  3. Write to context.filesDir/models/{filename}
-  4. Foreground notification with progress
-  5. On completion: GgufMetadataParser.parse(destFile)
-     → Save LocalModel to Room (name, filePath, sizeBytes, quantization, paramCount, architecture)
-  6. Delete checkpoint on success
-```
-
-**GGUF file listing gap (already working but subtle):**
-
-The `HuggingFaceApi.searchModels()` passes `library=gguf` which filters to GGUF-tagged models at the API level. The `HuggingFaceViewModel.selectModel()` filters siblings by `.gguf` extension. This is correct. The issue mentioned in PROJECT.md ("la búsqueda en Hugging Face lista modelos pero no muestra archivos .gguf") may be an API version mismatch — some HF API responses embed `siblings` in the search result (not just the detail endpoint). The DTO already has `HuggingFaceModel.siblings` field, so search results should carry sibling data. If not, a separate detail call per search result may be needed.
-
-**Validation pipeline (NEW — should add):**
-
-After download, before saving as a usable model, validate:
-1. File exists and size > 0
-2. `GgufMetadataParser.parse()` succeeds (not corrupt)
-3. Magic bytes = "GGUF"
-4. Architecture is a known type (llama, falcon, mistral, phi, etc.)
-5. Optional: test-load a minimal context (load model, create tiny context, run 1 token) — defer
-
-If validation fails, surface error to user, don't save invalid model to Room, delete corrupt file.
-
-### 6. Vulkan Backend Probing and Selection
-
-**What exists:**
-- `BackendDetector` probes `EGL14` (GPU presence) and `System.loadLibrary("OpenCL")` (OpenCL availability)
-- `probeBackend()` returns `BackendType.CPU` or `BackendType.GPU`
-- Result cached `@Volatile` for process lifetime
-- Used by `EngineManager.switchToLiteRT()` for LiteRT-LM backend selection
-- Not currently used for llama.cpp path (llama.cpp `ActiveEngine.backend` was always `null`)
-
-**What must change for Vulkan:**
-
-llama.cpp's GPU backend on Android uses **Vulkan** (not OpenCL, not OpenGL/EGL). Vulkan provides universal GPU compute on Android 7+ (API 24+) across all GPU vendors (Adreno, Mali, PowerVR, Xclipse). OpenCL is deprecated on Android and unreliable across vendors — many modern devices don't ship `libOpenCL.so` at all.
-
-**New Vulkan probing:**
-
+**Example:**
 ```kotlin
-// BackendDetector.kt — MODIFIED
-@Synchronized
-fun probeBackend(): BackendType {
-    cachedBackend?.let { return it }
+// ui/theme/CodeTheme.kt
+enum class CodeTheme(val label: String, val previewColor: Color) {
+    MONOKAI("Monokai", Color(0xFF272822)),
+    ONE_DARK("One Dark", Color(0xFF282C34)),
+    GITHUB("GitHub", Color(0xFFF6F8FA)),
+    DRACULA("Dracula", Color(0xFF282A36));
 
-    cachedBackend = try {
-        // Priority 1: Vulkan (for llama.cpp GPU acceleration)
-        if (isVulkanAvailable()) {
-            Timber.d("BackendDetector: Vulkan backend available")
-            BackendType.GPU
-        }
-        // Priority 2: OpenCL + EGL (for LiteRT-LM path, existing)
-        else if (isOpenCLAvailable() && isEGLAvailable()) {
-            Timber.d("BackendDetector: OpenCL+EGL GPU backend available")
-            BackendType.GPU
-        }
-        // Fallback: CPU only
-        else {
-            Timber.d("BackendDetector: no GPU backend available, falling back to CPU")
-            BackendType.CPU
-        }
-    } catch (e: Exception) {
-        Timber.w(e, "BackendDetector: probe failed, falling back to CPU")
-        BackendType.CPU
-    }
-    return cachedBackend!!
-}
-
-// NEW
-fun probeVulkanBackend(): BackendType {
-    return if (isVulkanAvailable()) BackendType.GPU else BackendType.CPU
-}
-
-// NEW — checks for Vulkan runtime availability
-private fun isVulkanAvailable(): Boolean {
-    return try {
-        // Android ships libvulkan.so on API 24+. Try loading it.
-        System.loadLibrary("vulkan")
-        Timber.d("BackendDetector: libvulkan.so loaded — Vulkan runtime present")
-        true
-    } catch (e: UnsatisfiedLinkError) {
-        Timber.d("BackendDetector: libvulkan.so not found on this device")
-        false
+    fun toHighlightingTheme(isDark: Boolean): HighlightingTheme = when (this) {
+        MONOKAI -> MonokaiTheme
+        ONE_DARK -> OneDarkTheme
+        GITHUB -> if (isDark) GitHubDarkTheme else GitHubLightTheme
+        DRACULA -> DraculaTheme
     }
 }
 ```
 
-**Vulkan capability info (NEW):**
+### Pattern 3: Composable Delegation (MarkdownText → CodeBlock)
 
-After `System.loadLibrary("vulkan")` succeeds, we need more details for the user:
+**What:** `MarkdownText` detects fenced code blocks (` ``` `) and delegates content + language hint to `CodeBlock` composable instead of rendering inline. `CodeBlock` is a separate `@Composable` that can be composed independently (testable, reusable).
 
+**When to use:** When a section of a composable has distinct behavior that benefits from its own state management (language detection, copy button interaction).
+
+**Trade-offs:** Slightly more composable nesting. Worth it for separation of concerns — MarkdownText handles markdown structure, CodeBlock handles syntax highlighting UX.
+
+**Example:**
 ```kotlin
-// BackendDetector.kt — NEW
-data class VulkanInfo(
-    val deviceName: String,       // e.g., "Adreno 750"
-    val apiVersion: String,       // e.g., "1.3"
-    val maxComputeSharedMemorySize: Long,  // bytes
-    val hasFloat16Support: Boolean,
-    val hasInt8Support: Boolean
-)
-
-// This requires native JNI — can't query Vulkan capabilities from pure Kotlin.
-// Add to jni_bridge.cpp:
-// JNIEXPORT jobject JNICALL Java_..._BackendDetector_nativeGetVulkanInfo(JNIEnv* env, jclass)
-```
-
-**Runtime backend selection logic:**
-
-When user loads a GGUF model:
-1. `BackendDetector.probeBackend()` returns `GPU` or `CPU`
-2. If `GPU`: pass `nGpuLayers = 99` (offload all layers to GPU) to `llamaEngine.loadModel()`
-3. If `CPU`: pass `nGpuLayers = 0` (pure CPU inference)
-4. `llama.cpp` internally selects Vulkan or CPU backend based on compile-time flags and runtime params
-
-**Compile-time configuration:**
-
-```cmake
-# CMakeLists.txt — MODIFIED
-option(GGML_VULKAN "Vulkan GPU backend" ON)
-option(GGML_VULKAN_CHECK_RESULTS "Check Vulkan results" ON)
-
-if(GGML_VULKAN)
-    add_subdirectory(${LLAMA_CPP_DIR}/ggml/src/ggml-vulkan ${CMAKE_BINARY_DIR}/ggml-vulkan)
-    target_link_libraries(warped_llama ggml-vulkan)
-    target_compile_definitions(warped_llama PRIVATE GGML_USE_VULKAN=1)
-endif()
-```
-
-**GPU layer offloading strategy:**
-- `nGpuLayers = 0` → pure CPU (always works, slower)
-- `nGpuLayers = 99` → all layers to GPU (fastest, requires enough VRAM)
-- `nGpuLayers = N` → partial offload (balanced, requires tuning per-device)
-
-Initial implementation should use `nGpuLayers = 0` for safety, then enable Vulkan offloading as a user toggle once stable.
-
-### 7. Streaming Token Flow (Native → Kotlin → ViewModel)
-
-**Data flow chain:**
-```
-llama.cpp inference loop (C++, jni_bridge.cpp)
-  │ on each token
-  ▼
-JNI callback: TokenCallback.onToken(token: String, done: Boolean)
-  │ called on JNI thread (not Kotlin coroutine thread)
-  ▼
-Kotlin callbackFlow { trySend(token) }
-  │ structured concurrency, thread-safe channel
-  ▼
-LocalLlmProvider.chat(request): Flow<StreamToken>
-  │ wraps generate() → maps String tokens to StreamToken.Delta
-  │ flowOn(Dispatchers.Default)
-  ▼
-ChatViewModel.sendMessage()
-  │ provider.chat(request).collect { token → ... }
-  │ 50ms debounce → update UI state
-  ▼
-ChatScreen composable (collectAsStateWithLifecycle)
-```
-
-**The critical thread transition:**
-```
-JNI thread (C++)           Coroutine context (Kotlin)
-      │                           │
-      │──onToken("Hello")────────▶│ trySend("Hello") → Channel
-      │                           │
-      │──onToken(" world")───────▶│ trySend(" world") → Channel
-      │                           │
-      │──onToken("!", done=true)─▶│ trySend("!") → close()
-                                  │
-                                  │─flowOn(Dispatchers.Default)─▶
-                                  │   emit StreamToken.Delta(token)
-                                  │
-                                  │─collect on Main──▶
-                                  │   update MutableStateFlow<ChatUiState>
-```
-
-**Thread safety in `callbackFlow`:**
-
-`trySend()` is thread-safe and non-blocking — it's designed for exactly this JNI callback pattern. `awaitClose { nativeStop() }` ensures proper cleanup when the Flow collector cancels (e.g., user taps stop, or ViewModel scope ends).
-
-**Potential issue: JNI thread overload**
-
-If the native `generate()` loop runs on the calling thread (which it does — `nativeGenerate` is blocking), then the coroutine thread that calls `flowOn(Dispatchers.Default)` is *waiting* on the native call. The JNI callbacks fire from **the same thread** that called `nativeGenerate` (llama.cpp runs inference on the calling thread). This means:
-- The coroutine worker thread IS the inference thread
-- `trySend()` from within the callback might block if the Channel buffer is full
-- Default `callbackFlow` buffer is `Channel.RENDEZVOUS` (0) — this causes `trySend` to fail if no collector is ready
-
-**Fix: Use BUFFERED channel**
-
-```kotlin
-// LlamaEngine.kt — MODIFIED
-fun generate(prompt: String): Flow<String> = callbackFlow {
-    val callback = object : TokenCallback {
-        override fun onToken(token: String, done: Boolean) {
-            if (done) close()
-            else if (token.isNotEmpty()) trySend(token)
+// In MarkdownText.kt — refactored code block handling
+@Composable
+fun MarkdownText(
+    text: String,
+    modifier: Modifier = Modifier,
+    baseColor: Color = Color.Unspecified,
+    codeTheme: CodeTheme = CodeTheme.MONOKAI,
+    isDarkTheme: Boolean = true  // NEW parameter
+) {
+    // ... parse lines ...
+    for (line in lines) {
+        if (line.trimStart().startsWith("```")) {
+            if (inCodeBlock) {
+                // OLD: withStyle(bg only) { append(content) }
+                // NEW: delegate to CodeBlock
+                val langHint = fenceLine.removePrefix("```").trim()
+                CodeBlock(
+                    code = codeBlockContent.toString().trimEnd(),
+                    languageHint = langHint,
+                    codeTheme = codeTheme,
+                    isDarkTheme = isDarkTheme,
+                    onCopy = { /* clipboard */ }
+                )
+                codeBlockContent.clear()
+            }
+            inCodeBlock = !inCodeBlock
+            continue
         }
+        // ... rest unchanged ...
     }
-    nativeGenerate(prompt, callback)
-    awaitClose { nativeStop() }
-}.buffer(Channel.BUFFERED)  // NEW: prevent trySend failure when Channel is full
- .flowOn(Dispatchers.Default)
+}
 ```
 
-`buffer(Channel.BUFFERED)` = 64 element buffer by default. Tokens are small strings — this is safe and prevents dropped tokens.
+## Data Flow
 
-**Prompt templating (NEW — currently hardcoded ChatML):**
+### Syntax Highlighting Flow (code block rendering)
 
-`LocalLlmProvider.buildPrompt()` uses a hardcoded ChatML template (`<|system|>`, `<|user|>`, `<|assistant|>`). Different models expect different templates:
-- Llama-3: `<|begin_of_text|><|start_header_id|>system<|end_header_id|>...`
-- Mistral: `[INST] ... [/INST]`
-- DeepSeek: `User: ...\n\nAssistant:`
-- Gemma: `<start_of_turn>user\n...<end_of_turn>\n<start_of_turn>model\n`
-
-**Defer:** Initial implementation uses llama.cpp's built-in chat template via `llama_chat_apply_template()` which reads the template from the GGUF metadata. The JNI wrapper calls this to format the prompt correctly per-model. In the future, expose template selection in UI.
-
-### 8. Thread Safety for JNI Calls from Coroutines
-
-**Problem:** Multiple coroutines could call `LlamaEngine.generate()` concurrently (e.g., user rapidly taps send, or a bug). The native C++ `LlamaEngine` is a singleton — concurrent `generate()` calls would corrupt model state.
-
-**Current state:** `EngineManager` uses `@Synchronized` on public methods, but `LocalLlmProvider.chat()` calls `llamaEngine.generate()` directly (bypasses EngineManager). `ChatViewModel.sendMessage()` uses a `generationJob` that prevents concurrent sends from the UI, but doesn't protect against programmatic calls.
-
-**Solution: Layered protection**
-
-1. **UI layer:** `ChatViewModel.sendMessage()` already uses `generationJob` to prevent duplicate sends (existing, correct)
-
-2. **Provider layer:** `LocalLlmProvider.chat()` checks `llamaEngine.isLoaded()` before calling `generate()`, but doesn't guard against concurrent calls
-
-3. **Engine layer:** `LlamaEngine.generate()` should be `@Synchronized` at the Kotlin level (NEW)
-
-4. **Native layer:** `LlamaEngine::generate()` in C++ already has `shouldStop` flag for cancellation, but no mutex (NEW — add `std::mutex`)
-
-```kotlin
-// LlamaEngine.kt — MODIFIED
-@Synchronized  // NEW
-fun generate(prompt: String): Flow<String> = callbackFlow {
-    // ... (existing code)
-}.buffer(Channel.BUFFERED)
- .flowOn(Dispatchers.Default)
+```
+LLM emits token "def fib(n):\n    if n <= 1:\n        return n\n..."
+    ↓
+ChatViewModel accumulates into streamingContent
+    ↓
+ChatScreen recomposes → MessageBubble(isStreaming=true, codeTheme=uiState.codeTheme)
+    ↓
+MessageBubble → MarkdownText(text=streamingContent, codeTheme=codeTheme)
+    ↓
+MarkdownText line parser detects ``` fence
+    ↓ (inside code block)
+CodeBlock(code=codeBlockContent, languageHint="python", ...)
+    ↓
+LanguageDetector.detect(code, hint) → Language.PYTHON
+    ↓
+SyntaxHighlighter.highlight(code, Language.PYTHON, theme)
+    ↓
+RegexSyntaxHighlighter tokenizes code into [Keyword("def"), Plain(" "), Function("fib"), ...]
+    ↓
+Applies theme SpanStyle per token → builds AnnotatedString
+    ↓
+CodeBlock renders:
+    ┌─ LanguageHeaderBar("Python") ────────────────────── [📋 Copy] ─┐
+    │  def fib(n):                            [keyword - pink]        │
+    │      if n <= 1:                         [keyword - pink]        │
+    │          return n                       [keyword - pink]        │
+    └────────────────────────────────────────────────────────────────┘
 ```
 
-```cpp
-// jni_bridge.h — MODIFIED
-class LlamaEngine {
-private:
-    std::mutex generateMutex;
-    // ...
-};
+### Theme Change Flow
+
+```
+User opens Settings → selects "Dracula" from Code Theme dropdown
+    ↓
+SettingsViewModel.setCodeTheme(CodeTheme.DRACULA)
+    ↓
+AdvancedPreferences.setCodeTheme(DRACULA) → stores "DRACULA" in DataStore
+    ↓
+ChatViewModel: advancedPreferences.codeTheme emits CodeTheme.DRACULA
+    ↓
+ChatViewModel: _uiState.update { copy(codeTheme = CodeTheme.DRACULA) }
+    ↓
+ChatScreen recomposes → codeTheme flows to all MessageBubble → MarkdownText → CodeBlock instances
+    ↓
+All visible code blocks instantly re-render with Dracula colors
 ```
 
-**Threading summary table:**
+### Copy Button Flow
 
-| Operation | Kotlin Dispatcher | Native Thread | Synchronization |
-|-----------|-------------------|---------------|-----------------|
-| `loadModel` | `Dispatchers.Default` | Calling thread (blocking) | `@Synchronized` + native mutex |
-| `generate` | `Dispatchers.Default` | Calling thread (blocking) | `@Synchronized` + native mutex |
-| `stop` | Any | Any | Native mutex + `shouldStop` flag |
-| `unload` | `Dispatchers.Default` | Calling thread | `@Synchronized` + native mutex |
-| `isLoaded` | Any | Calling thread | Native atomic flag |
-| Token callback | JNI thread | Same as generate thread | `callbackFlow` Channel |
+```
+User taps [📋] on a code block
+    ↓
+CodeBlock's CopyButton: clipboardManager.setText(AnnotatedString(code))
+    ↓
+Shows brief "Copied!" snackbar (local state, not global)
+    ↓
+Clipboard now contains plain text code (no formatting)
+```
 
-## New vs Modified Components
+### Streaming Rendering Flow (incremental)
 
-### NEW Components
+```
+During streaming, codeBlockContent grows with each token line
+    ↓
+MarkdownText sees codeBlockContent change → recomposes CodeBlock
+    ↓
+CodeBlock re-runs LanguageDetector.detect() on the growing content
+    (Detection result cached unless language confidence score improves)
+    ↓
+SyntaxHighlighter.highlight() runs on full content each recomposition
+    (Performance: O(n * p) where n = code lines, p = token patterns per language)
+    (For typical LLM output of 10–50 lines, this is < 1ms on any modern phone)
+    ↓
+AnnotatedString rebuilds with each recomposition
+    (Compose efficiently diffs AnnotatedString changes)
+```
 
-| Component | Package | Purpose |
-|-----------|---------|---------|
-| `VulkanInfo` data class | `data/local/inference/` | Vulkan device capabilities (adapter name, VRAM, compute support) |
-| `GgufValidator` | `data/local/inference/` | Post-download GGUF file validation (magic bytes, architecture check) |
-| `PromptTemplate` enum + resolver | `domain/model/` | Per-model chat template selection (deferred to later phase) |
-| `llama.cpp` source (vendored) | `app/src/main/cpp/llama.cpp/` | Compiled llama.cpp library (ggml, llama, common) |
-| `ggml-vulkan` source (vendored) | `app/src/main/cpp/ggml-vulkan/` | Vulkan backend for GGML |
+## Integration Points
 
-### MODIFIED Components
+### Internal Boundaries
 
-| Component | Change Summary |
-|-----------|---------------|
-| `LlamaEngine.kt` | `@Synchronized` on `generate()`, add `.buffer(Channel.BUFFERED)`, add Vulkan params to `loadModel()`, add new native methods for Vulkan info and metadata |
-| `jni_bridge.cpp` | Implement real llama.cpp calls (model load, generate loop, tokenization, sampling), add global JNI ref management, add Vulkan info queries |
-| `jni_bridge.h` | Add Vulkan params to `loadModel`, add mutex for `generate`, add metadata extraction |
-| `CMakeLists.txt` | Add llama.cpp source files, GGML Vulkan backend, cross-compilation config |
-| `EngineManager.kt` | `switchToLlama()` passes Vulkan params from `BackendDetector`, `ActiveEngine.backend` populated for llama.cpp |
-| `BackendDetector.kt` | Add `isVulkanAvailable()`, prioritize Vulkan over OpenCL, add `probeVulkanBackend()` |
-| `LocalLlmProvider.kt` | Pass `GenerationParameters` to `llamaEngine.generate()`, use native chat template instead of hardcoded ChatML |
-| `ChatViewModel.kt` | Tighter memory check using `ActivityManager.MemoryInfo`, OOM catch in `preloadLocalModel()` |
-| `GgufMetadataParser.kt` | Complete the `mapQuantization` table for all GGUF v3 quantizations, fix `parameterCount` extraction |
-| `ModelDownloadWorker.kt` | Add GGUF validation step after download (call `GgufValidator`) |
-| `AndroidManifest.xml` | Add `android:largeHeap="true"` |
-| `InferenceModule.kt` | No structural changes, but ensure `LlamaEngine` provider accounts for new dependencies |
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| `MarkdownText` → `CodeBlock` | Direct composable call + props | MarkdownText passes `code`, `languageHint`, `codeTheme`, `isDarkTheme`. CodeBlock is child composable. |
+| `CodeBlock` → `LanguageDetector` | Direct function call | Synchronous. Returns `Language`. No coroutine needed. |
+| `CodeBlock` → `SyntaxHighlighter` | Hilt-injected dependency | `@Inject lateinit var` or constructor injection in a wrapper ViewModel/holder. `SyntaxHighlighter.highlight()` is a pure function, could be called directly without scoping. |
+| `CodeTheme` → `HighlightingTheme` | Enum method `toHighlightingTheme()` | Synchronous mapping. No DI needed. |
+| `ChatScreen` → `MessageBubble` → `MarkdownText` → `CodeBlock` | Props threading | `codeTheme` flows from `uiState.codeTheme` (in ChatScreen) → `MessageBubble(codeTheme)` → `MarkdownText(codeTheme)` → `CodeBlock(codeTheme)`. Existing data flow, no new plumbing. |
+| `SettingsScreen` → `SettingsViewModel` → `AdvancedPreferences` | Existing MVVM flow | Unchanged. Adding new CodeTheme value to the enum auto-works with existing dropdown + DataStore. |
+| `Hilt` → `CodeBlock` | DI injection of `SyntaxHighlighter` + `LanguageDetector` | New `HighlightingModule` provides singletons. `CodeBlock` receives them as composable parameters or via `hiltViewModel()` wrapper. |
 
-### UNCHANGED Components
+### What Does NOT Change
 
 | Component | Why Unchanged |
-|-----------|--------------|
-| `ProviderRouter` | Already dispatches `LOCAL` to `LocalLlmProvider` — no routing change needed |
-| `ChatRepository` / `ChatRepositoryImpl` | Chat storage unchanged — messages flow the same regardless of provider |
-| `ChatScreen` (Compose) | UI unchanged — streams tokens from `ChatUiState.streamingContent` which works for any provider |
-| `ModelsScreen` / `ModelsViewModel` | Already displays `LocalModel.quantization`, `parameterCount`, `architecture` from Room — feeds from GGUF metadata parser |
-| `HuggingFaceScreen` / `HuggingFaceViewModel` | Already filters `.gguf` siblings — works; may need API detail call fix |
-| `HuggingFaceApi` / `HuggingFaceRepository` | API unchanged — endpoints already support GGUF model listing |
-| `LiteRTLmEngine` / `LiteRTLmProvider` | No changes — GGUF path is independent |
-| `Domain models` (ChatMessage, Conversation, etc.) | Unchanged — all models are provider-agnostic |
-| `Room entities / DAOs` | Unchanged — `LocalModel` table already has GGUF fields |
-| `ModelImportManager` | Already handles `.gguf` imports via `GgufMetadataParser` — unchanged |
+|-----------|---------------|
+| `ChatUiState.kt` | `codeTheme: CodeTheme` field already exists. The enum type reference updates but the data class structure is identical. |
+| `ChatViewModel.kt` | `advancedPreferences.codeTheme.collect { _uiState.update { it.copy(codeTheme = theme) } }` — zero changes. |
+| `ChatRepository`, `EndpointRepository`, etc. | No code highlighting logic touches data persistence or remote APIs. |
+| `Room database` | No new tables, DAOs, or migrations. Code blocks are rendered ephemerally from message content strings. |
+| `Retrofit APIs` | No API changes. LLM providers already return markdown with fenced code blocks. |
+| `MessageBubble.kt` | Passes `codeTheme` through as before. The internal `MarkdownText` handles the rendering change transparently. |
+| `SelectionContainer` | CodeBlock renders inside the existing `SelectionContainer` (wrapped by MessageBubble). Text selection includes code blocks automatically. No extra `SelectionContainer` needed. |
+| `NavGraph.kt` | No new routes. Code highlighting is a rendering concern, not navigation. |
+| `ConversationList.kt` | Conversation previews don't render full markdown. No change needed. |
 
-## Data Flow: GGUF Chat (End-to-End)
+## Build Order (Suggested)
 
-```
-User taps send on ChatScreen
-  │
-  ▼
-ChatViewModel.sendMessage(text, images=[])
-  │ 1. Validate model selected
-  │ 2. Create user ChatMessage, save to Room
-  │ 3. Resolve provider: ProviderRouter.resolveLocal(LOCAL, modelId)
-  │    → LocalLlmProvider.configure(modelFilePath)
-  │ 4. Check engine loaded → if not, preloadLocalModel(modelId)
-  │    → Memory check (ActivityManager.MemoryInfo, 80% threshold)
-  │    → withContext(Dispatchers.Default) {
-  │        engineManager.switchToLlama(modelPath, nGpuLayers=0|99)
-  │          → backendDetector.probeBackend() → GPU (Vulkan) or CPU
-  │          → llamaEngine.loadModel(path, threads=N, ctx=4096, nGpuLayers, useVulkan)
-  │            → JNI → nativeLoadModel → llama_load_model_from_file()
-  │            → llama_new_context_with_model()
-  │      }
-  │ 5. Build ChatRequest(messages, parameters, images=[])
-  │ 6. provider.chat(request).collect { token → ... }
-  │
-  ▼
-LocalLlmProvider.chat(request): Flow<StreamToken>
-  │ 1. Check llamaEngine.isLoaded()
-  │ 2. if not loaded: auto-load (same as preloadLocalModel)
-  │ 3. format prompt via llama_chat_apply_template() [deferred: use built-in]
-  │ 4. llamaEngine.generate(prompt, params).collect { token → ... }
-  │    .flowOn(Dispatchers.Default)
-  │
-  ▼
-LlamaEngine.generate(prompt): Flow<String>
-  │ callbackFlow { callback → nativeGenerate(prompt, callback) }
-  │ .buffer(Channel.BUFFERED)
-  │
-  ▼
-jni_bridge.cpp: LlamaEngine::generate(prompt, callback)
-  │ 1. Tokenize prompt → llama_tokenize()
-  │ 2. Create llama_batch
-  │ 3. Inference loop:
-  │    while (!shouldStop) {
-  │      llama_decode(ctx, batch)
-  │      llama_sample_*() → next token
-  │      token_str = llama_token_to_piece()
-  │      callback(token_str, done=false)
-  │      if (next_token == EOS) break
-  │    }
-  │ 4. callback("", done=true)
-  │
-  ▼ (back in Kotlin)
-ChatViewModel.sendMessage() collector:
-  │ StreamToken.Delta → 50ms buffer → update streamingContent
-  │ StreamToken.Done → save assistant message to Room, clear streaming
-  │ StreamToken.Error → surface ChatError
-  │
-  ▼
-ChatScreen composable:
-  │ collectAsStateWithLifecycle(uiState)
-  │ LazyColumn with streamingContent updated every 50ms
-```
+Based on dependency analysis of the existing architecture:
 
-## Integration Points Summary
+### Wave 1: Foundation — Theme & Token Model (no Compose)
+Files with zero UI dependencies. Pure Kotlin, fast unit-testable.
 
-| Integration Point | Existing Hook | Status | Action |
-|------------------|---------------|--------|--------|
-| ChatViewModel → llama.cpp | `ProviderRouter.resolveLocal(LOCAL)` → `LocalLlmProvider` | Works | Harden memory check, add OOM catch |
-| Model download → load pipeline | `ModelDownloadWorker` → `GgufMetadataParser` → Room → `ChatViewModel.preloadLocalModel()` | Works | Add GGUF validation step |
-| Engine lifecycle | `EngineManager.switchToLlama()` | Works | Pass Vulkan backend params through |
-| Token streaming | `callbackFlow` in `LlamaEngine.generate()` | Works | Add `.buffer(Channel.BUFFERED)`, `@Synchronized` |
-| GGUF metadata | `GgufMetadataParser` standalone, `LlamaEngine.getModelInfo()` stub | Partial | Complete quantization map, add native metadata extraction |
-| Vulkan backend | `BackendDetector` probes EGL+OpenCL (not Vulkan) | Needs Vulkan | Add `isVulkanAvailable()`, prioritize over OpenCL |
-| Memory management | `MemoryChecker` + `preloadLocalModel()` | Partial | Add `ActivityManager.MemoryInfo`, use 1.3× size estimate |
-| Thread safety | EngineManager `@Synchronized` | Partial | Add `@Synchronized` to `LlamaEngine.generate()`, native mutex |
-| JNI global refs | `nativeGenerate` uses callback object directly | Risky | Add `NewGlobalRef`/`DeleteGlobalRef` in JNI |
+1. **`domain/highlighting/CodeToken.kt`** — Sealed class for token types. No deps.
+2. **`domain/highlighting/Language.kt`** — Enum of supported languages. No deps.
+3. **`domain/highlighting/LanguageDefinition.kt`** — Data class for token patterns. No deps.
+4. **`domain/highlighting/SyntaxHighlighter.kt`** — Interface. No deps.
 
-## Build Order Dependencies
+### Wave 2: Token Patterns — Language Definitions (pure data)
+12 files, one per language. Pure Kotlin, no UI deps. Can be built in parallel.
 
-```
-Phase 1: CMake + llama.cpp compilation
-  ├── CMakeLists.txt update (add llama.cpp source)
-  ├── NDK cross-compilation config (arm64-v8a, x86_64)
-  └── Verify libwarped_llama.so builds with real llama.cpp symbols
+5. **`data/highlighting/definitions/*Definitions.kt`** — Regex patterns per language × 12 files. Depends on `CodeToken` + `LanguageDefinition`.
 
-Phase 2: JNI bridge — model loading
-  ├── Implement real nativeLoadModel (llama_load_model_from_file)
-  ├── Implement nativeUnload (llama_free)
-  ├── Implement nativeIsLoaded (check model pointer)
-  ├── Implement nativeGetModelInfo (llama_model_desc)
-  ├── Fix JNI global ref management
-  └── Test: load a tiny GGUF (TinyLlama 1B), verify loaded state
+### Wave 3: Theme Definitions (pure color data)
+4 theme files with light/dark `SpanStyle` maps. Pure Kotlin, depends on `CodeToken`.
 
-Phase 3: JNI bridge — token generation
-  ├── Implement nativeGenerate (llama_tokenize → decode loop → callback)
-  ├── Pass GenerationParameters to native (temperature, topK, topP, seed, threads)
-  ├── Implement nativeStop (shouldStop flag)
-  ├── Add @Synchronized + native mutex for thread safety
-  └── Test: generate a single response end-to-end
+6. **`data/highlighting/theme/HighlightingTheme.kt`** — Interface.
+7. **`data/highlighting/theme/MonokaiTheme.kt`** — Token → SpanStyle map.
+8. **`data/highlighting/theme/OneDarkTheme.kt`**
+9. **`data/highlighting/theme/GitHubTheme.kt`** — Needs both light + dark variants.
+10. **`data/highlighting/theme/DraculaTheme.kt`**
 
-Phase 4: Vulkan backend
-  ├── Add isVulkanAvailable() to BackendDetector
-  ├── Add GGML_VULKAN to CMake compilation
-  ├── Pass nGpuLayers to loadModel
-  ├── Add VulkanInfo JNI query
-  └── Test: GPU offloading on supported devices, CPU fallback on others
+### Wave 4: Engine — SyntaxHighlighter + LanguageDetector implementations
+11. **`data/highlighting/RegexSyntaxHighlighter.kt`** — Implements `SyntaxHighlighter`. Depends on Wave 1 + Wave 2 + Wave 3.
+12. **`data/highlighting/LanguageDetector.kt`** — Heuristic detection. Depends on `Language` enum.
 
-Phase 5: Production hardening
-  ├── .buffer(Channel.BUFFERED) on callbackFlow
-  ├── ActivityManager.MemoryInfo + 1.3× RAM estimate
-  ├── OOM catch in preloadLocalModel
-  ├── GGUF validation post-download
-  ├── Complete quantization mapping table
-  ├── android:largeHeap="true" in manifest
-  └── Test: memory pressure, device rotation, process death
-```
+### Wave 5: Preferences Bridge — CodeTheme migration
+13. **`ui/theme/CodeTheme.kt`** — MOVED from `ui/chat/components/MarkdownText.kt`. Expanded with `toHighlightingTheme()` and `previewColor`. Depends on Wave 3.
+14. **Update imports** in `MarkdownText.kt`, `ChatUiState.kt`, `ChatViewModel.kt`, `AdvancedPreferences.kt`, `SettingsScreen.kt`, `SettingsUiState.kt`, `SettingsViewModel.kt`, `MessageBubble.kt` → import new `CodeTheme` location.
+
+### Wave 6: UI Rendering — CodeBlock Composable
+15. **`ui/chat/components/CodeBlock.kt`** — NEW composable with language header bar + copy button + syntax-highlighted code. Depends on Waves 1–5.
+16. **Refactor `ui/chat/components/MarkdownText.kt`** — Delegate code block rendering to `CodeBlock`. Keep all other inline markdown handling unchanged.
+17. **`ui/settings/SettingsScreen.kt`** — Update theme dropdown to show preview color swatch alongside label. Optional: richer theme picker with preview.
+
+### Wave 7: DI Wiring
+18. **`di/HighlightingModule.kt`** — Hilt `@Module` providing `SyntaxHighlighter` and `LanguageDetector` as `@Singleton`.
+
+### Wave 8: Integration & Polish
+19. Update `MessageBubble.kt` to pass `isDarkTheme` (from `MaterialTheme.isSystemInDarkTheme()` or global state).
+20. Apply `CodeBlock` to any non-chat locations where code appears (model readmes, help screen — if those get markdown rendering later).
+21. Performance validation: measure `SyntaxHighlighter.highlight()` time for 50-line code blocks. Target < 2ms.
+22. Streaming validation: confirm incremental highlighting doesn't cause visual flicker during recomposition.
+
+### Build Order Rationale
+
+- **Waves 1–4 are pure Kotlin with zero Compose/Android dependencies** — they can be fully unit-tested without emulator or Robolectric. This follows the project's Clean Architecture pattern (domain first, then data).
+- **Wave 5 (CodeTheme migration) is isolated** — it's a find-and-replace import change that must happen before the CodeBlock composable but can happen independently of the syntax engine.
+- **Wave 6 (UI) can't start until Wave 5 completes** — `CodeBlock` needs the migrated `CodeTheme` enum.
+- **Wave 7 (DI) wires after everything exists** — standard Hilt pattern.
+- **Wave 8 (integration) validates the end-to-end user experience** — streaming, theme switching, copy.
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Loading model on Main thread
-**What people do:** Call `llamaEngine.loadModel()` from `ChatViewModel` without `withContext(Dispatchers.Default)`.
-**Why wrong:** Model loading is a blocking I/O + compute operation that can take 10-30 seconds. Freezes the UI.
-**Already correct:** `preloadLocalModel()` wraps load in `withContext(Dispatchers.Default)`. Maintain this.
+### Anti-Pattern 1: Building syntax highlighting into MarkdownText.kt without extraction
 
-### Anti-Pattern 2: Not converting JNI local refs to global refs
-**What happens:** Passing a `jobject callback` to a long-running native function without `NewGlobalRef`. When the JNI call returns (could be minutes later during generation), the local reference table may have been garbage collected, causing a crash.
-**Prevention:** Always `NewGlobalRef` for objects passed to long-running native functions; `DeleteGlobalRef` on cleanup.
+**What people do:** Add tokenizer logic directly inside the existing `buildAnnotatedString` block in MarkdownText, mixing markdown parsing with syntax coloring.
 
-### Anti-Pattern 3: Tokens dropped due to unbuffered Channel
-**What happens:** `callbackFlow` with default `Channel.RENDEZVOUS` (zero buffer). If the collector is slightly behind (e.g., UI thread busy), `trySend()` fails silently and tokens are lost.
-**Fix:** Add `.buffer(Channel.BUFFERED)` after `callbackFlow`.
+**Why it's wrong:** MarkdownText becomes a 400+ line god function. Syntax highlighting can't be tested independently of markdown parsing. The code block UI elements (language header, copy button) can't be added because they require Composition, not just AnnotatedString building.
 
-### Anti-Pattern 4: Unloading model while generating
-**What happens:** User switches models mid-generation → `unloadCurrent()` → `nativeUnload()` called while `nativeGenerate` is running on another thread. Memory freed under active use → crash.
-**Prevention:** `EngineManager.unloadCurrent()` already calls `llamaEngine.stop()` before `llamaEngine.unload()`. The `stop()` sets `shouldStop = true` which causes the native generate loop to exit gracefully. This is correct — ensure `unload()` waits for generate to finish (or add a timeout).
+**Do this instead:** Delegate code block rendering to a separate `CodeBlock` Composable. MarkdownText handles markdown structure detection (` ``` ` fences). CodeBlock handles everything inside the code block (syntax coloring, language detection, UX elements).
 
-### Anti-Pattern 5: Compiling llama.cpp pre-built .so from different NDK version
-**What happens:** Using pre-built `libllama.so` from GitHub releases compiled with a different NDK, STL, or ABI. Causes `UnsatisfiedLinkError` or segfaults at runtime.
-**Prevention:** Always build llama.cpp from source with the project's NDK version via CMake. The existing CMakeLists.txt already takes this approach (build from source).
+### Anti-Pattern 2: WebView-based syntax highlighting
+
+**What people do:** Render code blocks in an Android `WebView` with `highlight.js` injected as JavaScript.
+
+**Why it's wrong:** Heavy (WebView init is ~200ms), breaks offline-first (highlight.js CDN dependency or bundled asset bloat), breaks text selection (SelectionContainer can't span WebView boundaries), leaks memory if not carefully managed, breaks dark mode auto-adaptation.
+
+**Do this instead:** Custom regex tokenizer producing `AnnotatedString`. Fully Compose-native, no bridging, works offline, integrates with SelectionContainer.
+
+### Anti-Pattern 3: Full text in clipboard with formatting
+
+**What people do:** Copy button copies `AnnotatedString` with styling to clipboard.
+
+**Why it's wrong:** Users expect plain text when they paste into editors/terminals. Formatted text pastes as garbage in most contexts.
+
+**Do this instead:** Copy button copies raw code text via `ClipboardManager.setText(AnnotatedString(plainTextContent))`.
+
+### Anti-Pattern 4: Re-running language detection on every recomposition
+
+**What people do:** Call `LanguageDetector.detect()` inside a `@Composable` without memoization, re-running detection on every recompose.
+
+**Why it's wrong:** Language detection involves keyword frequency counting across the entire code block. On recomposition during streaming (every ~50ms), this wastes CPU.
+
+**Do this instead:** Use `remember(codeBlockContent)` to cache detection result. Only re-detect if the code content changed meaningfully (e.g., length delta > 20 chars, or a new line was added). The language hint from the markdown fence (e.g., `\`\`\`python`) serves as a strong prior — once detected as Python, don't re-run detection unless the fence hint is absent.
+
+## Scalability Considerations
+
+| Scale | Architecture Adjustments |
+|-------|--------------------------|
+| 10 languages, 50-line code blocks | Waves 1–4 as designed. Regex tokenizer is fast enough (< 2ms per block). No changes needed. |
+| 30+ languages | Add more `*Definitions.kt` files to `definitions/`. Tokenizer architecture supports arbitrary language count. Consider grouping less common languages into a secondary module to reduce APK size. |
+| 500+ line code blocks | Regex tokenizer may show latency. Two mitigations: (1) Cap rendering at first 200 lines with "Show all" expander. (2) Swap `RegexSyntaxHighlighter` implementation to `TextMateSyntaxHighlighter` (using `kotlin-textmate` library) once that library proves production-ready. The `SyntaxHighlighter` interface makes this a one-line DI change. |
+| Streaming at 60fps | `MarkdownText` recomposition is already optimized by Compose. `CodeBlock` should use `derivedStateOf` for the highlighted `AnnotatedString` to avoid recomputing when other state changes. |
+
+### First Bottleneck: Language detection during streaming
+
+**What breaks:** As code streams token-by-token, `LanguageDetector.detect()` runs on every recomposition (every ~50ms). For a 30-line code block, keyword counting is ~0.5ms — acceptable. But if the code block is 200+ lines, this could become noticeable.
+
+**Fix:** Cache detection result with `remember`. Only re-run detection when the content character count increases by > 20% or a newline appears. The fence hint (`\`\`\`python`) acts as a hard override — if present, skip content-based detection entirely.
+
+### Second Bottleneck: Theme switch re-rendering all visible code blocks
+
+User switches theme → all visible `MessageBubble` instances recompose → all `CodeBlock` instances re-run `SyntaxHighlighter.highlight()`.
+
+**Fix:** `AnnotatedString` building is pure computation (no I/O, no allocations beyond the string itself). For a chat screen with 5 visible code blocks of 30 lines each, recomputation is < 10ms total. Not a bottleneck in practice. If it becomes one, use `derivedStateOf` with `codeTheme` as key.
 
 ## Sources
 
-- **Warped codebase** (2026-05-05): `LlamaEngine.kt`, `jni_bridge.cpp/h`, `EngineManager.kt`, `BackendDetector.kt`, `LocalLlmProvider.kt`, `ChatViewModel.kt`, `CMakeLists.txt`, `GgufMetadataParser.kt`, `ModelDownloadWorker.kt`, `ModelImportManager.kt` — HIGH confidence (direct code analysis)
-- **llama.cpp official repository**: `github.com/ggerganov/llama.cpp` — Android build documentation, GGUF format spec, Vulkan backend documentation — HIGH confidence (authoritative source)
-- **Android NDK documentation**: JNI tips (global vs local references), `callbackFlow` thread safety — HIGH confidence (official Android docs)
-- **GGUF format specification**: `github.com/ggerganov/ggml/blob/master/docs/gguf.md` — HIGH confidence (format spec)
+- **Existing codebase analysis** (files read directly):
+  - `MarkdownText.kt` — current code block rendering: `withStyle(SpanStyle(background = codeTheme.bgCode)) { append(content) }` (lines 56–85)
+  - `MessageBubble.kt` — passes `codeTheme` from props to MarkdownText (lines 34, 109, 173)
+  - `ChatUiState.kt` — `codeTheme: CodeTheme = CodeTheme.MONOKAI` (line 36)
+  - `ChatViewModel.kt` — `advancedPreferences.codeTheme.collect` (lines 72–74)
+  - `AdvancedPreferences.kt` — DataStore persistence for `CodeTheme` (lines 60–69)
+  - `SettingsScreen.kt` — dropdown with `CodeTheme.entries.forEach` (lines 205–219)
+  - `SettingsViewModel.kt` — `setCodeTheme()` (lines 103–107)
+  - `ChatMessage.kt` — `content: String` field (line 9) — code blocks are part of the raw markdown string
+
+- **Library ecosystem survey** (GitHub topics, fetched today):
+  - **Prism4j** (noties/Prism4j) — ARCHIVED 2023. Java clone of prism.js. Last release 2019. Not suitable. Source: https://github.com/noties/Prism4j
+  - **CodeView-Android** (kbiakov/CodeView-Android, 891 stars) — View-based (RecyclerView), not Compose-native. Last updated Jan 2022. Source: GitHub topics search
+  - **KodeView** (SnipMeDev/KodeView, 116 stars) — KMM syntax highlighting views. Source: GitHub topics search
+  - **compose-code-editor** (Qawaz/compose-code-editor, 87 stars) — Compose-native but editor-focused, overkill for rendering. Last updated Apr 2024. Source: GitHub topics search
+  - **Highlights** (SnipMeDev/Highlights, 183 stars) — KMM syntax highlighting engine. Updated Sep 2025. Potential future upgrade path but KMM-focused, may have multiplatform overhead. Source: GitHub topics search
+  - **kotlin-textmate** (ivan-magda/kotlin-textmate, 12 stars) — NEW (updated today). Pure Kotlin TextMate grammar engine with Compose AnnotatedString rendering. Very promising for future upgrade but too new to depend on for production. Source: https://github.com/ivan-magda/kotlin-textmate
+  - **highlight.kt** (nyancrimew/highlight.kt, 6 stars) — Kotlin port of highlight.js. Unmaintained since 2019. Source: GitHub topics search
+
+- **Architecture references:**
+  - `.planning/codebase/ARCHITECTURE.md` — existing Clean Architecture layer documentation (HIGH confidence, mapped from recent commit)
+  - `.planning/PROJECT.md` — milestone v1.6 definition, constraints
+
+- **Confidence assessment:**
+  - Custom regex tokenizer approach: **HIGH** — proven pattern (TextMate, Pygments, highlight.js all use regex tokenizers). Compose `AnnotatedString` integration is straightforward.
+  - Library survey: **HIGH** — directly fetched from GitHub topics and repository pages today.
+  - Integration with existing MarkdownText: **HIGH** — read source code directly, zero ambiguity about current implementation.
+  - Language auto-detection: **MEDIUM** — heuristic approach (keyword frequency) works well for common LLM languages but edge cases exist. Flagged for deeper research in Phase plan.
 
 ---
 
-*Architecture research for: GGUF native inference integration with Clean Architecture*
-*Researched: 2026-05-05*
-*Confidence: HIGH (based on direct codebase analysis + authoritative documentation)*
+*Architecture research for: Code syntax highlighting integration into Warped chat app*
+*Researched: 2026-05-14*
