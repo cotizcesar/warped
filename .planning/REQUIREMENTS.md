@@ -89,6 +89,42 @@ Requirements for the Bug Hunt, Cleanup & Hardening milestone. Each maps to a roa
 - [x] **WZRD-02**: Wizard state simplified — ggufModelCount removed from WizardUiState; WizardViewModel GGUF count logic removed; context badges updated
 - [x] **WZRD-03**: Step content updated — GGUF-specific badges and descriptions removed from StepContent; engine comparison step simplified to LiteRT-LM-only explanation
 
+## v1.6 Requirements
+
+Requirements for the Code Syntax Highlighting milestone.
+
+### Syntax Highlighting (SYNX)
+
+- [ ] **SYNX-01**: User sees token-level syntax coloring (keywords, strings, comments, numbers, functions, types, operators) in code blocks
+- [ ] **SYNX-02**: Language detected from markdown code fence label (` ```python `) with alias mapping (py→python, js→javascript, sh→bash, etc.)
+- [ ] **SYNX-03**: Language auto-detected via keyword-frequency heuristics when fence has no language label
+- [ ] **SYNX-04**: Code renders flat monospace during active streaming; full syntax highlighting applied when closing fence arrives
+- [ ] **SYNX-05**: Simple syntax issue detection (unclosed strings, broken brackets) with subtle visual warning indicator
+
+### Themes (THEM)
+
+- [ ] **THEM-01**: User can select from 4 preset themes (Monokai, One Dark, GitHub, Dracula)
+- [ ] **THEM-02**: Each theme auto-adapts light/dark color variant based on system dark mode
+- [ ] **THEM-03**: User can change code theme from Settings page dropdown with preview color swatch
+- [ ] **THEM-04**: Selected theme persists across app restarts via DataStore
+
+### Code Block UI (CODE)
+
+- [ ] **CODE-01**: Copy-to-clipboard button on each code block — copies raw text, shows "Copied!" confirmation icon swap
+- [ ] **CODE-02**: Language header bar showing detected language name above each code block
+- [ ] **CODE-03**: Line numbers displayed alongside code blocks
+- [ ] **CODE-04**: Code font size scales relative to chat text size (multiplier setting)
+- [ ] **CODE-05**: Code blocks over 200 lines collapsed by default with tap-to-expand
+
+### Integration (INTG)
+
+- [ ] **INTG-01**: Syntax highlighting applied in chat messages (both user and AI responses)
+- [ ] **INTG-02**: Syntax highlighting applied in model card descriptions
+- [ ] **INTG-03**: Syntax highlighting applied in README/markdown preview content
+- [ ] **INTG-04**: Syntax highlighting applied everywhere code blocks appear throughout the app
+- [ ] **INTG-05**: Smooth color transition when streaming code block completes (animateColorAsState, consistent background)
+- [ ] **INTG-06**: No jank or frame drops during streaming — rendering stays under 16ms per frame
+
 ## Out of Scope
 
 | Feature | Reason |
@@ -133,12 +169,34 @@ Requirements for the Bug Hunt, Cleanup & Hardening milestone. Each maps to a roa
 | WZRD-01 | Phase 27 | Complete |
 | WZRD-02 | Phase 27 | Complete |
 | WZRD-03 | Phase 27 | Complete |
+| SYNX-01 | — | Pending |
+| SYNX-02 | — | Pending |
+| SYNX-03 | — | Pending |
+| SYNX-04 | — | Pending |
+| SYNX-05 | — | Pending |
+| THEM-01 | — | Pending |
+| THEM-02 | — | Pending |
+| THEM-03 | — | Pending |
+| THEM-04 | — | Pending |
+| CODE-01 | — | Pending |
+| CODE-02 | — | Pending |
+| CODE-03 | — | Pending |
+| CODE-04 | — | Pending |
+| CODE-05 | — | Pending |
+| INTG-01 | — | Pending |
+| INTG-02 | — | Pending |
+| INTG-03 | — | Pending |
+| INTG-04 | — | Pending |
+| INTG-05 | — | Pending |
+| INTG-06 | — | Pending |
 
 **Coverage:**
-- v1.5 requirements: 26 total
-- Mapped to phases: 26
-- Unmapped: 0 ✓
+- v1.6 requirements: 20 total
+- v1.5 requirements: 26 total (complete)
+- v1.4 requirements: 25 total (complete)
+- Mapped to phases: 26 (v1.5)
+- Unmapped: 20 (v1.6 — pending roadmap)
 
 ---
 *Requirements defined: 2026-05-08*
-*Last updated: 2026-05-09 after v1.5 requirements definition*
+*Last updated: 2026-05-14 after v1.6 requirements definition*
