@@ -7,7 +7,7 @@ import dev.snipme.highlights.model.PhraseLocation
 
 internal object TypeMapper {
 
-    private val CONSTANT_KEYWORDS = setOf("true", "false", "null", "nil", "None", "undefined")
+    private val CONSTANT_KEYWORDS = setOf("true", "false", "null", "nil", "none", "undefined")
     private val OPERATOR_REGEX = Regex("^[+\\-*/%=<>!&|^~?:]+$")
 
     private val TOKEN_TYPE_PRIORITY = mapOf(
