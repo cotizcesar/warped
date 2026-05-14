@@ -20,13 +20,13 @@ class SyntaxHighlighterImpl @Inject constructor(
 ) : SyntaxHighlighter {
 
     private val cacheMutex = Mutex()
-    private val cache = object : LinkedHashMap<Int, List<SyntaxToken>>(50, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, List<SyntaxToken>>?): Boolean {
+    private val cache = object : LinkedHashMap<String, List<SyntaxToken>>(50, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<SyntaxToken>>?): Boolean {
             return size > 50
         }
     }
 
-    private fun cacheKey(code: String, language: String): Int = code.hashCode() xor language.hashCode()
+    private fun cacheKey(code: String, language: String): String = "$code|$language"
 
     override suspend fun highlight(code: String, language: String): List<SyntaxToken> {
         if (code.length > 500_000) {
