@@ -169,33 +169,33 @@ Requirements for the Code Syntax Highlighting milestone.
 | WZRD-01 | Phase 27 | Complete |
 | WZRD-02 | Phase 27 | Complete |
 | WZRD-03 | Phase 27 | Complete |
-| SYNX-01 | — | Pending |
-| SYNX-02 | — | Pending |
-| SYNX-03 | — | Pending |
-| SYNX-04 | — | Pending |
-| SYNX-05 | — | Pending |
-| THEM-01 | — | Pending |
-| THEM-02 | — | Pending |
-| THEM-03 | — | Pending |
-| THEM-04 | — | Pending |
-| CODE-01 | — | Pending |
-| CODE-02 | — | Pending |
-| CODE-03 | — | Pending |
-| CODE-04 | — | Pending |
-| CODE-05 | — | Pending |
-| INTG-01 | — | Pending |
-| INTG-02 | — | Pending |
-| INTG-03 | — | Pending |
-| INTG-04 | — | Pending |
-| INTG-05 | — | Pending |
-| INTG-06 | — | Pending |
+| SYNX-01 | Phase 28 | Pending |
+| SYNX-02 | Phase 28 | Pending |
+| SYNX-03 | Phase 28 | Pending |
+| SYNX-04 | Phase 30 | Pending |
+| SYNX-05 | Phase 29 | Pending |
+| THEM-01 | Phase 28 | Pending |
+| THEM-02 | Phase 28 | Pending |
+| THEM-03 | Phase 29 | Pending |
+| THEM-04 | Phase 28 | Pending |
+| CODE-01 | Phase 29 | Pending |
+| CODE-02 | Phase 29 | Pending |
+| CODE-03 | Phase 29 | Pending |
+| CODE-04 | Phase 29 | Pending |
+| CODE-05 | Phase 29 | Pending |
+| INTG-01 | Phase 29 | Pending |
+| INTG-02 | Phase 30 | Pending |
+| INTG-03 | Phase 30 | Pending |
+| INTG-04 | Phase 30 | Pending |
+| INTG-05 | Phase 30 | Pending |
+| INTG-06 | Phase 30 | Pending |
 
 **Coverage:**
-- v1.6 requirements: 20 total
+- v1.6 requirements: 20 total — all mapped ✓
 - v1.5 requirements: 26 total (complete)
 - v1.4 requirements: 25 total (complete)
-- Mapped to phases: 26 (v1.5)
-- Unmapped: 20 (v1.6 — pending roadmap)
+- Mapped to phases: 46 (26 v1.5 + 20 v1.6)
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-08*
