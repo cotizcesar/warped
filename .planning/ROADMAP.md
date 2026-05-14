@@ -55,7 +55,12 @@
   3. Language auto-detection identifies code language from content via keyword-frequency heuristics when no fence label is present, falling back to plain text
   4. 4 preset themes (Monokai, One Dark, GitHub, Dracula) defined with both light and dark color variants covering all 12 token types
   5. Theme selection persists across app restarts via DataStore with backward-compatible migration from existing CodeTheme enum
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 28-01-PLAN.md — Dependency wiring + domain models (TokenType, SyntaxToken, SyntaxColor, SyntaxTheme)
+- [ ] 28-02-PLAN.md — Implementation layer (LanguageDetector, SyntaxHighlighterImpl, TypeMapper, AdvancedPreferences migration, DI module)
+- [ ] 28-03-PLAN.md — Unit tests (LanguageDetector, TypeMapper, SyntaxHighlighterImpl, SyntaxTheme, migration logic)
 
 ### Phase 29: UI Components & MarkdownText Refactoring
 **Goal**: Code blocks render with syntax-highlighted text, language header bar, copy button, line numbers, and expand/collapse in chat messages, with theme selection in Settings.
@@ -90,6 +95,6 @@
 | 25. Bug Fixes | v1.5 | BUG-01..04 (4) | 4/4 | Complete | 2026-05-09 |
 | 26. Security Hardening | v1.5 | SEC-01..08 (8) | 8/8 | Complete | 2026-05-09 |
 | 27. Wizard Update | v1.5 | WZRD-01..03 (3) | 3/3 | Complete | 2026-05-09 |
-| 28. Tokenization Engine & Theme System | v1.6 | SYNX-01..03, THEM-01,02,04 (6) | 0/0 | Not started | — |
+| 28. Tokenization Engine & Theme System | v1.6 | SYNX-01..03, THEM-01,02,04 (6) | 0/3 | Planned | — |
 | 29. UI Components & MarkdownText Refactoring | v1.6 | SYNX-05, THEM-03, CODE-01..05, INTG-01 (8) | 0/0 | Not started | — |
 | 30. Streaming Integration & Everywhere Application | v1.6 | SYNX-04, INTG-02..06 (6) | 0/0 | Not started | — |
