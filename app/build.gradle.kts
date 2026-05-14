@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
@@ -14,8 +15,8 @@ android {
         applicationId = "com.warped.app"
         minSdk = 28
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.3.0"
+        versionCode = 8
+        versionName = "1.5.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
 
@@ -23,12 +24,22 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file(
-                project.findProperty("RELEASE_STORE_FILE") as? String ?: "keystore/warped-release.jks"
-            )
-            storePassword = project.findProperty("RELEASE_STORE_PASSWORD") as? String ?: ""
-            keyAlias = project.findProperty("RELEASE_KEY_ALIAS") as? String ?: "warped"
-            keyPassword = project.findProperty("RELEASE_KEY_PASSWORD") as? String ?: ""
+            // Load signing props from local.properties (not committed to git)
+            val propsFile = rootProject.file("local.properties")
+            val props = mutableMapOf<String, String>()
+            if (propsFile.exists()) {
+                propsFile.readLines().forEach { line ->
+                    val trimmed = line.trim()
+                    if (trimmed.isNotEmpty() && !trimmed.startsWith("#") && trimmed.contains("=")) {
+                        val eq = trimmed.indexOf("=")
+                        props[trimmed.substring(0, eq).trim()] = trimmed.substring(eq + 1).trim()
+                    }
+                }
+            }
+            storeFile = file(props["RELEASE_STORE_FILE"] ?: "keystore/warped-release.jks")
+            storePassword = props["RELEASE_STORE_PASSWORD"] ?: ""
+            keyAlias = props["RELEASE_KEY_ALIAS"] ?: "warped"
+            keyPassword = props["RELEASE_KEY_PASSWORD"] ?: ""
         }
     }
 
@@ -56,6 +67,12 @@ android {
         compose = true
         buildConfig = true
     }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
 }
 
 kotlin {
@@ -64,7 +81,18 @@ kotlin {
     }
 }
 
+// AGP 8.x checkDebugClasspath fails with Gradle 8.13 due to Kotlin plugin
+// pulling kotlin-reflect 2.2.x. This is a no-op lint task, not needed.
+tasks.configureEach {
+    if (name.startsWith("check") && name.endsWith("Classpath")) {
+        enabled = false
+    }
+}
+
 dependencies {
+    // Force Kotlin library versions to match the compiler
+    implementation(platform("org.jetbrains.kotlin:kotlin-bom:2.3.20"))
+
     // Compose BOM governs all Compose library versions
     val composeBom = platform(libs.compose.bom)
     implementation(composeBom)
@@ -123,6 +151,9 @@ dependencies {
 
     // LiteRT-LM (per LITE-01)
     implementation(libs.litertlm)
+
+    // Highlights — syntax tokenization engine for code highlighting
+    implementation(libs.highlights)
 
     // Logging
     implementation(libs.timber)
