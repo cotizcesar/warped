@@ -61,8 +61,20 @@ class AdvancedPreferences @Inject constructor(
     }
 
     val codeTheme: Flow<CodeTheme> = context.advancedPreferencesStore.data.map { prefs ->
-        val name = prefs[KEY_CODE_THEME] ?: CodeTheme.MONOKAI.name
-        try { CodeTheme.valueOf(name) } catch (_: Exception) { CodeTheme.MONOKAI }
+        val name = prefs[KEY_CODE_THEME] ?: return@map CodeTheme.MONOKAI
+        // Try direct enum match first (legacy uppercase format)
+        try {
+            CodeTheme.valueOf(name)
+        } catch (_: IllegalArgumentException) {
+            // Handle SyntaxTheme keys (lowercase) written by migration
+            when (name.lowercase()) {
+                "monokai" -> CodeTheme.MONOKAI
+                "one_dark" -> CodeTheme.ONE_DARK
+                "github" -> CodeTheme.GITHUB
+                "dracula" -> CodeTheme.DRACULA
+                else -> CodeTheme.MONOKAI
+            }
+        }
     }
 
     suspend fun setCodeTheme(theme: CodeTheme) {
