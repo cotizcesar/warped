@@ -98,7 +98,7 @@ Requirements for the Code Syntax Highlighting milestone.
 - [ ] **SYNX-01**: User sees token-level syntax coloring (keywords, strings, comments, numbers, functions, types, operators) in code blocks
 - [ ] **SYNX-02**: Language detected from markdown code fence label (` ```python `) with alias mapping (py→python, js→javascript, sh→bash, etc.)
 - [ ] **SYNX-03**: Language auto-detected via keyword-frequency heuristics when fence has no language label
-- [ ] **SYNX-04**: Code renders flat monospace during active streaming; full syntax highlighting applied when closing fence arrives
+- [x] **SYNX-04**: Code renders flat monospace during active streaming; full syntax highlighting applied when closing fence arrives
 - [x] **SYNX-05**: Simple syntax issue detection (unclosed strings, broken brackets) with subtle visual warning indicator
 
 ### Themes (THEM)
@@ -119,10 +119,10 @@ Requirements for the Code Syntax Highlighting milestone.
 ### Integration (INTG)
 
 - [x] **INTG-01**: Syntax highlighting applied in chat messages (both user and AI responses)
-- [ ] **INTG-02**: Syntax highlighting applied in model card descriptions
+- [x] **INTG-02**: Syntax highlighting applied in model card descriptions
 - [ ] **INTG-03**: Syntax highlighting applied in README/markdown preview content
 - [ ] **INTG-04**: Syntax highlighting applied everywhere code blocks appear throughout the app
-- [ ] **INTG-05**: Smooth color transition when streaming code block completes (animateColorAsState, consistent background)
+- [x] **INTG-05**: Smooth color transition when streaming code block completes (animateColorAsState, consistent background)
 - [ ] **INTG-06**: No jank or frame drops during streaming — rendering stays under 16ms per frame
 
 ## Out of Scope
@@ -172,7 +172,7 @@ Requirements for the Code Syntax Highlighting milestone.
 | SYNX-01 | Phase 28 | Pending |
 | SYNX-02 | Phase 28 | Pending |
 | SYNX-03 | Phase 28 | Pending |
-| SYNX-04 | Phase 30 | Pending |
+| SYNX-04 | Phase 30 | Complete |
 | SYNX-05 | Phase 29 | Complete |
 | THEM-01 | Phase 28 | Pending |
 | THEM-02 | Phase 28 | Pending |
@@ -184,10 +184,10 @@ Requirements for the Code Syntax Highlighting milestone.
 | CODE-04 | Phase 29 | Complete |
 | CODE-05 | Phase 29 | Complete |
 | INTG-01 | Phase 29 | Complete |
-| INTG-02 | Phase 30 | Pending |
+| INTG-02 | Phase 30 | Complete |
 | INTG-03 | Phase 30 | Pending |
 | INTG-04 | Phase 30 | Pending |
-| INTG-05 | Phase 30 | Pending |
+| INTG-05 | Phase 30 | Complete |
 | INTG-06 | Phase 30 | Pending |
 
 **Coverage:**

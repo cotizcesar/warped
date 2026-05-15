@@ -91,7 +91,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 30-01-PLAN.md — Streaming transition fix, codeFontScale wiring, HuggingFace description MarkdownText
+- [x] 30-01-PLAN.md — Streaming transition fix, codeFontScale wiring, HuggingFace description MarkdownText
 - [ ] 30-02-PLAN.md — Compilation verification, coverage audit, performance guardrail checks
 
 ## Progress

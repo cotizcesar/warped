@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Code Syntax Highlighting
-status: verifying
+status: executing
 stopped_at: Completed 29-02-PLAN.md
-last_updated: "2026-05-15T01:35:06.171Z"
+last_updated: "2026-05-15T02:32:41.146Z"
 last_activity: 2026-05-15
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_plans: 8
+  completed_plans: 7
+  percent: 88
 ---
 
 # Project State: Warped
@@ -24,16 +24,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-14)
 
 **Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** Phase 29 — UI Components & MarkdownText Refactoring
+**Current focus:** Phase 30 — Streaming Integration & Everywhere Application
 
 ## Current Position
 
-Phase: 29 (UI Components & MarkdownText Refactoring) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
+Phase: 30 (Streaming Integration & Everywhere Application) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-05-15
 
-Progress: [██████████] 100%
+Progress: [█████████░] 88%
 
 ## Phase Structure
 
@@ -76,6 +76,8 @@ Progress: [██████████] 100%
 - [Phase ?]: [29-02] animateColorAsState applied per TokenType (13 calls) at composable scope
 - [Phase ?]: [29-02] Popup used for warning tooltip instead of Material 3 TooltipBox
 - [Phase ?]: [29-02] Header bar darkening via 0.92f RGB multiplier
+- [Phase ?]: codeFontScale follows same DataStore→UiState→component propagation pattern as syntaxTheme
+- [Phase ?]: HuggingFaceModel.description uses SyntaxTheme.MONOKAI default when no user preference available
 
 ### Pending Todos
 
@@ -94,9 +96,10 @@ None yet.
 | *(none)* | | | |
 | Phase 29 P01 | 12min | 3 tasks | 8 files |
 | Phase 29 P02 | 15 | 3 tasks | 1 files |
+| Phase 30 P01 | 6m30s | 3 tasks | 8 files |
 
 ## Session Continuity
 
-Last session: 2026-05-15T01:35:06.166Z
+Last session: 2026-05-15T02:32:29.787Z
 Stopped at: Completed 29-02-PLAN.md
 Resume file: None
