@@ -10,6 +10,7 @@ import com.warped.data.local.inference.BackendType
 import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.local.inference.MemoryChecker
+import com.warped.data.local.preferences.AdvancedPreferences
 import com.warped.data.remote.provider.ProviderRouter
 import com.warped.domain.model.*
 import com.warped.domain.repository.ChatRepository
@@ -40,6 +41,7 @@ class ChatViewModel @Inject constructor(
     private val engineManager: EngineManager,
     private val memoryChecker: MemoryChecker,
     private val inputSanitizer: InputSanitizer,
+    private val advancedPreferences: AdvancedPreferences,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -107,6 +109,11 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch(coroutineExceptionHandler) {
             endpointRepository.observeEndpoints().collect { endpoints ->
                 _uiState.update { it.copy(endpoints = endpoints) }
+            }
+        }
+        viewModelScope.launch(coroutineExceptionHandler) {
+            advancedPreferences.syntaxTheme.collect { theme ->
+                _uiState.update { it.copy(codeTheme = theme) }
             }
         }
     }

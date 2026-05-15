@@ -8,6 +8,7 @@ import com.warped.domain.model.Endpoint
 import com.warped.domain.model.GenerationParameters
 import com.warped.domain.model.LocalModel
 import com.warped.domain.model.ProviderType
+import com.warped.domain.model.SyntaxTheme
 
 data class ChatUiState(
     val conversationId: Long? = null,
@@ -32,7 +33,8 @@ data class ChatUiState(
     val reasoningEnabled: Boolean = true,
     val activeBackend: BackendType? = null,  // null unless LITE_RT_LM is loaded
     val isLocalModelLoaded: Boolean = false,
-    val memoryWarningModel: com.warped.domain.model.LocalModel? = null
+    val memoryWarningModel: com.warped.domain.model.LocalModel? = null,
+    val codeTheme: SyntaxTheme = SyntaxTheme.MONOKAI,
 )
 
 sealed class ChatError {

@@ -29,11 +29,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.warped.domain.model.ChatMessage
 import com.warped.domain.model.Role
+import com.warped.domain.model.SyntaxTheme
 
 @Composable
 fun MessageBubble(
     message: ChatMessage,
-    isStreaming: Boolean = false
+    isStreaming: Boolean = false,
+    codeTheme: SyntaxTheme = SyntaxTheme.MONOKAI,
 ) {
     val isUser = message.role == Role.USER
     var showReasoning by remember { mutableStateOf(false) }
@@ -104,7 +106,8 @@ fun MessageBubble(
                                     baseColor = Color(0xFF545450),
                                     modifier = Modifier
                                         .padding(vertical = 4.dp),
-                                    fontStyle = FontStyle.Italic
+                                    fontStyle = FontStyle.Italic,
+                                    codeTheme = codeTheme
                                 )
                             }
                         }
@@ -167,7 +170,8 @@ fun MessageBubble(
                             MarkdownText(
                                 text = message.content + if (isStreaming) "▌" else "",
                                 baseColor = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
+                                codeTheme = codeTheme
                             )
                         }
                     } else {
