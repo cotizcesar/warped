@@ -2,62 +2,65 @@
 
 ## What This Is
 
-An Android application equivalent to LM Studio for mobile, enabling users to run large language models (LLMs) locally via LiteRT-LM and connect to remote LLM providers. The app downloads `.litertlm` models from the litertlm-community on Hugging Face, executes them on-device, and connects to OpenAI-compatible APIs, Anthropic, Ollama, LM Studio, and custom servers. Built with Kotlin + Jetpack Compose, targeting production quality with clean modular architecture.
+An Android application equivalent to LM Studio for mobile, enabling users to run large language models (LLMs) locally via LiteRT-LM and connect to remote LLM providers. The app downloads `.litertlm` models from the litertlm-community on Hugging Face, executes them on-device, and connects to OpenAI-compatible APIs, Anthropic, Ollama, LM Studio, and custom servers. Code blocks in AI responses render with language-aware syntax highlighting using 4 preset themes. Built with Kotlin + Jetpack Compose, targeting production quality with clean modular architecture.
 
 ## Core Value
 
 Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
 
-## Current Milestone: v1.6 Code Syntax Highlighting
+## Previous Milestone: v1.6 Code Syntax Highlighting — COMPLETE ✅
 
-**Goal:** Code blocks in AI responses and throughout the app render with language-aware syntax highlighting using popular preset themes that auto-adapt to light/dark mode.
+**Shipped:** 2026-05-15 | [Archive →](.planning/milestones/v1.6-ROADMAP.md)
 
-**Target features:**
-- Syntax highlighting with auto-detected language for code blocks
-- Language header bar showing detected language name on each code block
-- Preset themes (Monokai, One Dark, GitHub, Dracula) selectable in Settings
-- Light/dark theme auto-adaptation per preset
-- Copy-to-clipboard button on each code block
-- Applied everywhere code blocks appear (chat, model cards, readmes, etc.)
+3 phases, 20 requirements completed. Code blocks render with token-level syntax highlighting (12 token types, 43 languages) via Highlights 1.1.0 engine. 4 preset themes (Monokai, One Dark, GitHub, Dracula) with light/dark auto-adaptation. Language header bar with copy button, line numbers, expand/collapse on every code block. Streaming-to-highlighted smooth transitions. Applied in chat, model cards, and everywhere code blocks appear.
 
-### Previous Milestone: v1.5 Bug Hunt, Cleanup & Hardening Pre-Prod — COMPLETE ✅
-
-**Archived:** 2026-05-09 | [Archive →](.planning/milestones/v1.5-ROADMAP.md)
-
-5 phases, 26 requirements completed.
+**Known deferred:** INTG-03 (README preview — requires new API endpoint). 18 pre-existing open items recorded in STATE.md.
 
 ## Requirements
 
 ### Validated
 
-(None yet — ship to validate)
+- ✓ User can search for .litertlm models from litertlm-community on Hugging Face — v1.0
+- ✓ User can download .litertlm models from Hugging Face with pause/resume — v1.0
+- ✓ User can import local .litertlm files from device storage — v1.0
+- ✓ User can load a .litertlm model and chat with streaming via LiteRT-LM — v1.0
+- ✓ User can configure generation parameters (temperature, top_p, top_k, repeat_penalty, max_tokens, context_size, seed, threads) — v1.0
+- ✓ User can chat with a remote OpenAI-compatible model with streaming responses — v1.0
+- ✓ User can add, edit, delete, and test remote endpoints (OpenAI-compatible, Ollama, LM Studio, Anthropic, custom) — v1.0
+- ✓ User can list models from a remote endpoint — v1.0
+- ✓ User can manage downloaded models (view, delete) — v1.0
+- ✓ User can save and reuse generation presets — v1.0
+- ✓ User can browse chat history and resume conversations — v1.0
+- ✓ API keys are stored encrypted via Android Keystore — v1.0
+- ✓ Chat history and model/endpoint configs persist across app restarts via Room — v1.0
+- ✓ Code blocks and markdown render correctly in chat messages — v1.5
+- ✓ App resumes active chat without "model not loaded" warning after backgrounding — v1.5
+- ✓ Active conversation is visually tracked and highlighted in conversation list — v1.5
+- ✓ Deleting a message immediately clears it from the rendered chat UI — v1.5
+- ✓ ProGuard/R8 obfuscation and shrinking enabled with aggressive rules for release — v1.5
+- ✓ All user inputs validated and sanitized against injection — v1.5
+- ✓ Global crash handler with graceful recovery — v1.5
+- ✓ Network security config blocks cleartext traffic in release builds — v1.5
+- ✓ All GGUF/llama.cpp code, JNI, CMake, and Vulkan backend removed — v1.5
+- ✓ Model search has no tabs — single search bar filtered to litertlm-community — v1.5
+- ✓ Onboarding wizard updated to reflect LiteRT-LM-only engine — v1.5
+- ✓ Syntax highlighting with auto-detected language for code blocks — v1.6
+- ✓ Language header bar showing detected language name on each code block — v1.6
+- ✓ Preset themes (Monokai, One Dark, GitHub, Dracula) in Settings — v1.6
+- ✓ Light/dark theme auto-adaptation per preset — v1.6
+- ✓ Copy-to-clipboard button on each code block — v1.6
+- ✓ Line numbers displayed alongside code blocks — v1.6
+- ✓ Code blocks over 200 lines collapsed with tap-to-expand — v1.6
+- ✓ Code font size scales relative to chat text (multiplier setting) — v1.6
+- ✓ Syntax highlighting applied everywhere code blocks appear (chat, model cards, etc.) — v1.6
+- ✓ Smooth color transition when streaming code block completes — v1.6
+- ✓ No jank or frame drops during streaming — v1.6
 
 ### Active
 
-- [ ] User can search for .litertlm models from litertlm-community on Hugging Face
-- [ ] User can download .litertlm models from Hugging Face with pause/resume
-- [ ] User can import local .litertlm files from device storage
-- [ ] User can load a .litertlm model and chat with streaming via LiteRT-LM
-- [ ] User can configure generation parameters (temperature, top_p, top_k, repeat_penalty, max_tokens, context_size, seed, threads)
-- [ ] User can chat with a remote OpenAI-compatible model with streaming responses
-- [ ] User can add, edit, delete, and test remote endpoints (OpenAI-compatible, Ollama, LM Studio, Anthropic, custom)
-- [ ] User can list models from a remote endpoint
-- [ ] User can manage downloaded models (view, delete)
-- [ ] User can save and reuse generation presets
-- [ ] User can browse chat history and resume conversations
-- [ ] API keys are stored encrypted via Android Keystore
-- [ ] Chat history and model/endpoint configs persist across app restarts via Room
-- [ ] Code blocks and markdown render correctly in chat messages
-- [ ] App resumes active chat without "model not loaded" warning after backgrounding
-- [ ] Active conversation is visually tracked and highlighted in conversation list
-- [ ] Deleting a message immediately clears it from the rendered chat UI
-- [ ] ProGuard/R8 obfuscation and shrinking enabled with aggressive rules for release
-- [ ] All user inputs validated and sanitized against injection
-- [ ] Global crash handler with graceful recovery
-- [ ] Network security config blocks cleartext traffic in release builds
-- [ ] All GGUF/llama.cpp code, JNI, CMake, and Vulkan backend removed
-- [ ] Model search has no tabs — single search bar filtered to litertlm-community
-- [ ] Onboarding wizard updated to reflect LiteRT-LM-only engine
+- [ ] README/markdown preview with syntax highlighting — deferred from v1.6 (INTG-03)
+- [ ] Pre-existing quick tasks from various milestones (12 items — see STATE.md)
+- [ ] Human verification for Phases 06, 07, 08, 09, 10, 29 (6 items — see STATE.md)
 
 ### Out of Scope
 
@@ -66,26 +69,20 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 - AI agents / autonomous tool use — defer, MCP tool calling via LM Studio API is in scope
 - Real-time sync across devices — defer
 - Paid subscriptions to remote providers built into the app — user brings own API keys
-- GGUF / llama.cpp local inference — REMOVED in v1.5. App pivots to LiteRT-LM as sole local engine. Hugging Face search limited to litertlm-community `.litertlm` models.
+- GGUF / llama.cpp local inference — REMOVED in v1.5. App pivots to LiteRT-LM as sole local engine.
 - Staff Picks tab and multi-tab model browser — REMOVED in v1.5. Single search bar replaces tabbed browsing.
+- Certificate pinning for remote endpoints — defer, not selected for v1.5 or v1.6 hardening scope
+- Play Integrity / root detection — defer, not selected for v1.5 or v1.6 hardening scope
 
 ## Context
 
-The Android ecosystem lacks a polished, production-grade app that combines local LLM inference (llama.cpp/GGUF) with remote provider connectivity in a single interface. Existing solutions are either CLI-only, desktop-only (LM Studio), or limited to one provider. There is a growing demand for running LLMs on flagship Android phones with 8-16GB RAM, especially for privacy-sensitive use cases and offline scenarios.
+The Android ecosystem lacks a polished, production-grade app that combines local LLM inference with remote provider connectivity in a single interface. Existing solutions are either CLI-only, desktop-only (LM Studio), or limited to one provider. There is growing demand for running LLMs on flagship Android phones with 8-16GB RAM.
 
-The user is an experienced Android developer with deep knowledge of Kotlin, Compose, and LLM inference. They want all the artifacts needed to build this app: architecture documents, data models, domain interfaces, initial implementations, and a phased roadmap.
+Warped has shipped 6 milestones (v1.0 through v1.6) across 30 phases and 185 requirements. The app supports LiteRT-LM local inference, 5 remote provider types (OpenAI, Anthropic, Ollama, LM Studio, custom), Hugging Face model search/download, chat with streaming, presets, history, an 8-step onboarding wizard, and syntax-highlighted code blocks with 4 themes. Production hardening is applied (ProGuard, Keystore encryption, input sanitization, crash resilience, network security).
 
-v1.1 added LiteRT-LM as a second local inference engine (shipped). LiteRT-LM is Google's production framework that powers on-device GenAI in Chrome, Chromebook Plus, and Pixel Watch. Its Kotlin API provides `Engine → Conversation → sendMessageAsync(Flow)` with native GPU/NPU backends and `.litertlm` model format.
+**v1.6 (2026-05-15):** Syntax highlighting engine built on Highlights 1.1.0 with custom TypeMapper and LanguageDetector. Code blocks show token-level coloring across 12 token types, auto-detected language with 20+ aliases, 4 themes with light/dark variants, copy button, line numbers, and expand/collapse. Streaming transitions smooth with flat monospace during active streaming and full highlighting on closing fence.
 
-v1.2 implementó inferencia GGUF nativa con llama.cpp: pipeline completo (download → load → streaming chat) con paridad de UX respecto a LiteRT-LM, backend CPU + Vulkan GPU, y manejo de memoria OOM graceful.
-
-v1.3 expande los endpoints de red: el ProviderType enum ya tiene OPENAI, ANTHROPIC, OLLAMA, LM_STUDIO, CUSTOM, pero el EndpointForm solo muestra LM_STUDIO. ProviderRouter ya maneja todos correctamente — solo falta exponerlos en la UI con nombres legibles y agregar soporte MCP para LM Studio.
-
-**v1.3 SHIPPED (2026-05-06):** 4 fases, 31 requisitos — todos los providers remotos expuestos en UI, API keys por endpoint, OpenAI completo (chat/responses/embeddings/completions), Anthropic Messages API con SSE, Ollama API completa (9 endpoints), LM Studio con MCP ephemeral + plugin servers.
-
-**v1.5:** Pivote a LiteRT-LM como único motor local. Se elimina completamente llama.cpp/GGUF (JNI, CMake, Vulkan). El buscador de modelos se simplifica a una sola barra filtrando `litertlm-community`. Hardening pre-producción (ProGuard, validación, crash resilience, network security). Corrección de 4 bugs de chat (code rendering, model reload, active tracking, ghost delete).
-
-**v1.6:** Code syntax highlighting in chat messages and throughout the app. Language auto-detection, preset themes (Monokai, One Dark, GitHub, Dracula) with light/dark variants, copy button, and language header bar on every code block. Settings page for theme selection.
+**Known issue:** JUnit Platform launcher classpath — `./gradlew :app:testDebugUnitTest` fails with "Failed to load JUnit Platform" (pre-existing, not introduced by v1.6).
 
 ## Constraints
 
@@ -103,13 +100,16 @@ v1.3 expande los endpoints de red: el ProviderType enum ya tiene OPENAI, ANTHROP
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Kotlin + Compose over Flutter/React Native | Native Android performance for JNI/NDK integration, idiomatic platform APIs | — Pending |
-| llama.cpp over MLC-LLM or ExecuTorch | Most mature GGUF ecosystem, widest model support, active community | — Pending |
-| Clean Architecture with Hilt | Testability, separation of concerns, industry standard for Android | — Pending |
-| Room for structured data | Official Android recommendation, Compose integration, type-safe queries | — Pending |
-| Coarse granularity (3-5 phases) | Build fast, validate early, iterate | — Pending |
-| LiteRT-LM as second local engine | Better performance than llama.cpp on Android, native GPU/NPU, Google's production framework for Chrome/Chromebook/Pixel | — Pending |
-| GGUF/llama.cpp removal in v1.5 | App pivots to LiteRT-LM as sole local engine. GGUF path had higher complexity (JNI/CMake/Vulkan), larger APK, and overlapping functionality. Single engine simplifies codebase, reduces bugs, and focuses resources. | — Pending |
+| Kotlin + Compose over Flutter/React Native | Native Android performance for JNI/NDK integration, idiomatic platform APIs | ✓ Good |
+| Clean Architecture with Hilt | Testability, separation of concerns, industry standard for Android | ✓ Good |
+| Room for structured data | Official Android recommendation, Compose integration, type-safe queries | ✓ Good |
+| Coarse granularity (3-5 phases) | Build fast, validate early, iterate | ✓ Good |
+| LiteRT-LM as sole local engine (v1.5) | Better performance than llama.cpp on Android, native GPU/NPU, simpler codebase | ✓ Good |
+| GGUF/llama.cpp removal in v1.5 | Single engine simplifies codebase, reduces bugs, focuses resources | ✓ Good |
+| Highlights 1.1.0 as syntax tokenization engine (v1.6) | Saved ~750-1,400 lines vs custom regex tokenizer. Wrapped behind SyntaxHighlighter domain interface for swapability | ✓ Good |
+| Deferred highlighting during streaming (v1.6) | Flat monospace during streaming, full coloring on closing fence. Prevents O(n²) jank | ✓ Good |
+| MarkdownText restructured to block-based Column (v1.6) | Enables per-block composables (language header, copy button) that were impossible with single Text(AnnotatedString) | ✓ Good |
+| CodeTheme → SyntaxTheme migration (v1.6) | Old enum names map to new theme objects via existing DataStore key. Backward compatible | ✓ Good |
 
 ## Evolution
 
@@ -129,4 +129,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-14 after milestone v1.6 start*
+*Last updated: 2026-05-15 after v1.6 Code Syntax Highlighting milestone*
