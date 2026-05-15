@@ -65,8 +65,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    experimentalProperties["android.packageBuildConfig.enable16kbAlignment"] = true
-
     buildFeatures {
         compose = true
         buildConfig = true
@@ -184,3 +182,26 @@ tasks.withType<Test> {
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
+
+// ── 16KB page alignment: patch all .so files to use 16KB page size ──
+// Required for Android 15+ (API 35+) 16KB page size support.
+// Native libs ship with 4KB alignment; patchelf rewrites ELF headers to 16KB.
+tasks.whenTaskAdded {
+    if (name.matches(Regex("strip(Release|Debug)DebugSymbols"))) {
+        val variant = if (name.contains("Release")) "release" else "debug"
+        val patchScript = File(project.projectDir, "patch_elf_16kb.py").absolutePath
+        doLast {
+            val strippedDir = project.layout.buildDirectory.dir("intermediates/stripped_native_libs/$variant/$name/out").get().asFile
+            if (!strippedDir.exists()) return@doLast
+            strippedDir.walkTopDown()
+                .filter { it.isFile && it.extension == "so" }
+                .forEach { so ->
+                    Runtime.getRuntime().exec(arrayOf("patchelf", "--page-size", "16384", so.absolutePath)).waitFor()
+                    if (so.name == "libsqlcipher.so") {
+                        Runtime.getRuntime().exec(arrayOf("python3", patchScript, so.absolutePath)).waitFor()
+                    }
+                }
+        }
+    }
+}
+
