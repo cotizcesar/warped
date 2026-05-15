@@ -91,7 +91,7 @@ class AdvancedPreferences @Inject constructor(
      */
     suspend fun migrateCodeThemeIfNeeded() {
         context.advancedPreferencesStore.edit { prefs ->
-            val stored = prefs[KEY_CODE_THEME] ?: return
+            val stored = prefs[KEY_CODE_THEME] ?: return@edit
             val migrated = migrateCodeTheme(stored)
             if (migrated.key != stored) {
                 prefs[KEY_CODE_THEME] = migrated.key
