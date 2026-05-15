@@ -16,5 +16,7 @@ data class DownloadCheckpointEntity(
     @ColumnInfo(name = "total_bytes")
     val totalBytes: Long,
     @ColumnInfo(name = "downloaded_bytes")
-    val downloadedBytes: Long
+    val downloadedBytes: Long,
+    @ColumnInfo(name = "is_gated")
+    val isGated: Boolean = false,
 )
