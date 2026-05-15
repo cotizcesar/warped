@@ -2,37 +2,38 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Code Syntax Highlighting
-status: planning
-last_updated: "2026-05-14T21:07:40.003Z"
-last_activity: 2026-05-14
+status: executing
+stopped_at: ROADMAP.md created for v1.6 milestone
+last_updated: "2026-05-15T00:56:14.060Z"
+last_activity: 2026-05-15
 progress:
   total_phases: 3
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 6
+  completed_plans: 4
+  percent: 67
 ---
 
 # Project State: Warped
 
 **Last updated:** 2026-05-14
-**Last activity:** 2026-05-14 — Milestone v1.6 roadmap created
+**Last activity:** 2026-05-15
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-05-14)
 
 **Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** v1.6 Code Syntax Highlighting — Phase 28 ready to plan
+**Current focus:** Phase 29 — UI Components & MarkdownText Refactoring
 
 ## Current Position
 
-Phase: 28 of 30 (Tokenization Engine & Theme System)
-Plan: —
-Status: Ready to plan
-Last activity: 2026-05-14 — ROADMAP.md created, 20 requirements mapped across 3 phases
+Phase: 29 (UI Components & MarkdownText Refactoring) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-05-15
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [███████░░░] 67%
 
 ## Phase Structure
 
@@ -56,6 +57,7 @@ Progress: [░░░░░░░░░░] 0%
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 38 (v1.5)
 - Average duration: ~18 min
 - Total execution time: ~12.5 hours
@@ -68,6 +70,9 @@ Progress: [░░░░░░░░░░] 0%
 - [v1.6]: Deferred highlighting strategy: flat monospace during streaming, full syntax coloring applied when closing ``` fence arrives. Prevents O(n²) streaming jank.
 - [v1.6]: CodeTheme enum → SyntaxTheme data class migration using existing DataStore key. Old enum names map to new theme objects.
 - [v1.6]: MarkdownText restructured from single Text(AnnotatedString) to block-based Column of composables to host language header bar and copy button.
+- [Phase ?]: MarkdownBlock sealed hierarchy uses pure Kotlin data classes in domain/model/ with no Android/Compose dependencies
+- [Phase ?]: parseMarkdown is a top-level pure function with LanguageDetector passed as parameter
+- [Phase ?]: CodeTheme enum kept as @Deprecated for backward compat with AdvancedPreferences migration
 
 ### Pending Todos
 
@@ -84,9 +89,10 @@ None yet.
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
 | *(none)* | | | |
+| Phase 29 P01 | 12min | 3 tasks | 8 files |
 
 ## Session Continuity
 
-Last session: 2026-05-14
+Last session: 2026-05-15T00:56:14.056Z
 Stopped at: ROADMAP.md created for v1.6 milestone
 Resume file: None

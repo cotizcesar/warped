@@ -118,7 +118,7 @@ Requirements for the Code Syntax Highlighting milestone.
 
 ### Integration (INTG)
 
-- [ ] **INTG-01**: Syntax highlighting applied in chat messages (both user and AI responses)
+- [x] **INTG-01**: Syntax highlighting applied in chat messages (both user and AI responses)
 - [ ] **INTG-02**: Syntax highlighting applied in model card descriptions
 - [ ] **INTG-03**: Syntax highlighting applied in README/markdown preview content
 - [ ] **INTG-04**: Syntax highlighting applied everywhere code blocks appear throughout the app
@@ -183,7 +183,7 @@ Requirements for the Code Syntax Highlighting milestone.
 | CODE-03 | Phase 29 | Pending |
 | CODE-04 | Phase 29 | Pending |
 | CODE-05 | Phase 29 | Pending |
-| INTG-01 | Phase 29 | Pending |
+| INTG-01 | Phase 29 | Complete |
 | INTG-02 | Phase 30 | Pending |
 | INTG-03 | Phase 30 | Pending |
 | INTG-04 | Phase 30 | Pending |
