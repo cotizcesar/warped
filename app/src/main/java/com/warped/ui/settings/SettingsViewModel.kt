@@ -7,6 +7,7 @@ import com.warped.data.local.inference.tools.ToolDefinitions
 import com.warped.data.local.inference.tools.ToolPreferences
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.domain.model.GenerationParameters
+import com.warped.domain.model.SyntaxTheme
 import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.LocalModelRepository
@@ -92,6 +93,16 @@ class SettingsViewModel @Inject constructor(
                 }
             }
         }
+        viewModelScope.launch(coroutineExceptionHandler) {
+            advancedPreferences.syntaxTheme.collect { theme ->
+                _uiState.update { it.copy(codeTheme = theme) }
+            }
+        }
+        viewModelScope.launch(coroutineExceptionHandler) {
+            advancedPreferences.codeFontScale.collect { scale ->
+                _uiState.update { it.copy(codeFontScale = scale) }
+            }
+        }
     }
 
     fun toggleTool(toolId: String) {
@@ -109,6 +120,18 @@ class SettingsViewModel @Inject constructor(
         val newParams = transform(_uiState.value.advancedParams)
         _uiState.update { it.copy(advancedParams = newParams) }
         viewModelScope.launch(coroutineExceptionHandler) { advancedPreferences.save(newParams) }
+    }
+
+    fun setCodeTheme(theme: SyntaxTheme) {
+        viewModelScope.launch(coroutineExceptionHandler) {
+            advancedPreferences.setSyntaxTheme(theme)
+        }
+    }
+
+    fun setCodeFontScale(scale: Float) {
+        viewModelScope.launch(coroutineExceptionHandler) {
+            advancedPreferences.setCodeFontScale(scale)
+        }
     }
 
     fun showDeleteChatsDialog() {

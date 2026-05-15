@@ -1,5 +1,7 @@
 package com.warped.ui.settings
 
+import com.warped.domain.model.SyntaxTheme
+
 data class SettingsUiState(
     val isDeletingChats: Boolean = false,
     val isDeletingKeys: Boolean = false,
@@ -13,5 +15,7 @@ data class SettingsUiState(
     val message: String? = null,
     val error: String? = null,
     val hfToken: String = "",
-    val hasHfToken: Boolean = false
+    val hasHfToken: Boolean = false,
+    val codeTheme: SyntaxTheme = SyntaxTheme.MONOKAI,
+    val codeFontScale: Float = 1.0f,
 )

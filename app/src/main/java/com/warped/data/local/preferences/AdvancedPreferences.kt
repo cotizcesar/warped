@@ -35,6 +35,7 @@ class AdvancedPreferences @Inject constructor(
         val KEY_CONTEXT_SIZE = intPreferencesKey("context_size")
         val KEY_SEED = intPreferencesKey("seed")
         val KEY_CODE_THEME = stringPreferencesKey("code_theme")
+        val KEY_CODE_FONT_SCALE = floatPreferencesKey("code_font_scale")
     }
 
     val defaultParameters: Flow<GenerationParameters> = context.advancedPreferencesStore.data.map { prefs ->
@@ -132,6 +133,16 @@ class AdvancedPreferences @Inject constructor(
     suspend fun setSyntaxTheme(theme: SyntaxTheme) {
         context.advancedPreferencesStore.edit { prefs ->
             prefs[KEY_CODE_THEME] = theme.key
+        }
+    }
+
+    val codeFontScale: Flow<Float> = context.advancedPreferencesStore.data.map { prefs ->
+        prefs[KEY_CODE_FONT_SCALE] ?: 1.0f
+    }
+
+    suspend fun setCodeFontScale(scale: Float) {
+        context.advancedPreferencesStore.edit { prefs ->
+            prefs[KEY_CODE_FONT_SCALE] = scale.coerceIn(0.8f, 1.5f)
         }
     }
 }

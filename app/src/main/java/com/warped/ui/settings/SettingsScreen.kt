@@ -1,5 +1,7 @@
 package com.warped.ui.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -9,13 +11,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,8 +33,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.R
 import com.warped.data.local.inference.tools.ToolCategory
-import com.warped.ui.components.WarpedAlertDialog
 import com.warped.data.local.inference.tools.ToolDefinitions
+import com.warped.domain.model.SyntaxTheme
+import com.warped.domain.model.TokenType
+import com.warped.ui.components.WarpedAlertDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -210,6 +217,105 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Presets", style = MaterialTheme.typography.bodyLarge)
                         Text("${uiState.presetCount}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+
+        // Display section
+        item {
+            Text("Display", style = MaterialTheme.typography.titleMedium)
+        }
+        // Code theme selector
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Code Theme", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Color scheme for code blocks in chat",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    var themeExpanded by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
+                        expanded = themeExpanded,
+                        onExpandedChange = { themeExpanded = it }
+                    ) {
+                        OutlinedTextField(
+                            value = uiState.codeTheme.label,
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = themeExpanded) },
+                            modifier = Modifier.menuAnchor().fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = Color(0xFF374151)
+                            )
+                        )
+                        ExposedDropdownMenu(
+                            expanded = themeExpanded,
+                            onDismissRequest = { themeExpanded = false }
+                        ) {
+                            SyntaxTheme.all().forEach { theme ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            ThemeSwatchStrip(theme = theme)
+                                            Spacer(Modifier.width(12.dp))
+                                            Text(theme.label, style = MaterialTheme.typography.bodyMedium)
+                                        }
+                                    },
+                                    onClick = {
+                                        viewModel.setCodeTheme(theme)
+                                        themeExpanded = false
+                                    },
+                                    trailingIcon = {
+                                        if (theme.key == uiState.codeTheme.key) {
+                                            Icon(
+                                                Icons.Outlined.Check,
+                                                "Selected",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // Code font scale slider
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Code font size", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "%.1fx".format(uiState.codeFontScale),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.width(40.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Slider(
+                            value = uiState.codeFontScale,
+                            onValueChange = { viewModel.setCodeFontScale(it) },
+                            valueRange = 0.8f..1.5f,
+                            steps = 6,
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
             }
@@ -553,6 +659,23 @@ private fun ParamSlider(
                 description,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun ThemeSwatchStrip(theme: SyntaxTheme) {
+    val isDark = isSystemInDarkTheme()
+    val variant = if (isDark) theme.darkVariant else theme.lightVariant
+    val swatches = listOf(TokenType.KEYWORD, TokenType.STRING, TokenType.COMMENT, TokenType.BACKGROUND)
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        swatches.forEach { tokenType ->
+            val color = Color(variant[tokenType]?.argb ?: 0xFF000000.toInt())
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .background(color, RoundedCornerShape(2.dp))
             )
         }
     }
