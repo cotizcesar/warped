@@ -190,8 +190,9 @@ tasks.whenTaskAdded {
     if (name.matches(Regex("strip(Release|Debug)DebugSymbols"))) {
         val variant = if (name.contains("Release")) "release" else "debug"
         val patchScript = File(project.projectDir, "patch_elf_16kb.py").absolutePath
+        val strippedDirProvider = project.layout.buildDirectory.dir("intermediates/stripped_native_libs/$variant/$name/out")
         doLast {
-            val strippedDir = project.layout.buildDirectory.dir("intermediates/stripped_native_libs/$variant/$name/out").get().asFile
+            val strippedDir = strippedDirProvider.get().asFile
             if (!strippedDir.exists()) return@doLast
             strippedDir.walkTopDown()
                 .filter { it.isFile && it.extension == "so" }
