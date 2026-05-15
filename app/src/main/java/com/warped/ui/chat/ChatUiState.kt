@@ -35,6 +35,10 @@ data class ChatUiState(
     val isLocalModelLoaded: Boolean = false,
     val memoryWarningModel: com.warped.domain.model.LocalModel? = null,
     val codeTheme: SyntaxTheme = SyntaxTheme.MONOKAI,
+    val modelUnavailable: Boolean = false,
+    val pendingModelSwitch: ModelSwitchRequest? = null,
+    val conversationModelId: String? = null,
+    val conversationProviderType: ProviderType? = null,
 )
 
 sealed class ChatError {
@@ -44,5 +48,11 @@ sealed class ChatError {
     data object NoModelSelected : ChatError()
     data object DownloadModelFirst : ChatError()
     data object ConnectionLost : ChatError()
+    data object ModelUnavailable : ChatError()
     data class Unknown(val message: String) : ChatError()
 }
+
+data class ModelSwitchRequest(
+    val modelId: String,
+    val providerType: ProviderType,
+)
