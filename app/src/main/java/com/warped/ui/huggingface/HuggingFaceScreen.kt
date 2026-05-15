@@ -424,18 +424,10 @@ private fun ModelDetailScreen(
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     model.tags.take(5).forEach { tag ->
                                         AssistInfoChip(text = tag)
-            }
-            if (model.description.isNotBlank()) {
-                Spacer(Modifier.height(8.dp))
-                MarkdownText(
-                    text = model.description,
-                    maxLines = 4,
-                    codeTheme = SyntaxTheme.MONOKAI,
-                )
-            }
-        }
-    }
-}
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
