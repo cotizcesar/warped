@@ -62,8 +62,8 @@ fun MarkdownText(
         return
     }
 
+    val appContext = LocalContext.current.applicationContext
     val detector = languageDetector ?: remember {
-        val appContext = LocalContext.current.applicationContext
         EntryPoints.get(appContext, MarkdownEntryPoint::class.java).languageDetector()
     }
 
@@ -106,17 +106,13 @@ fun MarkdownText(
                 }
 
                 is MarkdownBlock.CodeBlock -> {
-                    // Fallback rendering until CodeBlock composable is created in Plan 02
-                    Surface(
-                        color = bgCodeColor,
-                        shape = RoundedCornerShape(8.dp),
-                    ) {
-                        Text(
-                            text = block.code,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.padding(12.dp),
-                        )
-                    }
+                    CodeBlock(
+                        language = block.language,
+                        code = block.code,
+                        syntaxTheme = codeTheme,
+                        isStreaming = isStreaming,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
 
                 is MarkdownBlock.InlineCodeBlock -> {
