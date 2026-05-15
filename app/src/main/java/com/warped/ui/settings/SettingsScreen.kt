@@ -129,6 +129,7 @@ fun SettingsScreen(
 // =========================================
 // GENERAL TAB
 // =========================================
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, onNavigateToWizard: () -> Unit) {
     LazyColumn(
