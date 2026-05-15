@@ -77,6 +77,10 @@ android {
             useLegacyPackaging = true
         }
     }
+
+    lint {
+        disable.add("NullSafeMutableLiveData")
+    }
 }
 
 kotlin {

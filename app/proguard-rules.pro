@@ -38,3 +38,27 @@
 # Keep attributes for reflective access
 -keepattributes InnerClasses,EnclosingMethod
 
+# Highlights — syntax tokenization engine (Phase 28)
+-keep class dev.snipme.highlights.** { *; }
+-dontwarn dev.snipme.highlights.**
+
+# Syntax Highlighting domain models (Phase 28-30)
+-keep class com.warped.domain.model.SyntaxTheme { *; }
+-keep class com.warped.domain.model.SyntaxTheme$Companion { *; }
+-keep class com.warped.domain.model.SyntaxColor { *; }
+-keep class com.warped.domain.model.TokenType { *; }
+-keep class com.warped.domain.model.SyntaxToken { *; }
+-keep class com.warped.ui.chat.components.MarkdownBlock { *; }
+-keep class com.warped.ui.chat.components.MarkdownBlock$** { *; }
+
+# Hilt EntryPoints for composables (Phase 29)
+-keep class com.warped.ui.chat.components.SyntaxHighlightingEntryPoint { *; }
+-keep class com.warped.ui.chat.components.MarkdownEntryPoint { *; }
+
+# Hilt DI module (Phase 28)
+-keep class com.warped.di.SyntaxModule { *; }
+
+# Kotlinx Serialization — HuggingFace DTOs (Phase 30 description field)
+-keep class com.warped.data.remote.dto.HuggingFaceModel { *; }
+-keep class com.warped.data.remote.dto.HuggingFaceSearchResponse { *; }
+
