@@ -76,7 +76,7 @@ Plans:
 
 Plans:
 - [x] 29-01-PLAN.md — MarkdownBlock sealed class hierarchy, parseMarkdown() function, MarkdownText refactored to block-based Column with SyntaxTheme
-- [ ] 29-02-PLAN.md — CodeBlock composable with syntax highlighting, language header bar, copy button, line numbers, expand/collapse, warning indicator
+- [x] 29-02-PLAN.md — CodeBlock composable with syntax highlighting, language header bar, copy button, line numbers, expand/collapse, warning indicator
 - [ ] 29-03-PLAN.md — Full integration: ChatScreen/ChatViewModel/MessageBubble → SyntaxTheme, Settings ExposedDropdownMenuBox + code font scale slider, AdvancedPreferences persistence
 
 ### Phase 30: Streaming Integration & Everywhere Application

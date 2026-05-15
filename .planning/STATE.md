@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Code Syntax Highlighting
 status: executing
-stopped_at: ROADMAP.md created for v1.6 milestone
-last_updated: "2026-05-15T00:56:14.060Z"
+stopped_at: Completed 29-02-PLAN.md
+last_updated: "2026-05-15T01:16:10.956Z"
 last_activity: 2026-05-15
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 6
-  completed_plans: 4
-  percent: 67
+  completed_plans: 5
+  percent: 83
 ---
 
 # Project State: Warped
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 ## Current Position
 
 Phase: 29 (UI Components & MarkdownText Refactoring) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-05-15
 
-Progress: [███████░░░] 67%
+Progress: [████████░░] 83%
 
 ## Phase Structure
 
@@ -73,6 +73,9 @@ Progress: [███████░░░] 67%
 - [Phase ?]: MarkdownBlock sealed hierarchy uses pure Kotlin data classes in domain/model/ with no Android/Compose dependencies
 - [Phase ?]: parseMarkdown is a top-level pure function with LanguageDetector passed as parameter
 - [Phase ?]: CodeTheme enum kept as @Deprecated for backward compat with AdvancedPreferences migration
+- [Phase ?]: [29-02] animateColorAsState applied per TokenType (13 calls) at composable scope
+- [Phase ?]: [29-02] Popup used for warning tooltip instead of Material 3 TooltipBox
+- [Phase ?]: [29-02] Header bar darkening via 0.92f RGB multiplier
 
 ### Pending Todos
 
@@ -90,9 +93,10 @@ None yet.
 |----------|------|--------|-------------|
 | *(none)* | | | |
 | Phase 29 P01 | 12min | 3 tasks | 8 files |
+| Phase 29 P02 | 15 | 3 tasks | 1 files |
 
 ## Session Continuity
 
-Last session: 2026-05-15T00:56:14.056Z
-Stopped at: ROADMAP.md created for v1.6 milestone
+Last session: 2026-05-15T01:16:10.952Z
+Stopped at: Completed 29-02-PLAN.md
 Resume file: None

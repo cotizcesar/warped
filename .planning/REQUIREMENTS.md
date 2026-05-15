@@ -99,7 +99,7 @@ Requirements for the Code Syntax Highlighting milestone.
 - [ ] **SYNX-02**: Language detected from markdown code fence label (` ```python `) with alias mapping (py→python, js→javascript, sh→bash, etc.)
 - [ ] **SYNX-03**: Language auto-detected via keyword-frequency heuristics when fence has no language label
 - [ ] **SYNX-04**: Code renders flat monospace during active streaming; full syntax highlighting applied when closing fence arrives
-- [ ] **SYNX-05**: Simple syntax issue detection (unclosed strings, broken brackets) with subtle visual warning indicator
+- [x] **SYNX-05**: Simple syntax issue detection (unclosed strings, broken brackets) with subtle visual warning indicator
 
 ### Themes (THEM)
 
@@ -110,11 +110,11 @@ Requirements for the Code Syntax Highlighting milestone.
 
 ### Code Block UI (CODE)
 
-- [ ] **CODE-01**: Copy-to-clipboard button on each code block — copies raw text, shows "Copied!" confirmation icon swap
-- [ ] **CODE-02**: Language header bar showing detected language name above each code block
-- [ ] **CODE-03**: Line numbers displayed alongside code blocks
+- [x] **CODE-01**: Copy-to-clipboard button on each code block — copies raw text, shows "Copied!" confirmation icon swap
+- [x] **CODE-02**: Language header bar showing detected language name above each code block
+- [x] **CODE-03**: Line numbers displayed alongside code blocks
 - [ ] **CODE-04**: Code font size scales relative to chat text size (multiplier setting)
-- [ ] **CODE-05**: Code blocks over 200 lines collapsed by default with tap-to-expand
+- [x] **CODE-05**: Code blocks over 200 lines collapsed by default with tap-to-expand
 
 ### Integration (INTG)
 
@@ -173,16 +173,16 @@ Requirements for the Code Syntax Highlighting milestone.
 | SYNX-02 | Phase 28 | Pending |
 | SYNX-03 | Phase 28 | Pending |
 | SYNX-04 | Phase 30 | Pending |
-| SYNX-05 | Phase 29 | Pending |
+| SYNX-05 | Phase 29 | Complete |
 | THEM-01 | Phase 28 | Pending |
 | THEM-02 | Phase 28 | Pending |
 | THEM-03 | Phase 29 | Pending |
 | THEM-04 | Phase 28 | Pending |
-| CODE-01 | Phase 29 | Pending |
-| CODE-02 | Phase 29 | Pending |
-| CODE-03 | Phase 29 | Pending |
+| CODE-01 | Phase 29 | Complete |
+| CODE-02 | Phase 29 | Complete |
+| CODE-03 | Phase 29 | Complete |
 | CODE-04 | Phase 29 | Pending |
-| CODE-05 | Phase 29 | Pending |
+| CODE-05 | Phase 29 | Complete |
 | INTG-01 | Phase 29 | Complete |
 | INTG-02 | Phase 30 | Pending |
 | INTG-03 | Phase 30 | Pending |
