@@ -65,6 +65,8 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    experimentalProperties["android.packageBuildConfig.enable16kbAlignment"] = true
+
     buildFeatures {
         compose = true
         buildConfig = true
