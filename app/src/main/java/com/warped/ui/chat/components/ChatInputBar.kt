@@ -40,7 +40,10 @@ fun ChatInputBar(
     modelHasReasoning: Boolean = true,
     onAddImage: () -> Unit = {},
     attachedImages: List<Uri> = emptyList(),
-    onRemoveImage: (Int) -> Unit = {}
+    onRemoveImage: (Int) -> Unit = {},
+    modelHasAudio: Boolean = false,
+    onAudioRecorded: ((ByteArray) -> Unit)? = null,
+    onAudioRecordingChanged: ((Boolean) -> Unit)? = null,
 ) {
     Surface(
         color = Color(0xFF2B2B29),
