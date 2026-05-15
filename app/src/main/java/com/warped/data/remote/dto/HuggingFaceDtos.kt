@@ -12,6 +12,7 @@ data class HuggingFaceModel(
     val tags: List<String> = emptyList(),
     val downloads: Int = 0,
     val likes: Int = 0,
+    val description: String = "",
     @SerialName("pipeline_tag") val pipelineTag: String = "",
     @SerialName("private") val isPrivate: Boolean = false,
     @SerialName("gated") val gated: String = "false",

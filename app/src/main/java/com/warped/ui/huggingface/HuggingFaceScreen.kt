@@ -51,6 +51,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.R
+import com.warped.domain.model.SyntaxTheme
+import com.warped.ui.chat.components.MarkdownText
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -249,6 +251,14 @@ private fun ModelSearchResultCard(
                     AssistInfoChip(text = tag)
                 }
             }
+            if (model.description.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                MarkdownText(
+                    text = model.description,
+                    maxLines = 4,
+                    codeTheme = SyntaxTheme.MONOKAI,
+                )
+            }
         }
     }
 }
@@ -414,10 +424,18 @@ private fun ModelDetailScreen(
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     model.tags.take(5).forEach { tag ->
                                         AssistInfoChip(text = tag)
-                                    }
-                                }
-                            }
-                        }
+            }
+            if (model.description.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                MarkdownText(
+                    text = model.description,
+                    maxLines = 4,
+                    codeTheme = SyntaxTheme.MONOKAI,
+                )
+            }
+        }
+    }
+}
                     }
                 }
 
