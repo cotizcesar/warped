@@ -36,6 +36,7 @@ fun MessageBubble(
     message: ChatMessage,
     isStreaming: Boolean = false,
     codeTheme: SyntaxTheme = SyntaxTheme.MONOKAI,
+    codeFontScale: Float = 1.0f,
 ) {
     val isUser = message.role == Role.USER
     var showReasoning by remember { mutableStateOf(false) }
@@ -108,6 +109,7 @@ fun MessageBubble(
                                         .padding(vertical = 4.dp),
                                     fontStyle = FontStyle.Italic,
                                     codeTheme = codeTheme,
+                                    codeFontScale = codeFontScale,
                                     isStreaming = isStreaming
                                 )
                             }
@@ -173,6 +175,7 @@ fun MessageBubble(
                                 baseColor = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.fillMaxWidth(),
                                 codeTheme = codeTheme,
+                                codeFontScale = codeFontScale,
                                 isStreaming = isStreaming
                             )
                         }

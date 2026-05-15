@@ -116,6 +116,11 @@ class ChatViewModel @Inject constructor(
                 _uiState.update { it.copy(codeTheme = theme) }
             }
         }
+        viewModelScope.launch(coroutineExceptionHandler) {
+            advancedPreferences.codeFontScale.collect { scale ->
+                _uiState.update { it.copy(codeFontScale = scale) }
+            }
+        }
     }
 
     fun sendMessage(text: String, images: List<Uri> = emptyList(), audioBytes: ByteArray? = null) {

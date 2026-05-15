@@ -35,6 +35,7 @@ data class ChatUiState(
     val isLocalModelLoaded: Boolean = false,
     val memoryWarningModel: com.warped.domain.model.LocalModel? = null,
     val codeTheme: SyntaxTheme = SyntaxTheme.MONOKAI,
+    val codeFontScale: Float = 1.0f,
     val modelUnavailable: Boolean = false,
     val pendingModelSwitch: ModelSwitchRequest? = null,
     val conversationModelId: String? = null,
