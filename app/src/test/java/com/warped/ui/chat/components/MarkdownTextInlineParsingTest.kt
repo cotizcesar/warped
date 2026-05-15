@@ -1,21 +1,23 @@
 package com.warped.ui.chat.components
 
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import com.google.common.truth.Truth.assertThat
-import com.warped.domain.model.SyntaxTheme
 import org.junit.jupiter.api.Test
 
 class MarkdownTextInlineParsingTest {
+
+    private val inlineCodeBgColor = Color(0x3F272822) // Monokai bg at ~25% alpha
 
     @Test
     fun `parseInlineMarkdownAsAnnotatedString returns AnnotatedString with bold spans`() {
         val result = parseInlineMarkdownAsAnnotatedString(
             text = "**bold**",
             baseStyle = SpanStyle(),
-            codeTheme = SyntaxTheme.MONOKAI,
+            inlineCodeBgColor = inlineCodeBgColor,
         )
         val spans = result.spanStyles
         assertThat(spans).isNotEmpty()
@@ -28,7 +30,7 @@ class MarkdownTextInlineParsingTest {
         val result = parseInlineMarkdownAsAnnotatedString(
             text = "*italic*",
             baseStyle = SpanStyle(),
-            codeTheme = SyntaxTheme.MONOKAI,
+            inlineCodeBgColor = inlineCodeBgColor,
         )
         val spans = result.spanStyles
         val italicSpan = spans.first { it.item.fontStyle == FontStyle.Italic }
@@ -40,7 +42,7 @@ class MarkdownTextInlineParsingTest {
         val result = parseInlineMarkdownAsAnnotatedString(
             text = "`code`",
             baseStyle = SpanStyle(),
-            codeTheme = SyntaxTheme.MONOKAI,
+            inlineCodeBgColor = inlineCodeBgColor,
         )
         val spans = result.spanStyles
         val codeSpan = spans.first { it.item.fontFamily == FontFamily.Monospace }
@@ -52,7 +54,7 @@ class MarkdownTextInlineParsingTest {
         val result = parseInlineMarkdownAsAnnotatedString(
             text = "Hello World",
             baseStyle = SpanStyle(),
-            codeTheme = SyntaxTheme.MONOKAI,
+            inlineCodeBgColor = inlineCodeBgColor,
         )
         assertThat(result.text).isEqualTo("Hello World")
         assertThat(result.spanStyles).isEmpty()
