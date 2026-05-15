@@ -105,7 +105,7 @@ Requirements for the Code Syntax Highlighting milestone.
 
 - [ ] **THEM-01**: User can select from 4 preset themes (Monokai, One Dark, GitHub, Dracula)
 - [ ] **THEM-02**: Each theme auto-adapts light/dark color variant based on system dark mode
-- [ ] **THEM-03**: User can change code theme from Settings page dropdown with preview color swatch
+- [x] **THEM-03**: User can change code theme from Settings page dropdown with preview color swatch
 - [ ] **THEM-04**: Selected theme persists across app restarts via DataStore
 
 ### Code Block UI (CODE)
@@ -113,7 +113,7 @@ Requirements for the Code Syntax Highlighting milestone.
 - [x] **CODE-01**: Copy-to-clipboard button on each code block — copies raw text, shows "Copied!" confirmation icon swap
 - [x] **CODE-02**: Language header bar showing detected language name above each code block
 - [x] **CODE-03**: Line numbers displayed alongside code blocks
-- [ ] **CODE-04**: Code font size scales relative to chat text size (multiplier setting)
+- [x] **CODE-04**: Code font size scales relative to chat text size (multiplier setting)
 - [x] **CODE-05**: Code blocks over 200 lines collapsed by default with tap-to-expand
 
 ### Integration (INTG)
@@ -176,12 +176,12 @@ Requirements for the Code Syntax Highlighting milestone.
 | SYNX-05 | Phase 29 | Complete |
 | THEM-01 | Phase 28 | Pending |
 | THEM-02 | Phase 28 | Pending |
-| THEM-03 | Phase 29 | Pending |
+| THEM-03 | Phase 29 | Complete |
 | THEM-04 | Phase 28 | Pending |
 | CODE-01 | Phase 29 | Complete |
 | CODE-02 | Phase 29 | Complete |
 | CODE-03 | Phase 29 | Complete |
-| CODE-04 | Phase 29 | Pending |
+| CODE-04 | Phase 29 | Complete |
 | CODE-05 | Phase 29 | Complete |
 | INTG-01 | Phase 29 | Complete |
 | INTG-02 | Phase 30 | Pending |

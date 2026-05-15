@@ -40,7 +40,7 @@
 **Milestone Goal:** Code blocks in AI responses and throughout the app render with language-aware syntax highlighting using 4 preset themes that auto-adapt to light/dark mode.
 
 - [x] **Phase 28: Tokenization Engine & Theme System** — Domain models, Highlights library integration, language detection, 4 theme color schemes, syntax issue detection (completed 2026-05-14)
-- [ ] **Phase 29: UI Components & MarkdownText Refactoring** — CodeBlock composable, header bar, copy button, line numbers, expand/collapse, Settings dropdown, Hilt DI
+- [x] **Phase 29: UI Components & MarkdownText Refactoring** — CodeBlock composable, header bar, copy button, line numbers, expand/collapse, Settings dropdown, Hilt DI (completed 2026-05-15)
 - [ ] **Phase 30: Streaming Integration & Everywhere Application** — Streaming-aware rendering, smooth transitions, performance, apply to model cards/readmes/app-wide
 
 ## Phase Details
@@ -77,7 +77,7 @@ Plans:
 Plans:
 - [x] 29-01-PLAN.md — MarkdownBlock sealed class hierarchy, parseMarkdown() function, MarkdownText refactored to block-based Column with SyntaxTheme
 - [x] 29-02-PLAN.md — CodeBlock composable with syntax highlighting, language header bar, copy button, line numbers, expand/collapse, warning indicator
-- [ ] 29-03-PLAN.md — Full integration: ChatScreen/ChatViewModel/MessageBubble → SyntaxTheme, Settings ExposedDropdownMenuBox + code font scale slider, AdvancedPreferences persistence
+- [x] 29-03-PLAN.md — Full integration: ChatScreen/ChatViewModel/MessageBubble → SyntaxTheme, Settings ExposedDropdownMenuBox + code font scale slider, AdvancedPreferences persistence
 
 ### Phase 30: Streaming Integration & Everywhere Application
 **Goal**: Syntax highlighting works smoothly during streaming and everywhere code blocks appear throughout the app, with no performance degradation.
