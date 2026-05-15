@@ -379,7 +379,7 @@ fun ChatScreen(
                         verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         uiState.messages.forEach { message ->
-                            MessageBubble(message = message)
+                            MessageBubble(message = message, codeTheme = uiState.codeTheme)
                         }
                         if (uiState.streamingContent.isNotEmpty() || uiState.streamingReasoning.isNotEmpty()) {
                             MessageBubble(
@@ -388,7 +388,8 @@ fun ChatScreen(
                                     content = uiState.streamingContent,
                                     reasoning = uiState.streamingReasoning.ifEmpty { null }
                                 ),
-                                isStreaming = true
+                                isStreaming = true,
+                                codeTheme = uiState.codeTheme
                             )
                         } else if (uiState.isStreaming) {
                             Row(

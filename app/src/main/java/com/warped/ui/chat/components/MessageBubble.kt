@@ -107,7 +107,8 @@ fun MessageBubble(
                                     modifier = Modifier
                                         .padding(vertical = 4.dp),
                                     fontStyle = FontStyle.Italic,
-                                    codeTheme = codeTheme
+                                    codeTheme = codeTheme,
+                                    isStreaming = isStreaming
                                 )
                             }
                         }
@@ -171,7 +172,8 @@ fun MessageBubble(
                                 text = message.content + if (isStreaming) "▌" else "",
                                 baseColor = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.fillMaxWidth(),
-                                codeTheme = codeTheme
+                                codeTheme = codeTheme,
+                                isStreaming = isStreaming
                             )
                         }
                     } else {

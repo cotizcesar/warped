@@ -19,12 +19,27 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.warped.domain.highlighting.LanguageDetector
 import com.warped.domain.model.SyntaxTheme
 import com.warped.domain.model.TokenType
 import com.warped.domain.model.MarkdownBlock
+import dagger.hilt.EntryPoint
+import dagger.hilt.EntryPoints
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
+
+// ─────────────────────────────────────────────────────────────
+// Hilt EntryPoint — provides LanguageDetector to composables
+// ─────────────────────────────────────────────────────────────
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface MarkdownEntryPoint {
+    fun languageDetector(): LanguageDetector
+}
 
 // ─────────────────────────────────────────────────────────────
 // Public composable
@@ -47,7 +62,10 @@ fun MarkdownText(
         return
     }
 
-    val detector = languageDetector ?: LanguageDetector()
+    val detector = languageDetector ?: remember {
+        val appContext = LocalContext.current.applicationContext
+        EntryPoints.get(appContext, MarkdownEntryPoint::class.java).languageDetector()
+    }
 
     val blocks = remember(text, detector) {
         parseMarkdown(text, detector)
