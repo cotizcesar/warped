@@ -120,10 +120,10 @@ Requirements for the Code Syntax Highlighting milestone.
 
 - [x] **INTG-01**: Syntax highlighting applied in chat messages (both user and AI responses)
 - [x] **INTG-02**: Syntax highlighting applied in model card descriptions
-- [ ] **INTG-03**: Syntax highlighting applied in README/markdown preview content
-- [ ] **INTG-04**: Syntax highlighting applied everywhere code blocks appear throughout the app
+- [x] **INTG-03**: Syntax highlighting applied in README/markdown preview content
+- [x] **INTG-04**: Syntax highlighting applied everywhere code blocks appear throughout the app
 - [x] **INTG-05**: Smooth color transition when streaming code block completes (animateColorAsState, consistent background)
-- [ ] **INTG-06**: No jank or frame drops during streaming — rendering stays under 16ms per frame
+- [x] **INTG-06**: No jank or frame drops during streaming — rendering stays under 16ms per frame
 
 ## Out of Scope
 
@@ -185,10 +185,10 @@ Requirements for the Code Syntax Highlighting milestone.
 | CODE-05 | Phase 29 | Complete |
 | INTG-01 | Phase 29 | Complete |
 | INTG-02 | Phase 30 | Complete |
-| INTG-03 | Phase 30 | Pending |
-| INTG-04 | Phase 30 | Pending |
+| INTG-03 | Phase 30 | Complete |
+| INTG-04 | Phase 30 | Complete |
 | INTG-05 | Phase 30 | Complete |
-| INTG-06 | Phase 30 | Pending |
+| INTG-06 | Phase 30 | Complete |
 
 **Coverage:**
 - v1.6 requirements: 20 total — all mapped ✓

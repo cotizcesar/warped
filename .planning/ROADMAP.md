@@ -41,7 +41,7 @@
 
 - [x] **Phase 28: Tokenization Engine & Theme System** — Domain models, Highlights library integration, language detection, 4 theme color schemes, syntax issue detection (completed 2026-05-14)
 - [x] **Phase 29: UI Components & MarkdownText Refactoring** — CodeBlock composable, header bar, copy button, line numbers, expand/collapse, Settings dropdown, Hilt DI (completed 2026-05-15)
-- [ ] **Phase 30: Streaming Integration & Everywhere Application** — Streaming-aware rendering, smooth transitions, performance, apply to model cards/readmes/app-wide
+- [x] **Phase 30: Streaming Integration & Everywhere Application** — Streaming-aware rendering, smooth transitions, performance, apply to model cards/readmes/app-wide (completed 2026-05-15)
 
 ## Phase Details
 
@@ -92,7 +92,7 @@ Plans:
 
 Plans:
 - [x] 30-01-PLAN.md — Streaming transition fix, codeFontScale wiring, HuggingFace description MarkdownText
-- [ ] 30-02-PLAN.md — Compilation verification, coverage audit, performance guardrail checks
+- [x] 30-02-PLAN.md — Compilation verification, coverage audit, performance guardrail checks
 
 ## Progress
 

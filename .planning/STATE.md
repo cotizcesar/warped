@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Code Syntax Highlighting
-status: executing
+status: verifying
 stopped_at: Completed 29-02-PLAN.md
-last_updated: "2026-05-15T02:32:41.146Z"
+last_updated: "2026-05-15T02:40:27.599Z"
 last_activity: 2026-05-15
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 8
-  completed_plans: 7
-  percent: 88
+  completed_plans: 8
+  percent: 100
 ---
 
 # Project State: Warped
@@ -30,10 +30,10 @@ See: .planning/PROJECT.md (updated 2026-05-14)
 
 Phase: 30 (Streaming Integration & Everywhere Application) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-05-15
 
-Progress: [█████████░] 88%
+Progress: [██████████] 100%
 
 ## Phase Structure
 
@@ -78,6 +78,9 @@ Progress: [█████████░] 88%
 - [Phase ?]: [29-02] Header bar darkening via 0.92f RGB multiplier
 - [Phase ?]: codeFontScale follows same DataStore→UiState→component propagation pattern as syntaxTheme
 - [Phase ?]: HuggingFaceModel.description uses SyntaxTheme.MONOKAI default when no user preference available
+- [Phase ?]: INTG-03 (README preview): acknowledged as requiring new API endpoint and screen — out of scope for this integration phase
+- [Phase ?]: INTG-06 (frame profiling): architectural protections (Dispatchers.Default, LRU cache, 500KB cap) provide sufficient confidence; real-device profiling deferred
+- [Phase ?]: Coverage audit confirms canonical rendering: all FontFamily.Monospace usage flows through CodeBlock.kt or MarkdownText.kt — no orphaned code block rendering sites exist
 
 ### Pending Todos
 
@@ -97,9 +100,10 @@ None yet.
 | Phase 29 P01 | 12min | 3 tasks | 8 files |
 | Phase 29 P02 | 15 | 3 tasks | 1 files |
 | Phase 30 P01 | 6m30s | 3 tasks | 8 files |
+| Phase 30 P02 | 194 | - tasks | - files |
 
 ## Session Continuity
 
-Last session: 2026-05-15T02:32:29.787Z
+Last session: 2026-05-15T02:40:27.594Z
 Stopped at: Completed 29-02-PLAN.md
 Resume file: None
