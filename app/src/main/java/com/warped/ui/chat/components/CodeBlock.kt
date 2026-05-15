@@ -28,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -66,6 +68,7 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.window.Popup
 import timber.log.Timber
 
 // ─────────────────────────────────────────────────────────────
@@ -87,6 +90,7 @@ interface SyntaxHighlightingEntryPoint {
  * copy button, line numbers, and expand/collapse for large blocks.
  *
  * @param language The detected or declared programming language (e.g. "python", "javascript").
+ *                "plaintext" is supported — all tokens map to PLAIN type, rendering flat monospace.
  * @param code The raw source code string to display and highlight.
  * @param syntaxTheme The active [SyntaxTheme] for token coloring. Defaults to Monokai.
  * @param isStreaming When `true`, renders flat monospace without syntax colors.
@@ -223,6 +227,9 @@ fun CodeBlock(
     val needsCollapse = lineCount >= 200
     var expanded by remember { mutableStateOf(false) }
 
+    // ── Detect syntax issues ──────────────────────────────────
+    val syntaxIssue = remember(code) { detectSyntaxIssues(code) }
+
     Column(modifier = modifier.fillMaxWidth()) {
         // Header bar
         CodeHeaderBar(
@@ -230,6 +237,7 @@ fun CodeBlock(
             code = code,
             bgCode = bgCode,
             isStreaming = isStreaming,
+            syntaxIssue = syntaxIssue,
         )
 
         // Code area with optional collapse
@@ -325,12 +333,41 @@ fun CodeBlock(
 }
 
 // ─────────────────────────────────────────────────────────────
+// Syntax issue detection
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Detects common syntax issues for the warning indicator.
+ * Returns a human-readable description string, or `null` if no issues found.
+ */
+private fun detectSyntaxIssues(code: String): String? {
+    if (code.isBlank()) return null
+
+    // Check for unclosed string literals (odd number of quotes)
+    // Simple heuristic: count double and single quotes
+    val doubleQuoteCount = code.count { it == '"' }
+    val singleQuoteCount = code.count { it == '\'' }
+    if (doubleQuoteCount % 2 != 0 || singleQuoteCount % 2 != 0) {
+        return "Unclosed string literal"
+    }
+
+    // Check for bracket mismatch
+    val openBrackets = code.count { it == '(' || it == '[' || it == '{' }
+    val closeBrackets = code.count { it == ')' || it == ']' || it == '}' }
+    if (openBrackets != closeBrackets) {
+        return "Possible bracket mismatch"
+    }
+
+    return null
+}
+
+// ─────────────────────────────────────────────────────────────
 // CodeHeaderBar composable
 // ─────────────────────────────────────────────────────────────
 
 /**
- * Header bar showing the resolved language name and copy button.
- * Height: 28dp. Background: bgCode darkened by 8%.
+ * Header bar showing the resolved language name, optional warning indicator,
+ * and copy button. Height: 28dp. Background: bgCode darkened by 8%.
  */
 @Composable
 private fun CodeHeaderBar(
@@ -338,6 +375,7 @@ private fun CodeHeaderBar(
     code: String,
     bgCode: Color,
     isStreaming: Boolean,
+    syntaxIssue: String?,
 ) {
     val headerBg = Color(
         red = bgCode.red * 0.92f,
@@ -375,6 +413,44 @@ private fun CodeHeaderBar(
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
             modifier = Modifier.weight(1f),
         )
+
+        // Warning indicator for syntax issues
+        if (syntaxIssue != null) {
+            var showTooltip by remember { mutableStateOf(false) }
+
+            Spacer(Modifier.width(6.dp))
+
+            IconButton(
+                onClick = { showTooltip = true },
+                modifier = Modifier.size(16.dp),
+            ) {
+                Icon(
+                    Icons.Outlined.Warning,
+                    contentDescription = "Syntax issue",
+                    modifier = Modifier.size(16.dp),
+                    tint = Color(0xFFE6A817),
+                )
+            }
+
+            if (showTooltip) {
+                Popup(
+                    onDismissRequest = { showTooltip = false },
+                    offset = IntOffset(0, -40),
+                ) {
+                    Surface(
+                        color = Color(0xFF424242),
+                        shape = RoundedCornerShape(4.dp),
+                    ) {
+                        Text(
+                            text = syntaxIssue,
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        )
+                    }
+                }
+            }
+        }
 
         // Empty state
         if (code.isBlank()) {
