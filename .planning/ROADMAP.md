@@ -39,7 +39,7 @@
 
 **Milestone Goal:** Code blocks in AI responses and throughout the app render with language-aware syntax highlighting using 4 preset themes that auto-adapt to light/dark mode.
 
-- [ ] **Phase 28: Tokenization Engine & Theme System** — Domain models, Highlights library integration, language detection, 4 theme color schemes, syntax issue detection
+- [x] **Phase 28: Tokenization Engine & Theme System** — Domain models, Highlights library integration, language detection, 4 theme color schemes, syntax issue detection (completed 2026-05-14)
 - [ ] **Phase 29: UI Components & MarkdownText Refactoring** — CodeBlock composable, header bar, copy button, line numbers, expand/collapse, Settings dropdown, Hilt DI
 - [ ] **Phase 30: Streaming Integration & Everywhere Application** — Streaming-aware rendering, smooth transitions, performance, apply to model cards/readmes/app-wide
 
@@ -58,9 +58,9 @@
 **Plans**: 3 plans
 
 Plans:
-- [ ] 28-01-PLAN.md — Dependency wiring + domain models (TokenType, SyntaxToken, SyntaxColor, SyntaxTheme)
-- [ ] 28-02-PLAN.md — Implementation layer (LanguageDetector, SyntaxHighlighterImpl, TypeMapper, AdvancedPreferences migration, DI module)
-- [ ] 28-03-PLAN.md — Unit tests (LanguageDetector, TypeMapper, SyntaxHighlighterImpl, SyntaxTheme, migration logic)
+- [x] 28-01-PLAN.md — Dependency wiring + domain models (TokenType, SyntaxToken, SyntaxColor, SyntaxTheme)
+- [x] 28-02-PLAN.md — Implementation layer (LanguageDetector, SyntaxHighlighterImpl, TypeMapper, AdvancedPreferences migration, DI module)
+- [x] 28-03-PLAN.md — Unit tests (LanguageDetector, TypeMapper, SyntaxHighlighterImpl, SyntaxTheme, migration logic)
 
 ### Phase 29: UI Components & MarkdownText Refactoring
 **Goal**: Code blocks render with syntax-highlighted text, language header bar, copy button, line numbers, and expand/collapse in chat messages, with theme selection in Settings.
@@ -72,8 +72,12 @@ Plans:
   3. User sees line numbers alongside code and code blocks over 200 lines are collapsed with tap-to-expand
   4. User can change the code theme from the Settings page dropdown with a live preview color swatch for each option
   5. User sees code font size scaling relative to chat text and subtle visual warning indicators (warning icon) on code blocks with detected syntax issues
-**Plans**: TBD
-**UI hint**: yes
+**Plans**: 3 plans
+
+Plans:
+- [ ] 29-01-PLAN.md — MarkdownBlock sealed class hierarchy, parseMarkdown() function, MarkdownText refactored to block-based Column with SyntaxTheme
+- [ ] 29-02-PLAN.md — CodeBlock composable with syntax highlighting, language header bar, copy button, line numbers, expand/collapse, warning indicator
+- [ ] 29-03-PLAN.md — Full integration: ChatScreen/ChatViewModel/MessageBubble → SyntaxTheme, Settings ExposedDropdownMenuBox + code font scale slider, AdvancedPreferences persistence
 
 ### Phase 30: Streaming Integration & Everywhere Application
 **Goal**: Syntax highlighting works smoothly during streaming and everywhere code blocks appear throughout the app, with no performance degradation.
@@ -96,5 +100,5 @@ Plans:
 | 26. Security Hardening | v1.5 | SEC-01..08 (8) | 8/8 | Complete | 2026-05-09 |
 | 27. Wizard Update | v1.5 | WZRD-01..03 (3) | 3/3 | Complete | 2026-05-09 |
 | 28. Tokenization Engine & Theme System | v1.6 | SYNX-01..03, THEM-01,02,04 (6) | 0/3 | Planned | — |
-| 29. UI Components & MarkdownText Refactoring | v1.6 | SYNX-05, THEM-03, CODE-01..05, INTG-01 (8) | 0/0 | Not started | — |
+| 29. UI Components & MarkdownText Refactoring | v1.6 | SYNX-05, THEM-03, CODE-01..05, INTG-01 (8) | 0/3 | Planned | — |
 | 30. Streaming Integration & Everywhere Application | v1.6 | SYNX-04, INTG-02..06 (6) | 0/0 | Not started | — |
