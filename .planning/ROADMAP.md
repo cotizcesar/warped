@@ -88,7 +88,11 @@ Plans:
   2. User sees syntax-highlighted code blocks in model card descriptions and README/markdown preview screens
   3. User sees syntax-highlighted code blocks everywhere they appear — onboarding, help screens, settings documentation
   4. User experiences no jank, flicker, or frame drops during streaming — scrolling through chats with multiple code blocks stays fluid under 16ms per frame
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 30-01-PLAN.md — Streaming transition fix, codeFontScale wiring, HuggingFace description MarkdownText
+- [ ] 30-02-PLAN.md — Compilation verification, coverage audit, performance guardrail checks
 
 ## Progress
 
@@ -101,4 +105,4 @@ Plans:
 | 27. Wizard Update | v1.5 | WZRD-01..03 (3) | 3/3 | Complete | 2026-05-09 |
 | 28. Tokenization Engine & Theme System | v1.6 | SYNX-01..03, THEM-01,02,04 (6) | 0/3 | Planned | — |
 | 29. UI Components & MarkdownText Refactoring | v1.6 | SYNX-05, THEM-03, CODE-01..05, INTG-01 (8) | 0/3 | Planned | — |
-| 30. Streaming Integration & Everywhere Application | v1.6 | SYNX-04, INTG-02..06 (6) | 0/0 | Not started | — |
+| 30. Streaming Integration & Everywhere Application | v1.6 | SYNX-04, INTG-02..06 (6) | 0/2 | Planned | — |
