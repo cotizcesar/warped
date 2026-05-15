@@ -68,7 +68,7 @@ class HuggingFaceViewModel @Inject constructor(
         searchJob?.cancel()
         _uiState.update { it.copy(searchQuery = trimmedQuery, isLoading = true, error = null) }
         searchJob = viewModelScope.launch(coroutineExceptionHandler) {
-            val author: String? = "litertlm-community"
+            val author: String? = "litert-community"
             val result = huggingFaceRepository.searchModels(
                 query = trimmedQuery.ifBlank { null },
                 author = author
