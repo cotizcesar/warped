@@ -197,7 +197,7 @@ tasks.whenTaskAdded {
             strippedDir.walkTopDown()
                 .filter { it.isFile && it.extension == "so" }
                 .forEach { so ->
-                    Runtime.getRuntime().exec(arrayOf("patchelf", "--page-size", "16384", so.absolutePath)).waitFor()
+                    Runtime.getRuntime().exec(arrayOf("/usr/bin/patchelf", "--page-size", "16384", so.absolutePath)).waitFor()
                     if (so.name == "libsqlcipher.so") {
                         Runtime.getRuntime().exec(arrayOf("python3", patchScript, so.absolutePath)).waitFor()
                     }
