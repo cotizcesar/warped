@@ -56,6 +56,7 @@ fun MarkdownText(
     codeTheme: SyntaxTheme = SyntaxTheme.MONOKAI,
     languageDetector: LanguageDetector? = null,
     isStreaming: Boolean = false,
+    codeFontScale: Float = 1.0f,
 ) {
     if (text.isBlank()) {
         Text(text, modifier = modifier, color = baseColor, maxLines = maxLines)
@@ -110,6 +111,7 @@ fun MarkdownText(
                         language = block.language,
                         code = block.code,
                         syntaxTheme = codeTheme,
+                        codeFontScale = codeFontScale,
                         isStreaming = isStreaming,
                         modifier = Modifier.fillMaxWidth(),
                     )

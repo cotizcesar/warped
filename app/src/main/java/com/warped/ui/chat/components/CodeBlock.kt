@@ -93,6 +93,7 @@ interface SyntaxHighlightingEntryPoint {
  *                "plaintext" is supported — all tokens map to PLAIN type, rendering flat monospace.
  * @param code The raw source code string to display and highlight.
  * @param syntaxTheme The active [SyntaxTheme] for token coloring. Defaults to Monokai.
+ * @param codeFontScale Scaling factor for code font size (from Settings). Defaults to 1.0f.
  * @param isStreaming When `true`, renders flat monospace without syntax colors.
  * @param modifier Optional [Modifier] applied to the root [Column].
  */
@@ -101,6 +102,7 @@ fun CodeBlock(
     language: String,
     code: String,
     syntaxTheme: SyntaxTheme = SyntaxTheme.MONOKAI,
+    codeFontScale: Float = 1.0f,
     isStreaming: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
@@ -111,8 +113,7 @@ fun CodeBlock(
     val variant = if (isDark) syntaxTheme.darkVariant else syntaxTheme.lightVariant
     val bgCode = Color(variant[TokenType.BACKGROUND]?.argb ?: 0xFF1E1E1E.toInt())
 
-    // Code font sizing — scale wired from AdvancedPreferences in Plan 03
-    val codeFontScale: Float = 1.0f
+    // Code font sizing — scale wired from AdvancedPreferences
     val codeFontSize = (16f * codeFontScale).sp
     val codeLineHeight = (20f * codeFontScale).sp
 
@@ -124,7 +125,7 @@ fun CodeBlock(
     val highlighter = remember { highlighterEntryPoint.syntaxHighlighter() }
 
     // ── Launch async highlighting ────────────────────────────
-    LaunchedEffect(code, language) {
+    LaunchedEffect(code, language, isStreaming) {
         tokens = emptyList()
         if (code.isBlank()) return@LaunchedEffect
         if (code.length > 500_000) {
