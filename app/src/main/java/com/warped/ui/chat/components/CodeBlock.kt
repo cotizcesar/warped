@@ -225,7 +225,7 @@ fun CodeBlock(
 
     // ── Rendering ────────────────────────────────────────────
     val lineCount = code.lines().size
-    val needsCollapse = lineCount >= 200
+    val needsCollapse = lineCount >= 15
     var expanded by remember { mutableStateOf(false) }
 
     // ── Detect syntax issues ──────────────────────────────────
@@ -331,6 +331,25 @@ fun CodeBlock(
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color.White.copy(alpha = 0.7f),
+                    )
+                }
+            }
+
+            // Collapse button for expanded blocks
+            if (needsCollapse && expanded) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(32.dp)
+                        .align(Alignment.BottomCenter)
+                        .background(bgCode)
+                        .clickable { expanded = false },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "Show less",
+                        fontSize = 12.sp,
+                        color = Color.White.copy(alpha = 0.5f),
                     )
                 }
             }
