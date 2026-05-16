@@ -11,8 +11,13 @@
 -keep class * extends androidx.room.RoomDatabase
 -dontwarn androidx.room.paging.**
 
-# LiteRT-LM
--keep class com.google.ai.edge.litertlm.** { *; }
+# LiteRT-LM — keep ALL classes, members, and prevent ANY optimization of JNI-bound code
+-keep,allowshrinking class com.google.ai.edge.litertlm.** { *; }
+-keepclassmembers class com.google.ai.edge.litertlm.** { *; }
+-keepnames class com.google.ai.edge.litertlm.** { *; }
+-keepclassmembernames class com.google.ai.edge.litertlm.** { *; }
+-dontoptimize
+-dontobfuscate
 
 # OkHttp
 -dontwarn okhttp3.**
