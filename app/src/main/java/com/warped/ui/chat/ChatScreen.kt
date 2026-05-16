@@ -19,7 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
@@ -272,13 +272,17 @@ fun ChatScreen(
                     val isLocal = uiState.selectedProvider == ProviderType.LOCAL ||
                         uiState.selectedProvider == ProviderType.LITE_RT_LM
                     if (isLocal) {
-                        val brushColor = if (uiState.isLocalModelLoaded)
-                            Color(0xFFFF9800) else Color(0xFF666666)
+                        val statusColor = when {
+                            uiState.isLocalModelLoaded -> Color(0xFF4CAF50)
+                            uiState.isStreaming -> Color(0xFFFF9800)
+                            else -> Color(0xFF666666)
+                        }
                         IconButton(onClick = { viewModel.unloadLocalModels() }) {
                             Icon(
-                                Icons.Filled.Brush,
-                                contentDescription = "Unload model from memory",
-                                tint = brushColor
+                                Icons.Filled.Circle,
+                                contentDescription = "Model status",
+                                tint = statusColor,
+                                modifier = Modifier.size(12.dp)
                             )
                         }
                     }
