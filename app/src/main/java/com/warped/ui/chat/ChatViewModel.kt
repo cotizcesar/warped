@@ -137,7 +137,7 @@ class ChatViewModel @Inject constructor(
         }
 
         val imageDataUrls = images.mapNotNull { uriToBase64(it) }
-        val userMessage = ChatMessage(role = Role.USER, content = text, imageUris = imageDataUrls)
+        val userMessage = ChatMessage(role = Role.USER, content = text.trim(), imageUris = imageDataUrls)
         _uiState.update { it.copy(messages = it.messages + userMessage, inputText = "", isStreaming = true) }
 
         generationJob = viewModelScope.launch(coroutineExceptionHandler) {
