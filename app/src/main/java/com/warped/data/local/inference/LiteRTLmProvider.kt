@@ -211,7 +211,7 @@ class LiteRTLmProvider @Inject constructor(
                         emit(StreamToken.Delta("[tool:$toolName]"))
 
                         val result = try {
-                            val argsMap = if (argsJson.isNotBlank()) {
+                            val argsMap = if (!argsJson.isNullOrBlank()) {
                                 kotlinx.serialization.json.Json.parseToJsonElement(argsJson).jsonObject.mapValues {
                                     it.value.jsonPrimitive.content
                                 }
