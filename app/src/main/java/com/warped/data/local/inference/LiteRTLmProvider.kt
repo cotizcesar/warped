@@ -213,9 +213,9 @@ class LiteRTLmProvider @Inject constructor(
                         val result = try {
                             val argsMap = if (!argsJson.isNullOrBlank()) {
                                 kotlinx.serialization.json.Json.parseToJsonElement(argsJson).jsonObject.mapValues {
-                                    it.value.jsonPrimitive.content
+                                    it.value.jsonPrimitive.content as Any?
                                 }
-                            } else emptyMap()
+                            } else emptyMap<String, Any?>()
                             toolExecutors.execute(toolName, argsMap)
                         } catch (e: Exception) {
                             Timber.w(e, "LiteRTLmProvider: tool '$toolName' execution failed")
