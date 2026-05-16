@@ -210,8 +210,10 @@ class ToolExecutors @Inject constructor(
     private fun executeGetNews(params: Map<String, Any?>): String {
         val topic = params["topic"] as? String
         val query = topic ?: "headlines"
+        val lang = Locale.getDefault().language
+        val country = Locale.getDefault().country.ifEmpty { "US" }
         return try {
-            val url = "https://news.google.com/rss/search?q=${java.net.URLEncoder.encode(query, "UTF-8")}&hl=en-US&gl=US&ceid=US:en"
+            val url = "https://news.google.com/rss/search?q=${java.net.URLEncoder.encode(query, "UTF-8")}&hl=$lang&gl=$country&ceid=$country:$lang"
             val body = httpGet(url, "Mozilla/5.0")
             val titles = Regex("<title>(.*?)</title>").findAll(body)
                 .map { it.groupValues[1] }
@@ -227,7 +229,7 @@ class ToolExecutors @Inject constructor(
 
     private fun executeTranslateText(params: Map<String, Any?>): String {
         val text = params["text"] as? String ?: return """{"error": "text is required"}"""
-        val targetLang = params["target_language"] as? String ?: "en"
+        val targetLang = params["target_language"] as? String ?: Locale.getDefault().language
         val sourceLang = params["source_language"] as? String ?: "auto"
         return try {
             val url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=$sourceLang&tl=$targetLang&dt=t&q=${java.net.URLEncoder.encode(text, "UTF-8")}"
