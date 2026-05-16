@@ -19,6 +19,7 @@ class ToolPreferences @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private fun key(toolId: String) = booleanPreferencesKey("tool_$toolId")
+    private val manualToolCallingKey = booleanPreferencesKey("manual_tool_calling")
 
     val enabledTools: Flow<Set<String>> = context.toolPreferencesStore.data.map { prefs ->
         ToolDefinitions.all
@@ -27,9 +28,19 @@ class ToolPreferences @Inject constructor(
             .toSet()
     }
 
+    val manualToolCalling: Flow<Boolean> = context.toolPreferencesStore.data.map { prefs ->
+        prefs[manualToolCallingKey] ?: false
+    }
+
     suspend fun setEnabled(toolId: String, enabled: Boolean) {
         context.toolPreferencesStore.edit { prefs ->
             prefs[key(toolId)] = enabled
+        }
+    }
+
+    suspend fun setManualToolCalling(enabled: Boolean) {
+        context.toolPreferencesStore.edit { prefs ->
+            prefs[manualToolCallingKey] = enabled
         }
     }
 
