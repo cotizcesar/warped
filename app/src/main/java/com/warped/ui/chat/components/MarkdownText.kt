@@ -77,10 +77,12 @@ fun MarkdownText(
     val variant = if (isDark) codeTheme.darkVariant else codeTheme.lightVariant
     val bgCodeColor = Color(variant.getValue(TokenType.BACKGROUND).argb)
     val inlineCodeBgColor = bgCodeColor.copy(alpha = 0.25f)
+    val defaultFontSize = fontSize?.sp ?: MaterialTheme.typography.bodyMedium.fontSize
 
     val baseStyle = SpanStyle(
         fontStyle = fontStyle ?: FontStyle.Normal,
-    ).let { if (fontSize != null) it.copy(fontSize = fontSize.sp) else it }
+        fontSize = defaultFontSize,
+    )
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         blocks.forEach { block ->
@@ -91,19 +93,14 @@ fun MarkdownText(
                         baseStyle = baseStyle,
                         inlineCodeBgColor = inlineCodeBgColor,
                     )
-                    Text(annotated, color = baseColor)
+                    Text(annotated, color = baseColor, fontSize = defaultFontSize)
                 }
 
                 is MarkdownBlock.HeaderBlock -> {
-                    val style = when (block.level) {
-                        1 -> MaterialTheme.typography.titleLarge
-                        2 -> MaterialTheme.typography.titleMedium
-                        else -> MaterialTheme.typography.titleSmall
-                    }
                     Text(
                         text = block.text,
                         fontWeight = FontWeight.Bold,
-                        fontSize = style.fontSize,
+                        fontSize = defaultFontSize,
                     )
                 }
 
@@ -127,6 +124,7 @@ fun MarkdownText(
                         Text(
                             text = block.code,
                             fontFamily = FontFamily.Monospace,
+                            fontSize = defaultFontSize,
                             modifier = Modifier.padding(horizontal = 4.dp),
                         )
                     }
@@ -136,7 +134,7 @@ fun MarkdownText(
                     Column {
                         block.items.forEachIndexed { i, item ->
                             val prefix = if (block.ordered) "${i + 1}. " else "\u2022  "
-                            Text("$prefix$item")
+                            Text("$prefix$item", fontSize = defaultFontSize)
                         }
                     }
                 }
