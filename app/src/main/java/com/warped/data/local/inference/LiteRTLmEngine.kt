@@ -6,6 +6,9 @@ import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.ExperimentalApi
+import com.google.ai.edge.litertlm.ExperimentalFlags
+import com.google.ai.edge.litertlm.LiteRtLmJniException
 import com.google.ai.edge.litertlm.LogSeverity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
@@ -57,8 +60,21 @@ class LiteRTLmEngine @Inject constructor(
 
         val litertlmBackend = when (backend) {
             BackendType.CPU -> Backend.CPU()
-            BackendType.GPU -> Backend.GPU()
+            BackendType.GPU -> {
+                @OptIn(ExperimentalApi::class)
+                ExperimentalFlags.enableSpeculativeDecoding = true
+                Backend.GPU()
+            }
             BackendType.NPU -> Backend.GPU() // fallback: NPU not yet supported by EngineConfig
+        }
+
+        val visionB = when (visionBackend ?: BackendType.GPU) {
+            BackendType.GPU -> Backend.GPU()
+            else -> Backend.CPU()
+        }
+        val audioB = when (audioBackend ?: BackendType.CPU) {
+            BackendType.GPU -> Backend.GPU()
+            else -> Backend.CPU()
         }
 
         val cacheDir = java.io.File(context.cacheDir, "litertlm_cache").also { it.mkdirs() }
@@ -66,13 +82,23 @@ class LiteRTLmEngine @Inject constructor(
         val config = EngineConfig(
             modelPath = modelPath,
             backend = litertlmBackend,
+            visionBackend = visionB,
+            audioBackend = audioB,
             cacheDir = cacheDir.absolutePath
         )
 
         engine = Engine(config).also { e ->
             Timber.d("LiteRTLmEngine: initializing backend=$backend vision=$visionBackend audio=$audioBackend cache=${cacheDir.absolutePath}")
-            e.initialize()
-            Timber.d("LiteRTLmEngine: initialization complete")
+            try {
+                e.initialize()
+                Timber.d("LiteRTLmEngine: initialization complete")
+            } catch (jniEx: LiteRtLmJniException) {
+                Timber.e(jniEx, "LiteRTLmEngine: JNI init failed — ${jniEx.message}")
+                throw jniEx
+            } catch (ex: Exception) {
+                Timber.e(ex, "LiteRTLmEngine: init failed — ${ex.message}")
+                throw ex
+            }
         }
         loadedModelPath = modelPath
     }
@@ -96,6 +122,8 @@ class LiteRTLmEngine @Inject constructor(
         try {
             engine?.close()
             Timber.d("LiteRTLmEngine: closed successfully")
+        } catch (e: LiteRtLmJniException) {
+            Timber.w(e, "LiteRTLmEngine: JNI error during close")
         } catch (e: Exception) {
             Timber.w(e, "LiteRTLmEngine: error during close")
         } finally {

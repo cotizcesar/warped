@@ -8,6 +8,7 @@ import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.OpenApiTool
 import com.google.ai.edge.litertlm.SamplerConfig
+import com.google.ai.edge.litertlm.LiteRtLmJniException
 import com.google.ai.edge.litertlm.tool
 import com.warped.data.local.inference.tools.ToolRegistry
 import com.warped.domain.model.ActiveModelSelection
@@ -58,7 +59,10 @@ class LiteRTLmProvider @Inject constructor(
             if (modelPath != null && modelPath.endsWith(".litertlm", ignoreCase = true)) {
                 try {
                     engineManager.switchToLiteRT(modelPath)
-                } catch (e: Exception) {
+        } catch (e: LiteRtLmJniException) {
+            Timber.e(e, "LiteRTLmProvider: JNI native error — ${e.message}")
+            emit(StreamToken.Error("LiteRT-LM native error: ${e.message ?: "Unknown JNI error"}"))
+        } catch (e: Exception) {
                     emit(StreamToken.Error("Failed to load LiteRT-LM engine: ${e.message}"))
                     return@flow
                 }
@@ -110,14 +114,15 @@ class LiteRTLmProvider @Inject constructor(
             "reasoning_enabled" to params.reasoningEnabled
         )
 
-        // Step 6: Create conversation config with history and tools
+        // Step 6: Create conversation config with history, tools, and auto tool calling
         val conversationConfig = ConversationConfig(
             initialMessages = historyMessages,
             samplerConfig = samplerConfig,
             extraContext = extraContext,
             tools = toolRegistry.buildOpenApiTools(
                 kotlinx.coroutines.runBlocking { toolRegistry.enabledToolIds.first() }
-            ).map { tool(it) }
+            ).map { tool(it) },
+            automaticToolCalling = true
         )
 
         // Step 7: Send content with retry loop
