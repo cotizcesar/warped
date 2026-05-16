@@ -19,9 +19,7 @@ android {
         versionName = "1.5.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        ndk {
-            abiFilters += listOf("arm64-v8a")
-        }
+
     }
 
     signingConfigs {
@@ -48,8 +46,8 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("release")
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -74,10 +72,6 @@ android {
         jniLibs {
             useLegacyPackaging = false
         }
-    }
-
-    lint {
-        disable.add("NullSafeMutableLiveData")
     }
 }
 
@@ -153,6 +147,7 @@ dependencies {
 
     // Security
     implementation(libs.security.crypto)
+    implementation(libs.sqlcipher)
 
     // LiteRT-LM (per LITE-01)
     implementation(libs.litertlm)
@@ -181,4 +176,3 @@ tasks.withType<Test> {
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
-

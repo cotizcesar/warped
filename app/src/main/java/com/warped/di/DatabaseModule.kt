@@ -3,6 +3,7 @@ package com.warped.di
 import android.content.Context
 import androidx.room.Room
 import androidx.work.WorkManager
+import com.warped.BuildConfig
 import com.warped.data.local.db.AppDatabase
 import com.warped.data.local.db.MIGRATION_4_5
 import com.warped.data.local.db.MIGRATION_5_6
@@ -16,26 +17,52 @@ import com.warped.data.local.db.dao.LocalModelDao
 import com.warped.data.local.db.dao.MessageDao
 import com.warped.data.local.db.dao.PresetDao
 import com.warped.data.local.db.dao.RemoteEndpointDao
+import com.warped.data.local.security.KeystoreManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import net.sqlcipher.database.SupportFactory
+import java.security.SecureRandom
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
+    private const val DB_PASSPHRASE_KEY = "db_passphrase"
+
     @Provides
     @Singleton
     fun provideDatabase(
-        @ApplicationContext context: Context
+        @ApplicationContext context: Context,
+        keystoreManager: KeystoreManager
     ): AppDatabase {
+        val passphrase = getOrCreateDbPassphrase(keystoreManager)
+        val factory = SupportFactory(passphrase)
         return Room.databaseBuilder(context, AppDatabase::class.java, "warped.db")
+            .openHelperFactory(factory)
             .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
             .fallbackToDestructiveMigration(false)
             .build()
+    }
+
+    private fun getOrCreateDbPassphrase(keystoreManager: KeystoreManager): ByteArray {
+        val existing = keystoreManager.get(DB_PASSPHRASE_KEY)
+        return if (existing != null) {
+            existing.toByteArray(Charsets.UTF_8)
+        } else {
+            val newPhrase = generatePassphrase()
+            keystoreManager.put(DB_PASSPHRASE_KEY, newPhrase)
+            newPhrase.toByteArray(Charsets.UTF_8)
+        }
+    }
+
+    private fun generatePassphrase(): String {
+        val bytes = ByteArray(32)
+        SecureRandom().nextBytes(bytes)
+        return bytes.joinToString("") { "%02x".format(it) }
     }
 
     @Provides
