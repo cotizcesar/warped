@@ -9,6 +9,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -50,13 +51,12 @@ fun MessageBubble(
     ) {
         Surface(
             color = if (isUser) Color(0xFF121212) else Color.Transparent,
-            shape = MaterialTheme.shapes.medium,
+            shape = RoundedCornerShape(12.dp),
             modifier = Modifier
                 .widthIn(max = 340.dp)
         ) {
             Column(
-                modifier = if (isUser) Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
-                           else Modifier.padding(0.dp)
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
                 if (!isUser && !message.reasoning.isNullOrBlank()) {
                     Row(

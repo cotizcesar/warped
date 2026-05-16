@@ -231,7 +231,12 @@ fun CodeBlock(
     // ── Detect syntax issues ──────────────────────────────────
     val syntaxIssue = remember(code) { detectSyntaxIssues(code) }
 
-    Column(modifier = modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = bgCode,
+        modifier = modifier.fillMaxWidth().padding(vertical = 10.dp)
+    ) {
+    Column {
         // Header bar
         CodeHeaderBar(
             language = language,
@@ -246,7 +251,6 @@ fun CodeBlock(
 
         Box(
             modifier = Modifier
-                .background(bgCode)
                 .then(
                     if (needsCollapse && !expanded) {
                         Modifier
@@ -332,6 +336,7 @@ fun CodeBlock(
             }
         }
     }
+    } // Surface
 }
 
 // ─────────────────────────────────────────────────────────────
