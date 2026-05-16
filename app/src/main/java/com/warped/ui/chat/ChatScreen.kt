@@ -273,6 +273,7 @@ fun ChatScreen(
                         uiState.selectedProvider == ProviderType.LITE_RT_LM
                     if (isLocal) {
                         val statusColor = when {
+                            uiState.memoryWarningModel != null -> Color(0xFFF44336)
                             uiState.isLocalModelLoaded -> Color(0xFF4CAF50)
                             uiState.isStreaming -> Color(0xFFFF9800)
                             else -> Color(0xFF666666)
