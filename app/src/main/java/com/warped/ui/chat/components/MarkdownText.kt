@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -134,7 +135,15 @@ fun MarkdownText(
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         block.items.forEachIndexed { i, item ->
                             val prefix = if (block.ordered) "${i + 1}. " else "\u2022  "
-                            Text("$prefix$item", fontSize = defaultFontSize)
+                            Row {
+                                Text(prefix, fontSize = defaultFontSize)
+                                val annotated = parseInlineMarkdownAsAnnotatedString(
+                                    text = item,
+                                    baseStyle = baseStyle,
+                                    inlineCodeBgColor = inlineCodeBgColor,
+                                )
+                                Text(annotated, color = baseColor, fontSize = defaultFontSize)
+                            }
                         }
                     }
                 }
