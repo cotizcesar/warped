@@ -1,6 +1,7 @@
 package com.warped.ui.chat.components
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -81,7 +82,7 @@ fun MarkdownText(
         fontStyle = fontStyle ?: FontStyle.Normal,
     ).let { if (fontSize != null) it.copy(fontSize = fontSize.sp) else it }
 
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         blocks.forEach { block ->
             when (block) {
                 is MarkdownBlock.TextBlock -> {

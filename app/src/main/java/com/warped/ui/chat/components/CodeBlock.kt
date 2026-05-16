@@ -231,7 +231,7 @@ fun CodeBlock(
     // ── Detect syntax issues ──────────────────────────────────
     val syntaxIssue = remember(code) { detectSyntaxIssues(code) }
 
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(modifier = modifier.fillMaxWidth().padding(vertical = 10.dp)) {
         // Header bar
         CodeHeaderBar(
             language = language,
