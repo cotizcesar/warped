@@ -53,7 +53,6 @@ fun MessageBubble(
             shape = MaterialTheme.shapes.medium,
             modifier = Modifier
                 .widthIn(max = 340.dp)
-                .padding(bottom = if (isUser) 15.dp else 0.dp)
         ) {
             Column(
                 modifier = if (isUser) Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
@@ -199,7 +198,7 @@ fun MessageBubble(
                 style = MaterialTheme.typography.labelSmall,
                 color = Color(0xFF545450),
                 fontStyle = FontStyle.Italic,
-                modifier = Modifier.padding(bottom = 15.dp)
+                modifier = Modifier.padding(bottom = 4.dp)
             )
         }
     }
