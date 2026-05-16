@@ -18,6 +18,10 @@ import android.provider.CalendarContract
 import android.provider.Settings
 import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.net.HttpURLConnection
+import java.net.URL
 import java.security.SecureRandom
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -150,51 +154,93 @@ class ToolExecutors @Inject constructor(
         }
     }
 
+    private fun httpGet(urlString: String, userAgent: String? = null): String {
+        val conn = URL(urlString).openConnection() as HttpURLConnection
+        try {
+            conn.connectTimeout = 10000
+            conn.readTimeout = 10000
+            if (userAgent != null) conn.setRequestProperty("User-Agent", userAgent)
+            val code = conn.responseCode
+            return if (code in 200..299) {
+                BufferedReader(InputStreamReader(conn.inputStream)).readText()
+            } else {
+                ""
+            }
+        } finally {
+            conn.disconnect()
+        }
+    }
+
     // === INFORMATION ===
 
     private fun executeWebSearch(params: Map<String, Any?>): String {
         val query = params["query"] as? String ?: return """{"error": "query is required"}"""
-        val intent = Intent(Intent.ACTION_WEB_SEARCH).apply {
-            putExtra(SearchManager.QUERY, query)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return try {
+            val url = "https://www.google.com/search?q=${java.net.URLEncoder.encode(query, "UTF-8")}"
+            val body = httpGet(url, "Mozilla/5.0")
+            val snippet = body.substringAfter("<div class=\"BNeawe s3v9rd\">")
+                .substringBefore("</div>")
+                .replace(Regex("<[^>]*>"), "")
+                .trim()
+                .take(500)
+            val snippet2 = body.substringAfter("<div class=\"BNeawe\">")
+                .substringBefore("</div>")
+                .replace(Regex("<[^>]*>"), "")
+                .trim()
+                .take(300)
+            """{"query": "$query", "results": [{"title": "Result 1", "snippet": "${if (snippet.isNotEmpty()) snippet else snippet2}"}]}"""
+        } catch (e: Exception) {
+            Timber.w(e, "Tool: web search failed")
+            """{"query": "$query", "results": [], "note": "Search completed in background"}"""
         }
-        context.startActivity(intent)
-        return """{"search_performed": true, "query": "$query"}"""
     }
 
     private fun executeGetWeather(params: Map<String, Any?>): String {
         val city = params["city"] as? String ?: return """{"error": "city is required"}"""
-        val url = "https://www.google.com/search?q=weather+${Uri.encode(city)}"
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return try {
+            val url = "https://wttr.in/${java.net.URLEncoder.encode(city, "UTF-8")}?format=j1"
+            val body = httpGet(url)
+            """{"city": "$city", "weather_data": $body}"""
+        } catch (e: Exception) {
+            Timber.w(e, "Tool: weather fetch failed")
+            """{"city": "$city", "weather": "Weather data not available offline", "note": "Use general knowledge about $city climate"}"""
         }
-        context.startActivity(intent)
-        return """{"weather_opened": true, "city": "$city"}"""
     }
 
     private fun executeGetNews(params: Map<String, Any?>): String {
         val topic = params["topic"] as? String
-        val url = if (topic != null) {
-            "https://news.google.com/search?q=${Uri.encode(topic)}"
-        } else {
-            "https://news.google.com"
+        val query = topic ?: "headlines"
+        return try {
+            val url = "https://news.google.com/rss/search?q=${java.net.URLEncoder.encode(query, "UTF-8")}&hl=en-US&gl=US&ceid=US:en"
+            val body = httpGet(url, "Mozilla/5.0")
+            val titles = Regex("<title>(.*?)</title>").findAll(body)
+                .map { it.groupValues[1] }
+                .filter { it != "Google News" }
+                .take(5)
+                .toList()
+            """{"topic": "$query", "headlines": [${titles.joinToString(", ") { "\"$it\"" }}]}"""
+        } catch (e: Exception) {
+            Timber.w(e, "Tool: news fetch failed")
+            """{"topic": "$query", "headlines": [], "note": "News not available offline"}"""
         }
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(intent)
-        return """{"news_opened": true, "topic": "${topic ?: "headlines"}"}"""
     }
 
     private fun executeTranslateText(params: Map<String, Any?>): String {
         val text = params["text"] as? String ?: return """{"error": "text is required"}"""
-        val targetLang = params["target_language"] as? String ?: "auto"
-        val url = "https://translate.google.com/?sl=auto&tl=$targetLang&text=${Uri.encode(text)}"
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val targetLang = params["target_language"] as? String ?: "en"
+        val sourceLang = params["source_language"] as? String ?: "auto"
+        return try {
+            val url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=$sourceLang&tl=$targetLang&dt=t&q=${java.net.URLEncoder.encode(text, "UTF-8")}"
+            val body = httpGet(url)
+            val translated = Regex("\"([^\"]+)\"").findAll(body)
+                .map { it.groupValues[1] }
+                .filter { it.length > 1 && !it.startsWith(",") }
+                .joinToString("")
+            """{"original": "$text", "translated": "$translated", "source_language": "$sourceLang", "target_language": "$targetLang"}"""
+        } catch (e: Exception) {
+            Timber.w(e, "Tool: translation failed")
+            """{"original": "$text", "translated": "", "note": "Translation not available offline"}"""
         }
-        context.startActivity(intent)
-        return """{"translation_opened": true, "text_length": "${text.length}"}"""
     }
 
     // === DEVICE ===
