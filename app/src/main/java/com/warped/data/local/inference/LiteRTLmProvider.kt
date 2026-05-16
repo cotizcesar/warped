@@ -185,47 +185,11 @@ class LiteRTLmProvider @Inject constructor(
                 conv
             }
 
-        conversation.sendMessageAsync(contents).collect { responseMsg ->
-            val content = extractTextContent(responseMsg)
-            if (content.isNotEmpty()) {
-                Timber.d("LiteRTLmProvider: delta (${content.length} chars): %s", content.takeLast(100))
-                emit(StreamToken.Delta(content))
-            }
-        }
-                            } else emptyMap<String, Any?>()
-                            toolExecutors.execute(toolName, argsMap)
-                        } catch (e: Exception) {
-                            Timber.w(e, "LiteRTLmProvider: tool '$toolName' execution failed")
-                            "{\"error\": \"${e.message}\"}"
-                        }
-                        Timber.d("LiteRTLmProvider: tool '$toolName' result: ${result.take(200)}")
-                        emit(StreamToken.Delta(" → ${result.take(300)}"))
-
-                        toolResponses.add(Content.ToolResponse(toolName, result))
-                    }
-
-                    // Send tool responses back and get final response
-                    val toolResponseMsg = Message.tool(Contents.of(toolResponses))
-                    val finalMsg = conversation.sendMessage(toolResponseMsg)
-                    val finalContent = extractTextContent(finalMsg)
-                    if (finalContent.isNotEmpty()) {
-                        emit(StreamToken.Delta(finalContent))
-                    }
-                } else {
-                    // No tool calls — just emit text
-                    val content = extractTextContent(responseMsg)
-                    if (content.isNotEmpty()) {
-                        emit(StreamToken.Delta(content))
-                    }
-                }
-            } else {
-                // Auto mode: use sendMessageAsync (existing behavior)
-                conversation.sendMessageAsync(contents).collect { responseMsg ->
-                    val content = extractTextContent(responseMsg)
-                    if (content.isNotEmpty()) {
-                        Timber.d("LiteRTLmProvider: delta (${content.length} chars): %s", content.takeLast(100))
-                        emit(StreamToken.Delta(content))
-                    }
+            conversation.sendMessageAsync(contents).collect { responseMsg ->
+                val content = extractTextContent(responseMsg)
+                if (content.isNotEmpty()) {
+                    Timber.d("LiteRTLmProvider: delta (${content.length} chars): %s", content.takeLast(100))
+                    emit(StreamToken.Delta(content))
                 }
             }
 
