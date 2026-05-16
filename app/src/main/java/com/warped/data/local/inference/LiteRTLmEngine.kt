@@ -68,22 +68,17 @@ class LiteRTLmEngine @Inject constructor(
             BackendType.NPU -> Backend.GPU() // fallback: NPU not yet supported by EngineConfig
         }
 
-        val visionB = when (visionBackend ?: BackendType.GPU) {
-            BackendType.GPU -> Backend.GPU()
-            else -> Backend.CPU()
-        }
-        val audioB = when (audioBackend ?: BackendType.CPU) {
-            BackendType.GPU -> Backend.GPU()
-            else -> Backend.CPU()
-        }
-
         val cacheDir = java.io.File(context.cacheDir, "litertlm_cache").also { it.mkdirs() }
 
         val config = EngineConfig(
             modelPath = modelPath,
             backend = litertlmBackend,
-            visionBackend = visionB,
-            audioBackend = audioB,
+            visionBackend = visionBackend?.let {
+                when (it) { BackendType.GPU -> Backend.GPU(); else -> Backend.CPU() }
+            },
+            audioBackend = audioBackend?.let {
+                when (it) { BackendType.GPU -> Backend.GPU(); else -> Backend.CPU() }
+            },
             cacheDir = cacheDir.absolutePath
         )
 

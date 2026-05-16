@@ -69,8 +69,8 @@ class EngineManager @Inject constructor(
         liteRTLmEngine.init(
             modelPath = resolvedPath,
             backend = target.backend!!,
-            visionBackend = backendDetector.probeVisionBackend(),
-            audioBackend = backendDetector.probeAudioBackend()
+            visionBackend = null,
+            audioBackend = null
         )
         activeEngine = target
         Timber.d("EngineManager: LiteRT-LM engine now active")
