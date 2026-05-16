@@ -384,7 +384,7 @@ fun ChatScreen(
                         } else if (uiState.isStreaming) {
                             val statusText = uiState.toolCallActive?.let { tool ->
                                 "Using ${tool.replace("_", " ")}..."
-                            } ?: "Generating..."
+                            } ?: "Thinking..."
                             Row(
                                 modifier = Modifier.padding(vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically

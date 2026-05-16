@@ -109,16 +109,12 @@ class LiteRTLmProvider @Inject constructor(
             temperature = clamp(params.temperature.toDouble(), 0.0, 2.0, "temperature"),
             seed = if (params.seed != -1) params.seed else 0
         )
-        val extraContext = mapOf<String, Any>(
-            "max_output_tokens" to params.maxTokens,
-            "reasoning_enabled" to params.reasoningEnabled
-        )
 
         // Step 6: Create conversation config with history, tools, and auto tool calling
         val conversationConfig = ConversationConfig(
             initialMessages = historyMessages,
             samplerConfig = samplerConfig,
-            extraContext = extraContext,
+            extraContext = emptyMap(),
             tools = toolRegistry.buildOpenApiTools(
                 kotlinx.coroutines.runBlocking { toolRegistry.enabledToolIds.first() }
             ).map { tool(it) },
