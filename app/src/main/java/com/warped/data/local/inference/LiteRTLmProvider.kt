@@ -12,7 +12,11 @@ import com.google.ai.edge.litertlm.LiteRtLmJniException
 import com.google.ai.edge.litertlm.tool
 import com.warped.data.local.inference.tools.ToolRegistry
 import com.warped.data.local.inference.tools.ToolPreferences
+import com.warped.data.local.inference.tools.ToolExecutors
 import com.warped.domain.model.ActiveModelSelection
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import com.warped.domain.model.ChatRequest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -38,6 +42,7 @@ class LiteRTLmProvider @Inject constructor(
     private val engineManager: EngineManager,
     private val inputSanitizer: InputSanitizer,
     private val toolRegistry: ToolRegistry,
+    private val toolExecutors: ToolExecutors,
     private val toolPreferences: ToolPreferences,
     private val activeModelSelection: ActiveModelSelection
 ) : LlmProvider {
@@ -167,6 +172,7 @@ class LiteRTLmProvider @Inject constructor(
         attempt: Int
     ) {
         val maxRetries = 2
+        val manualMode = conversationConfig.automaticToolCalling == false
 
         try {
             val engine = engineManager.getLiteRTLmEngine()
@@ -185,11 +191,64 @@ class LiteRTLmProvider @Inject constructor(
                 conv
             }
 
-            conversation.sendMessageAsync(contents).collect { responseMsg ->
-                val content = extractTextContent(responseMsg)
-                if (content.isNotEmpty()) {
-                    Timber.d("LiteRTLmProvider: delta (${content.length} chars): %s", content.takeLast(100))
-                    emit(StreamToken.Delta(content))
+            if (manualMode) {
+                // Manual mode: send synchronously and handle tool calls
+                val responseMsg = conversation.sendMessage(contents)
+
+                // Check for tool calls
+                val toolCalls = responseMsg.toolCalls
+                if (toolCalls.isNotEmpty()) {
+                    Timber.d("LiteRTLmProvider: manual mode — ${toolCalls.size} tool calls detected")
+
+                    val toolResponses = mutableListOf<Content.ToolResponse>()
+                    for (tc in toolCalls) {
+                        val toolName = tc.name
+                        Timber.d("LiteRTLmProvider: executing tool '$toolName' with args: ${tc.arguments}")
+                        emit(StreamToken.Delta("[tool:$toolName](${tc.arguments})"))
+
+                        val argsJson = tc.arguments
+                        Timber.d("LiteRTLmProvider: executing tool '$toolName' with args: $argsJson")
+                        emit(StreamToken.Delta("[tool:$toolName]"))
+
+                        val result = try {
+                            val argsMap = if (argsJson.isNotBlank()) {
+                                kotlinx.serialization.json.Json.parseToJsonElement(argsJson).jsonObject.mapValues {
+                                    it.value.jsonPrimitive.content
+                                }
+                            } else emptyMap()
+                            toolExecutors.execute(toolName, argsMap)
+                        } catch (e: Exception) {
+                            Timber.w(e, "LiteRTLmProvider: tool '$toolName' execution failed")
+                            "{\"error\": \"${e.message}\"}"
+                        }
+                        Timber.d("LiteRTLmProvider: tool '$toolName' result: ${result.take(200)}")
+                        emit(StreamToken.Delta(" → ${result.take(300)}"))
+
+                        toolResponses.add(Content.ToolResponse(toolName, result))
+                    }
+
+                    // Send tool responses back and get final response
+                    val toolResponseMsg = Message.tool(Contents.of(toolResponses))
+                    val finalMsg = conversation.sendMessage(toolResponseMsg)
+                    val finalContent = extractTextContent(finalMsg)
+                    if (finalContent.isNotEmpty()) {
+                        emit(StreamToken.Delta(finalContent))
+                    }
+                } else {
+                    // No tool calls — just emit text
+                    val content = extractTextContent(responseMsg)
+                    if (content.isNotEmpty()) {
+                        emit(StreamToken.Delta(content))
+                    }
+                }
+            } else {
+                // Auto mode: use sendMessageAsync (existing behavior)
+                conversation.sendMessageAsync(contents).collect { responseMsg ->
+                    val content = extractTextContent(responseMsg)
+                    if (content.isNotEmpty()) {
+                        Timber.d("LiteRTLmProvider: delta (${content.length} chars): %s", content.takeLast(100))
+                        emit(StreamToken.Delta(content))
+                    }
                 }
             }
 
