@@ -114,8 +114,8 @@ fun CodeBlock(
     val bgCode = Color(variant[TokenType.BACKGROUND]?.argb ?: 0xFF1E1E1E.toInt())
 
     // Code font sizing — scale wired from AdvancedPreferences
-    val codeFontSize = (16f * codeFontScale).sp
-    val codeLineHeight = (20f * codeFontScale).sp
+    val codeFontSize = (13f * codeFontScale).sp
+    val codeLineHeight = (18f * codeFontScale).sp
 
     // ── Resolve Hilt entry point at composable scope ──────────
     val appContext = LocalContext.current.applicationContext
@@ -201,14 +201,14 @@ fun CodeBlock(
                     SpanStyle(
                         fontFamily = FontFamily.Monospace,
                         fontSize = codeFontSize,
-                        color = Color.White,
+                        color = plainColor,
                     ),
                 ) {
                     append(code)
                 }
             } else {
                 tokens.forEach { token ->
-                    val color = tokenColorMap[token.type] ?: Color.White
+                    val color = tokenColorMap[token.type] ?: plainColor
                     withStyle(
                         SpanStyle(
                             color = color,
@@ -246,6 +246,7 @@ fun CodeBlock(
 
         Box(
             modifier = Modifier
+                .background(bgCode)
                 .then(
                     if (needsCollapse && !expanded) {
                         Modifier
@@ -289,7 +290,7 @@ fun CodeBlock(
                 // Code text area
                 Box(
                     modifier = Modifier
-                        .padding(horizontal = 8.dp, vertical = 12.dp),
+                        .padding(8.dp),
                 ) {
                     SelectionContainer {
                         Text(
@@ -297,7 +298,7 @@ fun CodeBlock(
                             fontFamily = FontFamily.Monospace,
                             fontSize = codeFontSize,
                             lineHeight = codeLineHeight,
-                            color = Color.White,
+                            color = plainColor,
                         )
                     }
                 }
