@@ -40,6 +40,7 @@ data class ChatUiState(
     val pendingModelSwitch: ModelSwitchRequest? = null,
     val conversationModelId: String? = null,
     val conversationProviderType: ProviderType? = null,
+    val toolCallActive: String? = null,  // tool name while tool is executing (e.g. "web_search")
 )
 
 sealed class ChatError {

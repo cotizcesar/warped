@@ -382,6 +382,9 @@ fun ChatScreen(
                                 codeFontScale = uiState.codeFontScale
                             )
                         } else if (uiState.isStreaming) {
+                            val statusText = uiState.toolCallActive?.let { tool ->
+                                "Using ${tool.replace("_", " ")}..."
+                            } ?: "Generating..."
                             Row(
                                 modifier = Modifier.padding(vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
@@ -393,7 +396,7 @@ fun ChatScreen(
                                 )
                                 Spacer(Modifier.width(10.dp))
                                 Text(
-                                    "Generating...",
+                                    statusText,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = Color(0xFF545450)
                                 )

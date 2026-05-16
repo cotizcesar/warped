@@ -138,7 +138,7 @@ class ChatViewModel @Inject constructor(
 
         val imageDataUrls = images.mapNotNull { uriToBase64(it) }
         val userMessage = ChatMessage(role = Role.USER, content = text.trim(), imageUris = imageDataUrls)
-        _uiState.update { it.copy(messages = it.messages + userMessage, inputText = "", isStreaming = true) }
+        _uiState.update { it.copy(messages = it.messages + userMessage, inputText = "", isStreaming = true, toolCallActive = null) }
 
         generationJob = viewModelScope.launch(coroutineExceptionHandler) {
             try {
@@ -222,6 +222,11 @@ class ChatViewModel @Inject constructor(
                 provider.chat(request).collect { token ->
                     when (token) {
                         is StreamToken.Delta -> {
+                            // Detect tool call patterns [tool:NAME] and show indicator
+                            val toolMatch = Regex("\\[tool:(\\w+)\\]").find(token.content)
+                            if (toolMatch != null) {
+                                _uiState.update { it.copy(toolCallActive = toolMatch.groupValues[1]) }
+                            }
                             tokenBuffer.add(token.content)
                             val now = System.currentTimeMillis()
                             if (now - lastEmitTime >= 50) {
@@ -231,7 +236,8 @@ class ChatViewModel @Inject constructor(
                                 _uiState.update {
                                     it.copy(
                                         streamingContent = cleanContent,
-                                        streamingReasoning = reasoning
+                                        streamingReasoning = reasoning,
+                                        toolCallActive = null  // clear tool indicator once content arrives
                                     )
                                 }
                                 tokenBuffer.clear()
@@ -239,6 +245,7 @@ class ChatViewModel @Inject constructor(
                             }
                         }
                         is StreamToken.Done -> {
+                            _uiState.update { it.copy(toolCallActive = null) }
                             rawBuffer.append(tokenBuffer.joinToString(""))
                             val (finalClean, finalReasoning) = parseThinkBlocks(rawBuffer.toString(), reasoningActive, modelMayThink)
                             val content = if (finalClean.isBlank()) finalClean else finalClean.trimStart()
@@ -298,7 +305,8 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(
             isStreaming = false,
             streamingContent = "",
-            streamingReasoning = ""
+            streamingReasoning = "",
+            toolCallActive = null
         ) }
     }
 
