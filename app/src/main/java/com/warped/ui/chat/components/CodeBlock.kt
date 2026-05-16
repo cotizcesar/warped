@@ -264,13 +264,6 @@ fun CodeBlock(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(
-                        if (expanded) {
-                            Modifier.verticalScroll(rememberScrollState())
-                        } else {
-                            Modifier
-                        },
-                    )
                     .horizontalScroll(horizontalScrollState),
             ) {
                 // Line number gutter
