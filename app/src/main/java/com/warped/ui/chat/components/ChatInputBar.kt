@@ -18,6 +18,9 @@ import androidx.compose.material3.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -102,7 +105,14 @@ fun ChatInputBar(
             OutlinedTextField(
                 value = text,
                 onValueChange = onTextChange,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onKeyEvent { event ->
+                        if (event.key == Key.Enter && canSend && !isGenerating && text.isNotBlank()) {
+                            onSend()
+                            true
+                        } else false
+                    },
                 placeholder = { Text(stringResource(R.string.type_message)) },
                 enabled = !isGenerating && canSend,
                 maxLines = 4,
