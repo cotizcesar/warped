@@ -511,35 +511,6 @@ private fun ToolsTab(uiState: SettingsUiState, viewModel: SettingsViewModel) {
                 }
             }
         }
-        item { Spacer(Modifier.height(16.dp)) }
-
-        // Manual tool calling toggle
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29))
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Manual tool calling", fontWeight = FontWeight.Bold)
-                        Text(
-                            "When enabled, you'll see which tool is being used before the model responds.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    Switch(
-                        checked = uiState.manualToolCalling,
-                        onCheckedChange = { viewModel.setManualToolCalling(it) }
-                    )
-                }
-            }
-        }
-
         item { Spacer(Modifier.height(24.dp)) }
     }
 }

@@ -19,8 +19,7 @@ data class ToolSettingsUiState(
     val toolStates: List<ToolState> = ToolDefinitions.all.map {
         ToolState(it.id, it.name, it.description, it.tokenEstimate, it.defaultEnabled, it.defaultEnabled)
     },
-    val enabledIds: Set<String> = emptySet(),
-    val manualToolCalling: Boolean = false
+    val enabledIds: Set<String> = emptySet()
 )
 
 @HiltViewModel
@@ -55,23 +54,12 @@ class ToolSettingsViewModel @Inject constructor(
                 }
             }
         }
-        viewModelScope.launch(coroutineExceptionHandler) {
-            preferences.manualToolCalling.collect { manual ->
-                _uiState.update { it.copy(manualToolCalling = manual) }
-            }
-        }
     }
 
     fun toggleTool(toolId: String) {
         viewModelScope.launch(coroutineExceptionHandler) {
             val current = _uiState.value.toolStates.find { it.id == toolId } ?: return@launch
             preferences.setEnabled(toolId, !current.enabled)
-        }
-    }
-
-    fun setManualToolCalling(enabled: Boolean) {
-        viewModelScope.launch(coroutineExceptionHandler) {
-            preferences.setManualToolCalling(enabled)
         }
     }
 }

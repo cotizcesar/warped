@@ -169,41 +169,6 @@ fun ToolSettingsScreen(
                 }
             }
 
-            item { Spacer(Modifier.height(16.dp)) }
-
-            // Manual tool calling toggle
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "Manual tool calling",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                "When enabled, shows which tool is being used and lets you see tool results before sending them to the model.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Switch(
-                            checked = uiState.manualToolCalling,
-                            onCheckedChange = { viewModel.setManualToolCalling(it) }
-                        )
-                    }
-                }
-            }
-
             item { Spacer(Modifier.height(24.dp)) }
         }
     }

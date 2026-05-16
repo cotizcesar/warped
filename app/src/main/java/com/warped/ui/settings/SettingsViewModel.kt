@@ -94,11 +94,6 @@ class SettingsViewModel @Inject constructor(
             }
         }
         viewModelScope.launch(coroutineExceptionHandler) {
-            toolPreferences.manualToolCalling.collect { manual ->
-                _uiState.update { it.copy(manualToolCalling = manual) }
-            }
-        }
-        viewModelScope.launch(coroutineExceptionHandler) {
             advancedPreferences.syntaxTheme.collect { theme ->
                 _uiState.update { it.copy(codeTheme = theme) }
             }
@@ -114,12 +109,6 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch(coroutineExceptionHandler) {
             val current = _uiState.value.toolStates.find { it.id == toolId } ?: return@launch
             toolPreferences.setEnabled(toolId, !current.enabled)
-        }
-    }
-
-    fun setManualToolCalling(enabled: Boolean) {
-        viewModelScope.launch(coroutineExceptionHandler) {
-            toolPreferences.setManualToolCalling(enabled)
         }
     }
 

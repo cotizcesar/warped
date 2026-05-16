@@ -23,5 +23,4 @@ data class SettingsUiState(
     val toolStates: List<ToolState> = emptyList(),
     val enabledToolIds: Set<String> = emptySet(),
     val selectedTab: SettingsTab = SettingsTab.General,
-    val manualToolCalling: Boolean = false,
 )

@@ -11,7 +11,6 @@ import com.google.ai.edge.litertlm.SamplerConfig
 import com.google.ai.edge.litertlm.LiteRtLmJniException
 import com.google.ai.edge.litertlm.tool
 import com.warped.data.local.inference.tools.ToolRegistry
-import com.warped.data.local.inference.tools.ToolPreferences
 import com.warped.domain.model.ActiveModelSelection
 import com.warped.domain.model.ChatRequest
 import kotlinx.coroutines.flow.first
@@ -38,7 +37,6 @@ class LiteRTLmProvider @Inject constructor(
     private val engineManager: EngineManager,
     private val inputSanitizer: InputSanitizer,
     private val toolRegistry: ToolRegistry,
-    private val toolPreferences: ToolPreferences,
     private val activeModelSelection: ActiveModelSelection
 ) : LlmProvider {
 
@@ -112,8 +110,7 @@ class LiteRTLmProvider @Inject constructor(
             seed = if (params.seed != -1) params.seed else 0
         )
 
-        // Step 6: Create conversation config with history, tools, and tool calling mode
-        val manualMode = runBlocking { toolPreferences.manualToolCalling.first() }
+        // Step 6: Create conversation config with history, tools, and auto tool calling
         val conversationConfig = ConversationConfig(
             initialMessages = historyMessages,
             samplerConfig = samplerConfig,
@@ -121,7 +118,7 @@ class LiteRTLmProvider @Inject constructor(
             tools = toolRegistry.buildOpenApiTools(
                 runBlocking { toolRegistry.enabledToolIds.first() }
             ).map { tool(it) },
-            automaticToolCalling = !manualMode
+            automaticToolCalling = true
         )
 
         // Step 7: Send content with retry loop
