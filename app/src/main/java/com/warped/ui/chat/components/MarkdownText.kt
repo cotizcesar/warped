@@ -131,7 +131,7 @@ fun MarkdownText(
                 }
 
                 is MarkdownBlock.ListItemBlock -> {
-                    Column {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         block.items.forEachIndexed { i, item ->
                             val prefix = if (block.ordered) "${i + 1}. " else "\u2022  "
                             Text("$prefix$item", fontSize = defaultFontSize)
