@@ -87,7 +87,7 @@ fun ModelsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (isEndpointFormOpen) "Connect LM Studio" else "Models & Endpoints") },
+                title = { Text(if (isEndpointFormOpen) "Connect to an API" else "Models & Endpoints") },
                 navigationIcon = {
                     if (isEndpointFormOpen) {
                         IconButton(
@@ -157,7 +157,7 @@ fun ModelsScreen(
                             Icon(Icons.Filled.Dns, null, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Connect LM Studio", style = MaterialTheme.typography.bodyLarge)
+                                Text("Connect to an API", style = MaterialTheme.typography.bodyLarge)
                                 Text("Add a remote LM Studio server", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }

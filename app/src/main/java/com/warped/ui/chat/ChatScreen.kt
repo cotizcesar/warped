@@ -319,22 +319,6 @@ fun ChatScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Backend status chip — visible when LiteRT-LM is loaded
-            if (uiState.selectedProvider == ProviderType.LITE_RT_LM && uiState.activeBackend != null) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    shape = MaterialTheme.shapes.small
-                ) {
-                    Text(
-                        "LiteRT-LM · ${uiState.activeBackend!!.name}",
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                }
-                Spacer(Modifier.height(4.dp))
-            }
 
             if (uiState.isLoadingModel) {
                 Card(
