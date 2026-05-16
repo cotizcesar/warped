@@ -9,7 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -109,8 +109,8 @@ fun CodeBlock(
     // ── Syntax highlighting state ────────────────────────────
     var tokens by remember { mutableStateOf<List<SyntaxToken>>(emptyList()) }
 
-    val isDark = isSystemInDarkTheme()
-    val variant = if (isDark) syntaxTheme.darkVariant else syntaxTheme.lightVariant
+    // Code blocks always use dark variant regardless of system theme
+    val variant = syntaxTheme.darkVariant
     val bgCode = Color(variant[TokenType.BACKGROUND]?.argb ?: 0xFF1E1E1E.toInt())
 
     // Code font sizing — scale wired from AdvancedPreferences
