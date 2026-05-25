@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.6
-milestone_name: Code Syntax Highlighting
-status: shipped
-stopped_at: Milestone v1.6 complete
-last_updated: "2026-05-15T04:37:18.000Z"
-last_activity: 2026-05-15
+milestone: v1.7
+milestone_name: App Optimization & Smart Presets
+status: planning
+last_updated: "2026-05-25T23:29:45.057Z"
+last_activity: 2026-05-25
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State: Warped
@@ -28,13 +27,10 @@ See: .planning/PROJECT.md (updated 2026-05-15)
 
 ## Current Position
 
-Milestone v1.6: Code Syntax Highlighting — SHIPPED
-Phase: 30 (Streaming Integration & Everywhere Application) — COMPLETE
-Plan: 2 of 2
-Status: Milestone complete — 3 phases, 8 plans, 18/20 requirements satisfied
-Last activity: 2026-05-15
-
-Progress: [██████████] 100%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-25 — Milestone v1.7 started
 
 ## Phase Structure
 

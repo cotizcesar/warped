@@ -16,6 +16,16 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 **Known deferred:** INTG-03 (README preview — requires new API endpoint). 18 pre-existing open items recorded in STATE.md.
 
+## Current Milestone: v1.7 App Optimization & Smart Presets
+
+**Goal:** Optimize the app with latest LiteRT-LM library, unify model/endpoint selection, fix status indicators, and deliver memory-aware smart presets.
+
+**Target features:**
+- Upgrade LiteRT-LM library to latest stable release
+- Unified Models & Endpoints selector screen (1 local model + infinite endpoints)
+- Fix traffic light status indicator (semaforo) for correct connected/disconnected state
+- Memory-based auto-optimized generation presets
+
 ## Requirements
 
 ### Validated
@@ -129,4 +139,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-15 after v1.6 Code Syntax Highlighting milestone*
+*Last updated: 2026-05-25 after v1.7 App Optimization & Smart Presets milestone start*
