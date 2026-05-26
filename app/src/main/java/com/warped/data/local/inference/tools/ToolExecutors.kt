@@ -1,5 +1,6 @@
 package com.warped.data.local.inference.tools
 
+import android.Manifest
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.app.SearchManager
@@ -381,6 +382,12 @@ class ToolExecutors @Inject constructor(
             }
             context.startActivity(intent)
             return """{"location_enabled": false, "message": "Location is disabled. Opening settings..."}"""
+        }
+
+        val hasPermission = android.content.pm.PackageManager.PERMISSION_GRANTED ==
+            context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+        if (!hasPermission) {
+            return """{"location_enabled": true, "message": "Location permission not granted"}"""
         }
 
         val lastKnown = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)

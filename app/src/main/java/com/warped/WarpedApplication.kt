@@ -74,17 +74,20 @@ class WarpedApplication : Application(), Configuration.Provider {
     }
 
     override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
         if (::engineManager.isInitialized) {
             engineManager.handleTrimMemory(level)
         }
     }
 
-    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {}
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+    }
 
     override fun onLowMemory() {
+        super.onLowMemory()
         if (::engineManager.isInitialized) {
-            @Suppress("DEPRECATION")
-            engineManager.handleTrimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL)
+            engineManager.handleTrimMemory(android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL)
         }
     }
 

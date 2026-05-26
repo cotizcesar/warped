@@ -119,8 +119,7 @@ class EngineManager @Inject constructor(
      * Releases engine resources on critical memory pressure.
      */
     fun handleTrimMemory(level: Int) {
-        @Suppress("DEPRECATION")
-        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
+        if (level >= 15 /* ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL */) {
             Timber.d("EngineManager: TRIM_MEMORY_RUNNING_CRITICAL — unloading engine")
             try {
                 unloadCurrent()
