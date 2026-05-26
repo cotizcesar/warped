@@ -49,6 +49,10 @@ data class ChatUiState(
     val toolCallActive: String? = null  // tool name while tool is executing (e.g. "web_search")
 )
 
+enum class TrafficLightState {
+    GREEN, YELLOW, RED, GRAY
+}
+
 sealed class ChatError {
     data class Network(val message: String) : ChatError()
     data class Server(val code: Int, val message: String) : ChatError()
@@ -64,3 +68,36 @@ data class ModelSwitchRequest(
     val modelId: String,
     val providerType: ProviderType,
 )
+
+fun ChatUiState.trafficLightState(): TrafficLightState {
+    val isLocal = selectedLocalModelId != null && isLocalModelLoaded
+    val isRemote = selectedRemoteModelId != null && selectedRemoteProvider != null
+    return when {
+        isStreaming -> TrafficLightState.YELLOW
+        memoryWarningModel != null -> TrafficLightState.RED
+        error != null -> TrafficLightState.RED
+        isLocal && isLocalModelLoaded -> TrafficLightState.GREEN
+        isRemote && connectionStatus == ConnectionStatus.Connected -> TrafficLightState.GREEN
+        isLocal || isRemote -> TrafficLightState.RED
+        else -> TrafficLightState.GRAY
+    }
+}
+
+fun ChatUiState.trafficLightStatusText(): String {
+    val light = trafficLightState()
+    val isLocal = selectedLocalModelId != null
+    val isRemote = selectedRemoteModelId != null
+    val localName = localModels.firstOrNull { it.filePath == selectedLocalModelId }?.name
+    val remoteName = selectedRemoteModelId?.substringAfterLast("/")
+    return when {
+        light == TrafficLightState.YELLOW -> "Generating response…"
+        light == TrafficLightState.GREEN && isLocal -> "Local: $localName — Connected"
+        light == TrafficLightState.GREEN && isRemote -> "Remote: $remoteName — Connected"
+        light == TrafficLightState.RED && error != null -> "Error: ${(error as? ChatError)?.let { 
+            when (it) { is ChatError.Network -> it.message; is ChatError.Server -> it.message; is ChatError.Auth -> it.message; is ChatError.Unknown -> it.message; else -> "Connection error" } 
+        } ?: "Connection error"}"
+        light == TrafficLightState.RED && isLocal -> "Local: $localName — Not connected"
+        light == TrafficLightState.RED && isRemote -> "Remote: $remoteName — Disconnected"
+        else -> "No model selected"
+    }
+}

@@ -185,24 +185,47 @@ fun ChatScreen(
                     }
                 },
                 actions = {
-                    val isLocal = uiState.selectedProvider == ProviderType.LOCAL ||
-                        uiState.selectedProvider == ProviderType.LITE_RT_LM
-                    if (isLocal) {
-                        val statusColor = when {
-                            uiState.memoryWarningModel != null -> Color(0xFFF44336)
-                            uiState.isLocalModelLoaded -> Color(0xFF4CAF50)
-                            uiState.isStreaming -> Color(0xFFFF9800)
-                            else -> Color(0xFF666666)
+                    val lightState = uiState.trafficLightState()
+                    val statusText = uiState.trafficLightStatusText()
+                    val isLocal = uiState.selectedLocalModelId != null && uiState.isLocalModelLoaded
+                    val isRemote = uiState.selectedRemoteModelId != null && uiState.selectedRemoteProvider != null
+                    
+                    var showStatusSnackbar by remember { mutableStateOf(false) }
+                    val snackbarHostState = remember { SnackbarHostState() }
+
+                    LaunchedEffect(showStatusSnackbar) {
+                        if (showStatusSnackbar) {
+                            snackbarHostState.showSnackbar(statusText, duration = SnackbarDuration.Short)
+                            showStatusSnackbar = false
                         }
-                        IconButton(onClick = { viewModel.unloadLocalModels() }) {
+                    }
+
+                    val statusColor = when (lightState) {
+                        TrafficLightState.GREEN -> Color(0xFF4CAF50)
+                        TrafficLightState.YELLOW -> Color(0xFFFF9800)
+                        TrafficLightState.RED -> Color(0xFFF44336)
+                        TrafficLightState.GRAY -> Color(0xFF666666)
+                    }
+                    
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (isLocal) {
+                            Text("Local", style = MaterialTheme.typography.labelSmall, color = Color(0xFF9CA3AF))
+                            Spacer(Modifier.width(4.dp))
+                        } else if (isRemote) {
+                            Text("Remote", style = MaterialTheme.typography.labelSmall, color = Color(0xFF9CA3AF))
+                            Spacer(Modifier.width(4.dp))
+                        }
+                        IconButton(onClick = { showStatusSnackbar = true }) {
                             Icon(
                                 Icons.Filled.Circle,
-                                contentDescription = "Model status",
+                                contentDescription = "Connection status",
                                 tint = statusColor,
                                 modifier = Modifier.size(12.dp)
                             )
                         }
                     }
+
+                    SnackbarHost(hostState = snackbarHostState)
                 }
             )
         },
