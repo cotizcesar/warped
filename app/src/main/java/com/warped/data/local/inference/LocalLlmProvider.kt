@@ -20,6 +20,7 @@ import javax.inject.Singleton
 @Singleton
 class LocalLlmProvider @Inject constructor() : LlmProvider {
 
+    @Suppress("DEPRECATION")
     override val type = ProviderType.LOCAL
 
     override fun chat(request: ChatRequest): Flow<StreamToken> = flow {

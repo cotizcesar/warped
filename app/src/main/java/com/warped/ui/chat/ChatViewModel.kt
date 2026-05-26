@@ -72,19 +72,14 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch(coroutineExceptionHandler) {
             localModelRepository.observeModels().collect { models ->
                 _uiState.update { state ->
-                    if (state.selectedProvider == ProviderType.LOCAL ||
-                        state.selectedProvider == ProviderType.LITE_RT_LM) {
-                        val selectedModel = models.firstOrNull { it.filePath == state.selectedModelId }
+                    val activeLocalId = state.selectedLocalModelId
+                    if (activeLocalId != null) {
+                        val selectedModel = models.firstOrNull { it.filePath == activeLocalId }
                         val selectedExists = selectedModel != null
-                        val normalizedProvider = if (selectedModel?.isLiteRtLm() == true) {
-                            ProviderType.LITE_RT_LM
-                        } else {
-                            state.selectedProvider
-                        }
                         state.copy(
                             localModels = models,
-                            selectedModelId = state.selectedModelId.takeIf { selectedExists },
-                            selectedProvider = normalizedProvider.takeIf { selectedExists }
+                            selectedLocalModelId = activeLocalId.takeIf { selectedExists },
+                            isLocalModelLoaded = selectedExists && state.isLocalModelLoaded
                         )
                     } else {
                         state.copy(localModels = models)
@@ -159,8 +154,8 @@ class ChatViewModel @Inject constructor(
         val state = _uiState.value
 
         val effectiveModelId = state.selectedLocalModelId ?: state.selectedRemoteModelId ?: state.selectedModelId
-        val effectiveProvider = if (state.selectedLocalModelId != null) ProviderType.LITE_RT_LM
-            else state.selectedRemoteProvider ?: state.selectedProvider
+        val effectiveProvider = state.selectedLocalModelId?.let { ProviderType.LITE_RT_LM }
+            ?: state.selectedRemoteProvider
 
         if (text.isBlank() && images.isEmpty() && audioBytes == null) return
         if (effectiveModelId == null || effectiveProvider == null) {
@@ -182,11 +177,11 @@ class ChatViewModel @Inject constructor(
                 val conversationId = ensureConversation(text)
                 chatRepository.saveMessage(conversationId, userMessage)
 
-                val selectedProvider = resolvedSelectedProvider(state, effectiveProvider)
+                val selectedProvider = effectiveProvider
                 val modelId = effectiveModelId
 
                 // Validate model capabilities
-                if (selectedProvider == ProviderType.LOCAL || selectedProvider == ProviderType.LITE_RT_LM) {
+                if (selectedProvider == ProviderType.LITE_RT_LM) {
                     val capabilities = state.localModels.firstOrNull { it.filePath == modelId }?.capabilities
                     if (images.isNotEmpty() && capabilities?.vision != true) {
                         _uiState.update {
@@ -209,7 +204,7 @@ class ChatViewModel @Inject constructor(
                 }
 
                 // Auto-reload local model if engine was unloaded (e.g. memory pressure)
-                if (selectedProvider == ProviderType.LOCAL || selectedProvider == ProviderType.LITE_RT_LM) {
+                if (selectedProvider == ProviderType.LITE_RT_LM) {
                     val modelFile = java.io.File(modelId)
                     if (!modelFile.exists()) {
                         _uiState.update {
@@ -224,7 +219,7 @@ class ChatViewModel @Inject constructor(
                 }
 
                 val provider = when (selectedProvider) {
-                    ProviderType.LOCAL,
+                    ProviderType.LITE_RT_LM,
                     ProviderType.LITE_RT_LM -> providerRouter.resolveLocal(
                         selectedProvider,
                         modelId
@@ -380,7 +375,14 @@ class ChatViewModel @Inject constructor(
                     )
                 }
                 if (conversation.modelId != null && !modelMissing) {
-                    activeModelSelection.select(conversation.modelId, conversation.providerType)
+                    if (conversation.providerType == ProviderType.LITE_RT_LM) {
+                        activeModelSelection.markLocalLoading(conversation.modelId)
+                    } else {
+                        val endpoint = endpointRepository.getActive()
+                        if (endpoint != null) {
+                            activeModelSelection.selectRemote(conversation.modelId, conversation.providerType, endpoint.id)
+                        }
+                    }
                     // BUG-02: Preload the model if reload is needed, so the loading indicator shows.
                     // If engine already matches, preloadLocalModel will be a no-op (EngineManager.switchToLiteRT
                     // skips when activeEngine matches the target).
@@ -426,7 +428,7 @@ class ChatViewModel @Inject constructor(
         }
 
         // Check memory for local models
-        if (providerType == ProviderType.LOCAL || providerType == ProviderType.LITE_RT_LM) {
+        if (providerType == ProviderType.LITE_RT_LM) {
             val model = _uiState.value.localModels.firstOrNull { it.filePath == modelId }
             if (model != null && memoryChecker.shouldWarn(model.sizeBytes)) {
                 _uiState.update { it.copy(memoryWarningModel = model) }
@@ -473,7 +475,7 @@ class ChatViewModel @Inject constructor(
     fun confirmLoadMemoryWarning() {
         val model = _uiState.value.memoryWarningModel ?: return
         _uiState.update { it.copy(memoryWarningModel = null) }
-        val providerType = if (model.isLiteRtLm()) ProviderType.LITE_RT_LM else ProviderType.LOCAL
+        val providerType = if (model.isLiteRtLm()) ProviderType.LITE_RT_LM else ProviderType.LITE_RT_LM
         viewModelScope.launch(coroutineExceptionHandler) {
             setSelectedModel(model.filePath, providerType, isSameModel = false)
         }
@@ -484,45 +486,52 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun setSelectedModel(modelId: String, providerType: ProviderType, isSameModel: Boolean) {
-        val oldProvider = _uiState.value.selectedProvider
-        val oldModelId = _uiState.value.selectedModelId
+        val oldLocalId = _uiState.value.selectedLocalModelId
+        val oldRemoteId = _uiState.value.selectedRemoteModelId
         val oldInstance = _uiState.value.loadedInstanceId
-        
-        activeModelSelection.select(modelId, providerType)
-        _uiState.update { it.copy(selectedModelId = modelId, selectedProvider = providerType) }
-        
+
+        if (providerType == ProviderType.LITE_RT_LM) {
+            activeModelSelection.markLocalLoading(modelId)
+        } else {
+            viewModelScope.launch(coroutineExceptionHandler) {
+                val endpoint = endpointRepository.getActive()
+                if (endpoint != null) {
+                    activeModelSelection.selectRemote(modelId, providerType, endpoint.id)
+                }
+            }
+        }
+        _uiState.update { it.copy(selectedLocalModelId = modelId, selectedRemoteModelId = modelId) }
+
         if (isSameModel) {
-            // Even if same model, reload if engine was unloaded (memory pressure)
             val needsReload = when (providerType) {
                 ProviderType.LITE_RT_LM -> engineManager.getActiveEngine() == null
                 else -> false
             }
             if (!needsReload) return
         }
-        
+
         // Unload previous model
-        when (oldProvider) {
-            ProviderType.LM_STUDIO -> {
-                if (oldInstance != null && oldModelId != null) {
-                    viewModelScope.launch(coroutineExceptionHandler) {
-                        try {
-                            val endpoint = endpointRepository.getActive()
-                            if (endpoint != null) {
-                                val provider = com.warped.data.remote.provider.LMStudioProvider(endpoint.url, oldModelId, inputSanitizer = inputSanitizer)
-                                provider.unloadModel(oldInstance)
-                            }
-                        } catch (e: Exception) { Timber.e(e, "Chat: LMStudio unload failed") }
-                    }
-                }
+        if (oldLocalId != null && oldLocalId != modelId) {
+            viewModelScope.launch(coroutineExceptionHandler + Dispatchers.Default) {
+                try { engineManager.unloadCurrent() } catch (e: Exception) { Timber.e(e, "Chat: unloadCurrent failed") }
             }
-            ProviderType.LITE_RT_LM -> {
-                viewModelScope.launch(coroutineExceptionHandler + Dispatchers.Default) {
-                    try { engineManager.unloadCurrent() } catch (e: Exception) { Timber.e(e, "Chat: unloadCurrent failed") }
-                }
-            }
-            else -> {}
+            activeModelSelection.disconnectLocal()
         }
-        
+        if (oldRemoteId != null && oldRemoteId != modelId) {
+            viewModelScope.launch(coroutineExceptionHandler) {
+                try {
+                    if (oldInstance != null) {
+                        val endpoint = endpointRepository.getActive()
+                        if (endpoint != null) {
+                            val provider = com.warped.data.remote.provider.LMStudioProvider(endpoint.url, oldRemoteId, inputSanitizer = inputSanitizer)
+                            provider.unloadModel(oldInstance)
+                        }
+                    }
+                } catch (e: Exception) { Timber.e(e, "Chat: LMStudio unload failed") }
+            }
+            activeModelSelection.clearRemote()
+        }
+
         // Load new model
         when (providerType) {
             ProviderType.LM_STUDIO -> {
@@ -535,7 +544,7 @@ class ChatViewModel @Inject constructor(
                             val result = provider.loadModel(modelId)
                             result.onSuccess { instanceId ->
                                 _uiState.update { it.copy(loadedInstanceId = instanceId) }
-                                activeModelSelection.select(modelId, providerType, instanceId)
+                                activeModelSelection.connectLocal(modelId, providerType, instanceId)
                             }
                         }
                     } catch (e: Exception) { Timber.e(e, "Chat: LMStudio load failed") }
@@ -624,7 +633,7 @@ class ChatViewModel @Inject constructor(
 
     private fun resolvedSelectedProvider(state: ChatUiState, overrideProvider: ProviderType? = null): ProviderType {
         val provider = overrideProvider ?: state.selectedProvider ?: return ProviderType.LITE_RT_LM
-        return if (provider == ProviderType.LOCAL) ProviderType.LITE_RT_LM else provider
+        return if (provider == ProviderType.LITE_RT_LM) ProviderType.LITE_RT_LM else provider
     }
 
     private fun LocalModel.isLiteRtLm(): Boolean =
@@ -679,17 +688,20 @@ class ChatViewModel @Inject constructor(
         if (state.conversationId != null) return state.conversationId
 
         val title = if (firstMessage.length > 50) firstMessage.take(50) + "..." else firstMessage
+        val effectiveModelId = state.selectedLocalModelId ?: state.selectedRemoteModelId
+        val effectiveProvider = state.selectedLocalModelId?.let { ProviderType.LITE_RT_LM }
+            ?: state.selectedRemoteProvider ?: ProviderType.LITE_RT_LM
         val conversationId = chatRepository.createConversation(
             title = title,
-            providerType = resolvedSelectedProvider(state),
-            modelId = state.selectedModelId,
+            providerType = effectiveProvider,
+            modelId = effectiveModelId,
             endpointId = 0
         )
         _uiState.update {
             it.copy(
                 conversationId = conversationId,
-                conversationModelId = state.selectedModelId,
-                conversationProviderType = resolvedSelectedProvider(state)
+                conversationModelId = effectiveModelId,
+                conversationProviderType = effectiveProvider
             )
         }
         activeModelSelection.saveLastConversation(conversationId)
@@ -698,7 +710,7 @@ class ChatViewModel @Inject constructor(
 
     private fun isModelAvailable(modelId: String, providerType: ProviderType): Boolean {
         return when (providerType) {
-            ProviderType.LOCAL, ProviderType.LITE_RT_LM -> {
+            ProviderType.LITE_RT_LM, ProviderType.LITE_RT_LM -> {
                 _uiState.value.localModels.any { it.filePath == modelId }
             }
             else -> {

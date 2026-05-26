@@ -94,8 +94,7 @@ class ModelsViewModel @Inject constructor(
     }
 
     fun useLocalModel(model: LocalModel) {
-        val providerType = if (model.isLiteRtLm()) ProviderType.LITE_RT_LM else ProviderType.LOCAL
-        activeModelSelection.select(model.filePath, providerType)
+        activeModelSelection.connectLocal(model.filePath, ProviderType.LITE_RT_LM)
     }
 
     private fun LocalModel.isLiteRtLm(): Boolean =
@@ -210,9 +209,9 @@ class ModelsViewModel @Inject constructor(
             try {
                 endpointRepository.deleteEndpoint(endpoint.id)
                 // If this endpoint was the active selection, clear it from chat
-                val active = activeModelSelection.activeModel.value
-                if (active != null && active.modelId == endpoint.modelId && active.providerType == endpoint.apiType) {
-                    activeModelSelection.clear()
+                val remote = activeModelSelection.remoteSelection.value
+                if (remote.modelId == endpoint.modelId && remote.endpointId == endpoint.id) {
+                    activeModelSelection.clearRemote()
                 }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message) }
@@ -258,7 +257,7 @@ class ModelsViewModel @Inject constructor(
 
     fun useEndpoint(endpoint: Endpoint) {
         val modelId = endpoint.modelId ?: return
-        activeModelSelection.select(modelId, endpoint.apiType)
+        activeModelSelection.selectRemote(modelId, endpoint.apiType, endpoint.id)
         viewModelScope.launch(coroutineExceptionHandler) {
             endpointRepository.activateEndpoint(endpoint.id)
             fetchEndpointModels(endpoint)

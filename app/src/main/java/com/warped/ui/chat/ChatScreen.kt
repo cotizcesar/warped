@@ -142,13 +142,16 @@ fun ChatScreen(
     }
 
     val selectedModelName = run {
-        val local = uiState.localModels.firstOrNull { it.filePath == uiState.selectedModelId }
+        val effectiveModelId = uiState.selectedLocalModelId ?: uiState.selectedRemoteModelId
+        val effectiveProvider = if (uiState.selectedLocalModelId != null) ProviderType.LITE_RT_LM
+            else uiState.selectedRemoteProvider
+        val local = uiState.localModels.firstOrNull { it.filePath == effectiveModelId }
         val endpoint = uiState.endpoints.firstOrNull {
-            it.modelId == uiState.selectedModelId && it.apiType == uiState.selectedProvider
+            it.modelId == effectiveModelId && it.apiType == effectiveProvider
         }
         when {
             local != null -> local.name
-            endpoint != null -> uiState.selectedModelId?.substringAfterLast("/") ?: uiState.selectedModelId
+            endpoint != null -> effectiveModelId?.substringAfterLast("/") ?: effectiveModelId
             else -> null
         }
     }
@@ -179,9 +182,10 @@ fun ChatScreen(
                             .clickable { onNavigateToSelector() },
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (uiState.selectedProvider != null && selectedModelName != null) {
-                            val isLocal = uiState.selectedProvider == ProviderType.LOCAL ||
-                                uiState.selectedProvider == ProviderType.LITE_RT_LM
+                        val effectiveProvider = if (uiState.selectedLocalModelId != null) ProviderType.LITE_RT_LM
+                            else uiState.selectedRemoteProvider
+                        if (effectiveProvider != null && selectedModelName != null) {
+                            val isLocal = uiState.selectedLocalModelId != null
                             val typePillColor = if (isLocal) Color(0xFF4CAF50) else Color(0xFF2196F3)
                             val typePillText = if (isLocal) "Local" else "Net"
                             Surface(
@@ -273,7 +277,7 @@ fun ChatScreen(
             ChatInputBar(
                 text = uiState.inputText,
                 isGenerating = uiState.isStreaming,
-                canSend = uiState.selectedModelId != null,
+                canSend = (uiState.selectedLocalModelId ?: uiState.selectedRemoteModelId) != null,
                 onTextChange = { viewModel.updateInput(it) },
                 onSend = {
                     viewModel.sendMessage(uiState.inputText, attachedImages, audioBytes)
@@ -283,11 +287,11 @@ fun ChatScreen(
                 onStop = { viewModel.stopGeneration() },
                 reasoningEnabled = uiState.reasoningEnabled,
                 onToggleReasoning = { viewModel.toggleReasoning() },
-                modelHasReasoning = uiState.localModels.firstOrNull { it.filePath == uiState.selectedModelId }?.capabilities?.reasoning != false,
+                modelHasReasoning = uiState.localModels.firstOrNull { it.filePath == uiState.selectedLocalModelId }?.capabilities?.reasoning != false,
                 onAddImage = { imagePickerLauncher.launch("image/*") },
                 attachedImages = attachedImages,
                 onRemoveImage = { i -> attachedImages = attachedImages.filterIndexed { idx, _ -> idx != i } },
-                modelHasAudio = uiState.localModels.firstOrNull { it.filePath == uiState.selectedModelId }?.capabilities?.audio == true,
+                modelHasAudio = uiState.localModels.firstOrNull { it.filePath == uiState.selectedLocalModelId }?.capabilities?.audio == true,
                 onAudioRecorded = { bytes -> audioBytes = bytes },
                 onAudioRecordingChanged = { isRecording = it }
             )

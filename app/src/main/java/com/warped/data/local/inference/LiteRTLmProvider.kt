@@ -84,12 +84,13 @@ class LiteRTLmProvider @Inject constructor(
 
         // Step 4: Build current message contents (text + images + audio)
         val currentUserText = sanitizedMessages.lastOrNull { it.role == Role.USER }?.content ?: ""
-        val hasAudio = request.audioBytes != null && request.audioBytes!!.isNotEmpty()
+        val audioBytes = request.audioBytes
+        val hasAudio = audioBytes != null && audioBytes.isNotEmpty()
         val currentContents = if (hasImages || hasAudio) {
             val contentList = mutableListOf<Content>()
             if (hasAudio) {
-                contentList.add(Content.AudioBytes(request.audioBytes!!))
-                Timber.d("LiteRTLmProvider: attaching audio (${request.audioBytes!!.size} bytes)")
+                contentList.add(Content.AudioBytes(audioBytes))
+                Timber.d("LiteRTLmProvider: attaching audio (${audioBytes.size} bytes)")
             }
             request.images.forEach { dataUrl ->
                 decodeImage(dataUrl)?.let { contentList.add(Content.ImageBytes(it)) }
