@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, internal, alpha, beta, production]
+    branches: [beta, production]
   pull_request:
-    branches: [main, internal, alpha, beta, production]
+    branches: [beta, production]
 
 jobs:
   build:
@@ -30,7 +30,7 @@ jobs:
       - name: Cache Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-read-only: ${{ github.ref != 'refs/heads/production' }}
 
       - name: Lint
         run: ./gradlew lintDebug
