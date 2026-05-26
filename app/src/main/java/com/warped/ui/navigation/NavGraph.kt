@@ -324,6 +324,11 @@ fun WarpedNavGraph() {
                         }
                     },
                     onOpenHuggingFace = { navController.navigate(Screen.HuggingFace.route) },
+                    onNavigateToPresets = {
+                        navController.navigate(Screen.Presets.route) {
+                            launchSingleTop = true
+                        }
+                    },
                     onBack = { navController.popBackStack() }
                 )
             }

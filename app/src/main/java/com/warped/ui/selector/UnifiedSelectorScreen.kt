@@ -38,6 +38,7 @@ fun UnifiedSelectorScreen(
     viewModel: UnifiedSelectorViewModel = hiltViewModel(),
     onNavigateToChat: () -> Unit = {},
     onOpenHuggingFace: () -> Unit = {},
+    onNavigateToPresets: () -> Unit = {},
     onBack: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -229,7 +230,8 @@ fun UnifiedSelectorScreen(
                             }
                         },
                         onDisconnect = { viewModel.disconnectLocal() },
-                        onDelete = { viewModel.deleteModel(model) }
+                        onDelete = { viewModel.deleteModel(model) },
+                        onAdvancedParams = onNavigateToPresets
                     )
                 }
 
@@ -284,7 +286,8 @@ private fun LocalModelSelectorCard(
     isAnotherConnected: Boolean,
     onConnect: () -> Unit,
     onDisconnect: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onAdvancedParams: () -> Unit = {}
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
@@ -354,6 +357,11 @@ private fun LocalModelSelectorCard(
 
             IconButton(onClick = { showDeleteConfirm = true }) {
                 Icon(Icons.Filled.Delete, "Delete", tint = Color(0xFF6B7280), modifier = Modifier.size(18.dp))
+            }
+            if (isConnected) {
+                IconButton(onClick = onAdvancedParams) {
+                    Icon(Icons.Filled.Settings, "Parameters", tint = Color(0xFF9CA3AF), modifier = Modifier.size(18.dp))
+                }
             }
         }
     }
