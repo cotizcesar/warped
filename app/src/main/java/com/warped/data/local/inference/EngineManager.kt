@@ -50,14 +50,17 @@ class EngineManager @Inject constructor(
         if (!cachedFile.exists() || cachedFile.length() != sourceFile.length()) {
             Timber.d("EngineManager: caching .litertlm model to ${cachedFile.absolutePath}")
             try {
-                sourceFile.copyTo(cachedFile, overwrite = true)
+                cachedFile.delete()
+                sourceFile.copyTo(cachedFile, overwrite = false)
                 Timber.d("EngineManager: model cached successfully (${cachedFile.length()} bytes)")
             } catch (e: Exception) {
+                cachedFile.delete()
                 Timber.w(e, "EngineManager: failed to cache model, using original path")
             }
         }
 
-        val resolvedPath = if (cachedFile.exists()) cachedFile.absolutePath else modelPath
+        val resolvedPath = if (cachedFile.exists() && cachedFile.length() == sourceFile.length())
+            cachedFile.absolutePath else modelPath
         val target = ActiveEngine(EngineType.LITE_RT_LM, resolvedPath, backendDetector.probeBackend())
         if (activeEngine == target) {
             Timber.d("EngineManager: $target already loaded, skipping switch")
