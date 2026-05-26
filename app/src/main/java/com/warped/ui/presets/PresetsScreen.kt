@@ -44,6 +44,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.domain.model.GenerationParameters
 import com.warped.ui.components.WarpedAlertDialog
 import com.warped.domain.model.Preset
+import com.warped.domain.model.MemoryTier
+import com.warped.domain.model.SmartPresetCalculator
+import androidx.compose.foundation.layout.height
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,6 +83,19 @@ fun PresetsScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(vertical = 8.dp)
         ) {
+            if (uiState.smartPresetName != null) {
+                item(key = "smart-preset-card") {
+                    SmartPresetCard(
+                        presetName = uiState.smartPresetName!!,
+                        tier = uiState.smartPresetTier,
+                        availableGb = uiState.availableGb,
+                        totalGb = uiState.totalGb,
+                        isActive = !uiState.isCustomOverride && uiState.selectedPresetId == null,
+                        onApply = { viewModel.applySmartPreset() }
+                    )
+                }
+            }
+
             if (uiState.presets.isNotEmpty()) {
                 item {
                     Text("Saved Presets", style = MaterialTheme.typography.titleMedium)
@@ -376,5 +392,80 @@ private fun FormatBadge(format: String) {
             style = MaterialTheme.typography.labelSmall,
             maxLines = 1
         )
+    }
+}
+
+@Composable
+private fun SmartPresetCard(
+    presetName: String,
+    tier: MemoryTier?,
+    availableGb: Float,
+    totalGb: Float,
+    isActive: Boolean,
+    onApply: () -> Unit
+) {
+    val tierColor = when (tier) {
+        MemoryTier.LOW -> Color(0xFFFF9800)
+        MemoryTier.MID -> Color(0xFF2196F3)
+        MemoryTier.HIGH -> Color(0xFF4CAF50)
+        null -> MaterialTheme.colorScheme.primary
+    }
+    val tierLabel = tier?.let { SmartPresetCalculator.tierLabel(it) } ?: ""
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = if (isActive) CardDefaults.cardColors(containerColor = tierColor.copy(alpha = 0.12f))
+            else CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(presetName, style = MaterialTheme.typography.titleSmall)
+                    if (tier != null) {
+                        Spacer(Modifier.width(8.dp))
+                        Surface(
+                            shape = MaterialTheme.shapes.extraSmall,
+                            color = tierColor.copy(alpha = 0.2f)
+                        ) {
+                            Text(
+                                tierLabel,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = tierColor
+                            )
+                        }
+                    }
+                    if (isActive) {
+                        Spacer(Modifier.width(8.dp))
+                        Surface(
+                            shape = MaterialTheme.shapes.extraSmall,
+                            color = Color(0xFF4CAF50).copy(alpha = 0.2f)
+                        ) {
+                            Text(
+                                "Active",
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF4CAF50)
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "${"%.1f".format(availableGb)} GB free / ${"%.1f".format(totalGb)} GB total",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (!isActive) {
+                TextButton(onClick = onApply) {
+                    Text("Apply", color = tierColor)
+                }
+            }
+        }
     }
 }

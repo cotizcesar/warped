@@ -3,9 +3,8 @@ package com.warped.ui.presets
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.warped.data.local.inference.EngineManager
-import com.warped.domain.model.GenerationParameters
-import com.warped.domain.model.ParameterStore
-import com.warped.domain.model.Preset
+import com.warped.data.local.inference.MemoryChecker
+import com.warped.domain.model.*
 import com.warped.domain.repository.PresetRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,7 +21,10 @@ import javax.inject.Inject
 class PresetsViewModel @Inject constructor(
     private val presetRepository: PresetRepository,
     private val parameterStore: ParameterStore,
-    private val engineManager: EngineManager
+    private val engineManager: EngineManager,
+    private val memoryChecker: MemoryChecker,
+    private val activeModelSelection: ActiveModelSelection,
+    private val localModelRepository: com.warped.domain.repository.LocalModelRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PresetsUiState())
@@ -32,13 +34,29 @@ class PresetsViewModel @Inject constructor(
         timber.log.Timber.e(throwable, "Unhandled coroutine exception")
     }
 
+    private var smartPresetParams: GenerationParameters? = null
+    private var cachedModels: List<LocalModel> = emptyList()
+
     init {
         viewModelScope.launch(coroutineExceptionHandler) {
             presetRepository.observePresets().collect { presets ->
                 _uiState.update { it.copy(presets = presets) }
             }
         }
+        viewModelScope.launch(coroutineExceptionHandler) {
+            localModelRepository.observeModels().collect { models ->
+                cachedModels = models
+            }
+        }
+        viewModelScope.launch(coroutineExceptionHandler) {
+            activeModelSelection.localSelection.collect { local ->
+                if (local.modelId != null) {
+                    recalculateSmartPreset(local.modelId)
+                }
+            }
+        }
         refreshActiveFormat()
+        viewModelScope.launch(coroutineExceptionHandler) { refreshSmartPreset() }
     }
 
     /** Derive the currently active format string from the loaded engine. */
@@ -84,7 +102,43 @@ class PresetsViewModel @Inject constructor(
         _uiState.update { state ->
             val newParams = transform(state.parameters)
             parameterStore.update(newParams)
-            state.copy(parameters = newParams)
+            val isCustom = smartPresetParams == null || newParams != smartPresetParams
+            state.copy(parameters = newParams, isCustomOverride = isCustom, selectedPresetName = if (isCustom) "Custom" else state.selectedPresetName)
+        }
+    }
+
+    fun applySmartPreset() {
+        val smart = smartPresetParams ?: return
+        parameterStore.update(smart)
+        _uiState.update {
+            it.copy(
+                parameters = smart,
+                isCustomOverride = false,
+                selectedPresetId = null,
+                selectedPresetName = it.smartPresetName ?: "Smart Preset"
+            )
+        }
+    }
+
+    private suspend fun refreshSmartPreset() {
+        val localId = activeModelSelection.localSelection.value.modelId
+        if (localId != null) recalculateSmartPreset(localId)
+    }
+
+    private fun recalculateSmartPreset(modelId: String) {
+        val model = cachedModels.firstOrNull { it.filePath == modelId } ?: return
+        val memInfo = memoryChecker.getMemoryInfo()
+        val result = SmartPresetCalculator.calculate(memInfo, model.sizeBytes)
+        smartPresetParams = result.parameters
+        val label = "Smart Preset (${"%.1f".format(result.availableGb)} GB free)"
+        _uiState.update {
+            it.copy(
+                smartPresetName = label,
+                smartPresetTier = result.tier,
+                availableGb = result.availableGb,
+                totalGb = result.totalGb,
+                isCustomOverride = it.isCustomOverride || (it.parameters != result.parameters)
+            )
         }
     }
 
