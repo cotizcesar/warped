@@ -253,7 +253,7 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
                             onValueChange = {},
                             readOnly = true,
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = themeExpanded) },
-                            modifier = Modifier.menuAnchor().fillMaxWidth(),
+                            modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = MaterialTheme.colorScheme.primary,
                                 unfocusedBorderColor = Color(0xFF374151)

@@ -1,3 +1,4 @@
+@file:Suppress("DEPRECATION")
 package com.warped.data.local.security
 
 import android.content.Context
@@ -13,12 +14,14 @@ import javax.inject.Singleton
 class KeystoreManager @Inject constructor(
     @param:ApplicationContext private val context: Context
 ) {
+    @Suppress("DEPRECATION")
     private val masterKey: MasterKey by lazy {
         MasterKey.Builder(context)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
             .build()
     }
 
+    @Suppress("DEPRECATION")
     private val encryptedPrefs: SharedPreferences by lazy {
         EncryptedSharedPreferences.create(
             context,

@@ -10,7 +10,6 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.warped.domain.model.GenerationParameters
 import com.warped.domain.model.SyntaxTheme
-import com.warped.ui.chat.components.CodeTheme
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -59,29 +58,6 @@ class AdvancedPreferences @Inject constructor(
             prefs[KEY_MAX_TOKENS] = params.maxTokens
             prefs[KEY_CONTEXT_SIZE] = params.contextSize
             prefs[KEY_SEED] = params.seed
-        }
-    }
-
-    val codeTheme: Flow<CodeTheme> = context.advancedPreferencesStore.data.map { prefs ->
-        val name = prefs[KEY_CODE_THEME] ?: return@map CodeTheme.MONOKAI
-        // Try direct enum match first (legacy uppercase format)
-        try {
-            CodeTheme.valueOf(name)
-        } catch (_: IllegalArgumentException) {
-            // Handle SyntaxTheme keys (lowercase) written by migration
-            when (name.lowercase()) {
-                "monokai" -> CodeTheme.MONOKAI
-                "one_dark" -> CodeTheme.ONE_DARK
-                "github" -> CodeTheme.GITHUB
-                "dracula" -> CodeTheme.DRACULA
-                else -> CodeTheme.MONOKAI
-            }
-        }
-    }
-
-    suspend fun setCodeTheme(theme: CodeTheme) {
-        context.advancedPreferencesStore.edit { prefs ->
-            prefs[KEY_CODE_THEME] = theme.name
         }
     }
 

@@ -403,6 +403,7 @@ private fun CodeHeaderBar(
         alpha = 1f,
     )
 
+    @Suppress("DEPRECATION")
     val clipboardManager = LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
 

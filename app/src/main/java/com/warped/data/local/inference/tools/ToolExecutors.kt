@@ -391,6 +391,7 @@ class ToolExecutors @Inject constructor(
             val lat = String.format("%.6f", lastKnown.latitude)
             val lng = String.format("%.6f", lastKnown.longitude)
             try {
+                @Suppress("DEPRECATION")
                 val addresses = geocoder.getFromLocation(lastKnown.latitude, lastKnown.longitude, 1)
                 val address = addresses?.firstOrNull()
                 val addrStr = address?.getAddressLine(0) ?: ""

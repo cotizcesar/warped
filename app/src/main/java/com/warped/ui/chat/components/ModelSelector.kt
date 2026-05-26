@@ -82,7 +82,7 @@ fun ModelSelector(
                             }
                         },
                         onClick = {
-                            onModelSelected(model.filePath, ProviderType.LOCAL)
+                            onModelSelected(model.filePath, ProviderType.LITE_RT_LM)
                             expanded = false
                         }
                     )

@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import com.warped.domain.model.ChatMessage
 import com.warped.domain.model.Role
 import com.warped.domain.model.SyntaxTheme
+import kotlinx.coroutines.launch
 
 @Composable
 fun MessageBubble(
@@ -47,6 +48,7 @@ fun MessageBubble(
 ) {
     val isUser = message.role == Role.USER
     var showReasoning by remember { mutableStateOf(false) }
+    @Suppress("DEPRECATION")
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     if (isStreaming && !message.reasoning.isNullOrBlank()) {
