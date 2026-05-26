@@ -88,9 +88,9 @@ class SyntaxThemeTest {
         }
 
         @Test
-        fun `MONOKAI dark COMMENT is 0xFF75715E`() {
+        fun `MONOKAI dark COMMENT is 0xFF88846F`() {
             assertThat(SyntaxTheme.MONOKAI.darkVariant[TokenType.COMMENT]!!.argb)
-                .isEqualTo(0xFF75715E.toInt())
+                .isEqualTo(0xFF88846F.toInt())
         }
 
         // === Monokai Light color verification ===
