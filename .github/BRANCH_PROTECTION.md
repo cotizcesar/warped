@@ -59,3 +59,4 @@ Configure these in **Settings → Secrets and variables → Actions**:
 2. Create a service account with **Google Play Developer API** access
 3. In Google Play Console → **Users and permissions**, invite the service account with **Release Manager** role
 4. Download the JSON key and paste its contents into the `GCP_SERVICE_ACCOUNT` secret
+
