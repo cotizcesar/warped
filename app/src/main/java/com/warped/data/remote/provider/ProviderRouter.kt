@@ -2,7 +2,6 @@ package com.warped.data.remote.provider
 
 import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.local.inference.LiteRTLmProvider
-import com.warped.data.local.inference.LocalLlmProvider
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.domain.model.Endpoint
 import com.warped.domain.model.ProviderType
@@ -15,7 +14,6 @@ import javax.inject.Singleton
 class ProviderRouter @Inject constructor(
     private val apiKeyStore: ApiKeyStore,
     private val inputSanitizer: InputSanitizer,
-    private val localLlmProvider: dagger.Lazy<LocalLlmProvider>,
     private val liteRTLmProvider: dagger.Lazy<LiteRTLmProvider>
 ) {
     fun resolve(endpoint: Endpoint, modelId: String): LlmProvider {

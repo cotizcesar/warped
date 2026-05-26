@@ -170,7 +170,7 @@ class OpenAIProvider(
                     } catch (e: IOException) { Timber.e(e, "OpenAI: SSE stream read failed") }
                 } else {
                     // Non-streaming JSON — read remaining + first line
-                    val remaining = source.readUtf8() ?: ""
+                    val remaining = source.readUtf8()
                     val rawBody = firstLine + "\n" + remaining
                     try {
                         val result = json.decodeFromString<OpenAiNonStreamingResponse>(rawBody)

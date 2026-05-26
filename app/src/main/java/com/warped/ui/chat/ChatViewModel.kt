@@ -89,22 +89,24 @@ class ChatViewModel @Inject constructor(
         }
         viewModelScope.launch(coroutineExceptionHandler) {
             activeModelSelection.localSelection.collect { local ->
-                val loading = local.modelId != null && !local.isConnected
-                val justConnected = local.modelId != null && local.isConnected
+                val modelId = local.modelId
+                val connected = local.isConnected
+                val loading = modelId != null && !connected
+                val justConnected = modelId != null && connected
 
                 if (justConnected) {
-                    autoApplySmartPreset(local.modelId)
+                    autoApplySmartPreset(modelId)
                 }
-                if (local.modelId == null) {
+                if (modelId == null) {
                     lastAutoAppliedModelId = null
                 }
 
                 _uiState.update {
                     it.copy(
-                        selectedLocalModelId = local.modelId?.takeIf { local.isConnected },
-                        isLocalModelLoaded = local.isConnected,
+                        selectedLocalModelId = modelId,
+                        isLocalModelLoaded = connected,
                         isLoadingModel = loading,
-                        loadingModelName = if (loading) local.modelId?.substringAfterLast("/") ?: "" else it.loadingModelName,
+                        loadingModelName = modelId?.substringAfterLast("/") ?: it.loadingModelName,
                         loadedInstanceId = local.instanceId ?: it.loadedInstanceId
                     )
                 }
@@ -153,7 +155,7 @@ class ChatViewModel @Inject constructor(
     fun sendMessage(text: String, images: List<Uri> = emptyList(), audioBytes: ByteArray? = null) {
         val state = _uiState.value
 
-        val effectiveModelId = state.selectedLocalModelId ?: state.selectedRemoteModelId ?: state.selectedModelId
+        val effectiveModelId = state.selectedLocalModelId ?: state.selectedRemoteModelId
         val effectiveProvider = state.selectedLocalModelId?.let { ProviderType.LITE_RT_LM }
             ?: state.selectedRemoteProvider
 
@@ -361,11 +363,13 @@ class ChatViewModel @Inject constructor(
 
                 val modelMissing = conversation.modelId != null && !isModelAvailable(conversation.modelId, conversation.providerType)
                 _uiState.update {
+                    val isLocalConv = conversation.providerType == ProviderType.LITE_RT_LM
                     it.copy(
                         conversationId = conversation.id,
                         messages = messages,
-                        selectedModelId = conversation.modelId,
-                        selectedProvider = conversation.providerType,
+                        selectedLocalModelId = if (isLocalConv) conversation.modelId else null,
+                        selectedRemoteModelId = if (!isLocalConv) conversation.modelId else null,
+                        selectedRemoteProvider = if (!isLocalConv) conversation.providerType else null,
                         streamingContent = "",
                         streamingReasoning = "",
                         error = null,
@@ -591,11 +595,11 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun refreshActiveBackend() {
-        val isLocal = _uiState.value.selectedProvider == ProviderType.LITE_RT_LM
-        val backend = if (_uiState.value.selectedProvider == ProviderType.LITE_RT_LM) {
+        val isLocal = _uiState.value.selectedLocalModelId != null && _uiState.value.isLocalModelLoaded
+        val backend = if (isLocal) {
             engineManager.getActiveEngine()?.backend
         } else null
-        val isLoaded = _uiState.value.selectedProvider == ProviderType.LITE_RT_LM && engineManager.getActiveEngine() != null
+        val isLoaded = isLocal && engineManager.getActiveEngine() != null
         _uiState.update { it.copy(activeBackend = backend, isLocalModelLoaded = isLocal && isLoaded) }
     }
 
@@ -632,8 +636,7 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun resolvedSelectedProvider(state: ChatUiState, overrideProvider: ProviderType? = null): ProviderType {
-        val provider = overrideProvider ?: state.selectedProvider ?: return ProviderType.LITE_RT_LM
-        return if (provider == ProviderType.LITE_RT_LM) ProviderType.LITE_RT_LM else provider
+        return overrideProvider ?: ProviderType.LITE_RT_LM
     }
 
     private fun LocalModel.isLiteRtLm(): Boolean =

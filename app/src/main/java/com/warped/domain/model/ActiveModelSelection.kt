@@ -102,7 +102,7 @@ class ActiveModelSelection @Inject constructor(
 
     @Deprecated("Use connectLocal() or selectRemote() instead", ReplaceWith("connectLocal(modelId, providerType, instanceId)"))
     fun select(modelId: String, providerType: ProviderType, instanceId: String? = null) {
-        if (providerType == ProviderType.LITE_RT_LM || providerType == ProviderType.LOCAL) {
+        if (providerType == ProviderType.LITE_RT_LM) {
             connectLocal(modelId, providerType, instanceId)
         } else {
             _activeModel.value = ActiveModel(modelId = modelId, providerType = providerType, instanceId = instanceId)

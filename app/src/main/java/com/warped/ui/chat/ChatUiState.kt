@@ -93,9 +93,9 @@ fun ChatUiState.trafficLightStatusText(): String {
         light == TrafficLightState.YELLOW -> "Generating response…"
         light == TrafficLightState.GREEN && isLocal -> "Local: $localName — Connected"
         light == TrafficLightState.GREEN && isRemote -> "Remote: $remoteName — Connected"
-        light == TrafficLightState.RED && error != null -> "Error: ${error?.let { 
-            when (it) { is ChatError.Network -> it.message; is ChatError.Server -> it.message; is ChatError.Auth -> it.message; is ChatError.Unknown -> it.message; else -> "Connection error" } 
-        } ?: "Connection error"}"
+        light == TrafficLightState.RED && error != null -> "Error: ${
+            when (error) { is ChatError.Network -> error.message; is ChatError.Server -> error.message; is ChatError.Auth -> error.message; is ChatError.Unknown -> error.message; else -> "Connection error" }
+        }"
         light == TrafficLightState.RED && isLocal -> "Local: $localName — Not connected"
         light == TrafficLightState.RED && isRemote -> "Remote: $remoteName — Disconnected"
         else -> "No model selected"

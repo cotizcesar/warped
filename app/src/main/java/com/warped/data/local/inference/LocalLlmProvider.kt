@@ -20,8 +20,7 @@ import javax.inject.Singleton
 @Singleton
 class LocalLlmProvider @Inject constructor() : LlmProvider {
 
-    @Suppress("DEPRECATION")
-    override val type = ProviderType.LOCAL
+    override val type = ProviderType.LITE_RT_LM
 
     override fun chat(request: ChatRequest): Flow<StreamToken> = flow {
         emit(StreamToken.Error("LocalLlmProvider is deprecated — use LiteRTLmProvider"))

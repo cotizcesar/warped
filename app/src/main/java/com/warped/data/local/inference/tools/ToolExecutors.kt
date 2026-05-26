@@ -450,7 +450,7 @@ internal object Calculator {
                 "abs" -> kotlin.math.abs(inner)
                 "floor" -> kotlin.math.floor(inner)
                 "ceil" -> kotlin.math.ceil(inner)
-                "round" -> kotlin.math.round(inner).toDouble()
+                "round" -> kotlin.math.round(inner)
                 else -> throw IllegalArgumentException("Unknown function")
             }
         }
