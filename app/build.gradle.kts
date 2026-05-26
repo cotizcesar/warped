@@ -10,12 +10,22 @@ android {
     namespace = "com.warped"
     compileSdk = 35
 
+    val versionMajor = 1
+    val versionMinor = 7
+    val versionPatch = 1
+    val baseVersionCode = versionMajor * 10000 + versionMinor * 100 + versionPatch // 10701
+
+    // CI build number from GitHub Actions (always increments per workflow run)
+    val ciBuildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0
+    val versionCode = baseVersionCode * 1000 + ciBuildNumber // e.g. 10701001
+    val versionName = "$versionMajor.$versionMinor.$versionPatch"
+
     defaultConfig {
         applicationId = "com.warped.app"
         minSdk = 28
         targetSdk = 35
-        versionCode = 11
-        versionName = "1.7.1"
+        this.versionCode = versionCode
+        this.versionName = versionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
 
