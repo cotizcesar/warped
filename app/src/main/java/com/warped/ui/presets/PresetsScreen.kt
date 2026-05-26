@@ -12,12 +12,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -52,6 +56,7 @@ import androidx.compose.foundation.layout.height
 @Composable
 fun PresetsScreen(
     onParametersChanged: (GenerationParameters) -> Unit = {},
+    onBack: () -> Unit = {},
     viewModel: PresetsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -67,6 +72,11 @@ fun PresetsScreen(
             TopAppBar(
                 title = {
                     Text(if (uiState.selectedPresetName.isNotEmpty()) uiState.selectedPresetName else "Generation Parameters")
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
                 },
                 actions = {
                     TextButton(onClick = { viewModel.showSaveDialog() }) { Text("Save") }

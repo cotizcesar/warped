@@ -350,7 +350,11 @@ fun WarpedNavGraph() {
                     }
                 )
             }
-            composable(Screen.Presets.route) { PresetsScreen() }
+            composable(Screen.Presets.route) {
+                PresetsScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onOpenDrawer = { scope.launch { drawerState.open() } },
