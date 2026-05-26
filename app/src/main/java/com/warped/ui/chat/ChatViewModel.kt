@@ -95,9 +95,12 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch(coroutineExceptionHandler) {
             activeModelSelection.localSelection.collect { local ->
                 _uiState.update {
+                    val loading = local.modelId != null && !local.isConnected
                     it.copy(
                         selectedLocalModelId = local.modelId?.takeIf { local.isConnected },
                         isLocalModelLoaded = local.isConnected,
+                        isLoadingModel = loading,
+                        loadingModelName = if (loading) local.modelId?.substringAfterLast("/") ?: "" else it.loadingModelName,
                         loadedInstanceId = local.instanceId ?: it.loadedInstanceId
                     )
                 }

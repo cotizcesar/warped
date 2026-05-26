@@ -106,6 +106,7 @@ class UnifiedSelectorViewModel @Inject constructor(
                     refreshActiveBackend()
                     return@launch
                 }
+                activeModelSelection.markLocalLoading(model.filePath)
                 withContext(Dispatchers.Default) {
                     engineManager.switchToLiteRT(model.filePath)
                 }
@@ -114,7 +115,7 @@ class UnifiedSelectorViewModel @Inject constructor(
                 refreshActiveBackend()
             } catch (e: Exception) {
                 Timber.e(e, "UnifiedSelectorVM: connectLocal failed")
-                activeModelSelection.markLocalDisconnected()
+                activeModelSelection.disconnectLocal()
                 _uiState.update { it.copy(isConnecting = false, error = "Failed to load model: ${e.message}") }
             }
         }

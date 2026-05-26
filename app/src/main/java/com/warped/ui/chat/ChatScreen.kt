@@ -25,6 +25,11 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -217,13 +222,25 @@ fun ChatScreen(
                     val statusText = uiState.trafficLightStatusText()
                     val isLocal = uiState.selectedLocalModelId != null && uiState.isLocalModelLoaded
                     val isRemote = uiState.selectedRemoteModelId != null && uiState.selectedRemoteProvider != null
+                    val isLoading = uiState.isLoadingModel
 
-                    val statusColor = when (lightState) {
-                        TrafficLightState.GREEN -> Color(0xFF4CAF50)
-                        TrafficLightState.YELLOW -> Color(0xFFFF9800)
-                        TrafficLightState.RED -> Color(0xFFF44336)
-                        TrafficLightState.GRAY -> Color(0xFF666666)
+                    val statusColor = when {
+                        isLoading -> Color(0xFFFFC107)
+                        lightState == TrafficLightState.GREEN -> Color(0xFF4CAF50)
+                        lightState == TrafficLightState.YELLOW -> Color(0xFFFF9800)
+                        lightState == TrafficLightState.RED -> Color(0xFFF44336)
+                        else -> Color(0xFF666666)
                     }
+
+                    val infiniteTransition = rememberInfiniteTransition()
+                    val blinkAlpha by infiniteTransition.animateFloat(
+                        initialValue = 0.3f,
+                        targetValue = 1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(600),
+                            repeatMode = RepeatMode.Reverse
+                        )
+                    )
                     
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (isLocal) {
@@ -235,13 +252,16 @@ fun ChatScreen(
                         }
                         IconButton(onClick = {
                             scope.launch {
-                                snackbarHostState.showSnackbar(statusText, duration = SnackbarDuration.Short)
+                                snackbarHostState.showSnackbar(
+                                    if (isLoading) "Loading ${uiState.loadingModelName}..." else statusText,
+                                    duration = SnackbarDuration.Short
+                                )
                             }
                         }) {
                             Icon(
                                 Icons.Filled.Circle,
                                 contentDescription = "Connection status",
-                                tint = statusColor,
+                                tint = statusColor.copy(alpha = if (isLoading) blinkAlpha else 1f),
                                 modifier = Modifier.size(12.dp)
                             )
                         }
@@ -278,22 +298,6 @@ fun ChatScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-
-            if (uiState.isLoadingModel) {
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.width(12.dp))
-                        Text("Loading ${uiState.loadingModelName}...", style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-            }
 
             if (uiState.messages.isEmpty() && uiState.streamingContent.isEmpty()) {
                 // Empty state

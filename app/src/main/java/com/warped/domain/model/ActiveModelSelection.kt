@@ -78,6 +78,12 @@ class ActiveModelSelection @Inject constructor(
         deriveActiveModel()
     }
 
+    fun markLocalLoading(modelId: String, instanceId: String? = null) {
+        _localSelection.value = LocalSelection(modelId = modelId, isConnected = false, instanceId = instanceId)
+        try { persistLocal() } catch (e: Exception) { Timber.e(e, "ActiveModel: persist local loading failed") }
+        deriveActiveModel()
+    }
+
     fun markLocalDisconnected() {
         _localSelection.value = _localSelection.value.copy(isConnected = false)
     }
