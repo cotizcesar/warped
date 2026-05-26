@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -42,6 +43,7 @@ import com.warped.R
 import com.warped.data.local.inference.BackendType
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.Role
+import kotlinx.coroutines.launch
 import com.warped.ui.chat.components.ChatInputBar
 import com.warped.ui.chat.components.MessageBubble
 import com.warped.ui.components.WarpedAlertDialog
@@ -105,9 +107,34 @@ fun ChatScreen(
         )
     }
 
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
-    ) { uris -> attachedImages = uris }
+    ) { uris ->
+        val supported = mutableListOf<Uri>()
+        val rejected = mutableListOf<String>()
+        for (uri in uris) {
+            val mime = context.contentResolver.getType(uri)?.lowercase() ?: ""
+            if (mime == "image/png" || mime == "image/jpeg" || mime == "image/jpg") {
+                supported.add(uri)
+            } else {
+                rejected.add(mime.ifBlank { "unknown" })
+            }
+        }
+        attachedImages = supported
+        if (rejected.isNotEmpty()) {
+            val names = rejected.joinToString(", ") { it.substringAfterLast("/") }
+            scope.launch {
+                snackbarHostState.showSnackbar(
+                    "Unsupported format: $names — only PNG and JPEG are allowed",
+                    duration = SnackbarDuration.Short
+                )
+            }
+        }
+    }
 
     val selectedModelName = run {
         val local = uiState.localModels.firstOrNull { it.filePath == uiState.selectedModelId }
@@ -137,6 +164,7 @@ fun ChatScreen(
 
     Scaffold(
         modifier = Modifier.imePadding(),
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -189,16 +217,6 @@ fun ChatScreen(
                     val statusText = uiState.trafficLightStatusText()
                     val isLocal = uiState.selectedLocalModelId != null && uiState.isLocalModelLoaded
                     val isRemote = uiState.selectedRemoteModelId != null && uiState.selectedRemoteProvider != null
-                    
-                    var showStatusSnackbar by remember { mutableStateOf(false) }
-                    val snackbarHostState = remember { SnackbarHostState() }
-
-                    LaunchedEffect(showStatusSnackbar) {
-                        if (showStatusSnackbar) {
-                            snackbarHostState.showSnackbar(statusText, duration = SnackbarDuration.Short)
-                            showStatusSnackbar = false
-                        }
-                    }
 
                     val statusColor = when (lightState) {
                         TrafficLightState.GREEN -> Color(0xFF4CAF50)
@@ -215,7 +233,11 @@ fun ChatScreen(
                             Text("Remote", style = MaterialTheme.typography.labelSmall, color = Color(0xFF9CA3AF))
                             Spacer(Modifier.width(4.dp))
                         }
-                        IconButton(onClick = { showStatusSnackbar = true }) {
+                        IconButton(onClick = {
+                            scope.launch {
+                                snackbarHostState.showSnackbar(statusText, duration = SnackbarDuration.Short)
+                            }
+                        }) {
                             Icon(
                                 Icons.Filled.Circle,
                                 contentDescription = "Connection status",
@@ -224,8 +246,6 @@ fun ChatScreen(
                             )
                         }
                     }
-
-                    SnackbarHost(hostState = snackbarHostState)
                 }
             )
         },
