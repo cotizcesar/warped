@@ -94,8 +94,17 @@ class ChatViewModel @Inject constructor(
         }
         viewModelScope.launch(coroutineExceptionHandler) {
             activeModelSelection.localSelection.collect { local ->
+                val loading = local.modelId != null && !local.isConnected
+                val justConnected = local.modelId != null && local.isConnected
+
+                if (justConnected) {
+                    autoApplySmartPreset(local.modelId)
+                }
+                if (local.modelId == null) {
+                    lastAutoAppliedModelId = null
+                }
+
                 _uiState.update {
-                    val loading = local.modelId != null && !local.isConnected
                     it.copy(
                         selectedLocalModelId = local.modelId?.takeIf { local.isConnected },
                         isLocalModelLoaded = local.isConnected,
@@ -694,6 +703,25 @@ class ChatViewModel @Inject constructor(
             }
             else -> {
                 _uiState.value.endpoints.any { it.modelId == modelId && it.apiType == providerType }
+            }
+        }
+    }
+
+    private var lastAutoAppliedModelId: String? = null
+
+    private fun autoApplySmartPreset(modelId: String) {
+        if (modelId == lastAutoAppliedModelId) return
+        lastAutoAppliedModelId = modelId
+        viewModelScope.launch(coroutineExceptionHandler) {
+            try {
+                val models = localModelRepository.observeModels().first()
+                val model = models.firstOrNull { it.filePath == modelId } ?: return@launch
+                val memInfo = memoryChecker.getMemoryInfo()
+                val result = SmartPresetCalculator.calculate(memInfo, model.sizeBytes)
+                parameterStore.update(result.parameters)
+                Timber.d("ChatVM: auto-applied smart preset — tier=${result.tier} context=${result.parameters.contextSize} threads=${result.parameters.threads}")
+            } catch (e: Exception) {
+                Timber.w(e, "ChatVM: autoApplySmartPreset failed")
             }
         }
     }
