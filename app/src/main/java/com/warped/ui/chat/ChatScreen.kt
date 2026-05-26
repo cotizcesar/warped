@@ -141,7 +141,9 @@ fun ChatScreen(
             TopAppBar(
                 title = {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigateToSelector() },
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (uiState.selectedProvider != null && selectedModelName != null) {
@@ -169,14 +171,12 @@ fun ChatScreen(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
                         )
-                        IconButton(onClick = onNavigateToSelector) {
-                            Icon(
-                                Icons.Filled.Circle,
-                                contentDescription = "Select model",
-                                modifier = Modifier.size(20.dp).padding(2.dp),
-                                tint = if (uiState.isLocalModelLoaded) Color(0xFF4CAF50) else Color(0xFF6B7280)
-                            )
-                        }
+                        Icon(
+                            Icons.Filled.KeyboardArrowDown,
+                            contentDescription = "Select model",
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 },
                 navigationIcon = {
