@@ -108,7 +108,8 @@ fun ChatInputBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .onKeyEvent { event ->
-                        if (event.key == Key.Enter && canSend && !isGenerating && text.isNotBlank()) {
+                        val hasContent = text.isNotBlank() || attachedImages.isNotEmpty()
+                        if (event.key == Key.Enter && canSend && !isGenerating && hasContent) {
                             onSend()
                             true
                         } else false
@@ -117,7 +118,10 @@ fun ChatInputBar(
                 enabled = !isGenerating && canSend,
                 maxLines = 4,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { if (canSend && !isGenerating) onSend() }),
+                keyboardActions = KeyboardActions(onSend = {
+                    val hasContent = text.isNotBlank() || attachedImages.isNotEmpty()
+                    if (canSend && !isGenerating && hasContent) onSend()
+                }),
                 shape = MaterialTheme.shapes.medium,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Color.Transparent,
@@ -171,8 +175,8 @@ fun ChatInputBar(
                         Icon(Icons.Filled.Stop, "Stop", tint = Color.White, modifier = Modifier.size(24.dp))
                     }
                 } else {
-                    val hasText = text.isNotBlank()
-                    if (hasText && canSend) {
+                    val hasContent = text.isNotBlank() || attachedImages.isNotEmpty()
+                    if (hasContent && canSend) {
                         IconButton(
                             onClick = onSend,
                             modifier = Modifier.size(40.dp),
