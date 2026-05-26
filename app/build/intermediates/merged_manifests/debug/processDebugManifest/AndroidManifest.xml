@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.warped"
-    android:versionCode="1"
-    android:versionName="0.1.0" >
+    package="com.warped.app"
+    android:versionCode="9"
+    android:versionName="1.6.0" >
 
     <uses-sdk
         android:minSdkVersion="28"
@@ -13,14 +13,18 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <permission
-        android:name="com.warped.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+        android:name="com.warped.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
         android:protectionLevel="signature" />
 
-    <uses-permission android:name="com.warped.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+    <uses-permission android:name="com.warped.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
 
     <application
         android:name="com.warped.WarpedApplication"
@@ -44,6 +48,11 @@
         <uses-native-library
             android:name="libOpenCL.so"
             android:required="false" />
+
+        <!-- Timer tool receiver -->
+        <receiver
+            android:name="com.warped.data.local.inference.tools.TimerReceiver"
+            android:exported="false" />
 
         <activity
             android:name="com.warped.MainActivity"
@@ -69,7 +78,7 @@
         <!-- Disable default WorkManager initializer (HiltWorkerFactory replaces it) -->
         <provider
             android:name="androidx.startup.InitializationProvider"
-            android:authorities="com.warped.androidx-startup"
+            android:authorities="com.warped.app.androidx-startup"
             android:exported="false" >
             <meta-data
                 android:name="androidx.emoji2.text.EmojiCompatInitializer"

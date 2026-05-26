@@ -43,6 +43,7 @@ import com.warped.ui.help.HelpScreen
 import com.warped.ui.huggingface.HuggingFaceScreen
 import com.warped.ui.models.ModelsScreen
 import com.warped.ui.presets.PresetsScreen
+import com.warped.ui.selector.UnifiedSelectorScreen
 import com.warped.ui.settings.SettingsScreen
 import com.warped.ui.wizard.WizardScreen
 import dagger.hilt.android.EntryPointAccessors
@@ -220,7 +221,7 @@ fun WarpedNavGraph() {
                     HorizontalDivider(color = Color(0xFF333333), thickness = 0.5.dp)
                     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly) {
-                        val isModels = currentRoute == Screen.Models.route
+                        val isModels = currentRoute == Screen.Selector.route
                         NavigationDrawerItem(
                             icon = { Icon(Icons.Filled.Memory, null, tint = if (isModels) DrawerAccent else DrawerTextSecondary, modifier = Modifier.size(20.dp)) },
                             label = { Text("Models", color = if (isModels) DrawerAccent else DrawerTextSecondary, fontSize = 12.sp) },
@@ -228,7 +229,7 @@ fun WarpedNavGraph() {
                             colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = DrawerSelectedBg, unselectedContainerColor = Color.Transparent),
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                navController.navigate(Screen.Models.route) {
+                                navController.navigate(Screen.Selector.route) {
                                     popUpTo(Screen.Chat.route) { inclusive = false }
                                     launchSingleTop = true
                                 }
@@ -288,9 +289,9 @@ fun WarpedNavGraph() {
                 ChatScreen(
                     newChat = it.arguments?.getBoolean("newChat") ?: false,
                     onOpenDrawer = { scope.launch { drawerState.open() } },
-                    onNavigateToModels = {
-                        navController.navigate(Screen.Models.route) {
-                            popUpTo(Screen.Chat.route) { inclusive = false }
+                    onNavigateToSelector = {
+                        navController.navigate(Screen.Selector.route) {
+                            popUpTo(Screen.Selector.route) { inclusive = true }
                             launchSingleTop = true
                         }
                     }
@@ -307,12 +308,23 @@ fun WarpedNavGraph() {
                 ChatScreen(
                     conversationId = convId,
                     onOpenDrawer = { scope.launch { drawerState.open() } },
-                    onNavigateToModels = {
-                        navController.navigate(Screen.Models.route) {
+                    onNavigateToSelector = {
+                        navController.navigate(Screen.Selector.route) {
                             popUpTo(Screen.Chat.route) { inclusive = false }
                             launchSingleTop = true
                         }
                     }
+                )
+            }
+            composable(Screen.Selector.route) {
+                UnifiedSelectorScreen(
+                    onNavigateToChat = {
+                        navController.navigate("${Screen.Chat.route}?newChat=true") {
+                            popUpTo(Screen.Chat.route) { inclusive = true }
+                        }
+                    },
+                    onOpenHuggingFace = { navController.navigate(Screen.HuggingFace.route) },
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable(Screen.Models.route) {

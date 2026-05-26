@@ -2,7 +2,6 @@ package com.warped.data.local.inference;
 
 import dagger.internal.DaggerGenerated;
 import dagger.internal.Factory;
-import dagger.internal.Provider;
 import dagger.internal.QualifierMetadata;
 import dagger.internal.ScopeMetadata;
 import javax.annotation.processing.Generated;
@@ -24,22 +23,20 @@ import javax.annotation.processing.Generated;
     "nullness:initialization.field.uninitialized"
 })
 public final class LocalLlmProvider_Factory implements Factory<LocalLlmProvider> {
-  private final Provider<LlamaEngine> llamaEngineProvider;
-
-  private LocalLlmProvider_Factory(Provider<LlamaEngine> llamaEngineProvider) {
-    this.llamaEngineProvider = llamaEngineProvider;
-  }
-
   @Override
   public LocalLlmProvider get() {
-    return newInstance(llamaEngineProvider.get());
+    return newInstance();
   }
 
-  public static LocalLlmProvider_Factory create(Provider<LlamaEngine> llamaEngineProvider) {
-    return new LocalLlmProvider_Factory(llamaEngineProvider);
+  public static LocalLlmProvider_Factory create() {
+    return InstanceHolder.INSTANCE;
   }
 
-  public static LocalLlmProvider newInstance(LlamaEngine llamaEngine) {
-    return new LocalLlmProvider(llamaEngine);
+  public static LocalLlmProvider newInstance() {
+    return new LocalLlmProvider();
+  }
+
+  private static final class InstanceHolder {
+    static final LocalLlmProvider_Factory INSTANCE = new LocalLlmProvider_Factory();
   }
 }

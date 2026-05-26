@@ -1,6 +1,7 @@
 package com.warped.ui.models;
 
 import com.warped.data.local.download.ModelDownloadManager;
+import com.warped.data.local.inference.InputSanitizer;
 import com.warped.data.local.inference.MemoryChecker;
 import com.warped.data.local.inference.ModelImportManager;
 import com.warped.data.local.security.ApiKeyStore;
@@ -48,13 +49,16 @@ public final class ModelsViewModel_Factory implements Factory<ModelsViewModel> {
 
   private final Provider<ProviderRouter> providerRouterProvider;
 
+  private final Provider<InputSanitizer> inputSanitizerProvider;
+
   private ModelsViewModel_Factory(Provider<LocalModelRepository> localModelRepositoryProvider,
       Provider<EndpointRepository> endpointRepositoryProvider,
       Provider<ActiveModelSelection> activeModelSelectionProvider,
       Provider<ModelImportManager> modelImportManagerProvider,
       Provider<ModelDownloadManager> modelDownloadManagerProvider,
       Provider<MemoryChecker> memoryCheckerProvider, Provider<ApiKeyStore> apiKeyStoreProvider,
-      Provider<ProviderRouter> providerRouterProvider) {
+      Provider<ProviderRouter> providerRouterProvider,
+      Provider<InputSanitizer> inputSanitizerProvider) {
     this.localModelRepositoryProvider = localModelRepositoryProvider;
     this.endpointRepositoryProvider = endpointRepositoryProvider;
     this.activeModelSelectionProvider = activeModelSelectionProvider;
@@ -63,11 +67,12 @@ public final class ModelsViewModel_Factory implements Factory<ModelsViewModel> {
     this.memoryCheckerProvider = memoryCheckerProvider;
     this.apiKeyStoreProvider = apiKeyStoreProvider;
     this.providerRouterProvider = providerRouterProvider;
+    this.inputSanitizerProvider = inputSanitizerProvider;
   }
 
   @Override
   public ModelsViewModel get() {
-    return newInstance(localModelRepositoryProvider.get(), endpointRepositoryProvider.get(), activeModelSelectionProvider.get(), modelImportManagerProvider.get(), modelDownloadManagerProvider.get(), memoryCheckerProvider.get(), apiKeyStoreProvider.get(), providerRouterProvider.get());
+    return newInstance(localModelRepositoryProvider.get(), endpointRepositoryProvider.get(), activeModelSelectionProvider.get(), modelImportManagerProvider.get(), modelDownloadManagerProvider.get(), memoryCheckerProvider.get(), apiKeyStoreProvider.get(), providerRouterProvider.get(), inputSanitizerProvider.get());
   }
 
   public static ModelsViewModel_Factory create(
@@ -77,14 +82,16 @@ public final class ModelsViewModel_Factory implements Factory<ModelsViewModel> {
       Provider<ModelImportManager> modelImportManagerProvider,
       Provider<ModelDownloadManager> modelDownloadManagerProvider,
       Provider<MemoryChecker> memoryCheckerProvider, Provider<ApiKeyStore> apiKeyStoreProvider,
-      Provider<ProviderRouter> providerRouterProvider) {
-    return new ModelsViewModel_Factory(localModelRepositoryProvider, endpointRepositoryProvider, activeModelSelectionProvider, modelImportManagerProvider, modelDownloadManagerProvider, memoryCheckerProvider, apiKeyStoreProvider, providerRouterProvider);
+      Provider<ProviderRouter> providerRouterProvider,
+      Provider<InputSanitizer> inputSanitizerProvider) {
+    return new ModelsViewModel_Factory(localModelRepositoryProvider, endpointRepositoryProvider, activeModelSelectionProvider, modelImportManagerProvider, modelDownloadManagerProvider, memoryCheckerProvider, apiKeyStoreProvider, providerRouterProvider, inputSanitizerProvider);
   }
 
   public static ModelsViewModel newInstance(LocalModelRepository localModelRepository,
       EndpointRepository endpointRepository, ActiveModelSelection activeModelSelection,
       ModelImportManager modelImportManager, ModelDownloadManager modelDownloadManager,
-      MemoryChecker memoryChecker, ApiKeyStore apiKeyStore, ProviderRouter providerRouter) {
-    return new ModelsViewModel(localModelRepository, endpointRepository, activeModelSelection, modelImportManager, modelDownloadManager, memoryChecker, apiKeyStore, providerRouter);
+      MemoryChecker memoryChecker, ApiKeyStore apiKeyStore, ProviderRouter providerRouter,
+      InputSanitizer inputSanitizer) {
+    return new ModelsViewModel(localModelRepository, endpointRepository, activeModelSelection, modelImportManager, modelDownloadManager, memoryChecker, apiKeyStore, providerRouter, inputSanitizer);
   }
 }

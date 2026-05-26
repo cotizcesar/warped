@@ -51,13 +51,12 @@ import com.warped.ui.components.WarpedAlertDialog
 fun ChatScreen(
     viewModel: ChatViewModel = hiltViewModel(),
     onOpenDrawer: () -> Unit = {},
-    onNavigateToModels: () -> Unit = {},
+    onNavigateToSelector: () -> Unit = {},
     conversationId: Long = 0L,
     newChat: Boolean = false
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
-    var modelDropdownExpanded by remember { mutableStateOf(false) }
     var attachedImages by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var audioBytes by remember { mutableStateOf<ByteArray?>(null) }
     var isRecording by remember { mutableStateOf(false) }
@@ -141,125 +140,42 @@ fun ChatScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    ExposedDropdownMenuBox(
-                        expanded = modelDropdownExpanded,
-                        onExpandedChange = { modelDropdownExpanded = it },
-                        modifier = Modifier.fillMaxWidth()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                                .clickable { modelDropdownExpanded = true },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            if (uiState.selectedProvider != null && selectedModelName != null) {
-                                val isLocal = uiState.selectedProvider == ProviderType.LOCAL ||
-                                    uiState.selectedProvider == ProviderType.LITE_RT_LM
-                                val typePillColor = if (isLocal) Color(0xFF4CAF50) else Color(0xFF2196F3)
-                                val typePillText = if (isLocal) "Local" else "Net"
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = typePillColor.copy(alpha = 0.15f)
-                                ) {
-                                    Text(
-                                        text = typePillText,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = typePillColor
-                                    )
-                                }
-                                Spacer(Modifier.width(6.dp))
-                            }
-                            Text(
-                                text = selectedModelName ?: stringResource(R.string.select_model),
-                                style = MaterialTheme.typography.titleMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
-                            )
-                            Icon(
-                                Icons.Filled.KeyboardArrowDown,
-                                contentDescription = "Select model",
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        ExposedDropdownMenu(
-                            expanded = modelDropdownExpanded,
-                            onDismissRequest = { modelDropdownExpanded = false }
-                        ) {
-                            if (uiState.localModels.isNotEmpty()) {
-                                uiState.localModels.forEach { model ->
-                                    val isLiteRtLm = model.modelFormat.equals("LITERTLM", ignoreCase = true) ||
-                                        model.filePath.endsWith(".litertlm", ignoreCase = true)
-                                    val providerType = if (isLiteRtLm) ProviderType.LITE_RT_LM else ProviderType.LOCAL
-                                    DropdownMenuItem(
-                                        text = {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                // Type pill
-                                                Surface(
-                                                    shape = RoundedCornerShape(4.dp),
-                                                    color = Color(0xFF4CAF50).copy(alpha = 0.15f)
-                                                ) {
-                                                    Text(
-                                                        text = "Local",
-                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                                        style = MaterialTheme.typography.labelSmall,
-                                                        color = Color(0xFF4CAF50)
-                                                    )
-                                                }
-                                                Spacer(Modifier.width(8.dp))
-                                                Text(model.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            }
-                                        },
-                                        onClick = {
-                                            modelDropdownExpanded = false
-                                            // Defer model loading to avoid blocking UI during state updates
-                                            viewModel.launchModelSelection(model.filePath, providerType)
-                                        }
-                                    )
-                                }
-                            }
-                            if (uiState.localModels.isNotEmpty() && uiState.endpoints.isNotEmpty()) {
-                                HorizontalDivider()
-                            }
-                            uiState.endpoints.forEach { endpoint ->
-                                val modelId = endpoint.modelId
-                                if (modelId != null) {
-                                    val label = modelId.substringAfterLast("/")
-                                    DropdownMenuItem(
-                                        text = {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Surface(
-                                                    shape = RoundedCornerShape(4.dp),
-                                                    color = Color(0xFF2196F3).copy(alpha = 0.15f)
-                                                ) {
-                                                    Text(
-                                                        text = "Net",
-                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                                        style = MaterialTheme.typography.labelSmall,
-                                                        color = Color(0xFF2196F3)
-                                                    )
-                                                }
-                                                Spacer(Modifier.width(8.dp))
-                                                Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            }
-                                        },
-                                        onClick = {
-                                            modelDropdownExpanded = false
-                                            viewModel.launchModelSelection(modelId, endpoint.apiType)
-                                        }
-                                    )
-                                }
-                            }
-                            if (uiState.localModels.isEmpty() && uiState.endpoints.isEmpty()) {
-                                DropdownMenuItem(
-                                    text = { Text("Download a Model", color = MaterialTheme.colorScheme.primary) },
-                                    onClick = {
-                                        modelDropdownExpanded = false
-                                        onNavigateToModels()
-                                    }
+                        if (uiState.selectedProvider != null && selectedModelName != null) {
+                            val isLocal = uiState.selectedProvider == ProviderType.LOCAL ||
+                                uiState.selectedProvider == ProviderType.LITE_RT_LM
+                            val typePillColor = if (isLocal) Color(0xFF4CAF50) else Color(0xFF2196F3)
+                            val typePillText = if (isLocal) "Local" else "Net"
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = typePillColor.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    text = typePillText,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = typePillColor
                                 )
                             }
+                            Spacer(Modifier.width(6.dp))
+                        }
+                        Text(
+                            text = selectedModelName ?: stringResource(R.string.select_model),
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        IconButton(onClick = onNavigateToSelector) {
+                            Icon(
+                                Icons.Filled.Circle,
+                                contentDescription = "Select model",
+                                modifier = Modifier.size(20.dp).padding(2.dp),
+                                tint = if (uiState.isLocalModelLoaded) Color(0xFF4CAF50) else Color(0xFF6B7280)
+                            )
                         }
                     }
                 },

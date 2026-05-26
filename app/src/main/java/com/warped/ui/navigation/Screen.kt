@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     data object Chat : Screen("chat", "Chat", Icons.AutoMirrored.Filled.Chat)
+    data object Selector : Screen("selector", "Models & Endpoints", Icons.Filled.Dns)
     data object Endpoints : Screen("endpoints", "Endpoints", Icons.Filled.Dns)
     data object Models : Screen("models", "Models", Icons.Filled.Memory)
     data object HuggingFace : Screen("huggingface", "HF", Icons.Filled.Search)

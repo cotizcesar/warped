@@ -64,18 +64,18 @@ public class AppDatabase_Impl : AppDatabase() {
   }
 
   protected override fun createOpenDelegate(): RoomOpenDelegate {
-    val _openDelegate: RoomOpenDelegate = object : RoomOpenDelegate(9,
-        "e41312ed320aba476c8587f8f66fc984", "8f5d39badb5575739c837ef1dffe0e26") {
+    val _openDelegate: RoomOpenDelegate = object : RoomOpenDelegate(10,
+        "80d6fd06387f710b7e89bda7ba103c53", "cb2b209b5c2f59f4aae4a04efa46d849") {
       public override fun createAllTables(connection: SQLiteConnection) {
         connection.execSQL("CREATE TABLE IF NOT EXISTS `conversations` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `provider_type` TEXT NOT NULL, `endpoint_id` INTEGER NOT NULL, `model_id` TEXT, `system_prompt` TEXT)")
-        connection.execSQL("CREATE TABLE IF NOT EXISTS `messages` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `conversation_id` INTEGER NOT NULL, `role` TEXT NOT NULL, `content` TEXT NOT NULL, `token_count` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, `images` TEXT, `stats` TEXT, FOREIGN KEY(`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
+        connection.execSQL("CREATE TABLE IF NOT EXISTS `messages` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `conversation_id` INTEGER NOT NULL, `role` TEXT NOT NULL, `content` TEXT NOT NULL, `token_count` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, `images` TEXT, `stats` TEXT, `reasoning` TEXT, FOREIGN KEY(`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )")
         connection.execSQL("CREATE INDEX IF NOT EXISTS `index_messages_conversation_id` ON `messages` (`conversation_id`)")
         connection.execSQL("CREATE TABLE IF NOT EXISTS `endpoints` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `url` TEXT NOT NULL, `api_type` TEXT NOT NULL, `model_id` TEXT, `encrypted_api_key_ref` TEXT, `created_at` INTEGER NOT NULL, `is_active` INTEGER NOT NULL)")
-        connection.execSQL("CREATE TABLE IF NOT EXISTS `local_models` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `file_path` TEXT NOT NULL, `size_bytes` INTEGER NOT NULL, `quantization` TEXT NOT NULL, `parameter_count` TEXT NOT NULL, `architecture` TEXT NOT NULL, `imported_at` INTEGER NOT NULL, `model_format` TEXT NOT NULL DEFAULT 'GGUF')")
+        connection.execSQL("CREATE TABLE IF NOT EXISTS `local_models` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `file_path` TEXT NOT NULL, `size_bytes` INTEGER NOT NULL, `quantization` TEXT NOT NULL, `parameter_count` TEXT NOT NULL, `architecture` TEXT NOT NULL, `imported_at` INTEGER NOT NULL, `model_format` TEXT NOT NULL DEFAULT 'LITERTLM')")
         connection.execSQL("CREATE TABLE IF NOT EXISTS `presets` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `temperature` REAL NOT NULL, `top_p` REAL NOT NULL, `top_k` INTEGER NOT NULL, `repeat_penalty` REAL NOT NULL, `max_tokens` INTEGER NOT NULL, `context_size` INTEGER NOT NULL, `seed` INTEGER NOT NULL, `threads` INTEGER NOT NULL, `model_format` TEXT NOT NULL, `created_at` INTEGER NOT NULL)")
-        connection.execSQL("CREATE TABLE IF NOT EXISTS `download_checkpoints` (`model_id` TEXT NOT NULL, `file_name` TEXT NOT NULL, `file_url` TEXT NOT NULL, `total_bytes` INTEGER NOT NULL, `downloaded_bytes` INTEGER NOT NULL, PRIMARY KEY(`model_id`))")
+        connection.execSQL("CREATE TABLE IF NOT EXISTS `download_checkpoints` (`model_id` TEXT NOT NULL, `file_name` TEXT NOT NULL, `file_url` TEXT NOT NULL, `total_bytes` INTEGER NOT NULL, `downloaded_bytes` INTEGER NOT NULL, `is_gated` INTEGER NOT NULL, PRIMARY KEY(`model_id`))")
         connection.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)")
-        connection.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e41312ed320aba476c8587f8f66fc984')")
+        connection.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '80d6fd06387f710b7e89bda7ba103c53')")
       }
 
       public override fun dropAllTables(connection: SQLiteConnection) {
@@ -152,6 +152,8 @@ public class AppDatabase_Impl : AppDatabase() {
             TableInfo.CREATED_FROM_ENTITY))
         _columnsMessages.put("stats", TableInfo.Column("stats", "TEXT", false, 0, null,
             TableInfo.CREATED_FROM_ENTITY))
+        _columnsMessages.put("reasoning", TableInfo.Column("reasoning", "TEXT", false, 0, null,
+            TableInfo.CREATED_FROM_ENTITY))
         val _foreignKeysMessages: MutableSet<TableInfo.ForeignKey> = mutableSetOf()
         _foreignKeysMessages.add(TableInfo.ForeignKey("conversations", "CASCADE", "NO ACTION",
             listOf("conversation_id"), listOf("id")))
@@ -219,7 +221,7 @@ public class AppDatabase_Impl : AppDatabase() {
         _columnsLocalModels.put("imported_at", TableInfo.Column("imported_at", "INTEGER", true, 0,
             null, TableInfo.CREATED_FROM_ENTITY))
         _columnsLocalModels.put("model_format", TableInfo.Column("model_format", "TEXT", true, 0,
-            "'GGUF'", TableInfo.CREATED_FROM_ENTITY))
+            "'LITERTLM'", TableInfo.CREATED_FROM_ENTITY))
         val _foreignKeysLocalModels: MutableSet<TableInfo.ForeignKey> = mutableSetOf()
         val _indicesLocalModels: MutableSet<TableInfo.Index> = mutableSetOf()
         val _infoLocalModels: TableInfo = TableInfo("local_models", _columnsLocalModels,
@@ -284,6 +286,8 @@ public class AppDatabase_Impl : AppDatabase() {
             true, 0, null, TableInfo.CREATED_FROM_ENTITY))
         _columnsDownloadCheckpoints.put("downloaded_bytes", TableInfo.Column("downloaded_bytes",
             "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY))
+        _columnsDownloadCheckpoints.put("is_gated", TableInfo.Column("is_gated", "INTEGER", true, 0,
+            null, TableInfo.CREATED_FROM_ENTITY))
         val _foreignKeysDownloadCheckpoints: MutableSet<TableInfo.ForeignKey> = mutableSetOf()
         val _indicesDownloadCheckpoints: MutableSet<TableInfo.Index> = mutableSetOf()
         val _infoDownloadCheckpoints: TableInfo = TableInfo("download_checkpoints",

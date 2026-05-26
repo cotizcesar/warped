@@ -17,8 +17,14 @@ data class ChatUiState(
     val isGenerating: Boolean = false,
     val streamingContent: String = "",
     val streamingReasoning: String = "",
+    @Deprecated("Use selectedLocalModelId or selectedRemoteModelId instead")
     val selectedProvider: ProviderType? = null,
+    @Deprecated("Use selectedLocalModelId or selectedRemoteModelId instead")
     val selectedModelId: String? = null,
+    val selectedLocalModelId: String? = null,
+    val selectedRemoteModelId: String? = null,
+    val selectedRemoteProvider: ProviderType? = null,
+    val isLocalModelConnected: Boolean = false,
     val connectionStatus: ConnectionStatus = ConnectionStatus.Unknown,
     val error: ChatError? = null,
     val conversations: List<Conversation> = emptyList(),
@@ -40,7 +46,7 @@ data class ChatUiState(
     val pendingModelSwitch: ModelSwitchRequest? = null,
     val conversationModelId: String? = null,
     val conversationProviderType: ProviderType? = null,
-    val toolCallActive: String? = null,  // tool name while tool is executing (e.g. "web_search")
+    val toolCallActive: String? = null  // tool name while tool is executing (e.g. "web_search")
 )
 
 sealed class ChatError {

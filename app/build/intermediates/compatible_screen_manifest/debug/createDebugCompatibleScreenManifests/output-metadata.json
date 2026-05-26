@@ -4,7 +4,7 @@
     "type": "COMPATIBLE_SCREEN_MANIFEST",
     "kind": "Directory"
   },
-  "applicationId": "com.warped",
+  "applicationId": "com.warped.app",
   "variantName": "debug",
   "elements": []
 }
