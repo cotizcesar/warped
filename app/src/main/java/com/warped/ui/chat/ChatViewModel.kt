@@ -695,12 +695,18 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    private val supportedImageTypes = setOf("image/png", "image/jpeg", "image/jpg")
+
     private fun uriToBase64(uri: Uri): String? {
         return try {
             val input = context.contentResolver.openInputStream(uri) ?: return null
             val bytes = input.use { it.readBytes() }
+            val mime = context.contentResolver.getType(uri)?.lowercase() ?: "image/png"
+            if (mime !in supportedImageTypes) {
+                Timber.w("ChatVM: unsupported image type $mime — only PNG and JPEG are supported")
+                return null
+            }
             val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-            val mime = context.contentResolver.getType(uri) ?: "image/png"
             "data:$mime;base64,$base64"
         } catch (_: Exception) {
             null
