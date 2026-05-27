@@ -6,7 +6,7 @@
 
 ---
 
-## Phase 31: LiteRT-LM v0.12.0 Upgrade
+## ✅ Phase 31: LiteRT-LM v0.12.0 Upgrade (Done)
 
 **Goal:** Upgrade the inference engine from v0.11.0 to v0.12.0, verify compilation and all existing functionality.
 
@@ -28,7 +28,7 @@
 
 ---
 
-## Phase 32: Unified Models & Endpoints Selector
+## ✅ Phase 32: Unified Models & Endpoints Selector (Done)
 
 **Goal:** Build a single unified selector screen where the user sees 1 local model (with connect/disconnect toggle) alongside infinite remote endpoint models.
 
@@ -51,7 +51,7 @@
 
 ---
 
-## Phase 33: Unified UI Integration & Traffic Light
+## ✅ Phase 33: Unified UI Integration & Traffic Light (Done)
 
 **Goal:** Integrate the unified selector into the app navigation, replace old dropdown/standalone screens, and implement the full traffic light status indicator for both local and remote.
 
@@ -75,7 +75,7 @@
 
 ---
 
-## Phase 34: Smart Memory-Based Presets
+## ✅ Phase 34: Smart Memory-Based Presets (Done)
 
 **Goal:** Deliver one dynamically calculated optimal preset based on available device RAM and selected model size, with manual override capability.
 
@@ -102,10 +102,10 @@
 
 | # | Phase | Goal | Reqs | Success Criteria |
 |---|-------|------|------|------------------|
-| 31 | LiteRT-LM v0.12.0 Upgrade | Bump engine version, fix compilation | ENG-01..03 | 5 |
-| 32 | Unified Models & Endpoints Selector | Single screen: 1 local + N remote | UNIFY-01..05 | 5 |
-| 33 | Unified UI Integration & Traffic Light | Replace old UI, full semaforo both directions | UNIFY-06, SEMAF-01..05 | 6 |
-| 34 | Smart Memory-Based Presets | Dynamic preset from available RAM | SMART-01..05 | 5 |
+| 31 | LiteRT-LM v0.12.0 Upgrade | Bump engine version, fix compilation | ENG-01..03 | 5 | ✅ Done |
+| 32 | Unified Models & Endpoints Selector | Single screen: 1 local + N remote | UNIFY-01..05 | 5 | ✅ Done |
+| 33 | Unified UI Integration & Traffic Light | Replace old UI, full semaforo both directions | UNIFY-06, SEMAF-01..05 | 6 | ✅ Done |
+| 34 | Smart Memory-Based Presets | Dynamic preset from available RAM | SMART-01..05 | 5 | ✅ Done |
 
 **Total: 4 phases, 19 requirements, 21 success criteria**
 

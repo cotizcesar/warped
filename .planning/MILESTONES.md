@@ -1,5 +1,21 @@
 # Milestones
 
+## v1.7 App Optimization & Smart Presets (Shipped: 2026-05-25)
+
+**Phases completed:** 4 phases (31-34), 4 plans, 19 requirements
+**Requirements:** 19 defined, 19 satisfied
+**Known deferred items at close:** 0
+
+**Key accomplishments:**
+
+1. LiteRT-LM upgraded from v0.11.0 to v0.12.0 with compilation verified and all existing functionality preserved
+2. Unified Models & Endpoints Selector: single screen showing 1 local model (with connect/disconnect toggle) alongside infinite remote endpoint models
+3. Traffic light status indicator (semaforo) integrated in ChatScreen TopAppBar for both local and remote providers
+4. Smart Memory-Based Presets: dynamically calculated optimal preset based on available device RAM and selected model size, with manual override capability
+5. All 19 requirements satisfied across 4 phases, compilation clean, no tech debt introduced
+
+---
+
 ## v1.6 Code Syntax Highlighting (Shipped: 2026-05-15)
 
 **Phases completed:** 3 phases (28-30), 8 plans, 22 tasks
