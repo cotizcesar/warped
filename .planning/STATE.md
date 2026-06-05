@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: LiteRT Update, Bugfix Round & Recommended Models
 status: planning
-last_updated: "2026-06-05T15:26:05.105Z"
+last_updated: "2026-06-05T16:00:00.000Z"
 last_activity: 2026-06-05
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,26 +20,27 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-15)
+See: .planning/PROJECT.md (updated 2026-06-05)
 
 **Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** Planning next milestone
+**Current focus:** v1.8 LiteRT Update, Bugfix Round & Recommended Models — Phase 35 ready to plan
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 35 (LiteRT-LM Engine Upgrade & Conversation Context)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-06-05 — Milestone v1.8 started
+Status: Roadmap defined — ready to plan phase 35
+Last activity: 2026-06-05 — v1.8 roadmap created (5 phases, 30 requirements)
 
-## Phase Structure (v1.7)
+## Phase Structure (v1.8)
 
 | Phase | Name | Requirements | Status | Depends On |
 |-------|------|--------------|--------|------------|
-| 31 | LiteRT-LM v0.12.0 Upgrade | ENG-01..03 (3) | Complete | — |
-| 32 | Unified Models & Endpoints Selector | UNIFY-01..05 (5) | Complete | Phase 31 |
-| 33 | Unified UI Integration & Traffic Light | UNIFY-06, SEMAF-01..05 (6) | Complete | Phase 32 |
-| 34 | Smart Memory-Based Presets | SMART-01..05 (5) | Complete | Phase 32 |
+| 35 | LiteRT-LM Engine Upgrade & Conversation Context | LRT-01..03 (3) | Not started | — |
+| 36 | Hugging Face Model Browser Bugfixes | HF-01..09 (9) | Not started | — |
+| 37 | Chat UI Redesign & Model Selector | CHAT-01..08 (8) | Not started | — |
+| 38 | Endpoint CRUD & Provider Refactor | ENDPT-01..07 (7) | Not started | — |
+| 39 | Recommended Models Curated List | REC-01..03 (3) | Not started | — |
 
 ## Completed Milestones
 
@@ -51,8 +52,10 @@ Last activity: 2026-06-05 — Milestone v1.8 started
 - ✅ v1.5 Bug Hunt, Cleanup & Hardening — 5 phases, 26 requirements
 - ✅ v1.6 Code Syntax Highlighting — 3 phases, 20 requirements
 - ✅ v1.7 App Optimization & Smart Presets — 4 phases, 19 requirements
+- 🔄 v1.8 LiteRT Update, Bugfix Round & Recommended Models — 5 phases, 30 requirements (in progress)
 
-**Total across all milestones:** 34 phases, 204 requirements
+**Total across all milestones (completed):** 34 phases, 204 requirements
+**v1.8 target:** 5 phases, 30 requirements → 39 phases, 234 requirements at completion
 
 ## Performance Metrics
 
@@ -90,31 +93,31 @@ None.
 
 ## Deferred Items
 
-Items acknowledged and deferred at milestone close on 2026-05-15:
+Items acknowledged and deferred at milestone close on 2026-05-15. **All 12 quick tasks picked up in v1.8 roadmap** (Phases 35–38). Verification gaps remain pending until human runs them.
 
-| Category | Item | Status |
-|----------|------|--------|
-| verification_gap | Phase 06: 06-VERIFICATION.md | human_needed |
-| verification_gap | Phase 07: 07-VERIFICATION.md | human_needed |
-| verification_gap | Phase 08: 08-VERIFICATION.md | human_needed |
-| verification_gap | Phase 09: 09-VERIFICATION.md | human_needed |
-| verification_gap | Phase 10: 10-VERIFICATION.md | human_needed |
-| verification_gap | Phase 29: 29-VERIFICATION.md | human_needed |
-| quick_task | 260430-qv6-no-salen-los-modelos-en-el-detalle-del-m | missing |
-| quick_task | 260430-rdt-unificar-diseno-detalle-con-listado-prin | missing |
-| quick_task | 260430-ryn-rediseno-chat-ocultar-topbar-selector-mo | missing |
-| quick_task | 260430-sx3-navegar-a-models-al-terminar-descarga-ar | missing |
-| quick_task | 260430-tac-descargas-en-segundo-plano-listar-modelo | missing |
-| quick_task | 260430-u5f-editar-y-borrar-endpoints-anthropic-prov | missing |
-| quick_task | 260430-ulx-endpoints-en-selector-chat-titulo-models | missing |
-| quick_task | 260430-v7v-cargar-modelo-local-con-loading-listar-m | missing |
-| quick_task | 260430-vsl-lm-studio-nativo-v1-api-remover-openai-a | missing |
-| quick_task | 260430-wgt-arreglar-delete-endpoints-dropdown-model | missing |
-| quick_task | 260430-wtn-fix-real-delete-endpoints-y-fetch-modelo | missing |
-| quick_task | 260504-lmi-litert-lm-solo-env-a-el-primer-mensaje-d | missing |
+| Category | Item | Status | Mapped Phase |
+|----------|------|--------|--------------|
+| verification_gap | Phase 06: 06-VERIFICATION.md | human_needed | — |
+| verification_gap | Phase 07: 07-VERIFICATION.md | human_needed | — |
+| verification_gap | Phase 08: 08-VERIFICATION.md | human_needed | — |
+| verification_gap | Phase 09: 09-VERIFICATION.md | human_needed | — |
+| verification_gap | Phase 10: 10-VERIFICATION.md | human_needed | — |
+| verification_gap | Phase 29: 29-VERIFICATION.md | human_needed | — |
+| quick_task | 260430-qv6-no-salen-los-modelos-en-el-detalle-del-m | picked-up-v1.8 | Phase 36 (HF-01) |
+| quick_task | 260430-rdt-unificar-diseno-detalle-con-listado-prin | picked-up-v1.8 | Phase 36 (HF-02..04) |
+| quick_task | 260430-ryn-rediseno-chat-ocultar-topbar-selector-mo | picked-up-v1.8 | Phase 37 (CHAT-01..03) |
+| quick_task | 260430-sx3-navegar-a-models-al-terminar-descarga-ar | picked-up-v1.8 | Phase 36 (HF-05..06) |
+| quick_task | 260430-tac-descargas-en-segundo-plano-listar-modelo | picked-up-v1.8 | Phase 36 (HF-07..09) |
+| quick_task | 260430-u5f-editar-y-borrar-endpoints-anthropic-prov | picked-up-v1.8* | Phase 38 (ENDPT-01..02) — Anthropic portion removed in v1.8 scope |
+| quick_task | 260430-ulx-endpoints-en-selector-chat-titulo-models | picked-up-v1.8 | Phase 37 (CHAT-04..06) |
+| quick_task | 260430-v7v-cargar-modelo-local-con-loading-listar-m | picked-up-v1.8 | Phase 37 (CHAT-07..08) + Phase 38 (ENDPT-06) |
+| quick_task | 260430-vsl-lm-studio-nativo-v1-api-remover-openai-a | picked-up-v1.8 | Phase 38 (ENDPT-04..05) |
+| quick_task | 260430-wgt-arreglar-delete-endpoints-dropdown-model | picked-up-v1.8 | Phase 38 (ENDPT-02..04) |
+| quick_task | 260430-wtn-fix-real-delete-endpoints-y-fetch-modelo | shipped-v1.6 (commit 777f604) | — |
+| quick_task | 260504-lmi-litert-lm-solo-env-a-el-primer-mensaje-d | picked-up-v1.8 | Phase 35 (LRT-02) |
 
 ## Session Continuity
 
-Last session: 2026-05-15T04:37:18.000Z
-Stopped at: Milestone v1.6 complete
+Last session: 2026-06-05T16:00:00.000Z
+Stopped at: Milestone v1.8 roadmap defined — 5 phases, 30 requirements, ready to plan Phase 35
 Resume file: None

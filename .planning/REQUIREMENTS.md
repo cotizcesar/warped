@@ -1,90 +1,126 @@
 # Requirements: Warped
 
-**Defined:** 2026-05-25
+**Defined:** 2026-06-05
+**Last updated:** 2026-06-05 after milestone v1.8 requirements definition
 **Core Value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
 
-## v1.7 Requirements
+## v1.8 Requirements
 
-Requirements for App Optimization & Smart Presets milestone.
+Requirements for the LiteRT Update, Bugfix Round & Recommended Models milestone.
 
-### Engine & Library Upgrade
+### LiteRT Engine
 
-- [x] **ENG-01**: Upgrade LiteRT-LM library from v0.11.0 to latest stable v0.12.0
-- [x] **ENG-02**: Verify compilation succeeds and all existing local inference functionality works after upgrade
-- [x] **ENG-03**: Adapt any API changes introduced by v0.12.0 (if breaking changes exist)
+- [ ] **LRT-01**: User gets the latest stable LiteRT-LM library release (currently upgrading from v0.12.0) — version bump in `libs.versions.toml`, Gradle sync succeeds
+- [ ] **LRT-02**: Multi-turn conversation with a LiteRT-LM model retains full message history — the engine no longer treats each user message as the first message of a new conversation
+- [ ] **LRT-03**: Any breaking API changes introduced by the new LiteRT-LM version are adapted — compilation succeeds, all existing local inference functionality preserved, unit tests pass
 
-### Unified Models & Endpoints Selector
+### Hugging Face Model Browser
 
-- [x] **UNIFY-01**: User sees all available models (1 local + N remote endpoints) in a single unified selector screen
-- [x] **UNIFY-02**: User can connect/disconnect the local model with a toggle switch (only 1 local model at a time to preserve RAM)
-- [x] **UNIFY-03**: Local model connection state is visually indicated with a green/gray badge (connected/disconnected)
-- [x] **UNIFY-04**: User can select from infinite remote endpoint models alongside the single local model in the same list
-- [x] **UNIFY-05**: Connecting a new local model automatically releases the previous one from RAM before loading
-- [x] **UNIFY-06**: The unified Models & Endpoints screen replaces both the ChatScreen inline dropdown and the standalone Endpoints list section
+- [ ] **HF-01**: Model detail screen shows all `.litertlm` sibling files regardless of LFS metadata availability — files with `size=0` or missing `lfs` field appear in the list and compatibility check
+- [ ] **HF-02**: Model detail file cards match the visual design of the main search list — same Storage icon, chips, border, `primaryContainer` colors
+- [ ] **HF-03**: User can cancel an in-progress model download from the detail screen — cancels the in-flight download and removes any partial file
+- [ ] **HF-04**: Search query text in the Hugging Face browser survives device rotation and back-navigation from a model detail screen
+- [ ] **HF-05**: After a model download completes successfully, the user is auto-navigated to the Models & Endpoints list so the new model is immediately visible
+- [ ] **HF-06**: GGUF/LiteRT metadata parser validates string lengths before allocating byte arrays — corrupted or malformed metadata no longer triggers false "out of memory" errors
+- [ ] **HF-07**: Downloads continue in the background when the user navigates away from the Hugging Face screen — leaving the screen does not pause or kill the download
+- [ ] **HF-08**: Active and incomplete downloads appear in the Models & Endpoints list with progress bars
+- [ ] **HF-09**: User can cancel and delete an incomplete/paused download from the Models & Endpoints list
 
-### Traffic Light Status Indicator (Semaforo)
+### Chat UI & Model Selector
 
-- [x] **SEMAF-01**: Traffic light circle indicator shows status for both local models AND remote endpoints in the TopAppBar
-- [x] **SEMAF-02**: Local model states displayed correctly: Green = loaded in RAM and ready, Red = error, Gray = not loaded in RAM
-- [x] **SEMAF-03**: Yellow/Orange = actively generating tokens (streaming) — if detectable, otherwise omitted
-- [x] **SEMAF-04**: Remote endpoint states: Green = connected/healthy, Red = error/disconnected, Gray = idle/untested
-- [x] **SEMAF-05**: The status indicator circle is always visible in the TopAppBar regardless of provider type
+- [ ] **CHAT-01**: Chat input bar is a rounded pill with a transparent underline — ChatGPT/Claude style with Material `Icons.AutoMirrored.Filled.Send` and `Icons.Filled.Stop`
+- [ ] **CHAT-02**: Chat screen has no TopAppBar — model picker is inline above the messages, drawer is reachable via swipe gesture
+- [ ] **CHAT-03**: Bottom navigation bar shows icons only, no text labels — more vertical space for the chat content
+- [ ] **CHAT-04**: Network endpoints appear alongside local models in the chat model picker — single unified bottom-sheet selector
+- [ ] **CHAT-05**: Model selection is an icon button near the chat input that opens the bottom-sheet picker — no longer at the top of the chat
+- [ ] **CHAT-06**: Models & Endpoints screen has a compact title with minimal top space — wasted vertical padding removed
+- [ ] **CHAT-07**: When a user selects a local model for chat, a "Cargando modelo" loading indicator appears in the chat while the model loads asynchronously into RAM
+- [ ] **CHAT-08**: Network endpoints fetch and display their available models (e.g. LM Studio's `/api/v1/models`) — the picker shows models the endpoint can serve
 
-### Smart Memory-Based Presets
+### Endpoint CRUD & Provider
 
-- [x] **SMART-01**: User sees one dynamically calculated optimal preset based on available device RAM and selected model size
-- [x] **SMART-02**: The smart preset recalculates parameters when a different model is selected
-- [x] **SMART-03**: Smart preset adjusts temperature, context_size, threads, and max_tokens based on available memory headroom
-- [x] **SMART-04**: User can manually override any smart preset parameter via existing sliders
-- [x] **SMART-05**: Available/total device RAM is displayed alongside the smart preset for user transparency
+- [ ] **ENDPT-01**: User can edit an existing network endpoint from the Models & Endpoints list — name, URL, and API key are editable in a form
+- [ ] **ENDPT-02**: User can delete a network endpoint from the Models & Endpoints list — deletion removes the endpoint and its stored API key
+- [ ] **ENDPT-03**: Endpoint deletion provides immediate UI feedback — the card disappears from the list without waiting for the DB Flow to re-emit
+- [ ] **ENDPT-04**: Warped uses the LM Studio native v1 REST API (`/api/v1/chat`, `/api/v1/models`) instead of the OpenAI-compatible endpoint — full native provider with native DTOs
+- [ ] **ENDPT-05**: Endpoint form offers only LM_STUDIO as the provider type — OpenAI, Anthropic, Ollama, and Custom options are removed in favor of LM Studio focus
+- [ ] **ENDPT-06**: Network security config allows HTTP cleartext traffic to LAN IPs (192.168.x.x, 10.x.x.x, 172.16-31.x.x) — local-network LM Studio / Ollama servers work without TLS
+- [ ] **ENDPT-07**: User-entered endpoint URLs are normalized — missing `http://` scheme is added, missing trailing `/` is appended, before creating the provider
+
+### Recommended Models
+
+- [ ] **REC-01**: User sees a hand-curated "Recommended" section at the top of the model browser — a fixed list of 5–10 recommended `.litertlm` models shipped with the app (no scraping, no API calls)
+- [ ] **REC-02**: Each recommended model displays name, size, a one-line "why recommended" description, and a one-tap entry point that opens the model's Hugging Face detail page for download
+- [ ] **REC-03**: Recommended list is shipped as a static asset (e.g. JSON in `assets/` or a Kotlin constant) — the list is part of the app binary, versioned with the app, and never fetched over the network
 
 ## v2 Requirements
 
-Deferred to future release.
+Deferred to future release. Tracked but not in current roadmap.
 
 - **REMOTE-01**: Endpoint health check polling with background refresh
 - **REMOTE-02**: Memory pressure-based automatic model eviction with configurable thresholds
+- **LRT-04**: Samsung Hexagon NPU acceleration for LiteRT-LM (when stable)
+- **LRT-05**: Vulkan GPU acceleration for LiteRT-LM (when stable)
+- **ANTHROPIC-01**: Re-introduce Anthropic API support if user demand returns — currently removed in v1.8 in favor of LM Studio focus
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| GGUF / llama.cpp inference | Removed in v1.5, LiteRT-LM is sole local engine |
-| iOS / desktop platforms | Android only per project constraints |
-| Multi-model simultaneous loading | Explicitly limited to 1 local model to preserve RAM |
-| Cloud sync for presets | Local-only, no server infrastructure |
-| Auto-download models based on RAM | User-initiated downloads only, smart presets adjust to what's available |
-| Background endpoint health monitoring | Polling on user interaction only, not in background |
+| OpenAI, Anthropic, Ollama, Custom provider types | Removed in v1.8 — milestone focuses on LM Studio as the sole remote provider |
+| Voice input/output | Defer, focus on text chat |
+| Image/multimodal models | Defer, focus on text LLMs |
+| AI agents / autonomous tool use | Defer, MCP tool calling via LM Studio API is in scope |
+| Real-time sync across devices | Defer |
+| Paid subscriptions to remote providers | User brings own API keys |
+| GGUF / llama.cpp local inference | Removed in v1.5. App pivots to LiteRT-LM as sole local engine |
+| Certificate pinning for remote endpoints | Defer |
+| Play Integrity / root detection | Defer |
+| Auto-scraped "trending" models list | REC-01 uses a hand-curated static list — no API scraping, no ranking algorithms |
+| User-customizable recommended lists | REC-01 ships a fixed list with the app |
 
 ## Traceability
 
+Which phases cover which requirements. Updated during roadmap creation.
+
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ENG-01 | Phase 31 | Done |
-| ENG-02 | Phase 31 | Done |
-| ENG-03 | Phase 31 | Done |
-| UNIFY-01 | Phase 32 | Done |
-| UNIFY-02 | Phase 32 | Done |
-| UNIFY-03 | Phase 32 | Done |
-| UNIFY-04 | Phase 32 | Done |
-| UNIFY-05 | Phase 32 | Done |
-| UNIFY-06 | Phase 33 | Done |
-| SEMAF-01 | Phase 33 | Done |
-| SEMAF-02 | Phase 33 | Done |
-| SEMAF-03 | Phase 33 | Done |
-| SEMAF-04 | Phase 33 | Done |
-| SEMAF-05 | Phase 33 | Done |
-| SMART-01 | Phase 34 | Done |
-| SMART-02 | Phase 34 | Done |
-| SMART-03 | Phase 34 | Done |
-| SMART-04 | Phase 34 | Done |
-| SMART-05 | Phase 34 | Done |
+| LRT-01 | Phase 35 | Pending |
+| LRT-02 | Phase 35 | Pending |
+| LRT-03 | Phase 35 | Pending |
+| HF-01 | Phase 36 | Pending |
+| HF-02 | Phase 36 | Pending |
+| HF-03 | Phase 36 | Pending |
+| HF-04 | Phase 36 | Pending |
+| HF-05 | Phase 36 | Pending |
+| HF-06 | Phase 36 | Pending |
+| HF-07 | Phase 36 | Pending |
+| HF-08 | Phase 36 | Pending |
+| HF-09 | Phase 36 | Pending |
+| CHAT-01 | Phase 37 | Pending |
+| CHAT-02 | Phase 37 | Pending |
+| CHAT-03 | Phase 37 | Pending |
+| CHAT-04 | Phase 37 | Pending |
+| CHAT-05 | Phase 37 | Pending |
+| CHAT-06 | Phase 37 | Pending |
+| CHAT-07 | Phase 37 | Pending |
+| CHAT-08 | Phase 37 | Pending |
+| ENDPT-01 | Phase 38 | Pending |
+| ENDPT-02 | Phase 38 | Pending |
+| ENDPT-03 | Phase 38 | Pending |
+| ENDPT-04 | Phase 38 | Pending |
+| ENDPT-05 | Phase 38 | Pending |
+| ENDPT-06 | Phase 38 | Pending |
+| ENDPT-07 | Phase 38 | Pending |
+| REC-01 | Phase 39 | Pending |
+| REC-02 | Phase 39 | Pending |
+| REC-03 | Phase 39 | Pending |
 
 **Coverage:**
-- v1.7 requirements: 19 total
-- Mapped to phases: 19
-- Unmapped: 0
+- v1.8 requirements: 30 total
+- Mapped to phases: 30
+- Unmapped: 0 ✓
 
 ---
-*Requirements defined: 2026-05-25*
-*Last updated: 2026-05-25 after milestone v1.7 requirements definition*
+*Requirements defined: 2026-06-05*
+*Last updated: 2026-06-05 after milestone v1.8 requirements definition*
