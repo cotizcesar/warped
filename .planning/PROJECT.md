@@ -16,15 +16,22 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 **Known deferred:** INTG-03 (README preview — requires new API endpoint). 18 pre-existing open items recorded in STATE.md.
 
-## Current Milestone: v1.7 App Optimization & Smart Presets
+## Previous Milestone: v1.7 App Optimization & Smart Presets — COMPLETE ✅
 
-**Goal:** Optimize the app with latest LiteRT-LM library, unify model/endpoint selection, fix status indicators, and deliver memory-aware smart presets.
+**Shipped:** 2026-05-25 | [Archive →](.planning/milestones/v1.7-ROADMAP.md)
+
+4 phases (31-34), 19 requirements completed. LiteRT-LM upgraded to v0.12.0, unified Models & Endpoints selector with connect/disconnect toggle, traffic light status indicator for both local and remote, and memory-aware smart presets with manual override.
+
+**Known deferred:** 12 quick tasks + 6 verification gaps (see STATE.md Deferred Items).
+
+## Current Milestone: v1.8 LiteRT Update, Bugfix Round & Recommended Models
+
+**Goal:** Upgrade LiteRT-LM to the latest stable release, fix the accumulated broken/behaving features from the 12 deferred quick tasks, and ship a hand-curated list of recommended `.litertlm` models to the model browser.
 
 **Target features:**
-- Upgrade LiteRT-LM library to latest stable release
-- Unified Models & Endpoints selector screen (1 local model + infinite endpoints)
-- Fix traffic light status indicator (semaforo) for correct connected/disconnected state
-- Memory-based auto-optimized generation presets
+- Upgrade LiteRT-LM library from v0.12.0 to latest stable release (with API adaptation if breaking changes)
+- Tanda de bugfixes covering the 12 deferred quick tasks: model detail rendering, chat selector redesign, post-download navigation, background downloads, endpoint CRUD, local model loading states, LM Studio v1 API alignment, conversation history, and related regressions
+- Manual curated list of recommended `.litertlm` models — hand-picked, no scraping, with name, size, why-recommended, and one-tap download entry point
 
 ## Requirements
 
@@ -139,4 +146,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-25 after v1.7 App Optimization & Smart Presets milestone start*
+*Last updated: 2026-06-05 after v1.8 LiteRT Update, Bugfix Round & Recommended Models milestone start*

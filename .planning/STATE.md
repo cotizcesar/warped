@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.7
-milestone_name: App Optimization & Smart Presets
-status: complete
-last_updated: "2026-05-25T23:59:59.000Z"
-last_activity: 2026-05-25
+milestone: v1.8
+milestone_name: LiteRT Update, Bugfix Round & Recommended Models
+status: planning
+last_updated: "2026-06-05T15:26:05.105Z"
+last_activity: 2026-06-05
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 4
-  completed_plans: 4
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State: Warped
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-05-15)
 
 ## Current Position
 
-Phase: All complete (v1.7 shipped)
+Phase: Not started (defining requirements)
 Plan: —
-Status: Milestone v1.7 complete
-Last activity: 2026-05-25 — Milestone v1.7 delivered
+Status: Defining requirements
+Last activity: 2026-06-05 — Milestone v1.8 started
 
 ## Phase Structure (v1.7)
 
