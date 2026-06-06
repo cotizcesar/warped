@@ -49,7 +49,10 @@ data class ChatUiState(
     val pendingModelSwitch: ModelSwitchRequest? = null,
     val conversationModelId: String? = null,
     val conversationProviderType: ProviderType? = null,
-    val toolCallActive: String? = null  // tool name while tool is executing (e.g. "web_search")
+    val toolCallActive: String? = null,  // tool name while tool is executing (e.g. "web_search")
+    // 44-03: skill chips
+    val skills: List<com.warped.domain.skill.Skill> = emptyList(),
+    val selectedSkillIds: Set<String> = emptySet(),
 )
 
 enum class TrafficLightState {

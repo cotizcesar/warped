@@ -10,8 +10,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddPhotoAlternate
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
@@ -50,6 +50,10 @@ fun ChatInputBar(
     modelHasAudio: Boolean = false,
     onAudioRecorded: ((ByteArray) -> Unit)? = null,
     onAudioRecordingChanged: ((Boolean) -> Unit)? = null,
+    // 44-03: skill chips row
+    skills: List<com.warped.domain.skill.Skill> = emptyList(),
+    selectedSkillIds: Set<String> = emptySet(),
+    onToggleSkill: (com.warped.domain.skill.Skill) -> Unit = {},
 ) {
     Surface(
         color = Color(0xFF2B2B29),
@@ -60,6 +64,16 @@ fun ChatInputBar(
             .padding(start = 10.dp, end = 10.dp, top = 5.dp, bottom = 0.dp)
     ) {
         Column(modifier = Modifier.padding(10.dp)) {
+            // 44-03: skill chips above the input field
+            if (skills.isNotEmpty()) {
+                SkillChipsRow(
+                    skills = skills,
+                    selectedSkillIds = selectedSkillIds,
+                    onToggleSkill = onToggleSkill,
+                    modifier = Modifier.padding(bottom = 6.dp),
+                )
+            }
+
             // Image previews
             if (attachedImages.isNotEmpty()) {
                 LazyRow(
@@ -185,11 +199,11 @@ fun ChatInputBar(
                                 contentColor = Color.White
                             )
                         ) {
-                            Icon(Icons.Filled.ArrowUpward, "Send", modifier = Modifier.size(24.dp))
+                            Icon(Icons.AutoMirrored.Filled.Send, "Send", modifier = Modifier.size(24.dp))
                         }
                     } else {
                         IconButton(onClick = onSend, enabled = false, modifier = Modifier.size(40.dp)) {
-                            Icon(Icons.Filled.ArrowUpward, "Send",
+                            Icon(Icons.AutoMirrored.Filled.Send, "Send",
                                 tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(24.dp))
                         }
                     }

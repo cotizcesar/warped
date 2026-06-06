@@ -42,6 +42,7 @@ class ChatViewModel @Inject constructor(
     private val memoryChecker: MemoryChecker,
     private val advancedPreferences: AdvancedPreferences,
     private val allowlistRepository: ModelAllowlistRepository,
+    private val skillRepository: com.warped.domain.repository.SkillRepository,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -58,6 +59,13 @@ class ChatViewModel @Inject constructor(
         // Restore persisted loaded instance ID
         activeModelSelection.activeModel.value?.instanceId?.let {
             _uiState.value = _uiState.value.copy(loadedInstanceId = it)
+        }
+        // 44-03: load skills (full registry, static) + their enabled-set
+        _uiState.update { it.copy(skills = com.warped.domain.skill.SkillRegistry.all) }
+        viewModelScope.launch(coroutineExceptionHandler) {
+            skillRepository.enabledSkills.collect { enabled ->
+                _uiState.update { it.copy(selectedSkillIds = enabled.map { s -> s.id }.toSet()) }
+            }
         }
         viewModelScope.launch(coroutineExceptionHandler) {
             chatRepository.observeConversations().collect { conversations ->
@@ -265,7 +273,13 @@ class ChatViewModel @Inject constructor(
                 val modelMayThink = state.localModels.firstOrNull { it.filePath == modelId }?.capabilities?.reasoning == true
                 Timber.d("ChatVM: sendMessage reasoningActive=%b modelMayThink=%b", reasoningActive, modelMayThink)
 
-                helper.runInference(request, enableThinking = state.enableThinking && state.supportsThinking, skills = emptyList()).collect { token ->
+                // 44-03: pass only enabled skills to the inference helper
+                val enabledSkills = state.skills.filter { it.id in state.selectedSkillIds }
+                helper.runInference(
+                    request = request,
+                    enableThinking = state.enableThinking && state.supportsThinking,
+                    skills = enabledSkills,
+                ).collect { token ->
 
                     when (token) {
                         is StreamToken.Delta -> {
@@ -642,6 +656,13 @@ class ChatViewModel @Inject constructor(
         val next = !_uiState.value.enableThinking
         viewModelScope.launch(coroutineExceptionHandler) {
             advancedPreferences.setThinkingEnabled(next)
+        }
+    }
+
+    /** 44-03: toggle a skill on/off; persists via SkillPreferences. */
+    fun toggleSkill(skill: com.warped.domain.skill.Skill) {
+        viewModelScope.launch(coroutineExceptionHandler) {
+            skillRepository.setEnabled(skill.id, skill.id !in _uiState.value.selectedSkillIds)
         }
     }
 
