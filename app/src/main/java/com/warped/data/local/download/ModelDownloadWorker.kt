@@ -38,8 +38,9 @@ class ModelDownloadWorker @AssistedInject constructor(
     private val checkpointDao: DownloadCheckpointDao,
     private val apiKeyStore: ApiKeyStore,
     // PERF-10: skip the foreground notification when the user is already
-    // looking at the in-app download progress UI.
-    private val appLifecycle: AppLifecycleProvider,
+    // looking at the in-app download progress UI. Nullable to avoid
+    // blocking worker creation if ProcessLifecycleOwner is unavailable.
+    private val appLifecycle: AppLifecycleProvider?,
 ) : CoroutineWorker(context, workerParams) {
 
     companion object {
@@ -99,7 +100,7 @@ class ModelDownloadWorker @AssistedInject constructor(
 
         // Show foreground notification before the HTTP call when Android allows it
         // AND the user isn't already looking at the in-app progress UI.
-        if (appLifecycle.isAppInForeground) {
+        if (appLifecycle?.isAppInForeground == true) {
             foregroundUpdatesAllowed = false
         } else {
             try {
