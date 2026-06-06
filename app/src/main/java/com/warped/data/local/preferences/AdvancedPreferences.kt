@@ -5,10 +5,9 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
-import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.warped.domain.model.GenerationParameters
 import com.warped.domain.model.SyntaxTheme
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -26,39 +25,11 @@ class AdvancedPreferences @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private companion object {
-        val KEY_TEMPERATURE = floatPreferencesKey("temperature")
-        val KEY_TOP_P = floatPreferencesKey("top_p")
-        val KEY_TOP_K = intPreferencesKey("top_k")
-        val KEY_REPEAT_PENALTY = floatPreferencesKey("repeat_penalty")
-        val KEY_MAX_TOKENS = intPreferencesKey("max_tokens")
-        val KEY_CONTEXT_SIZE = intPreferencesKey("context_size")
-        val KEY_SEED = intPreferencesKey("seed")
         val KEY_CODE_THEME = stringPreferencesKey("code_theme")
         val KEY_CODE_FONT_SCALE = floatPreferencesKey("code_font_scale")
-    }
-
-    val defaultParameters: Flow<GenerationParameters> = context.advancedPreferencesStore.data.map { prefs ->
-        GenerationParameters(
-            temperature = prefs[KEY_TEMPERATURE] ?: 0.7f,
-            topP = prefs[KEY_TOP_P] ?: 0.9f,
-            topK = prefs[KEY_TOP_K] ?: 40,
-            repeatPenalty = prefs[KEY_REPEAT_PENALTY] ?: 1.1f,
-            maxTokens = prefs[KEY_MAX_TOKENS] ?: 512,
-            contextSize = prefs[KEY_CONTEXT_SIZE] ?: 1024,
-            seed = prefs[KEY_SEED] ?: -1
-        )
-    }
-
-    suspend fun save(params: GenerationParameters) {
-        context.advancedPreferencesStore.edit { prefs ->
-            prefs[KEY_TEMPERATURE] = params.temperature
-            prefs[KEY_TOP_P] = params.topP
-            prefs[KEY_TOP_K] = params.topK
-            prefs[KEY_REPEAT_PENALTY] = params.repeatPenalty
-            prefs[KEY_MAX_TOKENS] = params.maxTokens
-            prefs[KEY_CONTEXT_SIZE] = params.contextSize
-            prefs[KEY_SEED] = params.seed
-        }
+        val KEY_CACHE_MAX_SIZE_BYTES = longPreferencesKey("cache_max_size_bytes")
+        const val DEFAULT_CACHE_MAX_SIZE_BYTES: Long = 500L * 1024L * 1024L
+        const val MIN_CACHE_MAX_SIZE_BYTES: Long = 50L * 1024L * 1024L
     }
 
     /**
@@ -119,6 +90,16 @@ class AdvancedPreferences @Inject constructor(
     suspend fun setCodeFontScale(scale: Float) {
         context.advancedPreferencesStore.edit { prefs ->
             prefs[KEY_CODE_FONT_SCALE] = scale.coerceIn(0.8f, 1.5f)
+        }
+    }
+
+    val cacheMaxSizeBytes: Flow<Long> = context.advancedPreferencesStore.data.map { prefs ->
+        prefs[KEY_CACHE_MAX_SIZE_BYTES] ?: DEFAULT_CACHE_MAX_SIZE_BYTES
+    }.distinctUntilChanged()
+
+    suspend fun setCacheMaxSizeBytes(bytes: Long) {
+        context.advancedPreferencesStore.edit { prefs ->
+            prefs[KEY_CACHE_MAX_SIZE_BYTES] = bytes.coerceAtLeast(MIN_CACHE_MAX_SIZE_BYTES)
         }
     }
 }

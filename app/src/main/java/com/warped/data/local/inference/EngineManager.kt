@@ -3,6 +3,10 @@ package com.warped.data.local.inference
 import android.content.Context
 import com.google.ai.edge.litertlm.ConversationConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
@@ -22,13 +26,11 @@ data class ActiveEngine(
 class EngineManager @Inject constructor(
     private val liteRTLmEngine: LiteRTLmEngine,
     private val backendDetector: BackendDetector,
-    @param:ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context,
+    private val cacheManager: LiteRtLmCacheManager,
 ) {
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var activeEngine: ActiveEngine? = null
-
-    companion object {
-        private const val CACHE_SUBDIR = "litertlm_cache"
-    }
 
     /** Returns the currently active engine info, or null if nothing is loaded. */
     @Synchronized
@@ -36,46 +38,40 @@ class EngineManager @Inject constructor(
 
     /**
      * Switch to the LiteRT-LM engine with the given model.
-     * Unloads any currently loaded engine first, then initializes LiteRT-LM.
-     * The backend is auto-detected via BackendDetector.
+     * Unloads any currently loaded engine first, then initializes LiteRT-LM
+     * by mmap-ing the source model file directly (no copy). The internal
+     * cache directory used by EngineConfig is namespaced by the LiteRT-LM
+     * version and capped via [LiteRtLmCacheManager].
      *
      * @param modelPath Absolute path to the .litertlm model file
      */
     @Synchronized
     fun switchToLiteRT(modelPath: String) {
-        val cachedFile = getCachedModelPath(modelPath)
-
-        // If cache missing or size mismatch (corrupt/incomplete), recopy from source
+        cacheManager.cacheRoot
         val sourceFile = File(modelPath)
-        if (!cachedFile.exists() || cachedFile.length() != sourceFile.length()) {
-            Timber.d("EngineManager: caching .litertlm model to ${cachedFile.absolutePath}")
-            try {
-                cachedFile.delete()
-                sourceFile.copyTo(cachedFile, overwrite = false)
-                Timber.d("EngineManager: model cached successfully (${cachedFile.length()} bytes)")
-            } catch (e: Exception) {
-                cachedFile.delete()
-                Timber.w(e, "EngineManager: failed to cache model, using original path")
-            }
-        }
-
-        val resolvedPath = if (cachedFile.exists() && cachedFile.length() == sourceFile.length())
-            cachedFile.absolutePath else modelPath
-        val target = ActiveEngine(EngineType.LITE_RT_LM, resolvedPath, backendDetector.probeBackend())
+        val target = ActiveEngine(EngineType.LITE_RT_LM, modelPath, backendDetector.probeBackend())
         if (activeEngine == target) {
             Timber.d("EngineManager: $target already loaded, skipping switch")
             return
         }
         unloadCurrent()
 
-        Timber.d("EngineManager: initializing LiteRT-LM with backend=${target.backend} path=$resolvedPath")
+        if (!sourceFile.exists()) {
+            error("EngineManager: model file does not exist at $modelPath")
+        }
+
+        Timber.d("EngineManager: initializing LiteRT-LM with backend=${target.backend} path=$modelPath (mmap, no copy)")
         liteRTLmEngine.init(
-            modelPath = resolvedPath,
+            modelPath = modelPath,
             backend = target.backend!!,
             visionBackend = BackendType.CPU,
             audioBackend = BackendType.CPU
         )
         activeEngine = target
+        ioScope.launch {
+            runCatching { cacheManager.touchAccess(modelPath) }
+                .onFailure { Timber.w(it, "EngineManager: touchAccess failed") }
+        }
         Timber.d("EngineManager: LiteRT-LM engine now active")
     }
 
@@ -116,30 +112,29 @@ class EngineManager @Inject constructor(
 
     /**
      * Handle system memory pressure. Called from Application.onTrimMemory.
-     * Releases engine resources on critical memory pressure.
+     * - level >= 10 (TRIM_MEMORY_RUNNING_LOW): soft pre-evict to cap.
+     * - level >= 15 (TRIM_MEMORY_RUNNING_CRITICAL): unload engine and evict
+     *   the entire cache directory.
      */
     fun handleTrimMemory(level: Int) {
-        if (level >= 15 /* ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL */) {
-            Timber.d("EngineManager: TRIM_MEMORY_RUNNING_CRITICAL — unloading engine")
+        if (level >= 15) {
+            Timber.d("EngineManager: TRIM_MEMORY_RUNNING_CRITICAL — unloading engine and clearing cache")
             try {
                 unloadCurrent()
-                // Also clear cache to free disk space
-                val cacheDir = File(context.cacheDir, CACHE_SUBDIR)
-                if (cacheDir.exists()) {
-                    cacheDir.deleteRecursively()
-                    Timber.d("EngineManager: cache directory cleared")
+                ioScope.launch {
+                    runCatching { cacheManager.evictAll() }
+                        .onFailure { Timber.w(it, "EngineManager: evictAll failed") }
                 }
             } catch (e: Exception) {
-                Timber.w(e, "EngineManager: error during trim memory")
+                Timber.w(e, "EngineManager: error during trim memory (level=$level)")
+            }
+        } else if (level >= 10) {
+            Timber.d("EngineManager: TRIM_MEMORY_RUNNING_LOW — soft cap pre-eviction")
+            ioScope.launch {
+                runCatching { cacheManager.ensureWithinCap() }
+                    .onFailure { Timber.w(it, "EngineManager: ensureWithinCap failed") }
             }
         }
-    }
-
-    private fun getCachedModelPath(originalPath: String): File {
-        val cacheDir = File(context.cacheDir, CACHE_SUBDIR)
-        if (!cacheDir.exists()) cacheDir.mkdirs()
-        val fileName = File(originalPath).name
-        return File(cacheDir, fileName)
     }
 
     /**

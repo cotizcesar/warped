@@ -68,7 +68,10 @@ class LiteRTLmEngine @Inject constructor(
             BackendType.NPU -> Backend.GPU() // fallback: NPU not yet supported by EngineConfig
         }
 
-        val cacheDir = java.io.File(context.cacheDir, "litertlm_cache").also { it.mkdirs() }
+        val cacheDir = java.io.File(
+            context.cacheDir,
+            "litertlm/${com.warped.BuildConfig.LITERTLM_VERSION}"
+        ).also { it.mkdirs() }
 
         val config = EngineConfig(
             modelPath = modelPath,

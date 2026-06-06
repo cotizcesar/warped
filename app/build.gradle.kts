@@ -27,7 +27,7 @@ android {
         this.versionCode = versionCode
         this.versionName = versionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
+        buildConfigField("String", "LITERTLM_VERSION", "\"${libs.versions.litertlm.get()}\"")
 
     }
 
@@ -61,7 +61,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            buildConfigField("String", "LITERTLM_VERSION", "\"${libs.versions.litertlm.get()}\"")
         }
         debug {
             // StrictMode enabled in Application.onCreate for debug builds
