@@ -155,6 +155,9 @@ dependencies {
     // WorkManager
     implementation(libs.work.runtime.ktx)
 
+    // SplashScreen
+    implementation(libs.core.splashscreen)
+
     // Security
     implementation(libs.security.crypto)
     implementation(libs.sqlcipher)

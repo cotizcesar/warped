@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Warped.Splash" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">@drawable/splash_bg</item>
-        <item name="android:statusBarColor">@color/window_background</item>
-        <item name="android:navigationBarColor">@color/window_background</item>
+    <style name="Theme.Warped.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/window_background</item>
+        <item name="postSplashScreenTheme">@style/Theme.Warped</item>
     </style>
 
     <style name="Theme.Warped" parent="android:Theme.Material.Light.NoActionBar">
