@@ -20,7 +20,7 @@ v1.8 shipped 2026-06-05 with 5 phases (35–39) and 30 requirements. The full ar
 
 - [x] **Phase 40: Runtime & Allowlist Foundation** [P0, keystone] — Unify local + remote chat behind `LlmModelHelper`, ship `assets/model_allowlist.json`, apply mechanical stack bumps, add R8 keep rules ✓ 2026-06-06 (8 plans)
 - [x] **Phase 41: Thinking Mode + Model Benchmark** [P1] — Surface model reasoning trace as collapsible panel; ship on-device init/prefill/decode/peak-memory benchmark ✓ 2026-06-06 (5 plans)
-- [ ] **Phase 42: Prompt Lab** [P1] — Side-by-side single-turn prompt workspace with 5–8 curated templates
+ - [x] **Phase 42: Prompt Lab** [P1] — Side-by-side single-turn prompt workspace with 5–8 curated templates ✓ 2026-06-06 (3 plans)
 - [ ] **Phase 43: Performance Convergence** [P0, cross-cutting] — File-by-line perf overhaul: mmap-only cache, Compose state split, AppLifecycleProvider, splash, Macrobenchmark baseline
 - [ ] **Phase 44: Agent Skills Lite** [P2, optional — defer to v2.1 if scope tight] — 3–5 built-in Kotlin `@Tool` skills surfaced as chips under chat input
 
