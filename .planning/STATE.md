@@ -1,12 +1,12 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.8
-milestone_name: LiteRT Update, Bugfix Round & Recommended Models
+milestone: v2.0
+milestone_name: Gallery Convergence & Performance Overhaul
 status: planning
-last_updated: "2026-06-05T16:00:00.000Z"
-last_activity: 2026-06-05
+last_updated: "2026-06-06T03:08:41.408Z"
+last_activity: 2026-06-06
 progress:
-  total_phases: 5
+  total_phases: 0
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -23,24 +23,24 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-05)
 
 **Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** v1.8 LiteRT Update, Bugfix Round & Recommended Models — Phase 35 ready to plan
+**Current focus:** v1.8 LiteRT Update, Bugfix Round & Recommended Models — all 5 phases complete; entering lifecycle.
 
 ## Current Position
 
-Phase: 35 (LiteRT-LM Engine Upgrade & Conversation Context)
+Phase: Not started (defining requirements)
 Plan: —
-Status: Roadmap defined — ready to plan phase 35
-Last activity: 2026-06-05 — v1.8 roadmap created (5 phases, 30 requirements)
+Status: Defining requirements
+Last activity: 2026-06-06 — Milestone v2.0 started
 
 ## Phase Structure (v1.8)
 
 | Phase | Name | Requirements | Status | Depends On |
 |-------|------|--------------|--------|------------|
-| 35 | LiteRT-LM Engine Upgrade & Conversation Context | LRT-01..03 (3) | Not started | — |
-| 36 | Hugging Face Model Browser Bugfixes | HF-01..09 (9) | Not started | — |
-| 37 | Chat UI Redesign & Model Selector | CHAT-01..08 (8) | Not started | — |
-| 38 | Endpoint CRUD & Provider Refactor | ENDPT-01..07 (7) | Not started | — |
-| 39 | Recommended Models Curated List | REC-01..03 (3) | Not started | — |
+| 35 | LiteRT-LM Engine Upgrade & Conversation Context | LRT-01..03 (3) | ✅ Complete | — |
+| 36 | Hugging Face Model Browser Bugfixes | HF-01..09 (9) | ✅ Complete | — |
+| 37 | Chat UI Redesign & Model Selector | CHAT-01..08 (8) | ✅ Complete | — |
+| 38 | Endpoint CRUD & Provider Refactor | ENDPT-01..07 (7) | ✅ Complete | — |
+| 39 | Recommended Models Curated List | REC-01..03 (3) | ✅ Complete | — |
 
 ## Completed Milestones
 

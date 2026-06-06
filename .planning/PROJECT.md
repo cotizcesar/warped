@@ -24,14 +24,24 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 **Known deferred:** 12 quick tasks + 6 verification gaps (see STATE.md Deferred Items).
 
-## Current Milestone: v1.8 LiteRT Update, Bugfix Round & Recommended Models
+## Previous Milestone: v1.8 LiteRT Update, Bugfix Round & Recommended Models — COMPLETE ✅
 
-**Goal:** Upgrade LiteRT-LM to the latest stable release, fix the accumulated broken/behaving features from the 12 deferred quick tasks, and ship a hand-curated list of recommended `.litertlm` models to the model browser.
+**Shipped:** 2026-06-05 | [Archive →](.planning/milestones/v1.8-ROADMAP.md)
 
-**Target features:**
-- Upgrade LiteRT-LM library from v0.12.0 to latest stable release (with API adaptation if breaking changes)
-- Tanda de bugfixes covering the 12 deferred quick tasks: model detail rendering, chat selector redesign, post-download navigation, background downloads, endpoint CRUD, local model loading states, LM Studio v1 API alignment, conversation history, and related regressions
-- Manual curated list of recommended `.litertlm` models — hand-picked, no scraping, with name, size, why-recommended, and one-tap download entry point
+5 phases (35-39), 30 requirements implemented. LiteRT-LM upgrade path, Hugging Face model browser bugfixes (sibling file rendering, search persistence, post-download nav, background downloads with progress + cancel), chat UI redesign (rounded pill input, no TopAppBar, unified model+endpoint picker with traffic-light status), endpoint CRUD + LM Studio native v1 API, and a hand-curated recommended models section.
+
+**Known deferred:** 3 verification gaps in Phase 35 (compile gate not run, no unit test for conversation reuse, multi-turn smoke test pending) — user/CI verification required. 6 pre-existing verification gaps (Phases 06-10, 29) remain.
+
+## Current Milestone: v2.0 Gallery Convergence & Performance Overhaul
+
+**Goal:** Download and study the Google AI Edge Gallery repo, port its best patterns and any fitting features into Warped, and apply a file-by-file performance/efficiency overhaul so the app is as fast, smooth, and resource-light as possible. Major version bump signals architectural/feature convergence with the reference implementation.
+
+**Target features (tentative — refined after research):**
+- Performance audit across all axes: cold start, UI smoothness (60fps scrolling, no jank during streaming), memory footprint, time-to-first-token, APK size
+- Port Gallery-aligned features that fit Warped's scope (Prompt Lab, Thinking Mode toggle, Model Benchmark, Agent Skills infrastructure, mobile-first model allowlist patterns — refined by research)
+- Architectural pattern convergence: DI structure, state management, navigation, theming, model-loading pipeline
+- File-by-file, line-by-line optimization of every hot path (Hilt graph, Room queries, OkHttp interceptors, Compose recomposition, JNI/engine init)
+- Research output: 4 parallel researchers (Stack, Features, Architecture, Pitfalls) analyze the Gallery repo and surface concrete migration candidates
 
 ## Requirements
 
@@ -75,9 +85,7 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 ### Active
 
-- [ ] README/markdown preview with syntax highlighting — deferred from v1.6 (INTG-03)
-- [ ] Pre-existing quick tasks from various milestones (12 items — see STATE.md)
-- [ ] Human verification for Phases 06, 07, 08, 09, 10, 29 (6 items — see STATE.md)
+- [ ] v2.0 Gallery Convergence & Performance Overhaul — major version: research Gallery repo, port best patterns, file-by-file perf overhaul (see Current Milestone above)
 
 ### Out of Scope
 
@@ -95,11 +103,17 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 The Android ecosystem lacks a polished, production-grade app that combines local LLM inference with remote provider connectivity in a single interface. Existing solutions are either CLI-only, desktop-only (LM Studio), or limited to one provider. There is growing demand for running LLMs on flagship Android phones with 8-16GB RAM.
 
-Warped has shipped 6 milestones (v1.0 through v1.6) across 30 phases and 185 requirements. The app supports LiteRT-LM local inference, 5 remote provider types (OpenAI, Anthropic, Ollama, LM Studio, custom), Hugging Face model search/download, chat with streaming, presets, history, an 8-step onboarding wizard, and syntax-highlighted code blocks with 4 themes. Production hardening is applied (ProGuard, Keystore encryption, input sanitization, crash resilience, network security).
+Warped has shipped 8 milestones (v1.0 through v1.8) across 39 phases and 234 requirements. The app supports LiteRT-LM local inference, LM Studio v1 REST API, Hugging Face model search/download with background downloads and progress, chat with streaming, presets, history, an 8-step onboarding wizard, and syntax-highlighted code blocks with 4 themes. Production hardening is applied (ProGuard, Keystore encryption, input sanitization, crash resilience, network security).
+
+**v1.8 (2026-06-05):** Hugging Face model browser bugfixes (sibling file rendering, search persistence, post-download nav, background downloads with progress + cancel), chat UI redesign (rounded pill input, no TopAppBar, unified model+endpoint picker with traffic-light status), endpoint CRUD with LM Studio native v1 API, and a hand-curated recommended models section.
+
+**v1.7 (2026-05-25):** LiteRT-LM upgraded to v0.12.0, unified Models & Endpoints selector with connect/disconnect toggle, traffic light status indicator, memory-aware smart presets.
 
 **v1.6 (2026-05-15):** Syntax highlighting engine built on Highlights 1.1.0 with custom TypeMapper and LanguageDetector. Code blocks show token-level coloring across 12 token types, auto-detected language with 20+ aliases, 4 themes with light/dark variants, copy button, line numbers, and expand/collapse. Streaming transitions smooth with flat monospace during active streaming and full highlighting on closing fence.
 
 **Known issue:** JUnit Platform launcher classpath — `./gradlew :app:testDebugUnitTest` fails with "Failed to load JUnit Platform" (pre-existing, not introduced by v1.6).
+
+**v1.8 verification gaps:** 3 gaps in Phase 35 (compile gate not run, no unit test for conversation reuse, multi-turn smoke test pending) — user/CI verification required.
 
 ## Constraints
 
@@ -127,6 +141,9 @@ Warped has shipped 6 milestones (v1.0 through v1.6) across 30 phases and 185 req
 | Deferred highlighting during streaming (v1.6) | Flat monospace during streaming, full coloring on closing fence. Prevents O(n²) jank | ✓ Good |
 | MarkdownText restructured to block-based Column (v1.6) | Enables per-block composables (language header, copy button) that were impossible with single Text(AnnotatedString) | ✓ Good |
 | CodeTheme → SyntaxTheme migration (v1.6) | Old enum names map to new theme objects via existing DataStore key. Backward compatible | ✓ Good |
+| v1.8 LM Studio native v1 only | Simplify provider surface, use native REST + native DTOs, drop OpenAI/Anthropic/Ollama/Custom | ✓ Good |
+| v1.8 hand-curated recommended models | Static asset shipping with the app, no API scraping, no ranking algorithms | ✓ Good |
+| v2.0 references Google AI Edge Gallery (2026-06-05) | Reference implementation in same domain (Kotlin + LiteRT-LM on Android, 23.6k stars). Largest, most active OSS in the space. | — Pending |
 
 ## Evolution
 
@@ -146,4 +163,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-05 after v1.8 LiteRT Update, Bugfix Round & Recommended Models milestone start*
+*Last updated: 2026-06-05 after v2.0 Gallery Convergence & Performance Overhaul milestone start*
