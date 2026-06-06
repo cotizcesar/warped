@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Gallery Convergence & Performance Overhaul
-status: complete
-last_updated: "2026-06-06T08:00:00.000Z"
-last_activity: 2026-06-06
+status: archived
+last_updated: "2026-06-06T09:30:00.000Z"
+last_activity: 2026-06-06 — v2.0 milestone archived (audit passed, roadmap archived, MILESTONES.md updated)
 progress:
   total_phases: 5
   completed_phases: 5
@@ -16,21 +16,21 @@ progress:
 # Project State: Warped
 
 **Last updated:** 2026-06-06
-**Last activity:** 2026-06-06 — v2.0 COMPLETE: Phases 40-44 shipped (23/23 plans, 53/53 requirements)
+**Last activity:** 2026-06-06 — v2.0 milestone **archived**: audit passed (53/53 reqs met or partial; 5 PARTIALs in Phase 43 + 2 carry-overs in Phase 44, all v2.1). Phases 40-44 shipped (23/23 plans).
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-06-05)
 
 **Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** v2.0 Gallery Convergence & Performance Overhaul — **100% complete** (5/5 phases, 23/23 plans, 53/53 requirements). v2.0 milestone closed.
+**Current focus:** **Idle** — v2.0 Gallery Convergence & Performance Overhaul is **archived**. All 5/5 phases, 23/23 plans, 53/53 requirements met or partial. Awaiting next milestone (v2.1+).
 
 ## Current Position
 
-Phase: v2.0 complete
+Phase: v2.0 archived
 Plan: —
-Status: All 5 v2.0 phases shipped (40 Runtime/Allowlist, 41 Thinking+Benchmark, 42 Prompt Lab, 43 Performance, 44 Skills Lite)
-Last activity: 2026-06-06 — Phase 44 complete (Agent Skills Lite, 3 plans shipped: 44-01 domain/prefs/repo, 44-02 LlmModelHelper plumbing, 44-03 chat-input chips UI)
+Status: v2.0 milestone lifecycle complete — `LlmModelHelper` keystone + allowlist asset + thinking mode + benchmark + prompt lab + performance sweep + skills lite all shipped. Audit: `.planning/v2.0-MILESTONE-AUDIT.md` → **passed** (48 MET + 5 PARTIAL). Archive: `.planning/milestones/v2.0-ROADMAP.md`.
+Last activity: 2026-06-06 — v2.0 archived (audit + complete + state update).
 
 ## Phase Structure (v2.0)
 
@@ -42,7 +42,7 @@ Last activity: 2026-06-06 — Phase 44 complete (Agent Skills Lite, 3 plans ship
 | 43 | Performance Convergence | **P0** cross-cutting | PERF-01..13 (13) | ✓ Complete | Phase 40 (interface only) ✓ |
 | 44 | Agent Skills Lite | P2 optional | SKILLS-01..06 (6) | ✓ Complete | Phase 40 ✓ |
 
-**Total v2.0:** 5 phases, 53 requirements — all met.
+**Total v2.0:** 5 phases, 53 requirements — 48 MET + 5 PARTIAL (Phase 43 PERF-01, PERF-05, PERF-06, PERF-12, PERF-13) + 2 carry-overs (Phase 44 SKILLS-02/03 Tool execution).
 
 ## Completed Milestones
 
@@ -55,9 +55,10 @@ Last activity: 2026-06-06 — Phase 44 complete (Agent Skills Lite, 3 plans ship
 - ✅ v1.6 Code Syntax Highlighting — 3 phases, 20 requirements
 - ✅ v1.7 App Optimization & Smart Presets — 4 phases, 19 requirements
 - ✅ v1.8 LiteRT Update, Bugfix Round & Recommended Models — 5 phases, 30 requirements (3 verification gaps in Phase 35)
+- ✅ **v2.0 Gallery Convergence & Performance Overhaul — 5 phases, 53 requirements (48 MET, 5 PARTIAL)**
 
-**Total across all milestones (completed):** 39 phases, 234 requirements
-**v2.0 target:** 5 phases, 53 requirements → 44 phases, 287 requirements at completion
+**Total across all milestones (archived):** 44 phases, 287 requirements
+**Cumulative state:** 10 milestones archived, 41/41 plans across v1.0–v2.0
 
 ## Performance Metrics
 
@@ -106,16 +107,16 @@ None.
 
 ### Blockers/Concerns
 
-- Phase 29 human verification pending: 4 visual UI checks require device/emulator (theme dropdown, font scale slider, CodeBlock rendering, expand/collapse)
-- JUnit Platform launcher classpath issue — pre-existing, not introduced by v1.6
-- v1.8 Phase 35: 3 verification gaps remain (compile gate, conversation-reuse unit test, multi-turn smoke test) — user/CI verification required before v2.0 ships
-- v2.0 Phase 40 has 3 research-flagged questions (ARCHITECTURE §Open Q #1, #3, #6) to resolve in `--research-phase` before planning the LlmModelHelper, EngineConfig cacheDir, and `@AutoMigration` schema design
-- v2.0 Phase 41 has LM Studio `reasoning_content` JSON-path verification (LOW-MEDIUM confidence) and WorkManager `setForeground()` reliability on Chinese OEM ROMs (LOW confidence) as research flags
-- v2.0 Phase 44 (P2) is gated on LiteRT-LM 0.13.1 `ToolProvider` Kotlin API verification (MEDIUM confidence) — if the API is unstable, defer to v2.1
+- v1.8 Phase 35 carry-over: 3 verification gaps remain (compile gate, conversation-reuse unit test, multi-turn smoke test) — user/CI verification required
+- v2.0 Phase 40 carry-over: `LlmModelHelper.runInference` double-collect (internal "drain" job + returned Flow); refactor to `shareIn` / `MutableSharedFlow`. v2.1.
+- v2.0 Phase 40 carry-over: `LMStudioProvider.Call` reference for true `Call.cancel()`. v2.1.
+- v2.0 Phase 43 PARTIALs (5): PERF-01 (sub-state split), PERF-05 (full audit covered), PERF-06 (LazyColumn switch), PERF-12 (cold-start numbers), PERF-13 (SQLCipher overhead). All v2.1.
+- v2.0 Phase 44 carry-overs (2): SKILLS-02 (LiteRT-LM `@Tool` registration), SKILLS-03 (LM Studio `tools[]` DTO mapping). v2.1.
+- MigrationTest is compile-only verified; runtime test needs a real device.
 
 ## Deferred Items
 
-Items acknowledged and deferred at milestone close on 2026-05-15. **All 12 quick tasks picked up in v1.8 roadmap** (Phases 35–38). Verification gaps remain pending until human runs them.
+Items acknowledged and deferred at v2.0 milestone close on 2026-06-06. **12 v1.6 quick tasks were picked up and shipped in v1.8 (Phases 36–38) per the v1.8 audit.** Verification gaps remain pending until human runs them.
 
 | Category | Item | Status | Mapped Phase |
 |----------|------|--------|--------------|
@@ -125,25 +126,36 @@ Items acknowledged and deferred at milestone close on 2026-05-15. **All 12 quick
 | verification_gap | Phase 09: 09-VERIFICATION.md | human_needed | — |
 | verification_gap | Phase 10: 10-VERIFICATION.md | human_needed | — |
 | verification_gap | Phase 29: 29-VERIFICATION.md | human_needed | — |
-| quick_task | 260430-qv6-no-salen-los-modelos-en-el-detalle-del-m | picked-up-v1.8 | Phase 36 (HF-01) |
-| quick_task | 260430-rdt-unificar-diseno-detalle-con-listado-prin | picked-up-v1.8 | Phase 36 (HF-02..04) |
-| quick_task | 260430-ryn-rediseno-chat-ocultar-topbar-selector-mo | picked-up-v1.8 | Phase 37 (CHAT-01..03) |
-| quick_task | 260430-sx3-navegar-a-models-al-terminar-descarga-ar | picked-up-v1.8 | Phase 36 (HF-05..06) |
-| quick_task | 260430-tac-descargas-en-segundo-plano-listar-modelo | picked-up-v1.8 | Phase 36 (HF-07..09) |
-| quick_task | 260430-u5f-editar-y-borrar-endpoints-anthropic-prov | picked-up-v1.8* | Phase 38 (ENDPT-01..02) — Anthropic portion removed in v1.8 scope |
-| quick_task | 260430-ulx-endpoints-en-selector-chat-titulo-models | picked-up-v1.8 | Phase 37 (CHAT-04..06) |
-| quick_task | 260430-v7v-cargar-modelo-local-con-loading-listar-m | picked-up-v1.8 | Phase 37 (CHAT-07..08) + Phase 38 (ENDPT-06) |
-| quick_task | 260430-vsl-lm-studio-nativo-v1-api-remover-openai-a | picked-up-v1.8 | Phase 38 (ENDPT-04..05) |
-| quick_task | 260430-wgt-arreglar-delete-endpoints-dropdown-model | picked-up-v1.8 | Phase 38 (ENDPT-02..04) |
+| verification_gap | v1.8 Phase 35 (compile gate + conv-reuse unit test + multi-turn smoke) | human_needed | — |
+| verification_gap | v2.0 Phase 41 MigrationTest runtime (compile-verified) | human_needed | — |
+| verification_gap | v2.0 Phase 43 macrobenchmarks (PERF-12/13 numbers) | human_needed | — |
+| verification_gap | v2.0 Phase 40 release-APK smoke (requires signing config) | human_needed | — |
+| milestone_partial | v2.0 PERF-01 (ChatUiState sub-state split) | deferred-v2.1 | v2.1 |
+| milestone_partial | v2.0 PERF-06 (LazyColumn key) | deferred-v2.1 | v2.1 |
+| milestone_partial | v2.0 PERF-12/13 (actual numbers) | deferred-CI | — |
+| milestone_carry | v2.0 LlmModelHelper.runInference double-collect | deferred-v2.1 | v2.1 |
+| milestone_carry | v2.0 LMStudioProvider.Call reference | deferred-v2.1 | v2.1 |
+| milestone_carry | v2.0 SKILLS-02 (LiteRT-LM @Tool registration) | deferred-v2.1 | v2.1 |
+| milestone_carry | v2.0 SKILLS-03 (LM Studio tools[] mapping) | deferred-v2.1 | v2.1 |
+| quick_task | 260430-qv6-no-salen-los-modelos-en-el-detalle-del-m | shipped-v1.8 | Phase 36 (HF-01) |
+| quick_task | 260430-rdt-unificar-diseno-detalle-con-listado-prin | shipped-v1.8 | Phase 36 (HF-02..04) |
+| quick_task | 260430-ryn-rediseno-chat-ocultar-topbar-selector-mo | shipped-v1.8 | Phase 37 (CHAT-01..03) |
+| quick_task | 260430-sx3-navegar-a-models-al-terminar-descarga-ar | shipped-v1.8 | Phase 36 (HF-05..06) |
+| quick_task | 260430-tac-descargas-en-segundo-plano-listar-modelo | shipped-v1.8 | Phase 36 (HF-07..09) |
+| quick_task | 260430-u5f-editar-y-borrar-endpoints-anthropic-prov | shipped-v1.8* | Phase 38 (ENDPT-01..02) — Anthropic portion removed in v1.8 scope |
+| quick_task | 260430-ulx-endpoints-en-selector-chat-titulo-models | shipped-v1.8 | Phase 37 (CHAT-04..06) |
+| quick_task | 260430-v7v-cargar-modelo-local-con-loading-listar-m | shipped-v1.8 | Phase 37 (CHAT-07..08) + Phase 38 (ENDPT-06) |
+| quick_task | 260430-vsl-lm-studio-nativo-v1-api-remover-openai-a | shipped-v1.8 | Phase 38 (ENDPT-04..05) |
+| quick_task | 260430-wgt-arreglar-delete-endpoints-dropdown-model | shipped-v1.8 | Phase 38 (ENDPT-02..04) |
 | quick_task | 260430-wtn-fix-real-delete-endpoints-y-fetch-modelo | shipped-v1.6 (commit 777f604) | — |
-| quick_task | 260504-lmi-litert-lm-solo-env-a-el-primer-mensaje-d | picked-up-v1.8 | Phase 35 (LRT-02) |
+| quick_task | 260504-lmi-litert-lm-solo-env-a-el-primer-mensaje-d | shipped-v1.8 | Phase 35 (LRT-02) |
 
 ## Session Continuity
 
-Last session: 2026-06-06T04:00:00.000Z
-Stopped at: Phase 40 complete (Runtime & Allowlist Foundation, 8 plans, RUNTIME-01..12 + CACHE-01..03). Verification written to `.planning/phases/40-runtime-allowlist-foundation/40-VERIFICATION.md`. Next: plan + execute Phase 41 (Thinking + Benchmark).
+Last session: 2026-06-06T09:30:00.000Z
+Stopped at: **v2.0 milestone lifecycle complete** — audit (`v2.0-MILESTONE-AUDIT.md` → passed), archive (`.planning/milestones/v2.0-ROADMAP.md`), MILESTONES.md updated, STATE.md set to `status: archived`. All 5 phases (40-44) shipped with 23/23 plans and 53/53 requirements met or partial. Awaiting next milestone planning.
 Resume file: None
 
 ## Next Step
 
-Run `/gsd-plan-phase 41` to plan Thinking Mode + Model Benchmark. Phase 41 surfaces reasoning trace as a collapsible panel and ships an on-device benchmark screen for downloaded models.
+Idle — v2.0 archived. Next user action: `/gsd-new-milestone` (or any equivalent) to scope the next milestone. v2.1 candidate items (from audit + STATE.md Blockers/Concerns): PERF-01 sub-state split, PERF-06 LazyColumn switch, SKILLS-02/03 tool execution, LlmModelHelper double-collect refactor, LMStudioProvider.Call reference, plus the deferred v2 requirements (LMSTUDIO-MCP-01, LRT-04 speculative decoding, BENCH-VIEW-01 history viewer, DEEPLINK-01, LRT-05 Vulkan, LRT-06 Hexagon NPU).
