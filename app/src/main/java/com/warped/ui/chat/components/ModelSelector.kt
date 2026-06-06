@@ -1,146 +1,233 @@
 package com.warped.ui.chat.components
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.warped.R
 import com.warped.domain.model.Endpoint
 import com.warped.domain.model.LocalModel
 import com.warped.domain.model.ProviderType
 
+/**
+ * CHAT-04 / CHAT-05: ModalBottomSheet model picker.
+ * Triggered by an icon button near the chat input. Lists local models and network endpoints.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ModelSelector(
+fun ModelSelectorSheet(
+    visible: Boolean,
     selectedModelId: String?,
     selectedProvider: ProviderType?,
     localModels: List<LocalModel>,
     endpoints: List<Endpoint> = emptyList(),
-    onModelSelected: (String, ProviderType) -> Unit
+    endpointModels: Map<Long, List<String>> = emptyMap(),
+    onDismiss: () -> Unit,
+    onModelSelected: (String, ProviderType, Long?) -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    val selectedLocal = localModels.firstOrNull { it.filePath == selectedModelId }
-    val selectedEndpoint = endpoints.firstOrNull {
-        it.modelId == selectedModelId && it.apiType == selectedProvider
-    }
-    val hasItems = localModels.isNotEmpty() || endpoints.isNotEmpty()
-    val label = when {
-        selectedLocal != null -> "${selectedLocal.name} (${formatLabel(selectedLocal)})"
-        selectedEndpoint != null -> "${selectedEndpoint.name} (${endpointTypeLabel(selectedEndpoint)})"
-        !hasItems -> stringResource(R.string.no_models_select_model)
-        else -> stringResource(R.string.select_model)
-    }
+    if (!visible) return
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { if (hasItems) expanded = !expanded }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
-        TextField(
-            value = label,
-            onValueChange = {},
-            readOnly = true,
-            enabled = hasItems,
-            textStyle = MaterialTheme.typography.titleMedium,
-            colors = ExposedDropdownMenuDefaults.textFieldColors(
-                disabledTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                disabledIndicatorColor = MaterialTheme.colorScheme.surface,
-                disabledContainerColor = MaterialTheme.colorScheme.surface,
-                focusedIndicatorColor = MaterialTheme.colorScheme.surface,
-                unfocusedIndicatorColor = MaterialTheme.colorScheme.surface,
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface
-            ),
-            trailingIcon = {
-                if (hasItems) {
-                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-                }
-            },
+        Column(
             modifier = Modifier
-                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = hasItems)
                 .fillMaxWidth()
-        )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
+                .heightIn(max = 600.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
+            Text(
+                text = "Select a model",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+
             if (localModels.isNotEmpty()) {
-                localModels.forEach { model ->
-                    DropdownMenuItem(
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(model.name)
-                                Spacer(Modifier.width(8.dp))
-                                ModelTypePill(formatLabel(model))
-                            }
-                        },
-                        onClick = {
-                            onModelSelected(model.filePath, ProviderType.LITE_RT_LM)
-                            expanded = false
-                        }
-                    )
-                }
-            }
-            if (localModels.isNotEmpty() && endpoints.isNotEmpty()) {
-                HorizontalDivider()
-            }
-            if (endpoints.isNotEmpty()) {
-                endpoints.forEach { endpoint ->
-                    val modelId = endpoint.modelId
-                    if (modelId != null) {
-                        DropdownMenuItem(
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(endpoint.name)
-                                    Spacer(Modifier.width(8.dp))
-                                    ModelTypePill(endpointTypeLabel(endpoint))
-                                }
-                            },
+                SectionHeader("Local Models")
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 320.dp),
+                    contentPadding = PaddingValues(vertical = 4.dp)
+                ) {
+                    items(localModels, key = { it.filePath }) { model ->
+                        ModelRow(
+                            title = model.name,
+                            subtitle = model.sizeBytes.humanReadableSize(),
+                            typePill = "LiteRT-LM",
+                            isSelected = selectedModelId == model.filePath,
                             onClick = {
-                                onModelSelected(modelId, endpoint.apiType)
-                                expanded = false
+                                onModelSelected(model.filePath, ProviderType.LITE_RT_LM, null)
+                                onDismiss()
                             }
                         )
                     }
+                }
+            }
+
+            if (endpoints.isNotEmpty()) {
+                if (localModels.isNotEmpty()) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                }
+                SectionHeader("Network Endpoints")
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 320.dp),
+                    contentPadding = PaddingValues(vertical = 4.dp)
+                ) {
+                    items(endpoints, key = { it.id }) { endpoint ->
+                        val modelId = endpoint.modelId
+                        if (modelId != null) {
+                            val models = endpointModels[endpoint.id].orEmpty()
+                            val subtitle = if (models.isNotEmpty()) {
+                                "${models.take(3).joinToString(", ")}${if (models.size > 3) "…" else ""}"
+                            } else {
+                                endpoint.url
+                            }
+                            ModelRow(
+                                title = endpoint.name,
+                                subtitle = subtitle,
+                                typePill = "Net",
+                                isSelected = selectedModelId == modelId && selectedProvider == endpoint.apiType,
+                                onClick = {
+                                    onModelSelected(modelId, endpoint.apiType, endpoint.id)
+                                    onDismiss()
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (localModels.isEmpty() && endpoints.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No models available. Download a .litertlm model or add an endpoint.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
     }
 }
 
-private fun formatLabel(model: LocalModel): String = "LiteRT-LM"
-
-private fun endpointTypeLabel(endpoint: Endpoint): String =
-    when {
-        endpoint.apiType == ProviderType.LM_STUDIO -> "Net"
-        endpoint.apiType == ProviderType.OLLAMA -> "Net"
-        endpoint.apiType == ProviderType.OPENAI -> "Net"
-        else -> "Net"
-    }
+@Composable
+private fun SectionHeader(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(vertical = 4.dp)
+    )
+}
 
 @Composable
-private fun ModelTypePill(type: String) {
-    val (color, label) = when (type) {
+private fun ModelRow(
+    title: String,
+    subtitle: String,
+    typePill: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val (pillColor, pillText) = when (typePill) {
         "LiteRT-LM" -> Color(0xFF4CAF50) to "LiteRT-LM"
-        else -> MaterialTheme.colorScheme.outline to type
+        else -> Color(0xFF2196F3) to "Net"
     }
     Surface(
-        shape = MaterialTheme.shapes.extraSmall,
-        color = color.copy(alpha = 0.15f),
-        contentColor = color
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                else Color.Transparent
     ) {
-        Text(
-            text = label,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-            style = MaterialTheme.typography.labelSmall,
-            maxLines = 1
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Storage,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1
+                )
+                if (subtitle.isNotBlank()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                }
+            }
+            Surface(
+                shape = MaterialTheme.shapes.extraSmall,
+                color = pillColor.copy(alpha = 0.15f),
+                contentColor = pillColor
+            ) {
+                Text(
+                    text = pillText,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1
+                )
+            }
+            if (isSelected) {
+                Spacer(Modifier.width(8.dp))
+                Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = "Selected",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
     }
+}
+
+private fun Long.humanReadableSize(): String = when {
+    this >= 1024L * 1024 * 1024 -> "%.2f GB".format(this.toDouble() / (1024L * 1024 * 1024))
+    this >= 1024 * 1024 -> "%.0f MB".format(this.toDouble() / (1024 * 1024))
+    this >= 1024 -> "%.0f KB".format(this.toDouble() / 1024)
+    else -> "$this B"
 }

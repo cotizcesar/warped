@@ -23,6 +23,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.io.IOException
@@ -41,6 +42,9 @@ class LMStudioProvider(
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
+        .addInterceptor(HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BASIC
+        })
         .apply {
             if (!apiKey.isNullOrBlank()) {
                 addInterceptor { chain ->
@@ -67,11 +71,12 @@ class LMStudioProvider(
         val systemMessage = request.messages.firstOrNull { it.role == Role.SYSTEM }?.content
         val chatMessages = request.messages
             .filter { it.role != Role.SYSTEM }
+            .filter { it.content.isNotBlank() }
             .map {
                 val content = if (it.role == Role.USER) inputSanitizer.sanitize(it.content) else it.content
                 LmStudioInputItem(type = "text", content = content)
             }
-        
+
         val imageItems = request.images.map { LmStudioInputItem(type = "image", dataUrl = it) }
         val allInput = imageItems + chatMessages
 
@@ -124,7 +129,7 @@ class LMStudioProvider(
                                     if (eventType == "tool_call.success") {
                                         val obj = json.decodeFromString<JsonObject>(data)
                                         val out = obj["output"]?.jsonPrimitive?.content ?: ""
-                                        emit(StreamToken.Delta(" → $out"))
+                                        emit(StreamToken.Delta("$out"))
                                         hasTokens = true
                                     } else {
                                         handleSseEvent(eventType, event).forEach {
@@ -209,7 +214,7 @@ class LMStudioProvider(
             // tool_call.success handled inline (output field is a string, not a list)
             eventType == "tool_call.failure" -> {
                 val r = event.reason ?: "unknown error"
-                tokens.add(StreamToken.Delta(" ✗ $r"))
+                tokens.add(StreamToken.Delta("$r"))
             }
             // model load / prompt processing — silent (user sees spinner in UI)
             eventType == "model_load.progress" -> { /* silent */ }
@@ -224,23 +229,59 @@ class LMStudioProvider(
     }
 
     override suspend fun listModels(): Result<List<ModelInfo>> {
-        return try {
-            val response = api.listModels()
-            if (response.isSuccessful) {
-                val models = response.body()?.models?.map {
-                    ModelInfo(
-                        id = it.key,
-                        name = it.displayName.ifBlank { it.key },
-                        providerType = ProviderType.LM_STUDIO
-                    )
-                } ?: emptyList()
-                Result.success(models)
-            } else {
-                Result.failure(Exception("HTTP ${response.code()}"))
+        // Try multiple LM Studio endpoints in order. Different LM Studio versions
+        // expose different model-listing paths:
+        //  - v1 REST API (0.4+): /api/v1/models   -> { models: [...] }
+        //  - OpenAI compat:      /v1/models        -> { data: [...] }
+        //  - v0 REST (legacy):   /api/v0/models   -> { data: [...] }
+        // We hit them in order and use the first response that yields ≥1 model.
+        val candidates = listOf("api/v1/models", "v1/models", "api/v0/models")
+        var lastError: Throwable? = null
+        for (path in candidates) {
+            try {
+                val url = "${baseUrl}$path"
+                Timber.d("LMStudioProvider.listModels: GET $url")
+                val response = api.listModelsByPath(path)
+                Timber.d("LMStudioProvider.listModels: $url -> HTTP ${response.code()}")
+                if (response.isSuccessful) {
+                    val body = response.body()
+                    val lmDtos = body?.models.orEmpty()
+                    val openAiDtos = body?.data.orEmpty()
+                    val lmModels = lmDtos.map { d ->
+                        ModelInfo(
+                            id = d.key,
+                            name = d.displayName.ifBlank { d.key },
+                            providerType = ProviderType.LM_STUDIO
+                        )
+                    }
+                    val openAiModels = openAiDtos.map { d ->
+                        ModelInfo(
+                            id = d.id,
+                            name = d.displayName?.ifBlank { d.id } ?: d.id,
+                            providerType = ProviderType.LM_STUDIO
+                        )
+                    }
+                    val models = lmModels.ifEmpty { openAiModels }
+                    val dtos = lmDtos.ifEmpty { openAiDtos.map {
+                        com.warped.data.remote.dto.LmStudioModelData(
+                            key = it.id,
+                            displayName = it.displayName.orEmpty()
+                        )
+                    } }
+                    com.warped.data.repository.LmStudioModelCache.lastData = dtos
+                    Timber.d("LMStudioProvider.listModels: $url parsed ${models.size} models (lmV1=${lmModels.size} openAi=${openAiModels.size})")
+                    if (models.isNotEmpty()) return Result.success(models)
+                    // 200 OK with empty list — try next endpoint before giving up
+                    lastError = IllegalStateException("$url returned empty list")
+                } else {
+                    lastError = Exception("$url -> HTTP ${response.code()} ${response.message()}")
+                }
+            } catch (e: Exception) {
+                Timber.w(e, "LMStudioProvider.listModels: $path failed")
+                lastError = e
             }
-        } catch (e: Exception) {
-            Result.failure(e)
         }
+        return Result.failure(lastError ?: IllegalStateException("No LM Studio endpoint responded with models"))
     }
 
     suspend fun loadModel(modelKey: String): Result<String> {

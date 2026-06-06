@@ -17,6 +17,7 @@ import retrofit2.http.Headers
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Streaming
+import retrofit2.http.Url
 
 interface LmStudioApi {
     @Streaming
@@ -26,6 +27,9 @@ interface LmStudioApi {
 
     @GET("api/v1/models")
     suspend fun listModels(): Response<LmStudioModelListResponse>
+
+    @GET
+    suspend fun listModelsByPath(@Url path: String): Response<LmStudioModelListResponse>
 
     @POST("api/v1/models/load")
     @Headers("Content-Type: application/json")

@@ -1,16 +1,35 @@
 {
     "logs": [
         {
-            "outputFile": "com.warped.app-mergeDebugResources-59:/values-v30/values-v30.xml",
+            "outputFile": "com.warped.app-mergeDebugResources-53:/values-v30/values-v30.xml",
             "map": [
                 {
-                    "source": "/home/cotizcesar/.gradle/caches/9.4.1/transforms/841b8fea6eec467fbb292a1b67382deb/transformed/material3/res/values-v30/values-v30.xml",
+                    "source": "/home/cotizcesar/.gradle/caches/9.4.1/transforms/af71b6df8b6a38285e1b88d7861e26f9/transformed/material3/res/values-v30/values-v30.xml",
                     "from": {
                         "startLines": "2",
                         "startColumns": "4",
                         "startOffsets": "55",
                         "endColumns": "72",
                         "endOffsets": "123"
+                    }
+                },
+                {
+                    "source": "/home/cotizcesar/.gradle/caches/9.4.1/transforms/007d183ad4da5786938e6c973551879e/transformed/core-splashscreen-1.2.0-beta01/res/values-v30/values-v30.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endLines": "7",
+                        "endColumns": "12",
+                        "endOffsets": "433"
+                    },
+                    "to": {
+                        "startLines": "3",
+                        "startColumns": "4",
+                        "startOffsets": "128",
+                        "endLines": "8",
+                        "endColumns": "12",
+                        "endOffsets": "506"
                     }
                 }
             ]

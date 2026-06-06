@@ -45,6 +45,23 @@ class LiteRTLmProvider @Inject constructor(
     @Volatile
     private var activeConversation: Conversation? = null
 
+    @Volatile
+    private var activeConversationConfig: ConversationConfig? = null
+
+    /**
+     * Reset the active conversation. Called when the engine is reloaded or the model changes.
+     * The next chat() call will lazily create a new conversation.
+     */
+    fun resetConversation() {
+        synchronized(this) {
+            activeConversation?.let { prev ->
+                try { prev.close() } catch (e: Exception) { Timber.w(e, "LiteRTLm: resetConversation.close() failed") }
+            }
+            activeConversation = null
+            activeConversationConfig = null
+        }
+    }
+
     override fun chat(request: ChatRequest): Flow<StreamToken> = flow {
         // Step 1: Sanitize all messages
         val sanitizedMessages = request.messages.map { msg ->
@@ -86,6 +103,7 @@ class LiteRTLmProvider @Inject constructor(
         val currentUserText = sanitizedMessages.lastOrNull { it.role == Role.USER }?.content ?: ""
         val audioBytes = request.audioBytes
         val hasAudio = audioBytes != null && audioBytes.isNotEmpty()
+        val hasText = currentUserText.isNotBlank()
         val currentContents = if (hasImages || hasAudio) {
             val contentList = mutableListOf<Content>()
             if (hasAudio) {
@@ -95,14 +113,19 @@ class LiteRTLmProvider @Inject constructor(
             request.images.forEach { dataUrl ->
                 decodeImage(dataUrl)?.let { contentList.add(Content.ImageBytes(it)) }
             }
-            contentList.add(Content.Text(currentUserText))
-            Timber.d("LiteRTLmProvider: sending ${request.images.size} image(s) + audio=${hasAudio} with text")
+            // Only include text content if the user actually provided text.
+            // An image-only / audio-only message should not have an empty text part,
+            // which LiteRT-LM rejects.
+            if (hasText) {
+                contentList.add(Content.Text(currentUserText))
+            }
+            Timber.d("LiteRTLmProvider: sending ${request.images.size} image(s) + audio=${hasAudio} + text=${hasText}")
             Contents.of(contentList)
         } else {
             Contents.of(currentUserText)
         }
 
-        // Step 5: Map GenerationParameters → SamplerConfig
+        // Step 5: Map GenerationParameters -> SamplerConfig
         val params = request.parameters
         val samplerConfig = SamplerConfig(
             topK = clamp(params.topK, 1, 100, "topK"),
@@ -172,15 +195,24 @@ class LiteRTLmProvider @Inject constructor(
                 throw IllegalStateException("Engine not initialized")
             }
 
-            val conversation = if (activeConversation?.isAlive == true) {
-                activeConversation!!
-            } else {
-                activeConversation?.let { prev ->
-                    try { prev.close() } catch (e: Exception) { Timber.e(e, "LiteRTLm: prev.close() failed") }
+            // LRT-02: Reuse a single long-lived Conversation across chat() calls.
+            // The conversation is only recreated when the underlying engine is reloaded
+            // (see resetConversation()) or when a fatal error invalidates the native handle
+            // (see retry path below). Initial history is set on first creation; subsequent
+            // calls append to the conversation in-place.
+            val conversation = synchronized(this@LiteRTLmProvider) {
+                val existing = activeConversation
+                if (existing != null && existing.isAlive) {
+                    existing
+                } else {
+                    existing?.let { prev ->
+                        try { prev.close() } catch (e: Exception) { Timber.w(e, "LiteRTLm: stale.close() failed") }
+                    }
+                    engineManager.createLiteRTConversation(conversationConfig).also {
+                        activeConversation = it
+                        activeConversationConfig = conversationConfig
+                    }
                 }
-                val conv = engineManager.createLiteRTConversation(conversationConfig)
-                activeConversation = conv
-                conv
             }
 
             conversation.sendMessageAsync(contents).collect { responseMsg ->
@@ -206,6 +238,7 @@ class LiteRTLmProvider @Inject constructor(
                 Timber.w(e, "LiteRTLmProvider: engine error (attempt ${attempt + 1}/3), recovering...")
                 // Null out the conversation — its native handle may be invalid after the error
                 activeConversation = null
+                activeConversationConfig = null
                 recoverEngine()
                 Timber.w("LiteRTLmProvider: Engine recovered, retrying... (attempt ${attempt + 1})")
                 sendContentsWithRetry(contents, conversationConfig, attempt + 1)
@@ -223,6 +256,10 @@ class LiteRTLmProvider @Inject constructor(
         val active = engineManager.getActiveEngine()
         if (active != null && active.type == EngineType.LITE_RT_LM) {
             val modelPath = active.modelPath
+            // LRT-02: Drop the dead conversation; a new one will be created lazily on the
+            // next chat() call. This must happen BEFORE switchToLiteRT() so we don't leak
+            // a handle into a now-stale engine instance.
+            resetConversation()
             try {
                 engineManager.switchToLiteRT(modelPath)
                 Timber.d("LiteRTLmProvider: engine recovered successfully")

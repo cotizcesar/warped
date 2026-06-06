@@ -29,8 +29,7 @@ public class ConversationDao_Impl(
   init {
     this.__db = __db
     this.__insertAdapterOfConversationEntity = object : EntityInsertAdapter<ConversationEntity>() {
-      protected override fun createQuery(): String =
-          "INSERT OR REPLACE INTO `conversations` (`id`,`title`,`created_at`,`updated_at`,`provider_type`,`endpoint_id`,`model_id`,`system_prompt`) VALUES (nullif(?, 0),?,?,?,?,?,?,?)"
+      protected override fun createQuery(): String = "INSERT OR REPLACE INTO `conversations` (`id`,`title`,`created_at`,`updated_at`,`provider_type`,`endpoint_id`,`model_id`,`system_prompt`) VALUES (nullif(?, 0),?,?,?,?,?,?,?)"
 
       protected override fun bind(statement: SQLiteStatement, entity: ConversationEntity) {
         statement.bindLong(1, entity.id)
@@ -55,10 +54,8 @@ public class ConversationDao_Impl(
     }
   }
 
-  public override suspend fun upsert(conversation: ConversationEntity): Long =
-      performSuspending(__db, false, true) { _connection ->
-    val _result: Long = __insertAdapterOfConversationEntity.insertAndReturnId(_connection,
-        conversation)
+  public override suspend fun upsert(conversation: ConversationEntity): Long = performSuspending(__db, false, true) { _connection ->
+    val _result: Long = __insertAdapterOfConversationEntity.insertAndReturnId(_connection, conversation)
     _result
   }
 
@@ -102,8 +99,7 @@ public class ConversationDao_Impl(
           } else {
             _tmpSystemPrompt = _stmt.getText(_columnIndexOfSystemPrompt)
           }
-          _item =
-              ConversationEntity(_tmpId,_tmpTitle,_tmpCreatedAt,_tmpUpdatedAt,_tmpProviderType,_tmpEndpointId,_tmpModelId,_tmpSystemPrompt)
+          _item = ConversationEntity(_tmpId,_tmpTitle,_tmpCreatedAt,_tmpUpdatedAt,_tmpProviderType,_tmpEndpointId,_tmpModelId,_tmpSystemPrompt)
           _result.add(_item)
         }
         _result
@@ -154,8 +150,7 @@ public class ConversationDao_Impl(
           } else {
             _tmpSystemPrompt = _stmt.getText(_columnIndexOfSystemPrompt)
           }
-          _result =
-              ConversationEntity(_tmpId,_tmpTitle,_tmpCreatedAt,_tmpUpdatedAt,_tmpProviderType,_tmpEndpointId,_tmpModelId,_tmpSystemPrompt)
+          _result = ConversationEntity(_tmpId,_tmpTitle,_tmpCreatedAt,_tmpUpdatedAt,_tmpProviderType,_tmpEndpointId,_tmpModelId,_tmpSystemPrompt)
         } else {
           _result = null
         }

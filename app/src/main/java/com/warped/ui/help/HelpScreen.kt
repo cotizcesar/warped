@@ -74,7 +74,7 @@ fun HelpScreen(onNavigateBack: () -> Unit) {
                         "Tap a model to see its available .litertlm files.",
                         "Tap Download on the file you want.",
                         "Monitor progress in the Models tab — you can pause, resume, or cancel downloads.",
-                        "For gated/private models: add your HuggingFace Access Token in Settings→Hugging Face.",
+                        "For gated/private models: add your HuggingFace Access Token in Settings->Hugging Face.",
                         "For staff pick models (Gemma 3n): visit the model page on huggingface.co to accept the terms, then retry.",
                     )
                 )
@@ -103,7 +103,7 @@ fun HelpScreen(onNavigateBack: () -> Unit) {
                     icon = Icons.Filled.Dns,
                     title = "3. Connect to Remote LLMs",
                     steps = listOf(
-                        "Go to Settings → Endpoints to configure remote providers.",
+                        "Go to Settings -> Endpoints to configure remote providers.",
                         "Supported: OpenAI-compatible APIs, Ollama, LM Studio, Anthropic, and custom servers.",
                         "Enter the server URL and API key (stored securely in Android Keystore).",
                         "Select your remote model from the chat dropdown (marked with \"Net\" badge).",
@@ -163,7 +163,7 @@ fun HelpScreen(onNavigateBack: () -> Unit) {
                     title = "7. HuggingFace Access Token",
                     steps = listOf(
                         "Go to https://huggingface.co/settings/tokens to create a token.",
-                        "In the app: Settings → Hugging Face → enter your token (starts with hf_) and tap Save.",
+                        "In the app: Settings -> Hugging Face -> enter your token (starts with hf_) and tap Save.",
                         "A green \"Token configured\" message confirms it's saved.",
                         "This token is required for downloading gated/private models.",
                         "The token is stored securely using Android Keystore encryption.",

@@ -54,9 +54,11 @@ class CustomProvider(
     private val api = retrofit.create(CustomApi::class.java)
 
     override fun chat(request: ChatRequest): Flow<StreamToken> = flow {
-        val messages = request.messages.map {
-            OpenAiMessage(role = it.role.name.lowercase(), content = it.content)
-        }
+        val messages = request.messages
+            .filter { it.content.isNotBlank() }
+            .map {
+                OpenAiMessage(role = it.role.name.lowercase(), content = it.content)
+            }
         val body = OpenAiChatRequest(
             model = modelId,
             messages = messages,

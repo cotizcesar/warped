@@ -1,0 +1,96 @@
+{
+  "models": [
+    {
+      "type": "llm",
+      "publisher": "google",
+      "key": "google/gemma-4-12b-qat",
+      "display_name": "Gemma 4 12B Qat",
+      "architecture": "gemma4",
+      "quantization": {
+        "name": "Q4_0",
+        "bits_per_weight": 4
+      },
+      "size_bytes": 7151066820,
+      "params_string": "12B",
+      "loaded_instances": [
+        {
+          "id": "google/gemma-4-12b-qat",
+          "config": {
+            "context_length": 32768,
+            "eval_batch_size": 2048,
+            "physical_batch_size": 512,
+            "parallel": 4,
+            "flash_attention": true,
+            "offload_kv_cache_to_gpu": true
+          }
+        }
+      ],
+      "max_context_length": 262144,
+      "format": "gguf",
+      "capabilities": {
+        "vision": true,
+        "trained_for_tool_use": true,
+        "reasoning": {
+          "allowed_options": [
+            "off",
+            "on"
+          ],
+          "default": "on"
+        }
+      },
+      "description": null,
+      "variants": [
+        "google/gemma-4-12b-qat@q4_0"
+      ],
+      "selected_variant": "google/gemma-4-12b-qat@q4_0"
+    },
+    {
+      "type": "llm",
+      "publisher": "google",
+      "key": "google/gemma-4-12b",
+      "display_name": "Gemma 4 12B",
+      "architecture": "gemma4",
+      "quantization": {
+        "name": "Q4_K_M",
+        "bits_per_weight": 4
+      },
+      "size_bytes": 7556572777,
+      "params_string": "12B",
+      "loaded_instances": [],
+      "max_context_length": 262144,
+      "format": "gguf",
+      "capabilities": {
+        "vision": true,
+        "trained_for_tool_use": true,
+        "reasoning": {
+          "allowed_options": [
+            "off",
+            "on"
+          ],
+          "default": "on"
+        }
+      },
+      "description": null,
+      "variants": [
+        "google/gemma-4-12b@q4_k_m",
+        "google/gemma-4-12b@q8_0"
+      ],
+      "selected_variant": "google/gemma-4-12b@q4_k_m"
+    },
+    {
+      "type": "embedding",
+      "publisher": "nomic-ai",
+      "key": "text-embedding-nomic-embed-text-v1.5",
+      "display_name": "Nomic Embed Text v1.5",
+      "quantization": {
+        "name": "Q4_K_M",
+        "bits_per_weight": 4
+      },
+      "size_bytes": 84106624,
+      "params_string": null,
+      "loaded_instances": [],
+      "max_context_length": 2048,
+      "format": "gguf"
+    }
+  ]
+}

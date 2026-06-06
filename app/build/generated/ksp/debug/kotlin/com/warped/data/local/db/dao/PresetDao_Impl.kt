@@ -30,8 +30,7 @@ public class PresetDao_Impl(
   init {
     this.__db = __db
     this.__insertAdapterOfPresetEntity = object : EntityInsertAdapter<PresetEntity>() {
-      protected override fun createQuery(): String =
-          "INSERT OR REPLACE INTO `presets` (`id`,`name`,`temperature`,`top_p`,`top_k`,`repeat_penalty`,`max_tokens`,`context_size`,`seed`,`threads`,`model_format`,`created_at`) VALUES (nullif(?, 0),?,?,?,?,?,?,?,?,?,?,?)"
+      protected override fun createQuery(): String = "INSERT OR REPLACE INTO `presets` (`id`,`name`,`temperature`,`top_p`,`top_k`,`repeat_penalty`,`max_tokens`,`context_size`,`seed`,`threads`,`model_format`,`created_at`) VALUES (nullif(?, 0),?,?,?,?,?,?,?,?,?,?,?)"
 
       protected override fun bind(statement: SQLiteStatement, entity: PresetEntity) {
         statement.bindLong(1, entity.id)
@@ -50,8 +49,7 @@ public class PresetDao_Impl(
     }
   }
 
-  public override suspend fun upsert(preset: PresetEntity): Long = performSuspending(__db, false,
-      true) { _connection ->
+  public override suspend fun upsert(preset: PresetEntity): Long = performSuspending(__db, false, true) { _connection ->
     val _result: Long = __insertAdapterOfPresetEntity.insertAndReturnId(_connection, preset)
     _result
   }
@@ -100,8 +98,7 @@ public class PresetDao_Impl(
           _tmpModelFormat = _stmt.getText(_columnIndexOfModelFormat)
           val _tmpCreatedAt: Long
           _tmpCreatedAt = _stmt.getLong(_columnIndexOfCreatedAt)
-          _item =
-              PresetEntity(_tmpId,_tmpName,_tmpTemperature,_tmpTopP,_tmpTopK,_tmpRepeatPenalty,_tmpMaxTokens,_tmpContextSize,_tmpSeed,_tmpThreads,_tmpModelFormat,_tmpCreatedAt)
+          _item = PresetEntity(_tmpId,_tmpName,_tmpTemperature,_tmpTopP,_tmpTopK,_tmpRepeatPenalty,_tmpMaxTokens,_tmpContextSize,_tmpSeed,_tmpThreads,_tmpModelFormat,_tmpCreatedAt)
           _result.add(_item)
         }
         _result
@@ -156,8 +153,7 @@ public class PresetDao_Impl(
           _tmpModelFormat = _stmt.getText(_columnIndexOfModelFormat)
           val _tmpCreatedAt: Long
           _tmpCreatedAt = _stmt.getLong(_columnIndexOfCreatedAt)
-          _result =
-              PresetEntity(_tmpId,_tmpName,_tmpTemperature,_tmpTopP,_tmpTopK,_tmpRepeatPenalty,_tmpMaxTokens,_tmpContextSize,_tmpSeed,_tmpThreads,_tmpModelFormat,_tmpCreatedAt)
+          _result = PresetEntity(_tmpId,_tmpName,_tmpTemperature,_tmpTopP,_tmpTopK,_tmpRepeatPenalty,_tmpMaxTokens,_tmpContextSize,_tmpSeed,_tmpThreads,_tmpModelFormat,_tmpCreatedAt)
         } else {
           _result = null
         }

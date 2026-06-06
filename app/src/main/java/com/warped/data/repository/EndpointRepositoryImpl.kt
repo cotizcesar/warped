@@ -23,6 +23,9 @@ class EndpointRepositoryImpl @Inject constructor(
     override suspend fun getActive(): Endpoint? =
         endpointDao.getActive()?.toDomain()
 
+    override suspend fun getById(endpointId: Long): Endpoint? =
+        endpointDao.getById(endpointId)?.toDomain()
+
     override suspend fun saveEndpoint(endpoint: Endpoint): Long {
         val existing = if (endpoint.id != 0L) endpointDao.getById(endpoint.id) else null
         val keyRef = existing?.encryptedApiKeyRef ?: "api_key_${endpoint.id}"

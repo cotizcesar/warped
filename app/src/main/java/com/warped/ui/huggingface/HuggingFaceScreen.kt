@@ -11,34 +11,34 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -65,6 +66,12 @@ fun HuggingFaceScreen(
     var searchText by remember { mutableStateOf(uiState.searchQuery) }
     val canSearch = searchText.trim().length >= 3
 
+    LaunchedEffect(uiState.searchQuery) {
+        if (searchText != uiState.searchQuery) {
+            searchText = uiState.searchQuery
+        }
+    }
+
     LaunchedEffect(searchText) {
         val query = searchText.trim()
         if (query.length < 3) return@LaunchedEffect
@@ -77,34 +84,6 @@ fun HuggingFaceScreen(
         if (uiState.downloadSuccess) {
             viewModel.clearDownloadSuccess()
             onNavigateToModels()
-        }
-    }
-
-    if (uiState.selectedModel != null) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
-            onDismissRequest = { viewModel.clearDetail() },
-            sheetState = sheetState,
-            containerColor = Color(0xFF1F1F1E)
-        ) {
-            ModelDetailScreen(
-                model = uiState.selectedModel!!,
-                siblings = uiState.modelSiblings,
-                isDownloading = uiState.isDownloading,
-                isDownloadPaused = uiState.isDownloadPaused,
-                downloadProgress = uiState.downloadProgress,
-                downloadedBytes = uiState.downloadedBytes,
-                totalDownloadBytes = uiState.totalDownloadBytes,
-                downloadSpeedBytesPerSecond = uiState.downloadSpeedBytesPerSecond,
-                downloadingFileName = uiState.downloadingFileName,
-                downloadError = uiState.downloadError,
-                onDownload = { fileName, size ->
-                    viewModel.downloadFile(uiState.selectedModel!!.id, fileName, size)
-                },
-                onPauseDownload = { viewModel.pauseDownload() },
-                onResumeDownload = { viewModel.resumeDownload() },
-                onBack = { viewModel.clearDetail() }
-            )
         }
     }
 
@@ -126,6 +105,8 @@ fun HuggingFaceScreen(
                 .padding(padding)
                 .padding(horizontal = 16.dp)
         ) {
+            Spacer(Modifier.height(12.dp))
+
             OutlinedTextField(
                 value = searchText,
                 onValueChange = {
@@ -143,83 +124,158 @@ fun HuggingFaceScreen(
                         }
                     )
                 },
-                singleLine = true,
-                trailingIcon = {
-                    TextButton(
-                        onClick = { viewModel.search(searchText) },
-                        enabled = canSearch
-                    ) {
-                        Text("Search")
-                    }
-                }
+                singleLine = true
             )
 
             Spacer(Modifier.height(8.dp))
 
-            if (uiState.isLoading) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
+            val activeModelId = uiState.activeDownloadId?.substringBeforeLast("/")
+            val downloadState = DownloadCardState(
+                fileName = uiState.downloadingFileName,
+                isDownloading = uiState.isDownloading,
+                isPaused = uiState.isDownloadPaused,
+                progress = uiState.downloadProgress,
+                downloadedBytes = uiState.downloadedBytes,
+                totalBytes = uiState.totalDownloadBytes,
+                speed = uiState.downloadSpeedBytesPerSecond,
+                error = uiState.downloadError
+            )
 
-            if (uiState.searchResults.isNotEmpty()) {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(uiState.searchResults) { model ->
-                        ModelSearchResultCard(
-                            model = model,
-                            onClick = { viewModel.selectModel(model) }
-                        )
+            SearchResults(
+                isLoading = uiState.isLoading,
+                results = uiState.searchResults,
+                error = uiState.error,
+                searchQuery = uiState.searchQuery,
+                activeModelId = activeModelId,
+                downloadState = downloadState,
+                onDownload = { model, fileName, size ->
+                    viewModel.startDirectDownload(model, fileName, size)
+                },
+                onPause = { viewModel.pauseDownload() },
+                onResume = { viewModel.resumeDownload() },
+                onCancel = { viewModel.cancelDownload() },
+                onClearError = { viewModel.clearError() }
+            )
+        }
+    }
+}
+
+private data class DownloadCardState(
+    val fileName: String,
+    val isDownloading: Boolean,
+    val isPaused: Boolean,
+    val progress: Float,
+    val downloadedBytes: Long,
+    val totalBytes: Long,
+    val speed: Long,
+    val error: String?
+)
+
+@Composable
+private fun SearchResults(
+    isLoading: Boolean,
+    results: List<com.warped.data.remote.dto.HuggingFaceModel>,
+    error: String?,
+    searchQuery: String,
+    activeModelId: String?,
+    downloadState: DownloadCardState,
+    onDownload: (model: com.warped.data.remote.dto.HuggingFaceModel, fileName: String, fileSize: Long) -> Unit,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onCancel: () -> Unit,
+    onClearError: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        if (isLoading) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+
+        if (results.isNotEmpty()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(results, key = { it.id }) { model ->
+                    val chips = buildList {
+                        add("LiteRT-LM")
+                        add("${model.downloads} downloads")
+                        add("${model.likes} likes")
+                        model.tags.firstOrNull()?.let { add(it) }
                     }
+                    val litertlmFiles = model.siblings
+                        .filter { it.rfilename.endsWith(".litertlm", ignoreCase = true) }
+                        .sortedBy { it.size.takeIf { s -> s > 0 } ?: it.lfs?.size ?: 0L }
+                    ModelListCard(
+                        title = model.id.substringAfterLast("/"),
+                        subtitle = model.id,
+                        chips = chips,
+                        description = model.description.takeIf { it.isNotBlank() },
+                        descriptionAsMarkdown = true,
+                        files = litertlmFiles,
+                        isActive = activeModelId == model.id,
+                        downloadState = downloadState,
+                        onDownload = { fileName, size -> onDownload(model, fileName, size) },
+                        onPause = onPause,
+                        onResume = onResume,
+                        onCancel = onCancel
+                    )
                 }
-            } else if (!uiState.isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        if (uiState.error != null) {
-                            Text(
-                                uiState.error ?: "",
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                        }
+            }
+        } else if (!isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (error != null) {
                         Text(
-                            if (uiState.searchQuery.isNotBlank()) "No results found" else "Loading models...",
+                            error,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        TextButton(onClick = onClearError) { Text("Dismiss") }
+                    } else {
+                        Text(
+                            if (searchQuery.isNotBlank()) "No results found" else "Search Hugging Face to find models",
                             style = MaterialTheme.typography.bodyLarge
                         )
                     }
                 }
             }
-
-            if (uiState.error != null) {
-                Snackbar(
-                    modifier = Modifier.padding(16.dp),
-                    action = {
-                        TextButton(onClick = { viewModel.clearError() }) {
-                            Text("Dismiss")
-                        }
-                    }
-                ) { Text(uiState.error ?: "") }
-            }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ModelSearchResultCard(
-    model: com.warped.data.remote.dto.HuggingFaceModel,
-    onClick: () -> Unit
+private fun ModelListCard(
+    title: String,
+    subtitle: String,
+    chips: List<String>,
+    description: String?,
+    descriptionAsMarkdown: Boolean,
+    files: List<com.warped.data.remote.dto.HuggingFaceSibling>,
+    isActive: Boolean,
+    downloadState: DownloadCardState,
+    onDownload: (fileName: String, fileSize: Long) -> Unit,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onCancel: () -> Unit
 ) {
+    var selectedIndex by remember { mutableIntStateOf(0) }
+    var dropdownExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-        ),
-        onClick = onClick
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+        )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
@@ -228,36 +284,181 @@ private fun ModelSearchResultCard(
                     tint = MaterialTheme.colorScheme.primary
                 )
                 Spacer(Modifier.width(12.dp))
-                Text(
-                    model.id.substringAfterLast("/"),
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 2
-                )
-            }
-            Spacer(Modifier.height(4.dp))
-            Text(
-                model.id,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
-            )
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FormatBadge()
-                AssistInfoChip(text = "${model.downloads} downloads")
-                AssistInfoChip(text = "${model.likes} likes")
-                model.tags.firstOrNull()?.let { tag ->
-                    AssistInfoChip(text = tag)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
                 }
             }
-            if (model.description.isNotBlank()) {
+            if (chips.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                MarkdownText(
-                    text = model.description,
-                    maxLines = 4,
-                    codeTheme = SyntaxTheme.MONOKAI,
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    chips.forEach { chip ->
+                        if (chip == "LiteRT-LM") FormatBadge() else AssistInfoChip(text = chip)
+                    }
+                }
+            }
+            if (!description.isNullOrBlank()) {
+                Spacer(Modifier.height(6.dp))
+                if (descriptionAsMarkdown) {
+                    MarkdownText(
+                        text = description,
+                        maxLines = 4,
+                        codeTheme = SyntaxTheme.MONOKAI,
+                    )
+                } else {
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            if (files.isEmpty()) {
+                Text(
+                    text = "No LiteRT-LM files in this model",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            } else if (isActive) {
+                InlineDownloadProgress(
+                    state = downloadState,
+                    onPause = onPause,
+                    onResume = onResume,
+                    onCancel = onCancel,
+                    onOpenExternal = { url ->
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    }
+                )
+            } else {
+                val selectedFile = files.getOrNull(selectedIndex) ?: files.first()
+                val selectedSize = selectedFile.size.takeIf { it > 0 } ?: selectedFile.lfs?.size ?: 0L
+                val selectedLabel = buildString {
+                    append(selectedFile.rfilename.substringAfterLast("/"))
+                    if (selectedSize > 0) append("  ·  ").append(formatFileSize(selectedSize))
+                }
+                ExposedDropdownMenuBox(
+                    expanded = dropdownExpanded,
+                    onExpandedChange = { dropdownExpanded = !dropdownExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = selectedLabel,
+                        onValueChange = {},
+                        readOnly = true,
+                        singleLine = true,
+                        label = { Text("File") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = files.size > 1)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = dropdownExpanded,
+                        onDismissRequest = { dropdownExpanded = false }
+                    ) {
+                        files.forEachIndexed { i, file ->
+                            val size = file.size.takeIf { it > 0 } ?: file.lfs?.size ?: 0L
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(
+                                            text = file.rfilename.substringAfterLast("/"),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        if (size > 0) {
+                                            Text(
+                                                text = formatFileSize(size),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                },
+                                onClick = {
+                                    selectedIndex = i
+                                    dropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { onDownload(selectedFile.rfilename, selectedSize) },
+                    modifier = Modifier.align(Alignment.End),
+                    enabled = files.size > 0
+                ) {
+                    Text("Download")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InlineDownloadProgress(
+    state: DownloadCardState,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onCancel: () -> Unit,
+    onOpenExternal: (String) -> Unit
+) {
+    val progressInt = (state.progress * 100).toInt().coerceIn(0, 100)
+    Column {
+        LinearProgressIndicator(
+            progress = { state.progress.coerceIn(0f, 1f) },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = "${if (state.isPaused) "Paused" else "Downloading"}: ${state.fileName.substringAfterLast('/')} ($progressInt%)",
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Text(
+            text = "${formatFileSize(state.downloadedBytes)} / ${formatFileSize(state.totalBytes)}" +
+                if (state.isDownloading) " · ${formatDownloadSpeed(state.speed)}" else "",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (state.isPaused) {
+                TextButton(onClick = onResume) { Text("Resume") }
+            } else if (state.isDownloading) {
+                TextButton(onClick = onPause) { Text("Pause") }
+            }
+            TextButton(
+                onClick = onCancel,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+            ) { Text("Cancel") }
+        }
+        if (state.error != null) {
+            val isGated = state.error.startsWith("Gated model", ignoreCase = true)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = state.error,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall
+            )
+            if (isGated) {
+                Spacer(Modifier.height(4.dp))
+                OutlinedButton(onClick = { onOpenExternal("https://huggingface.co/${state.fileName.substringBefore('/')}") }) {
+                    Text("Open on Hugging Face")
+                }
             }
         }
     }
@@ -266,7 +467,7 @@ private fun ModelSearchResultCard(
 @Composable
 private fun FormatBadge() {
     val color = Color(0xFF4CAF50) // green for LiteRT-LM
-    Surface(
+    androidx.compose.material3.Surface(
         shape = MaterialTheme.shapes.extraSmall,
         color = color.copy(alpha = 0.15f),
         contentColor = color
@@ -282,7 +483,7 @@ private fun FormatBadge() {
 
 @Composable
 private fun AssistInfoChip(text: String) {
-    Surface(
+    androidx.compose.material3.Surface(
         shape = MaterialTheme.shapes.extraSmall,
         color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -293,224 +494,6 @@ private fun AssistInfoChip(text: String) {
             style = MaterialTheme.typography.labelSmall,
             maxLines = 1
         )
-    }
-}
-
-@Composable
-private fun SiblingFileCard(
-    sibling: com.warped.data.remote.dto.HuggingFaceSibling,
-    modelDownloads: Int,
-    isDownloading: Boolean,
-    onDownload: () -> Unit
-) {
-    val effectiveSize = sibling.size.takeIf { it > 0 } ?: sibling.lfs?.size ?: 0L
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-        )
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Storage,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    sibling.rfilename.substringAfterLast("/"),
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 2
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            if (effectiveSize > 0) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AssistInfoChip(text = formatFileSize(effectiveSize))
-                    AssistInfoChip(text = "$modelDownloads downloads")
-                }
-            } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AssistInfoChip(text = "$modelDownloads downloads")
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = onDownload,
-                enabled = !isDownloading,
-                modifier = Modifier.align(Alignment.End)
-            ) {
-                Text("Download")
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ModelDetailScreen(
-    model: com.warped.data.remote.dto.HuggingFaceModelDetail,
-    siblings: List<com.warped.data.remote.dto.HuggingFaceSibling>,
-    isDownloading: Boolean,
-    isDownloadPaused: Boolean,
-    downloadProgress: Float,
-    downloadedBytes: Long,
-    totalDownloadBytes: Long,
-    downloadSpeedBytesPerSecond: Long,
-    downloadingFileName: String,
-    downloadError: String?,
-    onDownload: (fileName: String, size: Long) -> Unit,
-    onPauseDownload: () -> Unit,
-    onResumeDownload: () -> Unit,
-    onBack: () -> Unit
-) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(model.id.substringAfterLast("/")) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to models")
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
-        ) {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                item {
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                model.id.substringAfterLast("/"),
-                                style = MaterialTheme.typography.headlineSmall
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            val isGated = model.gated != "false"
-                            if (isGated) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Lock,
-                                        contentDescription = null,
-                                        tint = Color(0xFFFF9800),
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Spacer(Modifier.width(4.dp))
-                                    Text(
-                                        "Gated model — requires Access Token in Settings",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Color(0xFFFF9800)
-                                    )
-                                }
-                            }
-                            if (model.tags.isNotEmpty()) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    model.tags.take(5).forEach { tag ->
-                                        AssistInfoChip(text = tag)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                item {
-                    Text("Available Models", style = MaterialTheme.typography.titleLarge)
-                }
-
-                if (siblings.isEmpty() && !isDownloading && !isDownloadPaused) {
-                    item {
-                        Text(
-                            "Modelo no compatible",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                if (isDownloading || isDownloadPaused) {
-                    item {
-                        Column {
-                            LinearProgressIndicator(
-                                progress = { downloadProgress },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    "${if (isDownloadPaused) "Paused" else "Downloading"}: $downloadingFileName (${(downloadProgress * 100).toInt()}%)",
-                                    modifier = Modifier.weight(1f)
-                                )
-                                if (isDownloadPaused) {
-                                    TextButton(onClick = onResumeDownload) {
-                                        Text("Resume")
-                                    }
-                                } else {
-                                    TextButton(onClick = onPauseDownload) {
-                                        Text("Pause")
-                                    }
-                                }
-                            }
-                            Text(
-                                "${formatFileSize(downloadedBytes)} / ${formatFileSize(totalDownloadBytes)}" +
-                                    if (isDownloading) " · ${formatDownloadSpeed(downloadSpeedBytesPerSecond)}" else "",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-
-                if (downloadError != null) {
-                    item {
-                        val isGated = downloadError.startsWith("Gated model", ignoreCase = true)
-                        Column {
-                            Text(downloadError, color = MaterialTheme.colorScheme.error)
-                            if (isGated) {
-                                val context = LocalContext.current
-                                val modelUrl = "https://huggingface.co/${model.id}"
-                                Spacer(Modifier.height(8.dp))
-                                OutlinedButton(onClick = {
-                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(modelUrl)))
-                                }) {
-                                    Text("Open on Hugging Face")
-                                }
-                            }
-                        }
-                    }
-                }
-
-                items(siblings) { sibling ->
-                    val effectiveSize = sibling.size.takeIf { it > 0 } ?: sibling.lfs?.size ?: 0L
-                    SiblingFileCard(
-                        sibling = sibling,
-                        modelDownloads = model.downloads,
-                        isDownloading = isDownloading || isDownloadPaused,
-                        onDownload = { onDownload(sibling.rfilename, effectiveSize) }
-                    )
-                }
-            }
-        }
     }
 }
 

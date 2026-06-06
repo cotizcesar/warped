@@ -285,9 +285,11 @@ class ModelsViewModel @Inject constructor(
                 }
                 val result = provider.listModels()
                 result.onSuccess { models ->
+                    val lmData = com.warped.data.repository.LmStudioModelCache.lastData
                     _uiState.update {
                         it.copy(
                             availableEndpointModels = models.map { m -> m.id },
+                            availableEndpointModelsData = lmData,
                             isFetchingEndpointModels = false
                         )
                     }

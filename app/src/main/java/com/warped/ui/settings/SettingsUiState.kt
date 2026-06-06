@@ -1,6 +1,5 @@
 package com.warped.ui.settings
 
-import com.warped.domain.model.GenerationParameters
 import com.warped.domain.model.SyntaxTheme
 
 data class SettingsUiState(
@@ -19,7 +18,8 @@ data class SettingsUiState(
     val hasHfToken: Boolean = false,
     val codeTheme: SyntaxTheme = SyntaxTheme.MONOKAI,
     val codeFontScale: Float = 1.0f,
-    val advancedParams: GenerationParameters = GenerationParameters(),
+    val contextSize: Int = 4096,
+    val maxTokens: Int = 2048,
     val toolStates: List<ToolState> = emptyList(),
     val enabledToolIds: Set<String> = emptySet(),
     val selectedTab: SettingsTab = SettingsTab.General,

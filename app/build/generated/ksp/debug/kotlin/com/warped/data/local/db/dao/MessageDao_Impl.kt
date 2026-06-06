@@ -33,8 +33,7 @@ public class MessageDao_Impl(
   init {
     this.__db = __db
     this.__insertAdapterOfMessageEntity = object : EntityInsertAdapter<MessageEntity>() {
-      protected override fun createQuery(): String =
-          "INSERT OR REPLACE INTO `messages` (`id`,`conversation_id`,`role`,`content`,`token_count`,`created_at`,`images`,`stats`,`reasoning`) VALUES (nullif(?, 0),?,?,?,?,?,?,?,?)"
+      protected override fun createQuery(): String = "INSERT OR REPLACE INTO `messages` (`id`,`conversation_id`,`role`,`content`,`token_count`,`created_at`,`images`,`stats`,`reasoning`) VALUES (nullif(?, 0),?,?,?,?,?,?,?,?)"
 
       protected override fun bind(statement: SQLiteStatement, entity: MessageEntity) {
         statement.bindLong(1, entity.id)
@@ -64,8 +63,7 @@ public class MessageDao_Impl(
       }
     }
     this.__updateAdapterOfMessageEntity = object : EntityDeleteOrUpdateAdapter<MessageEntity>() {
-      protected override fun createQuery(): String =
-          "UPDATE OR ABORT `messages` SET `id` = ?,`conversation_id` = ?,`role` = ?,`content` = ?,`token_count` = ?,`created_at` = ?,`images` = ?,`stats` = ?,`reasoning` = ? WHERE `id` = ?"
+      protected override fun createQuery(): String = "UPDATE OR ABORT `messages` SET `id` = ?,`conversation_id` = ?,`role` = ?,`content` = ?,`token_count` = ?,`created_at` = ?,`images` = ?,`stats` = ?,`reasoning` = ? WHERE `id` = ?"
 
       protected override fun bind(statement: SQLiteStatement, entity: MessageEntity) {
         statement.bindLong(1, entity.id)
@@ -97,14 +95,12 @@ public class MessageDao_Impl(
     }
   }
 
-  public override suspend fun insert(message: MessageEntity): Long = performSuspending(__db, false,
-      true) { _connection ->
+  public override suspend fun insert(message: MessageEntity): Long = performSuspending(__db, false, true) { _connection ->
     val _result: Long = __insertAdapterOfMessageEntity.insertAndReturnId(_connection, message)
     _result
   }
 
-  public override suspend fun update(message: MessageEntity): Unit = performSuspending(__db, false,
-      true) { _connection ->
+  public override suspend fun update(message: MessageEntity): Unit = performSuspending(__db, false, true) { _connection ->
     __updateAdapterOfMessageEntity.handle(_connection, message)
   }
 
@@ -157,8 +153,7 @@ public class MessageDao_Impl(
           } else {
             _tmpReasoning = _stmt.getText(_columnIndexOfReasoning)
           }
-          _item =
-              MessageEntity(_tmpId,_tmpConversationId,_tmpRole,_tmpContent,_tmpTokenCount,_tmpCreatedAt,_tmpImages,_tmpStats,_tmpReasoning)
+          _item = MessageEntity(_tmpId,_tmpConversationId,_tmpRole,_tmpContent,_tmpTokenCount,_tmpCreatedAt,_tmpImages,_tmpStats,_tmpReasoning)
           _result.add(_item)
         }
         _result
@@ -217,8 +212,7 @@ public class MessageDao_Impl(
           } else {
             _tmpReasoning = _stmt.getText(_columnIndexOfReasoning)
           }
-          _item =
-              MessageEntity(_tmpId,_tmpConversationId,_tmpRole,_tmpContent,_tmpTokenCount,_tmpCreatedAt,_tmpImages,_tmpStats,_tmpReasoning)
+          _item = MessageEntity(_tmpId,_tmpConversationId,_tmpRole,_tmpContent,_tmpTokenCount,_tmpCreatedAt,_tmpImages,_tmpStats,_tmpReasoning)
           _result.add(_item)
         }
         _result

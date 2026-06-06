@@ -30,7 +30,9 @@ import com.warped.domain.model.Endpoint
 import com.warped.domain.model.LocalModel
 import com.warped.domain.model.ProviderType
 import com.warped.ui.components.WarpedAlertDialog
+import com.warped.ui.components.ModelParamsDialog
 import com.warped.ui.endpoints.components.EndpointForm
+import com.warped.domain.model.GenerationParameters
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,6 +45,7 @@ fun UnifiedSelectorScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showMemoryWarning by remember { mutableStateOf<LocalModel?>(null) }
+    var editingModel by remember { mutableStateOf<LocalModel?>(null) }
     val isEndpointFormOpen = uiState.isEndpointFormVisible || uiState.isEditingEndpoint
 
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -72,6 +75,18 @@ fun UnifiedSelectorScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showMemoryWarning = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (editingModel != null) {
+        ModelParamsDialog(
+            title = "Parameters for ${editingModel!!.name}",
+            initial = editingModel!!.parameters,
+            onDismiss = { editingModel = null },
+            onSave = { newParams ->
+                viewModel.updateModelParameters(editingModel!!.id, newParams)
+                editingModel = null
             }
         )
     }
@@ -160,10 +175,10 @@ fun UnifiedSelectorScreen(
                     onFieldChange = { field, value -> viewModel.updateEndpointField(field, value) },
                     onSave = { if (uiState.isEditingEndpoint) viewModel.saveEndpointEdit() else viewModel.saveEndpoint() },
                     onDismiss = { viewModel.dismissEndpointForm() },
-                    availableModels = emptyList(),
-                    availableModelsData = emptyList(),
-                    isFetchingModels = false,
-                    onFetchModels = {}
+                    availableModels = uiState.availableEndpointModels,
+                    availableModelsData = uiState.availableEndpointModelsData,
+                    isFetchingModels = uiState.isFetchingEndpointModels,
+                    onFetchModels = { viewModel.fetchEndpointModels() }
                 )
             }
         } else if (uiState.localModels.isEmpty() && uiState.endpoints.isEmpty() && uiState.activeDownloads.isEmpty()) {
@@ -231,7 +246,7 @@ fun UnifiedSelectorScreen(
                         },
                         onDisconnect = { viewModel.disconnectLocal() },
                         onDelete = { viewModel.deleteModel(model) },
-                        onAdvancedParams = onNavigateToPresets
+                        onEditParams = { editingModel = model }
                     )
                 }
 
@@ -251,14 +266,10 @@ fun UnifiedSelectorScreen(
                         EndpointSelectorCard(
                             endpoint = endpoint,
                             isSelected = uiState.selectedRemoteEndpointId == endpoint.id,
-                            isFetchingModels = uiState.isFetchingModels && uiState.fetchingEndpointId == endpoint.id,
-                            fetchedModels = uiState.endpointModels[endpoint.id] ?: emptyList(),
-                            fetchError = uiState.endpointModelErrors[endpoint.id],
                             onUseInChat = {
                                 viewModel.selectRemote(endpoint)
                                 onNavigateToChat()
                             },
-                            onFetchModels = { viewModel.fetchEndpointModels(endpoint) },
                             onEdit = { viewModel.editEndpoint(endpoint) },
                             onDelete = { viewModel.deleteEndpoint(endpoint) }
                         )
@@ -287,7 +298,7 @@ private fun LocalModelSelectorCard(
     onConnect: () -> Unit,
     onDisconnect: () -> Unit,
     onDelete: () -> Unit,
-    onAdvancedParams: () -> Unit = {}
+    onEditParams: () -> Unit
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
@@ -355,13 +366,11 @@ private fun LocalModelSelectorCard(
                 )
             }
 
+            IconButton(onClick = onEditParams) {
+                Icon(Icons.Filled.Tune, "Parameters", tint = Color(0xFF9CA3AF), modifier = Modifier.size(18.dp))
+            }
             IconButton(onClick = { showDeleteConfirm = true }) {
                 Icon(Icons.Filled.Delete, "Delete", tint = Color(0xFF6B7280), modifier = Modifier.size(18.dp))
-            }
-            if (isConnected) {
-                IconButton(onClick = onAdvancedParams) {
-                    Icon(Icons.Filled.Settings, "Parameters", tint = Color(0xFF9CA3AF), modifier = Modifier.size(18.dp))
-                }
             }
         }
     }
@@ -386,15 +395,10 @@ private fun ConnectionDot(isConnected: Boolean, isLoading: Boolean) {
 private fun EndpointSelectorCard(
     endpoint: Endpoint,
     isSelected: Boolean,
-    isFetchingModels: Boolean,
-    fetchedModels: List<com.warped.domain.model.ModelInfo>,
-    fetchError: String?,
     onUseInChat: () -> Unit,
-    onFetchModels: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     if (showDeleteConfirm) {
@@ -408,7 +412,9 @@ private fun EndpointSelectorCard(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel")
+                }
             }
         )
     }
@@ -442,53 +448,25 @@ private fun EndpointSelectorCard(
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
-
-            Button(
-                onClick = {
-                    if (endpoint.modelId != null) onUseInChat()
-                    else { expanded = !expanded; if (!expanded && fetchedModels.isEmpty()) onFetchModels() }
-                },
-                enabled = endpoint.modelId != null || fetchedModels.isNotEmpty() || !isFetchingModels,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text(
-                    if (endpoint.modelId != null) "Use in chat" else "Browse models",
-                    color = Color.White
-                )
-            }
-
-            if (expanded) {
+            // Model fetch and selection happen in the endpoint form (Add/Edit).
+            // The selector card only shows what's already saved.
+            if (endpoint.modelId != null) {
                 Spacer(Modifier.height(8.dp))
-                if (isFetchingModels) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp).align(Alignment.CenterHorizontally), strokeWidth = 2.dp)
-                } else if (fetchError != null) {
-                    Text(fetchError, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                    TextButton(onClick = onFetchModels) { Text("Retry") }
-                } else if (fetchedModels.isEmpty() && endpoint.modelId == null) {
-                    TextButton(onClick = onFetchModels) { Text("Fetch models") }
-                } else {
-                    fetchedModels.forEach { modelInfo ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                modelInfo.name.ifBlank { modelInfo.id },
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.weight(1f)
-                            )
-                            TextButton(onClick = {
-                                // Handled by Parent UI (uses active Endpoint)
-                            }) {
-                                Text("Select", fontSize = 12.sp)
-                            }
-                        }
-                    }
+                Button(
+                    onClick = onUseInChat,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Use in chat", color = Color.White)
                 }
+            } else {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "No model selected. Edit this endpoint to pick one.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF9CA3AF)
+                )
             }
         }
     }

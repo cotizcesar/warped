@@ -29,10 +29,8 @@ public class RemoteEndpointDao_Impl(
   private val __insertAdapterOfRemoteEndpointEntity: EntityInsertAdapter<RemoteEndpointEntity>
   init {
     this.__db = __db
-    this.__insertAdapterOfRemoteEndpointEntity = object :
-        EntityInsertAdapter<RemoteEndpointEntity>() {
-      protected override fun createQuery(): String =
-          "INSERT OR REPLACE INTO `endpoints` (`id`,`name`,`url`,`api_type`,`model_id`,`encrypted_api_key_ref`,`created_at`,`is_active`) VALUES (nullif(?, 0),?,?,?,?,?,?,?)"
+    this.__insertAdapterOfRemoteEndpointEntity = object : EntityInsertAdapter<RemoteEndpointEntity>() {
+      protected override fun createQuery(): String = "INSERT OR REPLACE INTO `endpoints` (`id`,`name`,`url`,`api_type`,`model_id`,`encrypted_api_key_ref`,`created_at`,`is_active`) VALUES (nullif(?, 0),?,?,?,?,?,?,?)"
 
       protected override fun bind(statement: SQLiteStatement, entity: RemoteEndpointEntity) {
         statement.bindLong(1, entity.id)
@@ -58,10 +56,8 @@ public class RemoteEndpointDao_Impl(
     }
   }
 
-  public override suspend fun upsert(endpoint: RemoteEndpointEntity): Long = performSuspending(__db,
-      false, true) { _connection ->
-    val _result: Long = __insertAdapterOfRemoteEndpointEntity.insertAndReturnId(_connection,
-        endpoint)
+  public override suspend fun upsert(endpoint: RemoteEndpointEntity): Long = performSuspending(__db, false, true) { _connection ->
+    val _result: Long = __insertAdapterOfRemoteEndpointEntity.insertAndReturnId(_connection, endpoint)
     _result
   }
 
@@ -75,8 +71,7 @@ public class RemoteEndpointDao_Impl(
         val _columnIndexOfUrl: Int = getColumnIndexOrThrow(_stmt, "url")
         val _columnIndexOfApiType: Int = getColumnIndexOrThrow(_stmt, "api_type")
         val _columnIndexOfModelId: Int = getColumnIndexOrThrow(_stmt, "model_id")
-        val _columnIndexOfEncryptedApiKeyRef: Int = getColumnIndexOrThrow(_stmt,
-            "encrypted_api_key_ref")
+        val _columnIndexOfEncryptedApiKeyRef: Int = getColumnIndexOrThrow(_stmt, "encrypted_api_key_ref")
         val _columnIndexOfCreatedAt: Int = getColumnIndexOrThrow(_stmt, "created_at")
         val _columnIndexOfIsActive: Int = getColumnIndexOrThrow(_stmt, "is_active")
         val _result: MutableList<RemoteEndpointEntity> = mutableListOf()
@@ -108,8 +103,7 @@ public class RemoteEndpointDao_Impl(
           val _tmp: Int
           _tmp = _stmt.getLong(_columnIndexOfIsActive).toInt()
           _tmpIsActive = _tmp != 0
-          _item =
-              RemoteEndpointEntity(_tmpId,_tmpName,_tmpUrl,_tmpApiType,_tmpModelId,_tmpEncryptedApiKeyRef,_tmpCreatedAt,_tmpIsActive)
+          _item = RemoteEndpointEntity(_tmpId,_tmpName,_tmpUrl,_tmpApiType,_tmpModelId,_tmpEncryptedApiKeyRef,_tmpCreatedAt,_tmpIsActive)
           _result.add(_item)
         }
         _result
@@ -131,8 +125,7 @@ public class RemoteEndpointDao_Impl(
         val _columnIndexOfUrl: Int = getColumnIndexOrThrow(_stmt, "url")
         val _columnIndexOfApiType: Int = getColumnIndexOrThrow(_stmt, "api_type")
         val _columnIndexOfModelId: Int = getColumnIndexOrThrow(_stmt, "model_id")
-        val _columnIndexOfEncryptedApiKeyRef: Int = getColumnIndexOrThrow(_stmt,
-            "encrypted_api_key_ref")
+        val _columnIndexOfEncryptedApiKeyRef: Int = getColumnIndexOrThrow(_stmt, "encrypted_api_key_ref")
         val _columnIndexOfCreatedAt: Int = getColumnIndexOrThrow(_stmt, "created_at")
         val _columnIndexOfIsActive: Int = getColumnIndexOrThrow(_stmt, "is_active")
         val _result: RemoteEndpointEntity?
@@ -163,8 +156,7 @@ public class RemoteEndpointDao_Impl(
           val _tmp: Int
           _tmp = _stmt.getLong(_columnIndexOfIsActive).toInt()
           _tmpIsActive = _tmp != 0
-          _result =
-              RemoteEndpointEntity(_tmpId,_tmpName,_tmpUrl,_tmpApiType,_tmpModelId,_tmpEncryptedApiKeyRef,_tmpCreatedAt,_tmpIsActive)
+          _result = RemoteEndpointEntity(_tmpId,_tmpName,_tmpUrl,_tmpApiType,_tmpModelId,_tmpEncryptedApiKeyRef,_tmpCreatedAt,_tmpIsActive)
         } else {
           _result = null
         }
@@ -185,8 +177,7 @@ public class RemoteEndpointDao_Impl(
         val _columnIndexOfUrl: Int = getColumnIndexOrThrow(_stmt, "url")
         val _columnIndexOfApiType: Int = getColumnIndexOrThrow(_stmt, "api_type")
         val _columnIndexOfModelId: Int = getColumnIndexOrThrow(_stmt, "model_id")
-        val _columnIndexOfEncryptedApiKeyRef: Int = getColumnIndexOrThrow(_stmt,
-            "encrypted_api_key_ref")
+        val _columnIndexOfEncryptedApiKeyRef: Int = getColumnIndexOrThrow(_stmt, "encrypted_api_key_ref")
         val _columnIndexOfCreatedAt: Int = getColumnIndexOrThrow(_stmt, "created_at")
         val _columnIndexOfIsActive: Int = getColumnIndexOrThrow(_stmt, "is_active")
         val _result: RemoteEndpointEntity?
@@ -217,8 +208,7 @@ public class RemoteEndpointDao_Impl(
           val _tmp: Int
           _tmp = _stmt.getLong(_columnIndexOfIsActive).toInt()
           _tmpIsActive = _tmp != 0
-          _result =
-              RemoteEndpointEntity(_tmpId,_tmpName,_tmpUrl,_tmpApiType,_tmpModelId,_tmpEncryptedApiKeyRef,_tmpCreatedAt,_tmpIsActive)
+          _result = RemoteEndpointEntity(_tmpId,_tmpName,_tmpUrl,_tmpApiType,_tmpModelId,_tmpEncryptedApiKeyRef,_tmpCreatedAt,_tmpIsActive)
         } else {
           _result = null
         }

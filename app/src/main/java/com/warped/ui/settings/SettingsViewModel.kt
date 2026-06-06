@@ -6,7 +6,6 @@ import com.warped.data.local.preferences.AdvancedPreferences
 import com.warped.data.local.inference.tools.ToolDefinitions
 import com.warped.data.local.inference.tools.ToolPreferences
 import com.warped.data.local.security.ApiKeyStore
-import com.warped.domain.model.GenerationParameters
 import com.warped.domain.model.SyntaxTheme
 import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
@@ -70,11 +69,6 @@ class SettingsViewModel @Inject constructor(
             }
         }
         viewModelScope.launch(coroutineExceptionHandler) {
-            advancedPreferences.defaultParameters.collect { params ->
-                _uiState.update { it.copy(advancedParams = params) }
-            }
-        }
-        viewModelScope.launch(coroutineExceptionHandler) {
             toolPreferences.enabledTools.collect { enabledIds ->
                 _uiState.update { current ->
                     current.copy(
@@ -114,12 +108,6 @@ class SettingsViewModel @Inject constructor(
 
     fun selectTab(tab: SettingsTab) {
         _uiState.update { it.copy(selectedTab = tab) }
-    }
-
-    fun updateAdvancedParam(transform: (GenerationParameters) -> GenerationParameters) {
-        val newParams = transform(_uiState.value.advancedParams)
-        _uiState.update { it.copy(advancedParams = newParams) }
-        viewModelScope.launch(coroutineExceptionHandler) { advancedPreferences.save(newParams) }
     }
 
     fun setCodeTheme(theme: SyntaxTheme) {

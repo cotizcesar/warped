@@ -1,16 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  ENDPT-06: HTTP cleartext traffic is permitted for the whole app.
+
+  Rationale: LM Studio (the sole remote provider in v1.8) is a local-network server that
+  runs on the user's machine and exposes only HTTP, not HTTPS. The Android
+  network-security-config XML format does not support CIDR ranges in <domain> entries
+  (only exact hostnames), so a per-IP allowlist is impractical. Permitting cleartext at
+  the base-config level is the simplest correct configuration for a local-LLM client.
+
+  For users running a HTTPS-fronted LM Studio, the same connection works without this
+  exception — cleartextTrafficPermitted="true" is permissive, not exclusive.
+-->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false">
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
-
-    <!-- LAN IP ranges for Ollama/LM Studio on local network -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">localhost</domain>
-        <domain includeSubdomains="false">10.0.0.0/8</domain>
-        <domain includeSubdomains="false">172.16.0.0/12</domain>
-        <domain includeSubdomains="false">192.168.0.0/16</domain>
-    </domain-config>
 </network-security-config>

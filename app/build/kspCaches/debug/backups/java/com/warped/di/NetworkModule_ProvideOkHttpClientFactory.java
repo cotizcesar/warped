@@ -8,8 +8,8 @@ import dagger.internal.Provider;
 import dagger.internal.QualifierMetadata;
 import dagger.internal.ScopeMetadata;
 import javax.annotation.processing.Generated;
+import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
-import okhttp3.logging.HttpLoggingInterceptor;
 
 @ScopeMetadata("javax.inject.Singleton")
 @QualifierMetadata
@@ -28,12 +28,11 @@ import okhttp3.logging.HttpLoggingInterceptor;
     "nullness:initialization.field.uninitialized"
 })
 public final class NetworkModule_ProvideOkHttpClientFactory implements Factory<OkHttpClient> {
-  private final Provider<HttpLoggingInterceptor> loggingInterceptorProvider;
+  private final Provider<Interceptor> loggingInterceptorProvider;
 
   private final Provider<AuthInterceptor> authInterceptorProvider;
 
-  private NetworkModule_ProvideOkHttpClientFactory(
-      Provider<HttpLoggingInterceptor> loggingInterceptorProvider,
+  private NetworkModule_ProvideOkHttpClientFactory(Provider<Interceptor> loggingInterceptorProvider,
       Provider<AuthInterceptor> authInterceptorProvider) {
     this.loggingInterceptorProvider = loggingInterceptorProvider;
     this.authInterceptorProvider = authInterceptorProvider;
@@ -45,12 +44,12 @@ public final class NetworkModule_ProvideOkHttpClientFactory implements Factory<O
   }
 
   public static NetworkModule_ProvideOkHttpClientFactory create(
-      Provider<HttpLoggingInterceptor> loggingInterceptorProvider,
+      Provider<Interceptor> loggingInterceptorProvider,
       Provider<AuthInterceptor> authInterceptorProvider) {
     return new NetworkModule_ProvideOkHttpClientFactory(loggingInterceptorProvider, authInterceptorProvider);
   }
 
-  public static OkHttpClient provideOkHttpClient(HttpLoggingInterceptor loggingInterceptor,
+  public static OkHttpClient provideOkHttpClient(Interceptor loggingInterceptor,
       AuthInterceptor authInterceptor) {
     return Preconditions.checkNotNullFromProvides(NetworkModule.INSTANCE.provideOkHttpClient(loggingInterceptor, authInterceptor));
   }

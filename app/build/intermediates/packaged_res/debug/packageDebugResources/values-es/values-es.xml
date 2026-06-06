@@ -63,6 +63,13 @@
     <string name="no_results_found">Sin resultados</string>
     <string name="pause">Pausar</string>
     <string name="paused">Pausado</string>
+    <string name="provider_anthropic">Anthropic</string>
+    <string name="provider_custom">Personalizado</string>
+    <string name="provider_lite_rt_lm">LiteRT-LM</string>
+    <string name="provider_lm_studio">LM Studio</string>
+    <string name="provider_local">Local (heredado)</string>
+    <string name="provider_ollama">Ollama</string>
+    <string name="provider_openai">OpenAI</string>
     <string name="provider_type">Tipo de Provider</string>
     <string name="recents">Recientes</string>
     <string name="remove">Quitar</string>

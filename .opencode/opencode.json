@@ -1,0 +1,11 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "read": {
+      "/home/cotizcesar/Documents/warped/.opencode/gsd-core/*": "allow"
+    },
+    "external_directory": {
+      "/home/cotizcesar/Documents/warped/.opencode/gsd-core/*": "allow"
+    }
+  }
+}

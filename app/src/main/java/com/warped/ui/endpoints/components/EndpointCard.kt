@@ -1,6 +1,8 @@
 package com.warped.ui.endpoints.components
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -51,7 +53,12 @@ fun EndpointCard(
                     )
                     if (endpoint.isActive) {
                         Spacer(Modifier.width(8.dp))
-                        Text("●", color = MaterialTheme.colorScheme.primary)
+                        Icon(
+                            imageVector = Icons.Filled.FiberManualRecord,
+                            contentDescription = "Active",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(10.dp)
+                        )
                     }
                 }
             }

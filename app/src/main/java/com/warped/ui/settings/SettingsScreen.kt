@@ -113,7 +113,6 @@ fun SettingsScreen(
             when (uiState.selectedTab) {
                 SettingsTab.General -> GeneralTab(uiState, viewModel, onNavigateToWizard)
                 SettingsTab.Tools -> ToolsTab(uiState, viewModel)
-                SettingsTab.Advanced -> AdvancedTab(uiState, viewModel)
             }
         }
 
@@ -382,8 +381,8 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
 private fun ToolsTab(uiState: SettingsUiState, viewModel: SettingsViewModel) {
     val enabledCount = uiState.toolStates.count { it.enabled }
     val enabledTokenSum = uiState.toolStates.filter { it.enabled }.sumOf { it.tokenEstimate }
-    val contextSize = uiState.advancedParams.contextSize
-    val maxOutTokens = uiState.advancedParams.maxTokens
+    val contextSize = uiState.contextSize
+    val maxOutTokens = uiState.maxTokens
     val availableForConv = contextSize - enabledTokenSum - maxOutTokens
     val toolsRatio = (enabledTokenSum.toFloat() / contextSize.toFloat() * 100).toInt()
     val totalRatio = ((enabledTokenSum + maxOutTokens).toFloat() / contextSize.toFloat() * 100).toInt()
@@ -516,154 +515,8 @@ private fun ToolsTab(uiState: SettingsUiState, viewModel: SettingsViewModel) {
 }
 
 // =========================================
-// ADVANCED TAB
+// ADVANCED TAB (removed) — params are now per-model
 // =========================================
-@Composable
-private fun AdvancedTab(uiState: SettingsUiState, viewModel: SettingsViewModel) {
-    val p = uiState.advancedParams
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(vertical = 12.dp)
-    ) {
-        item {
-            Text("Model Defaults", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "These parameters apply to new conversations",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        // Temperature
-        item {
-            ParamSlider(
-                label = "Temperature",
-                value = p.temperature,
-                range = 0f..2f,
-                steps = 19,
-                description = "Controls randomness. Lower = more deterministic.",
-                format = { "%.1f".format(it) }
-            ) { v -> viewModel.updateAdvancedParam { it.copy(temperature = v) } }
-        }
-
-        // Top P
-        item {
-            ParamSlider(
-                label = "Top P",
-                value = p.topP,
-                range = 0f..1f,
-                steps = 9,
-                description = "Nucleus sampling. Lower = more focused.",
-                format = { "%.1f".format(it) }
-            ) { v -> viewModel.updateAdvancedParam { it.copy(topP = v) } }
-        }
-
-        // Top K
-        item {
-            ParamSlider(
-                label = "Top K",
-                value = p.topK.toFloat(),
-                range = 1f..100f,
-                steps = 9,
-                description = "Limits token selection to top K.",
-                format = { it.toInt().toString() }
-            ) { v -> viewModel.updateAdvancedParam { it.copy(topK = v.toInt()) } }
-        }
-
-        // Repeat Penalty
-        item {
-            ParamSlider(
-                label = "Repeat Penalty",
-                value = p.repeatPenalty,
-                range = 1f..2f,
-                steps = 9,
-                description = "Penalizes token repetition. Higher = less repetition.",
-                format = { "%.2f".format(it) }
-            ) { v -> viewModel.updateAdvancedParam { it.copy(repeatPenalty = v) } }
-        }
-
-        // Max Tokens
-        item {
-            ParamSlider(
-                label = "Max Tokens",
-                value = p.maxTokens.toFloat(),
-                range = 128f..8192f,
-                steps = 8,
-                description = "Maximum output tokens per response.",
-                format = { it.toInt().toString() }
-            ) { v -> viewModel.updateAdvancedParam { it.copy(maxTokens = v.toInt()) } }
-        }
-
-        // Context Size
-        item {
-            ParamSlider(
-                label = "Context Size",
-                value = p.contextSize.toFloat(),
-                range = 512f..32768f,
-                steps = 6,
-                description = "Maximum context window size.",
-                format = { it.toInt().toString() }
-            ) { v -> viewModel.updateAdvancedParam { it.copy(contextSize = v.toInt()) } }
-        }
-
-        // Seed
-        item {
-            ParamSlider(
-                label = "Seed",
-                value = p.seed.toFloat(),
-                range = -1f..100000f,
-                steps = 10,
-                description = "Random seed. -1 = random each time.",
-                format = { if (it.toInt() == -1) "Random" else it.toInt().toString() }
-            ) { v -> viewModel.updateAdvancedParam { it.copy(seed = v.toInt()) } }
-        }
-
-        item { Spacer(Modifier.height(24.dp)) }
-    }
-}
-
-@Composable
-private fun ParamSlider(
-    label: String,
-    value: Float,
-    range: ClosedFloatingPointRange<Float>,
-    steps: Int,
-    description: String,
-    format: (Float) -> String,
-    onValueChange: (Float) -> Unit
-) {
-    Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                Text(
-                    format(value),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            Slider(
-                value = value,
-                onValueChange = onValueChange,
-                valueRange = range,
-                steps = steps,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Text(
-                description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
 
 @Composable
 private fun ThemeSwatchStrip(theme: SyntaxTheme) {

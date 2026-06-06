@@ -38,7 +38,8 @@ class UnifiedSelectorViewModel @Inject constructor(
     private val providerRouter: ProviderRouter,
     private val memoryChecker: MemoryChecker,
     private val apiKeyStore: ApiKeyStore,
-    private val inputSanitizer: InputSanitizer
+    private val inputSanitizer: InputSanitizer,
+    private val parameterStore: ParameterStore
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UnifiedSelectorUiState())
@@ -97,6 +98,7 @@ class UnifiedSelectorViewModel @Inject constructor(
         ) ProviderType.LITE_RT_LM else ProviderType.LITE_RT_LM
 
         _uiState.update { it.copy(isConnecting = true, connectingModelName = model.name) }
+        parameterStore.update(model.parameters)
         viewModelScope.launch(coroutineExceptionHandler) {
             try {
                 val activeEngine = engineManager.getActiveEngine()
@@ -144,6 +146,49 @@ class UnifiedSelectorViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Fetch models for the endpoint currently being configured in the form.
+     * Uses a temp endpoint built from [SelectorFormState] fields, identical to
+     * the [com.warped.ui.models.ModelsViewModel.fetchEndpointModels] flow.
+     */
+    fun fetchEndpointModels() {
+        val state = _uiState.value
+        var url = state.formUrl.ifBlank { return }
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            url = "http://$url"
+        }
+        if (!url.endsWith("/")) {
+            url = "$url/"
+        }
+        val apiType = try { ProviderType.valueOf(state.formApiType) } catch (_: IllegalArgumentException) { ProviderType.CUSTOM }
+        val tempEndpoint = Endpoint(id = 0, name = "temp", url = url, apiType = apiType, modelId = "fetch")
+        viewModelScope.launch(coroutineExceptionHandler) {
+            _uiState.update { it.copy(isFetchingEndpointModels = true) }
+            try {
+                val provider = if (apiType == ProviderType.ANTHROPIC) {
+                    LMStudioProvider(baseUrl = url, modelId = "fetch", inputSanitizer = inputSanitizer)
+                } else {
+                    providerRouter.resolve(tempEndpoint, "fetch")
+                }
+                val result = provider.listModels()
+                result.onSuccess { models ->
+                    val lmData = com.warped.data.repository.LmStudioModelCache.lastData
+                    _uiState.update {
+                        it.copy(
+                            availableEndpointModels = models.map { m -> m.id },
+                            availableEndpointModelsData = lmData,
+                            isFetchingEndpointModels = false
+                        )
+                    }
+                }.onFailure { e ->
+                    _uiState.update { it.copy(isFetchingEndpointModels = false, error = "Failed to fetch: ${e.message}") }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isFetchingEndpointModels = false, error = e.message) }
+            }
+        }
+    }
+
     fun fetchEndpointModels(endpoint: Endpoint) {
         viewModelScope.launch(coroutineExceptionHandler) {
             _uiState.update {
@@ -185,6 +230,23 @@ class UnifiedSelectorViewModel @Inject constructor(
                         endpointModelErrors = it.endpointModelErrors + (endpoint.id to (e.message ?: "Unknown error"))
                     )
                 }
+            }
+        }
+    }
+
+    fun updateModelParameters(modelId: Long, parameters: GenerationParameters) {
+        viewModelScope.launch(coroutineExceptionHandler) {
+            try {
+                localModelRepository.updateParameters(modelId, parameters)
+                val activeId = activeModelSelection.localSelection.value.modelId
+                if (activeId != null) {
+                    val active = localModelRepository.getByFilePath(activeId)
+                    if (active != null && active.id == modelId) {
+                        parameterStore.update(parameters)
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
             }
         }
     }

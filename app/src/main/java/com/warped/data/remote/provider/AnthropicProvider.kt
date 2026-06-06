@@ -61,7 +61,7 @@ class AnthropicProvider(
     override fun chat(request: ChatRequest): Flow<StreamToken> = flow {
         val systemMessage = request.messages.firstOrNull { it.role.name == "SYSTEM" }?.content
         val chatMessages = request.messages
-            .filter { it.role.name != "SYSTEM" }
+            .filter { it.role.name != "SYSTEM" && it.content.isNotBlank() }
             .map {
                 val content = if (it.role == Role.USER) inputSanitizer.sanitize(it.content) else it.content
                 AnthropicMessage(role = it.role.name.lowercase(), content = content)

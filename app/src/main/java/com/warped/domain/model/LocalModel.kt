@@ -11,7 +11,8 @@ data class LocalModel(
     val parameterCount: String,
     val architecture: String,
     val modelFormat: String = "LITERTLM",
-    val importedAt: Instant
+    val importedAt: Instant,
+    val parameters: GenerationParameters = GenerationParameters()
 ) {
     val capabilities: ModelCapabilities by lazy {
         val lower = "${name} ${filePath}".lowercase()

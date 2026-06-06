@@ -5,10 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.warped.data.local.download.ModelDownloadManager
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.data.remote.dto.HuggingFaceModel
-import com.warped.data.remote.dto.HuggingFaceSibling
-import com.warped.domain.model.AllowlistEntry
 import com.warped.domain.repository.HuggingFaceRepository
-import com.warped.domain.repository.ModelAllowlistRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,7 +21,6 @@ import timber.log.Timber
 @HiltViewModel
 class HuggingFaceViewModel @Inject constructor(
     private val huggingFaceRepository: HuggingFaceRepository,
-    private val modelAllowlistRepository: ModelAllowlistRepository,
     private val downloadManager: ModelDownloadManager,
     private val apiKeyStore: ApiKeyStore
 ) : ViewModel() {
@@ -38,7 +34,6 @@ class HuggingFaceViewModel @Inject constructor(
     }
 
     init {
-        loadRecommended()
         viewModelScope.launch(coroutineExceptionHandler) {
             downloadManager.downloadStates.collect { states ->
                 val activeId = _uiState.value.activeDownloadId
@@ -159,64 +154,6 @@ class HuggingFaceViewModel @Inject constructor(
 
     fun onSearchTextChanged(text: String) {
         _uiState.update { it.copy(searchQuery = text) }
-    }
-
-    fun selectTab(tab: HuggingFaceTab) {
-        _uiState.update { it.copy(selectedTab = tab) }
-        if (tab == HuggingFaceTab.Recommended && _uiState.value.recommendedResults.isEmpty() && !_uiState.value.isLoadingRecommended) {
-            loadRecommended()
-        }
-    }
-
-    /**
-     * Populate the Recommended tab from the curated `assets/model_allowlist.json`
-     * asset. The allowlist is the source of truth for which models are
-     * recommended — it removes the runtime HF API call and guarantees offline
-     * availability of the Recommended tab on first launch.
-     */
-    fun loadRecommended() {
-        if (_uiState.value.isLoadingRecommended) return
-        _uiState.update { it.copy(isLoadingRecommended = true, error = null) }
-        viewModelScope.launch(coroutineExceptionHandler) {
-            val entries = modelAllowlistRepository.getAll()
-            val mapped = entries.map { it.toHuggingFaceModel() }
-            _uiState.update {
-                it.copy(
-                    recommendedResults = mapped,
-                    isLoadingRecommended = false
-                )
-            }
-        }
-    }
-
-    private fun AllowlistEntry.toHuggingFaceModel(): HuggingFaceModel {
-        val author = name.substringBefore('/')
-        val capList = capabilities
-        val tags = buildList {
-            add("litertlm")
-            if ("llm_chat" in capList) add("conversational")
-            if ("llm_vision" in capList) add("image-text-to-text")
-        }
-        return HuggingFaceModel(
-            id = name,
-            modelIdAlias = name,
-            author = author,
-            tags = tags,
-            downloads = 0,
-            likes = 0,
-            description = displayName,
-            pipelineTag = if ("llm_vision" in capList) "image-text-to-text" else "text-generation",
-            gated = "false",
-            lastModified = "",
-            siblings = listOf(
-                HuggingFaceSibling(
-                    rfilename = modelFile,
-                    size = sizeInBytes,
-                    blobId = null,
-                    lfs = null
-                )
-            )
-        )
     }
 
     /**

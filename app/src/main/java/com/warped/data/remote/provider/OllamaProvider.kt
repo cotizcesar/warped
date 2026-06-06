@@ -54,10 +54,12 @@ class OllamaProvider(
     private val api = retrofit.create(OllamaApi::class.java)
 
     override fun chat(request: ChatRequest): Flow<StreamToken> = flow {
-        val messages = request.messages.map {
-            val content = if (it.role == Role.USER) inputSanitizer.sanitize(it.content) else it.content
-            OllamaMessage(role = it.role.name.lowercase(), content = content)
-        }
+        val messages = request.messages
+            .filter { it.content.isNotBlank() }
+            .map {
+                val content = if (it.role == Role.USER) inputSanitizer.sanitize(it.content) else it.content
+                OllamaMessage(role = it.role.name.lowercase(), content = content)
+            }
         val body = OllamaChatRequest(
             model = modelId,
             messages = messages,

@@ -28,7 +28,7 @@ class InputSanitizer @Inject constructor() {
         result = result.replace(Regex("""[\u200B\u200C\u200D\uFEFF]"""), "")
 
         if (result != input) {
-            Timber.d("InputSanitizer: sanitized input (${input.length} → ${result.length} chars)")
+            Timber.d("InputSanitizer: sanitized input (${input.length} -> ${result.length} chars)")
         }
 
         return result

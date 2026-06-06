@@ -48,6 +48,14 @@ fun ModelsScreen(
     var showMemoryWarning by remember { mutableStateOf<LocalModel?>(null) }
     var showAddWizard by remember { mutableStateOf(false) }
     val isEndpointFormOpen = uiState.isEndpointFormVisible || uiState.isEditingEndpoint
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let { msg ->
+            snackbarHostState.showSnackbar(message = msg, actionLabel = "Dismiss", withDismissAction = true)
+            viewModel.clearError()
+        }
+    }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -85,9 +93,16 @@ fun ModelsScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text(if (isEndpointFormOpen) "Connect to an API" else "Models & Endpoints") },
+                title = {
+                    Text(
+                        if (isEndpointFormOpen) "Connect to an API" else "Models & Endpoints",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                },
+                windowInsets = TopAppBarDefaults.windowInsets,
                 navigationIcon = {
                     if (isEndpointFormOpen) {
                         IconButton(
@@ -302,14 +317,8 @@ fun ModelsScreen(
             }
 
             if (uiState.error != null) {
-                Snackbar(
-                    modifier = Modifier.padding(16.dp),
-                    action = {
-                        TextButton(onClick = { viewModel.clearError() }) {
-                            Text("Dismiss")
-                        }
-                    }
-                ) { Text(uiState.error ?: "") }
+                // Error is now shown via the SnackbarHost in the Scaffold.
+                // Keep this block as a no-op for now (in case we want to show inline later).
             }
         }
     }
