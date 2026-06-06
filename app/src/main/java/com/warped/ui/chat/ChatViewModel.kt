@@ -265,7 +265,7 @@ class ChatViewModel @Inject constructor(
                 val modelMayThink = state.localModels.firstOrNull { it.filePath == modelId }?.capabilities?.reasoning == true
                 Timber.d("ChatVM: sendMessage reasoningActive=%b modelMayThink=%b", reasoningActive, modelMayThink)
 
-                helper.runInference(request, enableThinking = state.enableThinking && state.supportsThinking).collect { token ->
+                helper.runInference(request, enableThinking = state.enableThinking && state.supportsThinking, skills = emptyList()).collect { token ->
 
                     when (token) {
                         is StreamToken.Delta -> {

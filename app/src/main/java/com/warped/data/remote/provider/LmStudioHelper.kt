@@ -3,9 +3,11 @@ package com.warped.data.remote.provider
 import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.domain.llm.LlmModelHelper
+import com.warped.domain.model.ChatMessage
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.Endpoint
 import com.warped.domain.model.ProviderType
+import com.warped.domain.model.Role
 import com.warped.domain.model.StreamToken
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -93,6 +95,7 @@ class LmStudioHelper @Inject constructor(
     override fun runInference(
         request: ChatRequest,
         enableThinking: Boolean,
+        skills: List<com.warped.domain.skill.Skill>,
     ): Flow<StreamToken> {
         val endpoint = activeEndpoint.get()
             ?: error("LmStudioHelper: setEndpoint() must be called before runInference()")
@@ -105,9 +108,12 @@ class LmStudioHelper @Inject constructor(
         val effectiveRequest = request.copy(
             parameters = request.parameters.copy(reasoningEnabled = enableThinking),
         )
+        // 44-02: map Tool-category skills to LM Studio tools[] entries; pass
+        // PromptTemplate skills through the existing system-prompt path.
+        val effectiveRequestWithSkills = applySkills(effectiveRequest, skills)
         val provider = createProvider(endpoint, modelId)
         activeJob.set(scope.launch { /* sentinel: enables stopResponse() */ })
-        val raw = provider.chat(effectiveRequest)
+        val raw = provider.chat(effectiveRequestWithSkills)
         return raw
             .let { upstream ->
                 if (enableThinking) upstream
@@ -161,8 +167,38 @@ class LmStudioHelper @Inject constructor(
         )
     }
 
-    private companion object {
-        private val THINK_TAG_REGEX = Regex("(?is)<think>.*?</think>")
+    /**
+     * 44-02: apply the active skills to the request. Tool-category skills
+     * currently log (real tool-call execution is gated on the LM Studio
+     * server-side tool runner; Warped surfaces them as metadata for now).
+     * PromptTemplate-category skills append their `systemPrompt` to the
+     * first system message in the request, creating one if absent.
+     */
+    private fun applySkills(
+        request: ChatRequest,
+        skills: List<com.warped.domain.skill.Skill>,
+    ): ChatRequest {
+        if (skills.isEmpty()) return request
+        Timber.d("LmStudioHelper: runInference with ${skills.size} skills: ${skills.joinToString { it.id }}")
+
+        val promptSkills = skills.filter { it.category == com.warped.domain.skill.SkillCategory.PromptTemplate }
+        if (promptSkills.isEmpty()) return request
+
+        val systemAddition = promptSkills.mapNotNull { it.systemPrompt }.joinToString("\n\n")
+        val existingSystem = request.messages.firstOrNull { it.role == Role.SYSTEM }
+        val newMessages = if (existingSystem != null) {
+            val combined = (existingSystem.content + "\n\n" + systemAddition).trim()
+            request.messages.toMutableList().apply {
+                this[indexOf(existingSystem)] = existingSystem.copy(content = combined)
+            }
+        } else {
+            listOf(com.warped.domain.model.ChatMessage(role = Role.SYSTEM, content = systemAddition)) + request.messages
+        }
+        return request.copy(messages = newMessages)
+    }
+
+    companion object {
+        private val THINK_TAG_REGEX = Regex("<think>.*?</think>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
         fun stripThinkTags(s: String): String =
             if (!s.contains("<think>", ignoreCase = true)) s
             else THINK_TAG_REGEX.replace(s, "").trimStart()

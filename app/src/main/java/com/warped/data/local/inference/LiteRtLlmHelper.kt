@@ -67,7 +67,15 @@ class LiteRtLlmHelper @Inject constructor(
     override fun runInference(
         request: ChatRequest,
         enableThinking: Boolean,
+        skills: List<com.warped.domain.skill.Skill>,
     ): Flow<StreamToken> {
+        // 44-02: log the active skill list. LiteRT-LM 0.13.1 does not yet expose
+        // a tool-registration entry point from a Skill value object, so the
+        // skills are surfaced as metadata only. The model can still emit
+        // `[tool:NAME]` markers and ChatViewModel handles them.
+        if (skills.isNotEmpty()) {
+            Timber.d("LiteRtLlmHelper: runInference with ${skills.size} skills: ${skills.joinToString { it.id }}")
+        }
         // 41-01: thread `enableThinking` through by mutating the request's
         // GenerationParameters.reasoningEnabled flag. Then strip `<think>...</think>`
         // markers client-side when the user has the toggle off — belt+suspenders

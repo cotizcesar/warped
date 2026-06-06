@@ -3,6 +3,7 @@ package com.warped.domain.llm
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.StreamToken
+import com.warped.domain.skill.Skill
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -48,6 +49,7 @@ interface LlmModelHelper {
     fun runInference(
         request: ChatRequest,
         enableThinking: Boolean = false,
+        skills: List<Skill> = emptyList(),
     ): Flow<StreamToken>
 
     /**

@@ -19,7 +19,23 @@ data class LmStudioChatRequest(
     @SerialName("context_length") val contextLength: Int? = null,
     val reasoning: String? = null,
     @EncodeDefault(EncodeDefault.Mode.ALWAYS) val store: Boolean = false,
-    val integrations: List<LmStudioIntegration> = emptyList()
+    val integrations: List<LmStudioIntegration> = emptyList(),
+    // 44-02: OpenAI-compatible tools[] field. Empty by default; LmStudioHelper
+    // maps each Tool-category Skill into an entry when skills are active.
+    val tools: List<LmStudioTool> = emptyList(),
+)
+
+@Serializable
+data class LmStudioTool(
+    val type: String = "function",
+    val function: LmStudioToolFunction,
+)
+
+@Serializable
+data class LmStudioToolFunction(
+    val name: String,
+    val description: String,
+    val parameters: kotlinx.serialization.json.JsonObject = kotlinx.serialization.json.buildJsonObject {},
 )
 
 @Serializable
@@ -31,7 +47,17 @@ data class LmStudioInputItem(
 
 @Serializable
 data class LmStudioModelListResponse(
-    val models: List<LmStudioModelData> = emptyList()
+    // LM Studio v1 REST API format: { "models": [...] }
+    val models: List<LmStudioModelData> = emptyList(),
+    // OpenAI-compatible format: { "object": "list", "data": [...] }
+    val data: List<OpenAiModelEntry> = emptyList()
+)
+
+@Serializable
+data class OpenAiModelEntry(
+    val id: String,
+    @SerialName("display_name") val displayName: String? = null,
+    val type: String? = null
 )
 
 @Serializable
@@ -46,7 +72,10 @@ data class LmStudioModelData(
     @SerialName("params_string") val paramsString: String? = null,
     @SerialName("max_context_length") val maxContextLength: Int = 0,
     val format: String? = null,
-    val capabilities: LmStudioCapabilities? = null
+    val capabilities: LmStudioCapabilities? = null,
+    val description: String? = null,
+    val variants: List<String> = emptyList(),
+    @SerialName("selected_variant") val selectedVariant: String? = null
 )
 
 @Serializable
@@ -58,7 +87,7 @@ data class LmStudioCapabilities(
 @Serializable
 data class LmStudioQuantization(
     val name: String? = null,
-    @SerialName("bits_per_weight") val bitsPerWeight: Int? = null
+    @SerialName("bits_per_weight") val bitsPerWeight: Double? = null
 )
 
 @Serializable
