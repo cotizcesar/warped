@@ -30,6 +30,7 @@ data class ChatUiState(
     val conversations: List<Conversation> = emptyList(),
     val localModels: List<LocalModel> = emptyList(),
     val endpoints: List<Endpoint> = emptyList(),
+    val endpointModels: Map<Long, List<String>> = emptyMap(),
     val isStreaming: Boolean = false,
     val generationParameters: GenerationParameters = GenerationParameters(),
     val isLoadingModel: Boolean = false,
@@ -37,6 +38,8 @@ data class ChatUiState(
     val modelLoadError: String? = null,
     val loadedInstanceId: String? = null,
     val reasoningEnabled: Boolean = true,
+    val enableThinking: Boolean = false,
+    val supportsThinking: Boolean = false,
     val activeBackend: BackendType? = null,  // null unless LITE_RT_LM is loaded
     val isLocalModelLoaded: Boolean = false,
     val memoryWarningModel: com.warped.domain.model.LocalModel? = null,
@@ -67,6 +70,7 @@ sealed class ChatError {
 data class ModelSwitchRequest(
     val modelId: String,
     val providerType: ProviderType,
+    val endpointId: Long? = null,
 )
 
 fun ChatUiState.trafficLightState(): TrafficLightState {

@@ -15,6 +15,7 @@ import com.warped.domain.model.*
 import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.LocalModelRepository
+import com.warped.domain.repository.ModelAllowlistRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +41,7 @@ class ChatViewModel @Inject constructor(
     private val engineManager: EngineManager,
     private val memoryChecker: MemoryChecker,
     private val advancedPreferences: AdvancedPreferences,
+    private val allowlistRepository: ModelAllowlistRepository,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -105,7 +107,8 @@ class ChatViewModel @Inject constructor(
                         isLocalModelLoaded = connected,
                         isLoadingModel = loading,
                         loadingModelName = modelId?.substringAfterLast("/") ?: it.loadingModelName,
-                        loadedInstanceId = local.instanceId ?: it.loadedInstanceId
+                        loadedInstanceId = local.instanceId ?: it.loadedInstanceId,
+                        supportsThinking = supportsThinkingFor(modelId, it.selectedRemoteModelId),
                     )
                 }
             }
@@ -115,7 +118,8 @@ class ChatViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         selectedRemoteModelId = remote.modelId,
-                        selectedRemoteProvider = remote.providerType
+                        selectedRemoteProvider = remote.providerType,
+                        supportsThinking = supportsThinkingFor(it.selectedLocalModelId, remote.modelId),
                     )
                 }
             }
@@ -146,6 +150,11 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch(coroutineExceptionHandler) {
             advancedPreferences.codeFontScale.collect { scale ->
                 _uiState.update { it.copy(codeFontScale = scale) }
+            }
+        }
+        viewModelScope.launch(coroutineExceptionHandler) {
+            advancedPreferences.thinkingEnabled.collect { enabled ->
+                _uiState.update { it.copy(enableThinking = enabled) }
             }
         }
     }
@@ -256,7 +265,7 @@ class ChatViewModel @Inject constructor(
                 val modelMayThink = state.localModels.firstOrNull { it.filePath == modelId }?.capabilities?.reasoning == true
                 Timber.d("ChatVM: sendMessage reasoningActive=%b modelMayThink=%b", reasoningActive, modelMayThink)
 
-                helper.runInference(request).collect { token ->
+                helper.runInference(request, enableThinking = state.enableThinking && state.supportsThinking).collect { token ->
 
                     when (token) {
                         is StreamToken.Delta -> {
@@ -613,6 +622,27 @@ class ChatViewModel @Inject constructor(
 
     fun toggleReasoning() {
         _uiState.update { it.copy(reasoningEnabled = !it.reasoningEnabled) }
+    }
+
+    /**
+     * 41-02: Decide whether the active model has the `llm_thinking` capability
+     * from `model_allowlist.json`. Local model id has priority; falls back to
+     * the remote model id. Returns false when no model is selected.
+     */
+    private fun supportsThinkingFor(localId: String?, remoteId: String?): Boolean {
+        val active = localId ?: remoteId ?: return false
+        return allowlistRepository.supportsThinking(active)
+    }
+
+    /**
+     * 41-02: Flip the "Thinking" toggle and persist via DataStore. The actual UI
+     * state value is updated by the AdvancedPreferences collector in init().
+     */
+    fun toggleThinking() {
+        val next = !_uiState.value.enableThinking
+        viewModelScope.launch(coroutineExceptionHandler) {
+            advancedPreferences.setThinkingEnabled(next)
+        }
     }
 
     fun loadLastConversation() {

@@ -51,6 +51,7 @@ import com.warped.domain.model.Role
 import kotlinx.coroutines.launch
 import com.warped.ui.chat.components.ChatInputBar
 import com.warped.ui.chat.components.MessageBubble
+import com.warped.ui.chat.components.ModelSelectorSheet
 import com.warped.ui.components.WarpedAlertDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,6 +68,7 @@ fun ChatScreen(
     var attachedImages by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var audioBytes by remember { mutableStateOf<ByteArray?>(null) }
     var isRecording by remember { mutableStateOf(false) }
+    var showModelPicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(conversationId) {
         if (conversationId > 0) viewModel.selectConversation(conversationId)
@@ -173,105 +175,9 @@ fun ChatScreen(
     Scaffold(
         modifier = Modifier.imePadding(),
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onNavigateToSelector() },
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        val effectiveProvider = if (uiState.selectedLocalModelId != null) ProviderType.LITE_RT_LM
-                            else uiState.selectedRemoteProvider
-                        if (effectiveProvider != null && selectedModelName != null) {
-                            val isLocal = uiState.selectedLocalModelId != null
-                            val typePillColor = if (isLocal) Color(0xFF4CAF50) else Color(0xFF2196F3)
-                            val typePillText = if (isLocal) "Local" else "Net"
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = typePillColor.copy(alpha = 0.15f)
-                            ) {
-                                Text(
-                                    text = typePillText,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = typePillColor
-                                )
-                            }
-                            Spacer(Modifier.width(6.dp))
-                        }
-                        Text(
-                            text = selectedModelName ?: stringResource(R.string.select_model),
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                        Icon(
-                            Icons.Filled.KeyboardArrowDown,
-                            contentDescription = "Select model",
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onOpenDrawer) {
-                        Icon(Icons.Filled.Menu, contentDescription = "Menu")
-                    }
-                },
-                actions = {
-                    val lightState = uiState.trafficLightState()
-                    val statusText = uiState.trafficLightStatusText()
-                    val isLocal = uiState.selectedLocalModelId != null && uiState.isLocalModelLoaded
-                    val isRemote = uiState.selectedRemoteModelId != null && uiState.selectedRemoteProvider != null
-                    val isLoading = uiState.isLoadingModel
-
-                    val statusColor = when {
-                        isLoading -> Color(0xFFFFC107)
-                        lightState == TrafficLightState.GREEN -> Color(0xFF4CAF50)
-                        lightState == TrafficLightState.YELLOW -> Color(0xFFFF9800)
-                        lightState == TrafficLightState.RED -> Color(0xFFF44336)
-                        else -> Color(0xFF666666)
-                    }
-
-                    val infiniteTransition = rememberInfiniteTransition()
-                    val blinkAlpha by infiniteTransition.animateFloat(
-                        initialValue = 0.3f,
-                        targetValue = 1f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(600),
-                            repeatMode = RepeatMode.Reverse
-                        )
-                    )
-                    
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (isLocal) {
-                            Text("Local", style = MaterialTheme.typography.labelSmall, color = Color(0xFF9CA3AF))
-                            Spacer(Modifier.width(4.dp))
-                        } else if (isRemote) {
-                            Text("Remote", style = MaterialTheme.typography.labelSmall, color = Color(0xFF9CA3AF))
-                            Spacer(Modifier.width(4.dp))
-                        }
-                        IconButton(onClick = {
-                            scope.launch {
-                                snackbarHostState.showSnackbar(
-                                    if (isLoading) "Loading ${uiState.loadingModelName}..." else statusText,
-                                    duration = SnackbarDuration.Short
-                                )
-                            }
-                        }) {
-                            Icon(
-                                Icons.Filled.Circle,
-                                contentDescription = "Connection status",
-                                tint = statusColor.copy(alpha = if (isLoading) blinkAlpha else 1f),
-                                modifier = Modifier.size(12.dp)
-                            )
-                        }
-                    }
-                }
-            )
+        topBar = { /* CHAT-02: removed TopAppBar — model picker is now inline above messages */
+            // Drawer remains reachable via swipe (ModalNavigationDrawer around the Scaffold)
+            // and the parent NavHost provides the drawer gesture.
         },
         bottomBar = {
             ChatInputBar(
@@ -285,9 +191,9 @@ fun ChatScreen(
                     audioBytes = null
                 },
                 onStop = { viewModel.stopGeneration() },
-                reasoningEnabled = uiState.reasoningEnabled,
-                onToggleReasoning = { viewModel.toggleReasoning() },
-                modelHasReasoning = uiState.localModels.firstOrNull { it.filePath == uiState.selectedLocalModelId }?.capabilities?.reasoning != false,
+                reasoningEnabled = uiState.enableThinking,
+                onToggleReasoning = { viewModel.toggleThinking() },
+                modelHasReasoning = uiState.supportsThinking,
                 onAddImage = { imagePickerLauncher.launch("image/*") },
                 attachedImages = attachedImages,
                 onRemoveImage = { i -> attachedImages = attachedImages.filterIndexed { idx, _ -> idx != i } },
@@ -302,6 +208,25 @@ fun ChatScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+
+            // CHAT-02/04/05: Inline model selector bar above messages
+            InlineModelSelectorBar(
+                selectedModelName = selectedModelName,
+                isLocal = uiState.selectedLocalModelId != null,
+                isLoading = uiState.isLoadingModel,
+                loadingModelName = uiState.loadingModelName,
+                trafficLight = uiState.trafficLightState(),
+                onClick = {
+                    showModelPicker = true
+                    viewModel.fetchAllEndpointModels()
+                },
+                onOpenDrawer = onOpenDrawer
+            )
+
+            // CHAT-07: Model loading indicator
+            if (uiState.isLoadingModel) {
+                ModelLoadingIndicator(loadingModelName = uiState.loadingModelName)
+            }
 
             if (uiState.messages.isEmpty() && uiState.streamingContent.isEmpty()) {
                 // Empty state
@@ -470,5 +395,132 @@ fun ChatScreen(
                 )
             }
         }
+
+        // CHAT-04/05: ModalBottomSheet model picker
+        ModelSelectorSheet(
+            visible = showModelPicker,
+            selectedModelId = uiState.selectedLocalModelId ?: uiState.selectedRemoteModelId,
+            selectedProvider = if (uiState.selectedLocalModelId != null) ProviderType.LITE_RT_LM else uiState.selectedRemoteProvider,
+            localModels = uiState.localModels,
+            endpoints = uiState.endpoints,
+            endpointModels = uiState.endpointModels,
+            onDismiss = { showModelPicker = false },
+            onModelSelected = { modelId, providerType, endpointId ->
+                viewModel.launchModelSelection(modelId, providerType, endpointId)
+            }
+        )
+    }
+}
+
+/**
+ * CHAT-02/04/05: Inline model selector bar.
+ * Replaces the TopAppBar — sits above the messages column, opens a ModalBottomSheet
+ * when tapped. Shows the selected model name, a Local/Net pill, and the traffic light.
+ * Also exposes a hamburger menu button on the left to open the drawer.
+ */
+@Composable
+private fun InlineModelSelectorBar(
+    selectedModelName: String?,
+    isLocal: Boolean,
+    isLoading: Boolean,
+    loadingModelName: String,
+    trafficLight: TrafficLightState,
+    onClick: () -> Unit,
+    onOpenDrawer: () -> Unit
+) {
+    val pillColor = if (isLocal) Color(0xFF4CAF50) else Color(0xFF2196F3)
+    val pillText = if (isLocal) "Local" else "Net"
+    val lightColor = when {
+        isLoading -> Color(0xFFFFC107)
+        trafficLight == TrafficLightState.GREEN -> Color(0xFF4CAF50)
+        trafficLight == TrafficLightState.YELLOW -> Color(0xFFFF9800)
+        trafficLight == TrafficLightState.RED -> Color(0xFFF44336)
+        else -> Color(0xFF666666)
+    }
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 4.dp),
+        color = Color.Transparent
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onOpenDrawer) {
+                Icon(
+                    Icons.Filled.Menu,
+                    contentDescription = "Open drawer",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(onClick = onClick)
+                    .padding(vertical = 6.dp, horizontal = 4.dp),
+                color = Color.Transparent
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = pillColor.copy(alpha = 0.15f)
+                    ) {
+                        Text(
+                            text = pillText,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = pillColor
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = selectedModelName ?: stringResource(R.string.select_model),
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Icon(
+                        Icons.Filled.Circle,
+                        contentDescription = "Connection status",
+                        tint = lightColor,
+                        modifier = Modifier.size(10.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Icon(
+                        Icons.Filled.KeyboardArrowDown,
+                        contentDescription = "Select model",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * CHAT-07: "Cargando modelo" indicator shown in the chat while a local model is loading.
+ */
+@Composable
+private fun ModelLoadingIndicator(loadingModelName: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(14.dp),
+            strokeWidth = 2.dp,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = "Cargando ${loadingModelName.substringAfterLast("/")}…",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

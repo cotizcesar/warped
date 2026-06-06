@@ -3,6 +3,7 @@ package com.warped.data.local.preferences
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
@@ -28,6 +29,7 @@ class AdvancedPreferences @Inject constructor(
         val KEY_CODE_THEME = stringPreferencesKey("code_theme")
         val KEY_CODE_FONT_SCALE = floatPreferencesKey("code_font_scale")
         val KEY_CACHE_MAX_SIZE_BYTES = longPreferencesKey("cache_max_size_bytes")
+        val KEY_THINKING_ENABLED = booleanPreferencesKey("thinking_enabled")
         const val DEFAULT_CACHE_MAX_SIZE_BYTES: Long = 500L * 1024L * 1024L
         const val MIN_CACHE_MAX_SIZE_BYTES: Long = 50L * 1024L * 1024L
     }
@@ -100,6 +102,16 @@ class AdvancedPreferences @Inject constructor(
     suspend fun setCacheMaxSizeBytes(bytes: Long) {
         context.advancedPreferencesStore.edit { prefs ->
             prefs[KEY_CACHE_MAX_SIZE_BYTES] = bytes.coerceAtLeast(MIN_CACHE_MAX_SIZE_BYTES)
+        }
+    }
+
+    val thinkingEnabled: Flow<Boolean> = context.advancedPreferencesStore.data.map { prefs ->
+        prefs[KEY_THINKING_ENABLED] ?: false
+    }.distinctUntilChanged()
+
+    suspend fun setThinkingEnabled(enabled: Boolean) {
+        context.advancedPreferencesStore.edit { prefs ->
+            prefs[KEY_THINKING_ENABLED] = enabled
         }
     }
 }
