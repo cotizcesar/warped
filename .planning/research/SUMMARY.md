@@ -1,208 +1,347 @@
-# Project Research Summary
+# Research Summary — Warped v2.0 Gallery Convergence & Performance Overhaul
 
-**Project:** Warped — Android LM-Studio-equivalent LLM chat app
-**Domain:** Code syntax highlighting in Android/Compose AI chat application
-**Researched:** 2026-05-14
-**Confidence:** HIGH
+**Project:** Warped (Android LM Studio equivalent — Kotlin + Jetpack Compose + LiteRT-LM + LM Studio v1)
+**Domain:** On-device LLM chat with remote provider bridge
+**Researched:** 2026-06-05
+**Confidence:** **HIGH** overall — version facts, Gallery repo architecture, LiteRT-LM API surface all verified against primary sources within 24 hours. **MEDIUM** on performance impact estimates (no Warped-hardware profiling yet).
+
+**Reference implementation:** [google-ai-edge/gallery](https://github.com/google-ai-edge/gallery) v1.0.16 main branch (23.6k stars, 91.9% Kotlin). Gallery is the only major OSS in the "LiteRT-LM + Compose + Android" niche, making it the most defensible convergence target.
+
+---
 
 ## Executive Summary
 
-Warped is an Android chat application for running and chatting with LLMs locally and remotely. The v1.6 milestone adds language-aware syntax highlighting to code blocks in AI responses — transforming flat monospace rendering into colored, token-aware display with language header bars, copy buttons, and 4 preset themes that auto-adapt to system light/dark mode.
+Warped v2.0 is a **two-pronged milestone**: (1) **port Gallery's runtime abstraction** so that Thinking Mode, Model Benchmark, Prompt Lab, and (optionally) Agent Skills can plug in cleanly, and (2) **file-by-line performance overhaul** to make the app feel as fast, smooth, and resource-light as the reference implementation. The keystone of the feature work is a single `LlmModelHelper` interface (mirroring Gallery's `runtime/LlmModelHelper.kt`) that unifies `LiteRTLmProvider` and `LMStudioProvider` behind one streaming API. Without it, every v2.0 feature needs its own bespoke plumbing for local vs remote; with it, all four features share a surface. The keystone of the perf work is **dropping Warped's file-copy model cache** (1–3 GB of dead I/O in `EngineManager.getCachedModelPath()`) and keeping only LiteRT-LM's mmap cache — a 3–10 second cold-start win plus halved on-device storage footprint.
 
-The recommended approach is to **integrate the `dev.snipme:highlights:1.1.0` library as the tokenization engine**, wrapped behind a Clean Architecture `SyntaxHighlighter` domain interface. This resolves a key research conflict: STACK.md identified Highlights as the best library option (183 GitHub stars, 26 Maven Central dependents, pure Kotlin, actively maintained), while FEATURES/ARCHITECTURE/PITFALLS conducted library surveys that either missed or cursorily dismissed Highlights and defaulted to a fully custom regex tokenizer. Using Highlights eliminates ~750–1,400 lines of hand-written regex definitions across 15 languages while maintaining all Clean Architecture benefits via the domain interface — if Highlights ever becomes unmaintained, a single implementation swap suffices. The theme system, language auto-detector, and CodeBlock composable must be custom-built regardless (Highlights only provides 2 themes, no auto-detection, and no Compose rendering).
+**Warped is already ahead of Gallery on several axes** (Hilt 2.59.2 vs Gallery's 2.58, KSP-only vs Gallery's kapt, kotlinx-serialization only vs Gallery's triple-JSON mess, per-screen ViewModels vs Gallery's 850-line mega-VM, EncryptedSharedPreferences + Preferences DataStore vs Gallery's 5-Proto-DataStore approach). v2.0 is a **convergence, not a copy**: adopt Gallery's interface and manifest patterns, keep Warped's existing strengths, **do not import** Gallery's tech-debt surface (kapt, kotlin-reflect, Moshi, Gson, Firebase, Ktor, mlkit-genai-prompt, CameraX, TFLite, AppAuth, compose-richtext, Proto DataStore, JS webview skills).
 
-The two critical risks are: (1) **streaming performance** — re-tokenizing code on every ~50ms streaming token causes O(n²) jank, mitigated by deferring syntax highlighting until the closing ` ``` ` fence arrives (render flat monospace mid-stream, then apply full highlighting once); and (2) **recomposition thrashing** — `buildAnnotatedString` running on every `StateFlow` emission, mitigated by `remember(text, theme)` caching. The existing `MarkdownText` composable must be restructured from a single `Text(AnnotatedString)` to a block-based `Column` of composable blocks so code blocks can host a language header bar and copy button — elements that cannot exist inside an `AnnotatedString`.
+**The biggest risks** are (a) R8 stripping LiteRT-LM JNI / kotlinx-serialization in release builds, (b) `Engine.initialize()` blocking the main thread if not dispatched to `Dispatchers.IO`, (c) Compose 1.11 strong-skipping mode silently making every `List<T>` parameter unstable, and (d) LiteRT-LM 0.12→0.13 file-format breakage leaving some existing user models unloadable. All four have known prevention recipes in the research and should be addressed in **Phase 40 — Runtime & Allowlist Foundation** before any feature work.
 
-## Key Findings
+---
 
-### Recommended Stack (from STACK.md)
+## Top 10 Actionable Items (Highest-ROI for v2.0)
 
-The syntax highlighting pipeline consists of four components, only one of which is a new external dependency:
+Ranked by leverage × risk-reduction. Each item has a STACK → FEATURE → PITFALL chain citation.
 
-| Component | Choice | Reason |
-|-----------|--------|--------|
-| **Tokenization engine** | `dev.snipme:highlights:1.1.0` | Most mature pure-Kotlin syntax highlighter for Android. 183 stars, 26 Maven Central dependents. Supports 17 languages covering 95%+ of LLM output. Hand-written regex — zero native deps, zero JS interop. Apache 2.0 license. Version-compatible with project's Kotlin 2.3.20, coroutines 1.9.0, and kotlinx-serialization 1.7.x. |
-| **AnnotatedString bridge** | Custom adapter (~50 lines) | Maps Highlights' `CodeHighlight` token types to Compose `SpanStyle` with per-token colors from the active theme palette. Integrates with the existing `buildAnnotatedString` pattern in `MarkdownText.kt`. |
-| **Syntax color schemes** | Custom `SyntaxTheme` data classes | 4 themes × 2 variants (light/dark) × 12 token types = 96 color values defined as pure Kotlin. Highlights only provides Monokai and Atom One — One Dark, GitHub, and Dracula must be custom-defined regardless of engine choice. |
-| **Language detector** | Custom two-tier heuristic | (1) Parse markdown fence ` ```python ` covering ~90% of LLM output; (2) Keyword-frequency heuristics for unspecified languages. No mature JVM language-detection library exists — this is custom regardless of engine choice. |
+| # | Action | Why It Matters | Cross-Reference |
+|---|--------|----------------|-----------------|
+| **1** | **Port `LlmModelHelper` interface + 2 impls** (`LiteRtLlmHelper`, `LmStudioHelper`) and refactor `ChatViewModel` to depend on the interface. | Keystone for all v2.0 features. Without it, Thinking/Benchmark/PromptLab/Skills each need their own local-vs-remote plumbing. Estimated 7–10 days; touches the chat hot path. | FEATURES §Table Stakes; ARCHITECTURE §5 (#MUST REFACTOR); PITFALLS Critical #2 (off-main), #7 (backpressure), #8 (Hilt cycle) |
+| **2** | **Drop the model file copy in `EngineManager.getCachedModelPath()`**; pass `context.cacheDir.absolutePath` (or external) directly to `EngineConfig.cacheDir` for mmap only. | Single biggest perf win: 1–3 GB disk savings per model + 3–10s cold-start I/O removed. Gallery's pattern. | STACK §3 (LiteRT-LM); ARCHITECTURE §8; PITFALLS Critical #4 (cache invalidation), Anti-Pattern A14 |
+| **3** | **Add `core-splashscreen:1.2.0-beta01`** + `installSplashScreen()` + cross-fade mask in `MainActivity`. Add `android:configChanges="uiMode"` + `<uses-native-library>` for `libvndksupport.so`/`libOpenCL.so`/`libcdsprpc.so` to manifest. | Eliminates cold-start flash. Required manifest entries unlock GPU/NPU backend on supported devices (no auto-detection without them). | STACK §13, §14, §3; ARCHITECTURE §4, §Cross-Cutting Manifest; PITFALLS Anti-Pattern A15, A16 |
+| **4** | **Bump dependencies**: compose-bom 2026.04.01→2026.05.01, hilt-navigation-compose/hilt-work 1.2.0→1.3.0, Room 2.7.1→2.8.4, Lifecycle 2.8.7→2.10.0, Navigation 2.8.8→2.9.x, LiteRT-LM 0.13.0→0.13.1, add `lifecycle-process:2.10.0`. | Aligns with Gallery's proven version matrix. Lifecycle-process enables app-wide foreground/background awareness. LiteRT-LM 0.13.1 adds ToolProvider + Agent Skills. | STACK §1, §2, §3, §4, §5, §6 (Version Compatibility Matrix); PITFALLS Critical #3 (0.13 file format) |
+| **5** | **Add `AppLifecycleProvider`** (interface + impl) and wire `LifecycleEventObserver` in `MainActivity` to gate download notifications. Use `ProcessLifecycleOwner` from `lifecycle-process`. | Suppresses download notifications when app is foregrounded. Warped has no such gate today. Gallery does this. | ARCHITECTURE §4 (#MUST REFACTOR #3); STACK §5; PITFALLS Critical #12 (battery optimizer) |
+| **6** | **Plumb `enableThinking` + `partialThinkingResult`** through `LlmModelHelper.runInference`. Render collapsible "Thinking" panel in `MessageBubble`. Gate by `capabilities: ["llm_thinking"]` in allowlist. | Newer reasoning models (Gemma 4 E2B/E4B, DeepSeek-R1-Distill) expose thinking; users running these expect it. LM Studio v1 `/api/v1/chat` returns `reasoning_content`. Both engines supported. | FEATURES §Table Stakes; ARCHITECTURE §5; PITFALLS Critical #7, UX Pitfall (toggle hidden) |
+| **7** | **Add `assets/model_allowlist.json`** matching Gallery's schema (`name`, `modelFile`, `sizeInBytes`, `capabilities`, `llmPromptTemplates`). Replace `RecommendedModels` Kotlin constant. New `ModelAllowlistRepository`. | Required for capability gating (Thinking, Speculative Decoding). Static asset = no network dep, aligns with v1.8 REC-03. | FEATURES §Table Stakes; ARCHITECTURE §6; PITFALLS "Looks Done" #5 |
+| **8** | **Add R8 keep rules** for `com.google.ai.edge.litertlm.**` (JNI), `MessageCallback`, `ToolProvider`, and canonical kotlinx-serialization `$$serializer` companions. Enable R8 full mode. | **Release builds only.** Without these, `UnsatisfiedLinkError` on first model load + `Serializer for class 'X' is not found` on first DTO. Verify with `aapt2 dump strings` on release APK. | PITFALLS Critical #5, #6; STACK §8; Anti-Pattern A1 |
+| **9** | **Split `ChatUiState` (50 fields) into 3 sub-states** + add `@Immutable` annotation. Audit `MessageBubble` / `CodeBlock` / `ChatInputBar` for hoisted state, stable lambdas, `key()` in `LazyColumn`. Add `kotlinx-collections-immutable:0.4.0` and convert `List<T>` params to `ImmutableList<T>`. | Compose 1.11 strong-skipping mode (default in BOM 2026.05.01) treats `List<T>` as unstable → every streaming token recomposes every row. ChatScreen during streaming will become visibly jankier. **Must be addressed before Thinking Mode is wired up** (Thinking adds a new StateFlow subscription = worst-case scenario). | ARCHITECTURE §2, §7; PITFALLS Critical #11; STACK §1 (BOM bump) |
+| **10** | **Add Room migration infrastructure** for v1.8 → v2.0 schema changes (new `BenchmarkResult` table in Phase 41, new `thinking` column on `Message`). Set `exportSchema = true`, commit `schemas/` to git, write a `MigrationTest` in `androidTest/`. **Never** use `fallbackToDestructiveMigration()`. | v2.0 install on a device with v1.8 chat history will silently wipe the DB if migration is missing. Warped now has production users (39 phases, 234 requirements shipped) — this is no longer a non-issue. | PITFALLS Critical #9; STACK §4; "Looks Done" #8 |
 
-**Rejected alternatives:**
-- **Custom regex tokenizer (recommended by FEATURES/ARCHITECTURE/PITFALLS):** Writing 12–15 language grammars from scratch (~750–1,400 lines) is unnecessary when Highlights provides the same regex-based tokenization with proven accuracy across its 26 Maven Central dependents. Both approaches need the same custom theme system, language detector, and Composables. The `SyntaxHighlighter` domain interface makes the engine swappable — start with Highlights, swap later if needed.
-- **Prism4j:** Archived July 2023. Dead dependency.
-- **kotlin-textmate:** v0.1.0 released today (May 14, 2026). 12 stars. Known limitations (no injection grammars, Joni regex fallback, not thread-safe). Too new for production.
-- **WebView + highlight.js:** Destroys scroll performance, breaks Compose text selection, adds memory pressure.
+**Run order (critical path):** 1, 4, 8, 2, 3, 5, 7 → 6, 9, 10 (6 and 9 are blocking-start for Phase 41/43; 10 is inline with Phase 41 schema work).
 
-### Expected Features (from FEATURES.md)
+---
 
-**Must have — P1 (table stakes):**
-- **Language-aware syntax coloring** — colored keywords, strings, comments, numbers, functions, types, operators via tokenized `AnnotatedString`. This is what differentiates "code rendering" from "syntax highlighting."
-- **Fence language detection** — parse ` ```python ` specifiers with alias mapping (`py` → `python`, `js` → `javascript`). Covers ~90% of LLM cases.
-- **4 preset themes** — Monokai, One Dark, GitHub, Dracula, each with light and dark variants. Theme selection persists via existing DataStore flow.
-- **Light/dark auto-adaptation** — selects variant matching system `isSystemInDarkTheme()`. Rare in mobile chat apps — competitive differentiator.
-- **Language header bar** — shows detected language name above each code block.
-- **Copy-to-clipboard button** — in header bar, copies raw code text (not `AnnotatedString`). Table stakes — every major chat app has this.
-- **Applied in chat messages** — syntax highlighting visible during and after streaming.
+## Cross-Dimensional Dependencies (STACK → FEATURE → PITFALL chains)
 
-**Should have — P2 (differentiators, can slip to v1.7):**
-- **Heuristic auto-detection** — detect language from code content when fence specifier is missing. Adds polish but LLMs specify language >90% of the time.
-- **Applied everywhere** — extend to model card descriptions, README previews, onboarding content.
+The following chains show where a stack decision unlocks a feature that triggers a pitfall. Each chain is one decision to make consciously.
 
-**Anti-features (not in scope):**
-- WebView-based rendering (performance killer)
-- 190+ language support (maintenance burden; 15 covers >95% of LLM output)
-- Line numbers (wastes narrow mobile screen space)
-- Custom theme builder/editor (massive UX complexity for marginal value)
-- Syntax error highlighting (misleading for LLM-generated code; requires full parsers)
+### Chain A: `LlmModelHelper` (keystone)
+- **STACK:** LiteRT-LM 0.13.1 adds `ToolProvider` + `MessageCallback` (STACK §3). PITFALLS Critical #2 requires `withContext(Dispatchers.IO)` wrap around `Engine.initialize()`.
+- **FEATURE:** Enables Thinking Mode (FEATURES §Thinking Mode), Model Benchmark (FEATURES §Model Benchmark), Prompt Lab (FEATURES §Prompt Lab), Agent Skills Lite (FEATURES §Agent Skills Lite). All four depend on the keystone.
+- **PITFALLS:** Critical #2 (off-Main init), #7 (callbackFlow backpressure with `Channel.UNLIMITED`), #8 (Hilt cycle — use `@Binds` for interface), #10 (SSE cancellation — `stopResponse` must cancel the read loop and `Call`). All must be addressed in the same phase.
+- **Verdict:** Phase 40 is non-negotiable. Touches the chat hot path; needs 7–10 days.
 
-### Architecture Approach (from ARCHITECTURE.md)
+### Chain B: `EngineConfig.cacheDir` mmap-only
+- **STACK:** LiteRT-LM `EngineConfig` accepts `cacheDir: String?` for mmap warm-start (STACK §3).
+- **FEATURE:** Doesn't unlock a new feature but enables **5–10× faster warm starts** (FEATURES §Performance), and **1–3 GB disk savings** (ARCHITECTURE §8).
+- **PITFALLS:** Critical #4 — LiteRT-LM does NOT expose a cache-version API. The cache is silently stale after `EngineConfig` schema change. Must namespace by `BuildConfig.LITERTLM_VERSION` and cap at 500MB with LRU eviction. Anti-Pattern A14 (Gallery's mistake).
+- **Verdict:** Phase 43 (Performance). The cleanest single-file change in the v2.0 mandate.
 
-The integration follows Clean Architecture with a new `domain/highlighting/` package for interfaces and models, and `data/highlighting/` for implementations:
+### Chain C: Compose BOM 2026.05.01 → strong-skipping mode
+- **STACK:** BOM 2026.05.01 includes Compose 1.11.0 with strong skipping as default (STACK §1).
+- **FEATURE:** Doesn't unlock a feature but **all v2.0 features assume the recomposition perf budget holds**. Adding Thinking Mode = new StateFlow subscription = worst case for unstable params.
+- **PITFALLS:** Critical #11 — every `List<T>` parameter becomes unstable. `kotlinx-collections-immutable:0.4.0` is the standard escape hatch. Layout Inspector in Android Studio is the verification tool.
+- **Verdict:** Phase 43 (Performance Convergence). Must be addressed **before** or **concurrent with** Phase 41 (Thinking Mode wiring) — not after.
 
-**Major components:**
+### Chain D: AndroidManifest `<uses-native-library>` + `largeHeap` + `extractNativeLibs="false"`
+- **STACK:** Native library declarations required for GPU/NPU/DSP auto-detection (STACK §3, §13).
+- **FEATURE:** Unlocks `Backend.GPU()` runtime selection → 2–5× faster inference on flagship devices (STACK §3, PITFALLS LiteRT-LM integration table).
+- **PITFALLS:** Critical #12 — `largeHeap="true"` is already in Warped but `extractNativeLibs="true"` would balloon APK by 10–20 MB (Anti-Pattern A16). `windowSoftInputMode="adjustResize"` is required for proper chat behavior.
+- **Verdict:** Phase 40 manifest changes. One manifest file edit; large downstream impact.
 
-1. **`SyntaxHighlighter` (domain interface)** — `fun highlight(code, language, theme): AnnotatedString`. Pure Kotlin, zero Android/Compose deps. Implemented by `RegexSyntaxHighlighter` wrapping Highlights.
+### Chain E: Room → benchmark history → migration risk
+- **STACK:** Room 2.8.4 stable, KSP-only (STACK §4).
+- **FEATURE:** Model Benchmark needs a `BenchmarkResult` table (FEATURES §Model Benchmark).
+- **PITFALLS:** Critical #9 — missing migration = silent data loss for all v1.8 users on upgrade. `@AutoMigration` for additive, `Migration` for breaking. `MigrationTest` in `androidTest/`. NEVER `fallbackToDestructiveMigration()`.
+- **Verdict:** Phase 41 inline. Address at table-add time, not as cleanup.
 
-2. **`LanguageDetector` (data utility)** — heuristic detection with priority chain: fence specifier → shebang → keyword frequency → "text" fallback. "text" (no highlighting) is better than wrong highlighting.
-
-3. **`CodeTheme` enum → `SyntaxTheme` bridge** — enum persists via DataStore (unchanged key); maps to rich `SyntaxTheme` objects with 12 token-type colors per variant. Migration-safe: old enum names map to new theme objects.
-
-4. **`CodeBlock` composable (new)** — replaces inline code rendering in `MarkdownText`. Renders a `Surface` with language header bar, copy button, and syntax-highlighted `AnnotatedString`. Allows UI elements that can't exist inside `buildAnnotatedString`.
-
-5. **`MarkdownText` (refactored)** — detects code fences as before but delegates content + language hint to `CodeBlock` composable instead of rendering inline. Inline code (single backticks) unchanged.
-
-**What does NOT change:** `ChatUiState`, `ChatViewModel`, `ChatRepository`, Room database, Retrofit APIs, `MessageBubble` (passes `codeTheme` through as before), `NavGraph`, `SelectionContainer`.
-
-**Suggested wave structure** (8 waves in ARCHITECTURE.md) consolidates into 3 roadmap phases (see Roadmap Implications below).
-
-### Critical Pitfalls (from PITFALLS.md)
-
-1. **Streaming O(n²) jank (Pitfall #2):** Re-tokenizing the entire code block on every ~50ms streaming token. **Prevention:** Defer syntax highlighting until closing ` ``` ` fence arrives. Render flat monospace mid-stream, apply full highlighting once. This matches how ChatGPT and LM Studio behave.
-
-2. **Recomposition thrashing (Pitfall #6):** `buildAnnotatedString` runs on every `StateFlow` emission, not just when text changes. **Prevention:** `remember(text, theme) { buildAnnotatedString { ... } }` — only recompute when inputs actually change.
-
-3. **Theme data model gap (Pitfall #3):** Existing `CodeTheme` enum has only 2 colors (`bgCode`, `bgInline`). Syntax highlighting needs 12 token-type colors per theme. **Prevention:** Expand to `SyntaxTheme` data class with `tokenColors: Map<TokenType, Color>` maps. Use existing DataStore key — `CodeTheme` enum name maps to new `SyntaxTheme` objects.
-
-4. **Language detection inconsistency (Pitfall #5):** Wrong detection = wrong colors = user confusion. **Prevention:** Fence info is authoritative. Content-based detection only when fence is absent. Always show detected language in header bar so the user can verify. "Plain text" fallback is better than wrong highlighting.
-
-5. **Code block flicker during streaming (Pitfall #7):** Gray monospace → colored tokens transition when closing fence arrives. **Prevention:** Keep background color consistent during transition. Use `animateColorAsState()` on token text colors for smooth fade.
+---
 
 ## Implications for Roadmap
 
-Based on combined research, the build order from ARCHITECTURE.md (8 waves) and the pitfall-to-phase mapping from PITFALLS.md consolidate naturally into 3 roadmap phases:
+### Recommended Phase Structure (5 phases, 35–47 days)
 
-### Phase 1: Tokenization Engine & Theme System
+```
+Phase 40 — Runtime & Allowlist Foundation   [P0]  5–7 days   ← KEYS ALL OTHERS
+Phase 41 — Thinking Mode + Benchmark         [P1]  7–10 days
+Phase 42 — Prompt Lab                        [P1]  5–7 days
+Phase 43 — Performance Convergence          [P0]  7–10 days  ← can parallel 41/42
+Phase 44 — Agent Skills Lite (optional)      [P2]  10–14 days ← DEFER to v2.1 if scope tight
+```
 
-**Rationale:** Everything depends on the tokenizer and theme data model. Language definitions, token types, and theme color maps must exist before any UI can render them. This phase is pure Kotlin (zero Compose/Android deps) — fully unit-testable without emulator.
+**Total: 34–48 days** for all 5 phases, depending on Phase 44 inclusion.
 
-**Delivers:**
-- `domain/highlighting/` — `CodeToken` sealed class, `Language` enum, `LanguageDefinition` data class, `SyntaxHighlighter` interface
-- `data/highlighting/definitions/` — 12 language definition files with Highlights-compatible token patterns
-- `data/highlighting/theme/` — `HighlightingTheme` interface + 4 theme implementations (Monokai, One Dark, GitHub, Dracula) with light/dark variants
-- `data/highlighting/RegexSyntaxHighlighter.kt` — implementation wrapping Highlights engine via `SyntaxHighlighter` interface
-- `data/highlighting/LanguageDetector.kt` — priority-chain language detection (fence → shebang → keyword heuristics → plain)
-- `ui/theme/CodeTheme.kt` — migrated + expanded enum with `toHighlightingTheme()` bridge and `previewColor`
-- Import updates across `MarkdownText.kt`, `ChatUiState.kt`, `ChatViewModel.kt`, `AdvancedPreferences.kt`, `SettingsScreen.kt`, `MessageBubble.kt`
+### Phase 40 — Runtime & Allowlist Foundation [P0, keystone]
 
-**Features from FEATURES.md:** Fence language detection, syntax-highlighted code blocks (engine only), 4 preset themes (data), light/dark auto-adaptation (data)
-
-**Pitfalls avoided:** #1 (no Prism4j — using Highlights), #3 (theme data model expanded), #5 (language detection priority chain)
-
-**Research needed:** MEDIUM — Highlights API exploration for language definition format and `CodeHighlight` token type mapping. Plan for `/gsd-research-phase` if token type mapping proves complex.
-
-### Phase 2: UI Components & MarkdownText Refactoring
-
-**Rationale:** The rendering pipeline needs to shift from a single `Text(AnnotatedString)` to a block-based `Column` of composable blocks. The `CodeBlock` composable cannot be built until the tokenization engine exists (Phase 1). This is the largest user-facing change — the composable block model unlocks the language header bar and copy button that differentiate Warped from competitors.
+**Rationale:** Without `LlmModelHelper`, every other feature phase is duplicated plumbing. This is the single biggest v2.0 leverage point. Also the cheapest place to do all the **mechanical stack bumps** and **R8 keep rules** before any feature code lands.
 
 **Delivers:**
-- `ui/chat/components/CodeBlock.kt` — new composable: language header bar + copy button + syntax-highlighted `AnnotatedString` rendering
-- `ui/chat/components/MarkdownText.kt` — refactored: code fence detection delegates to `CodeBlock`; inline code and other markdown unchanged
-- `ui/settings/SettingsScreen.kt` — updated theme dropdown with preview color swatch
-- `di/HighlightingModule.kt` — Hilt `@Module` providing `SyntaxHighlighter` and `LanguageDetector` as `@Singleton`
+- `domain/runtime/LlmModelHelper.kt` interface (mirror Gallery's 5 methods + `ResultListener`/`CleanUpListener` typealiases, drop `image`/`audio` params).
+- `data/runtime/LiteRtLlmHelper.kt` (wraps `EngineManager` + `LiteRTLmEngine`).
+- `data/runtime/LmStudioHelper.kt` (wraps `LMStudioProvider`; SSE cancellation-aware).
+- `ChatViewModel` accepts `LlmModelHelper` (interface) via `ProviderRouter` factory.
+- `assets/model_allowlist.json` (Gallery schema subset: `name`, `displayName`, `modelFile`, `sizeInBytes`, `capabilities`, `llmPromptTemplates`, `taskTypes`).
+- `ModelAllowlistRepository` reads asset, surfaces capabilities.
+- Type-safe nav (`@Serializable` destinations) for 7 routes.
+- `app/src/main/AndroidManifest.xml`: add `configChanges="uiMode"`, `<uses-native-library>` x3, `windowSoftInputMode="adjustResize"`, `extractNativeLibs="false"`, `largeHeap="true"`, `theme="...SplashScreen"`.
+- `libs.versions.toml` bumps (compose-bom, hilt-nav, hilt-work, room, lifecycle, navigation, litertlm).
+- `gradle.properties`: `android.nonTransitiveRClass=true`, `-Xmx4g`, `kotlin.incremental=true`.
+- `proguard-rules.pro`: LiteRT-LM JNI keep rules + kotlinx-serialization $$serializer keep rules + R8 full mode.
 
-**Features from FEATURES.md:** Language header bar, copy-to-clipboard button, applied in chat messages, composable block rendering
+**Addresses:** All 4 STACK MUST-ADOPT buckets in one PR; FEATURES §LlmModelHelper + §Model Allowlist JSON (both P0); ARCHITECTURE §MUST REFACTOR #1, #4, #5, #7, #10; PITFALLS Critical #1, #2, #3 (defensive try/catch), #5, #6, #8, #10.
 
-**Uses from STACK.md:** Highlights 1.1.0 (via `RegexSyntaxHighlighter`), Compose `buildAnnotatedString`, `LocalClipboardManager`, custom `AnnotatedString` bridge, custom `SyntaxTheme` color schemes
+**Avoids:** All Gallery anti-patterns A1–A6, A11, A15, A16 (verified by `dependencies` audit empty for kapt/firebase/moshi/gson/kotlin-reflect/ktor + manifest audit + proguard audit).
 
-**Pitfalls avoided:** #4 (copy raw text, not `AnnotatedString` spans), #8 (code blocks extracted as separate composables, not inline in `buildAnnotatedString`)
+**Research flag:** Needs `--research-phase` for: (a) exact `EngineConfig.cacheDir` parameter name (ARCHITECTURE §Open Q #1), (b) `Message.thinking` accessor name in LiteRT-LM 0.13.1 (FEATURES §Open Q #1, ARCHITECTURE §Open Q #3), (c) `@AutoMigration` schema design for `thinking` column (PITFALLS Critical #9).
 
-**Research needed:** LOW — standard Compose patterns, well-documented. Skip `/gsd-research-phase`. May benefit from `/gsd-ui-phase` for the CodeBlock design contract.
+### Phase 41 — Thinking Mode + Benchmark [P1]
 
-### Phase 3: Streaming Integration & Performance
-
-**Rationale:** The core streaming pitfall (#2) must be addressed before the feature ships — highlighting during streaming causes O(n²) jank. This phase is intentionally last because it validates Phase 1 + 2 together under streaming conditions. Deferred highlighting (flat monospace mid-stream → colored on block completion) is the recommended strategy for v1.6.
+**Rationale:** Both features ride on the `LlmModelHelper` keystone and need the same data plumbing (`partialThinkingResult` + benchmark history persistence). Co-locating them shares the Room migration work.
 
 **Delivers:**
-- Streaming-aware code block rendering: flat monospace while ` ``` ` fence is open, syntax highlighting applied once fence closes
-- `remember(text, theme)` caching around `buildAnnotatedString` to prevent recomputation on unrelated `StateFlow` emissions
-- Language detection cached via `remember(codeBlockContent)` to avoid re-detection on every recomposition
-- Smooth color transition from flat monospace to highlighted via `animateColorAsState()`
-- Performance validation: < 2ms `SyntaxHighlighter.highlight()` for 50-line code blocks
-- Streaming validation: no flicker during recomposition, no frame drops during streaming
-- Edge case handling: malformed code, empty blocks, code with only special characters, partial language specifiers
+- `LlmModelHelper` extended with `enableThinking` via `extraContext: Map<String, String>` (per ARCHITECTURE §5; type-safe sealed class preferred over Map for benchmark hot path per PITFALLS Performance Traps row 12).
+- `ResultListener.partialThinkingResult: String?` plumbing in both impls.
+- UI: collapsible "Thinking..." panel in `MessageBubble` (above the response); chip in chat input bar shows "💭 Thinking ON/OFF" (PITFALLS UX Pitfall).
+- Capability gate: only show toggle if `model.capabilities.contains(LLM_THINKING)`.
+- `ui/benchmark/` package: `BenchmarkScreen`, `BenchmarkViewModel`, `BenchmarkResultsViewer`, `BenchmarkValueSeriesViewer` (mirrors Gallery's 4 files).
+- `worker/ModelBenchmarkWorker.kt` (WorkManager, `setForeground()` for long runs, `Constraints(UNMETERED, BATTERY_NOT_LOW)`).
+- `domain/repository/BenchmarkRepository.kt` + impl (Room table, NOT Proto DataStore per Anti-Pattern A7).
+- Room schema: add `BenchmarkResult` table (id, modelId, configHash, initTimeMs, prefillTokPerSec, decodeTokPerSec, peakMemoryBytes, createdAt) with `@AutoMigration(from=v1, to=v2)`. **NEVER** `fallbackToDestructiveMigration()`.
+- `MigrationTest` in `androidTest/` covering v1.8 → v2.0 (50 messages round-trip).
+- `lifecycle-process:2.10.0` added; `AppLifecycleProvider` interface in `domain/lifecycle/`.
+- `DownloadWorker` reads `appLifecycleProvider.isAppInForeground` before posting notification (PITFALLS Critical #12).
 
-**Features from FEATURES.md:** Streaming-aware rendering (completes chat message integration)
+**Addresses:** FEATURES §Thinking Mode + §Model Benchmark; ARCHITECTURE §MUST REFACTOR #3 (AppLifecycleProvider), #7 (per-feature module); PITFALLS Critical #9, #12.
 
-**Pitfalls avoided:** #2 (O(n²) streaming — deferred highlighting), #6 (recomposition thrashing — `remember` caching), #7 (code block flicker — consistent background + `animateColorAsState`)
+**Avoids:** Proto DataStore (Anti-Pattern A7), JS webview skills (Anti-Pattern A12), exposing thinking panel for non-reasoning models (PITFALLS "Looks Done" #3).
 
-**Research needed:** LOW — performance optimization patterns are well-understood. Skip `/gsd-research-phase`. Focus on measurement and validation.
+**Research flag:** Needs `--research-phase` for: (a) exact `Message.thinking` API (carries over from Phase 40), (b) LM Studio's `reasoning_content` exact JSON path (FEATURES §Open Q #1), (c) WorkManager `setForeground()` reliability on Chinese OEM ROMs (PITFALLS Critical #12).
+
+### Phase 42 — Prompt Lab [P1]
+
+**Rationale:** Pure feature on top of the keystone. Independent from Phase 41 (no shared schema work). Reuses the existing `MarkdownText` renderer.
+
+**Delivers:**
+- `ui/promptlab/` package: `PromptLabScreen`, `PromptLabViewModel`, `PromptTemplateConfigs.kt` (5–8 templates: rewrite, summarize, extract-key-points, code-explain, translate, sentiment, table-to-json).
+- `PromptLabTaskModule` Hilt module with `@IntoSet` binding per Gallery pattern.
+- Side-by-side prompt input + output composable; single-turn, no conversation state.
+- Reuses `LlmModelHelper` from Phase 40 (no new inference plumbing).
+
+**Addresses:** FEATURES §Prompt Lab; ARCHITECTURE §MUST REFACTOR #7 (per-feature Hilt).
+
+**Avoids:** Gallery's `compose-richtext` + `commonmark` (Anti-Pattern A6) — reuse Warped's `MarkdownText` (v1.6).
+
+**Research flag:** Standard pattern. No research needed unless template content selection is contentious (FEATURES §Open Q #7 — decide during phase planning).
+
+### Phase 43 — Performance Convergence [P0, cross-cutting]
+
+**Rationale:** Explicit v2.0 mandate. Largely orthogonal to the feature ports; can run **in parallel** with Phase 41/42 once `LlmModelHelper` is interface-defined (even before Phase 40 ships — interface signature is the dependency, not the full impl).
+
+**Delivers (ranked by ROI):**
+1. **Drop `EngineManager.getCachedModelPath()`** file copy → mmap only. Pass `context.cacheDir.absolutePath` (or external) directly to `EngineConfig.cacheDir`. Namespaced by `BuildConfig.LITERTLM_VERSION` per Critical #4. **Biggest single win: 1–3 GB disk savings + 3–10s cold-start removed.**
+2. **Compose recomposition audit**: split `ChatUiState` (50 fields) into 3 sub-states (`ChatListState`, `ChatInputState`, `ChatStreamingState`). Add `@Immutable` annotation. Add `kotlinx-collections-immutable:0.4.0`. Convert `List<T>` → `ImmutableList<T>` on all public composable params. Extract subcomposables in `MessageBubble` and `CodeBlock` (565 lines, the largest composable). Hoist `codeTheme`, `codeFontScale`, `attachedImages` to parent. Add `derivedStateOf` for `trafficLightState` and `trafficLightStatusText`.
+3. **`AppLifecycleProvider` + `ProcessLifecycleOwner` + download notification gate** (also listed in Phase 41; can split — Phase 41 adds the interface, Phase 43 does the perf-side wiring).
+4. **`installSplashScreen()` + cross-fade mask** in `MainActivity`. `androidx.core:core-splashscreen:1.2.0-beta01` added.
+5. **Room composite index** on `messages(conversation_id, created_at)` (PITFALLS Performance Traps + Integration Gotchas). `EXPLAIN QUERY PLAN` to confirm.
+6. **Hilt graph audit**: every `@Provides` is either `@Singleton` (true singleton) or `@ViewModelScoped`. No eager `LiteRtLlmEngine` SingletonComponent injection (PITFALLS Performance Traps first row).
+7. **OkHttp interceptor chain audit**: `retryOnConnectionFailure(false)` for SSE, `callTimeout(60s)`, `Cache(50MB)` TTL (PITFALLS Performance Traps).
+8. **R8 full mode + ProGuard rule audit** (also Phase 40 for the keep rules; Phase 43 measures APK size and adds `Modifier.drawWithCache` audit per ARCHITECTURE §CONSIDER #2).
+9. **SQLCipher microbench** (with/without) — measure first, decide removal (STACK §4, PITFALLS Security row 7).
+10. **Macrobenchmark cold-start baseline** on Pixel 7 reference (target: < 1.5s cold, < 800ms warm, 60fps streaming, peak memory < 1.5× model size). Numbers recorded in `BENCHMARKS.md`.
+
+**Addresses:** STACK §12 gradle.properties + §13 manifest + §3 LiteRT-LM cacheDir; FEATURES §Performance Convergence; ARCHITECTURE §2, §7, §8 + §MUST REFACTOR #2, #6, #8, #9; PITFALLS Critical #4, #11, #12 + Performance Traps.
+
+**Avoids:** OkHttp 5.x (API-breaking, defer), SQLCipher removal without measurement (audit first).
+
+**Research flag:** Needs `--research-phase` for: (a) Compose 1.11 stability annotation behavior (ARCHITECTURE §Open Q #6), (b) Macrobenchmark setup (PITFALLS Sources — Android Dev Guide), (c) `EngineManager.handleTrimMemory` semantics after cache refactor (ARCHITECTURE §Open Q #7).
+
+### Phase 44 — Agent Skills Lite [P2, optional, defer to v2.1 if scope tight]
+
+**Rationale:** XL scope. High user value (calculator, JSON-formatter, etc.) but 10–14 days. Defer to v2.1 unless v2.0 timeline permits.
+
+**Delivers (Lite variant only):**
+- 3–5 built-in Kotlin `@Tool`-annotated skills (calculator, JSON-formatter, text-summarizer-template, current-time, code-block-extractor).
+- `LlmModelHelper.tools: List<ToolProvider>` plumbed to LiteRT-LM 0.13.1 (and to LM Studio's `/api/v1/chat` `tools` field).
+- UI: skill chips under chat input.
+- `domain/repository/SkillRepository.kt` + impl.
+- `skills/` package with one file per skill.
+
+**Addresses:** FEATURES §Agent Skills Lite (P2).
+
+**Avoids:** Gallery's full Agent Skills (JS webview, native intents, MCP) — Anti-Pattern A12, A13. PROJECT.md explicitly defers "autonomous tool use".
+
+**Research flag:** Needs `--research-phase` to verify `ToolProvider` Kotlin API surface in LiteRT-LM 0.13.1 (FEATURES §Open Q #2, ARCHITECTURE §Open Q #4) — this is the gating question for the whole phase.
+
+### Deferred to v2.1+
+
+- **LM Studio MCP Bridge** [L]: separate phase. Requires MCP Kotlin SDK or custom JSON-RPC-over-HTTP client. Reuses the `ToolProvider` plumbing from Agent Skills Lite.
+- **Speculative Decoding toggle** [S]: small but peripheral. Requires `capabilities: ["speculative_decoding"]` in allowlist. Land in Phase 40 if time.
+- **Benchmark history viewer** [S]: needs accumulated benchmark data. Land after Phase 41 ships and users have 1+ weeks of results.
+- **Deep links** (`warped://chat/<id>`) [M]: nice-to-have. Phase 40's type-safe nav migration makes it easy.
+- **Gallery `Model.runtimeHelper` extension property** [S]: cosmetic. Skip unless pattern is widely useful.
+
+### Excluded (Anti-Features, also excluded in v2.0)
+
+Per FEATURES §Anti-Features: Ask Image, Audio Scribe, Tiny Garden, Mobile Actions (native intents), Scheduled Notifications, JS webview skills, Community Skills marketplace, AICore system service, "Best for" model pinning, Multi-tab browser, Public trending scraping, Remote allowlist hosting, iOS feature parity.
 
 ### Phase Ordering Rationale
 
-- **Phase 1 must come first** — all rendering depends on the tokenizer, language detector, and theme definitions. These are pure Kotlin with no UI deps, enabling fast unit testing.
-- **Phase 2 must follow Phase 1** — the `CodeBlock` composable needs `SyntaxHighlighter`, `LanguageDetector`, and `SyntaxTheme` to render anything. The composable block model is a prerequisite for the language header bar and copy button.
-- **Phase 3 is intentionally last** — it validates Phase 1 + 2 together under real streaming conditions. Deferred highlighting is the performance strategy; it can only be verified after the rendering pipeline works.
-- This ordering also follows Clean Architecture: domain → data → UI, with integration validation at the end.
+- **Phase 40 is keystone** — every other phase depends on `LlmModelHelper`. Must land first. Even Phase 43 (Performance) needs the interface signature defined to do the right `Lazy<LiteRtLlmEngine>` refactor (PITFALLS Performance Traps row 1).
+- **Phase 43 is parallel** — it touches engine plumbing, manifest, and Compose state but NOT the new `LlmModelHelper` surface. Can start as soon as Phase 40's interface is defined (could be day 3 of Phase 40). Hot path: `EngineManager.getCachedModelPath()` deletion, manifest updates, Compose state split.
+- **Phase 41 and 42 are independent** — both depend on Phase 40 but not on each other. Can run in parallel.
+- **Phase 44 is optional** — XL scope, defer to v2.1 if v2.0 timeline is tight. LiteRT-LM 0.13.1 ToolProvider API verification is the gating question (FEATURES §Open Q #2).
+- **Build order also respects data layer**: Room migration (Phase 41 schema work) must be the first thing touching `@Database` — schema changes are not reversible. Set `exportSchema = true` immediately in Phase 40, commit `schemas/` to git, even if no schema change yet.
 
 ### Research Flags
 
-**Phases likely needing deeper research during planning:**
-- **Phase 1:** Highlights API integration — the `CodeHighlight` token type system must be mapped to our `CodeToken` sealed class. If the mapping is complex or Highlights' internal token types don't align with the 12-token taxonomy from FEATURES.md, a `/gsd-research-phase` spike is warranted before planning.
+Phases needing deeper research during planning (`/gsd-plan-phase --research-phase`):
+- **Phase 40:** EngineConfig `cacheDir` parameter exact name; `Message.thinking` accessor; Hilt `@Binds` scoping for the new interface.
+- **Phase 41:** LM Studio `reasoning_content` JSON path; WorkManager `setForeground()` reliability on Xiaomi/Oppo ROMs; `@AutoMigration` schema design.
+- **Phase 43:** Compose 1.11 strong-skipping behavior with `@Immutable`; Macrobenchmark setup; `EngineManager.handleTrimMemory` after cache refactor.
+- **Phase 44:** LiteRT-LM 0.13.1 `ToolProvider` Kotlin API surface; LM Studio `/api/v1/chat` `tools` field schema.
 
-**Phases with standard, well-documented patterns (skip `/gsd-research-phase`):**
-- **Phase 2:** Standard Compose patterns — `Surface`, `Row`, `IconButton`, `buildAnnotatedString`, `LocalClipboardManager`. May benefit from `/gsd-ui-phase` for the CodeBlock visual design contract.
-- **Phase 3:** Performance optimization with `remember`, `derivedStateOf`, and `animateColorAsState` — all well-documented Compose APIs.
+Phases with standard patterns (skip `--research-phase`):
+- **Phase 42 (Prompt Lab):** Well-documented Gallery pattern. 5–8 template content is the only design question; no API research needed.
+
+---
+
+## Gallery Anti-Patterns to NOT Copy
+
+These are Gallery's tech-debt items Warped must explicitly reject. Each is grounded in PITFALLS §Gallery Anti-Patterns and STACK §What NOT to Add.
+
+| # | Anti-Pattern | Why Gallery Has It | Why Warped Skips |
+|---|--------------|--------------------|------------------|
+| **A1** | kapt for Hilt compiler | Legacy pre-Hilt 2.48 (Dec 2023) | Hilt KSP stable since 2.48. Warped is KSP-only. Adding kapt = 2–5× slower builds. |
+| **A2** | Three JSON libs (kotlinx-serialization + Moshi + Gson) | Firebase uses Gson; HF OAuth uses Moshi | Warped has neither. kotlinx-serialization only. 4+ MB APK savings. |
+| **A3** | `kotlin-reflect:2.2.21` | Pulled by `compose-richtext` | Warped doesn't use `compose-richtext`. 2.5 MB savings. |
+| **A4** | Firebase BOM + Analytics + Messaging | Gallery uses for analytics + push | PROJECT.md §"Out of Scope" excludes Firebase/cloud sync. Zero Firebase. |
+| **A5** | Ktor 3.4.3 + MCP Kotlin SDK 0.8.0 | HF + MCP use Ktor | Warped has Retrofit + OkHttp. Adopting MCP SDK would force Ktor. PROJECT.md scopes MCP via LM Studio REST, not the SDK. |
+| **A6** | `compose-richtext` + `commonmark` | Gallery's markdown renderer | Warped has custom `MarkdownText` (v1.6). Per-block composables are critical. |
+| **A7** | Proto DataStore (5 instances) | Benchmark results, user data, cutout collection, skills | Warped has Preferences DataStore + Room. Add Proto only for deeply nested schemas. Use Room for benchmark history. |
+| **A8** | CameraX 1.4.2 | "Ask Image" task (multimodal) | PROJECT.md §"Out of Scope" — text-only. Zero CameraX. |
+| **A9** | AICore system service + `mlkit-genai-prompt` | Pixel 8+ system LLM | Pixel-only, preview, narrow support. v2 deferred in REQUIREMENTS.md. |
+| **A10** | `play-services-tflite-*` | Legacy TFLite for older devices | Warped uses LiteRT-LM directly via AAR. v1.5 already removed TFLite. |
+| **A11** | AppAuth 0.11.1 | HF OAuth | Warped has no OAuth. HF models are public; LM Studio uses API keys (EncryptedSharedPreferences). |
+| **A12** | JS webview skill runtime (full Skills) | "Spin a wheel", "show a map" demos | Heavy (200–500ms init per skill), XSS surface. Agent Skills Lite is Kotlin-only. |
+| **A13** | `com.google.mlkit:genai-prompt` | AICore backend | Same as A9. Pixel-only. |
+| **A14** | mmap cache shared across all models (no version namespacing) | `cacheDir = context.cacheDir.path` | LiteRT-LM bumps break cache. Warped must namespace by `BuildConfig.LITERTLM_VERSION`. |
+| **A15** | `android:configChanges` missing `uiMode` | Toggling dark mode recreates Activity | Compose can re-theme. 100–300ms savings. Add `uiMode|orientation|screenSize|smallestScreenSize|screenLayout`. |
+| **A16** | `extractNativeLibs="true"` | "Easier debugging" | 10–20 MB APK bloat. `extractNativeLibs="false"` is AGP 8+ default. |
+
+**Verification (Phase 40 exit criterion):**
+```bash
+# Must all return empty:
+./gradlew :app:dependencies --configuration kapt | grep -v "^$"
+./gradlew :app:dependencies | grep -E "(firebase|moshi|gson|kotlin-reflect|ktor|mcp|tflite|mlkit-genai|appauth|compose-richtext|cameraX|datastore.*proto)"
+# Must be present in libs.versions.toml:
+grep "litertlm-android" gradle/libs.versions.toml
+grep "core-splashscreen" gradle/libs.versions.toml
+grep "lifecycle-process" gradle/libs.versions.toml
+# Must be present in AndroidManifest.xml:
+grep "uses-native-library" app/src/main/AndroidManifest.xml
+grep "configChanges.*uiMode" app/src/main/AndroidManifest.xml
+grep "extractNativeLibs.*false" app/src/main/AndroidManifest.xml
+```
+
+---
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | **HIGH** | Highlights 1.1.0 confirmed via Maven Central POM inspection — version, transitive deps, and Kotlin compatibility verified. All version compatibility checks passed against project's version catalog. Custom theme/language-detector/adapter need is unambiguous. |
-| Features | **HIGH** | Competitive analysis done against ChatGPT Android, Claude Android, and LM Studio Desktop. Token taxonomy sourced from Prism.js industry standard. Library survey (Prism4j archived status, Sora Editor overkill, kotlin-textmate immaturity) independently verified. MVP definition clear with P1/P2/P3 priorities. |
-| Architecture | **HIGH** | Existing codebase inspected directly (`MarkdownText.kt`, `MessageBubble.kt`, `ChatViewModel.kt`, `ChatUiState.kt`, `AdvancedPreferences.kt`, `SettingsScreen.kt`). Integration points mapped precisely — every component's change status (new/refactored/unchanged) documented. 8-wave build order provides granular sequencing. |
-| Pitfalls | **HIGH** | Each pitfall grounded in existing code patterns (e.g., `buildAnnotatedString` in composable body without `remember` is observable in current `MarkdownText.kt` line 45). Streaming pitfalls verified against `ChatViewModel.kt` 50ms emission interval. Prevention strategies are concrete Kotlin snippets, not abstract advice. |
+| Stack versions | **HIGH** | All verified against Google Maven, GitHub releases, Compose BOM mapping. Fetched within 24h of research. |
+| Feature surface mapping (Gallery → Warped) | **HIGH** | Direct repo exploration: README, `model_allowlist.json`, `LlmModelHelper.kt`, `Model.kt`, `customtasks/*/`, `ui/*/`, `mcp/README.md`, `skills/README.md`. |
+| Architecture refactor targets | **HIGH** | Warped source files directly inspected (line counts, signatures). Gallery patterns verified. |
+| LiteRT-LM 0.13.1 API surface | **HIGH** | Engine.initialize, cacheDir, Backend.GPU, MessageCallback, ToolProvider all confirmed in Maven listing + official docs. |
+| LiteRT-LM 0.12 → 0.13 file format breaking change | **MEDIUM** | One open issue (#2454) confirmed. Other breaking changes may emerge — needs regression smoke tests for all v1.8-era `.litertlm` files. |
+| Compose 1.11 strong-skipping impact | **MEDIUM** | Documented in dev.to article + Compose 1.11 release notes. Migration cost depends on how many `List<T>` params exist in Warped — needs Layout Inspector audit. |
+| `Message.thinking` exact accessor name | **MEDIUM** | Inferred from Gallery's `ResultListener` typealias. Actual field name on `Message` should be verified in the AAR. |
+| LM Studio `reasoning_content` exact JSON path | **LOW-MEDIUM** | OpenAI-compatible convention. Verify in LM Studio's API docs or via integration test before promising Thinking Mode for remote. |
+| `ToolProvider` Kotlin API stability | **MEDIUM** | Visible in `LlmModelHelper.kt` interface. Specific API surface should be verified before committing to Agent Skills Lite scope. |
+| Performance impact estimates (mmap 5–10×, SQLCipher 10–30%) | **LOW** | Well-documented in respective docs but not measured on Warped hardware. Verify with Macrobenchmark in Phase 43. |
+| WorkManager reliability on Chinese OEM ROMs | **LOW** | Anecdotal from Gallery's open issues. Needs real-device test in Phase 41. |
 
-**Overall confidence:** HIGH — all four research files drew from primary sources (Maven Central, GitHub repos, direct codebase inspection, official Android documentation). No findings depend on inference or single sources.
+**Overall confidence:** **HIGH** for the strategic direction (what to port, what to skip, what to defer). **MEDIUM** for the precise implementation details that will be resolved in Phase 40's research-phase. **LOW** for performance impact numbers, which need Macrobenchmark validation.
 
-### Gaps to Address
+### Gaps to Address During Implementation
 
-- **Highlights `CodeHighlight` → `CodeToken` mapping:** The exact token type taxonomy of Highlights needs verification during Phase 1 planning. If Highlights uses fewer token types than the 12 defined in FEATURES.md, a mapping layer is straightforward. If it uses more, some types may collapse. **Handle during:** Phase 1 plan discussion or a `/gsd-spike` before planning.
-
-- **Language auto-detection accuracy:** The keyword-frequency heuristic for 15 languages has not been benchmarked against real LLM code block output. The 90% fence-coverage claim (LLMs specify language in fence >90% of the time) is a reasonable estimate but unverified. **Handle during:** Phase 2 or 3 — auto-detection is a P2 feature. If accuracy proves low during testing, defer fully to v1.7.
-
-- **Long code block performance (>500 lines):** Highlights' regex tokenizer performance on large code blocks has not been benchmarked on representative Android hardware. The `remember` caching mitigates recomposition but initial tokenization cost is unknown. **Handle during:** Phase 3 performance validation. Cap rendering at 200 lines with "Show all" expander if latency exceeds 16ms.
-
-- **Data migration: old `CodeTheme` enum → new `SyntaxTheme`:** The migration path (store enum name, map to new theme objects) is conceptually sound but the exact migration code needs validation against the current `KEY_CODE_THEME` DataStore key and existing user data. **Handle during:** Phase 1 — test with a pre-migration DataStore snapshot.
-
-## Sources
-
-### Primary (HIGH confidence)
-- **Highlights GitHub** (SnipMeDev/Highlights) — 183 stars, 26 dependents, version 1.1.0, 17 languages, Apache 2.0 license. Repository README, sample code, language list, theme documentation.
-- **Highlights Maven Central** — Version 1.1.0 confirmed with POM showing kotlin-stdlib 2.2.0, kotlinx-coroutines 1.9.0, kotlinx-serialization-json 1.7.1.
-- **Prism4j GitHub** (noties/Prism4j) — Confirmed ARCHIVED July 2023. Last release June 2019. Read-only repository.
-- **kotlin-textmate GitHub** (ivan-magda/kotlin-textmate) — v0.1.0 released 2026-05-14. 12 stars. Known limitations documented in README.
-- **Warped codebase** — Direct inspection of `MarkdownText.kt`, `MessageBubble.kt`, `ChatViewModel.kt`, `ChatUiState.kt`, `AdvancedPreferences.kt`, `SettingsScreen.kt`, `ChatMessage.kt`. Current `CodeTheme` enum structure, DataStore persistence, Compose rendering approach, and streaming at 50ms intervals confirmed.
-- **Prism.js token documentation** (prismjs.com/tokens.html) — Industry-standard token type taxonomy: keyword, string, number, comment, function, type, operator, punctuation, boolean, builtin, variable, constant, plain.
-- **Jetpack Compose official docs** — `buildAnnotatedString`, `LocalClipboardManager`, performance/stability guidance (stability, `remember`, recomposition skipping).
-
-### Secondary (MEDIUM confidence)
-- **Sora Editor** (rosemoe/sora-editor) — Context7 docs confirming TextMate/TreeSitter approach exists for Android, but designed for code editors, not read-only rendering.
-- **Highlight.js auto-detection** (highlightjs.org) — Reference for Bayesian classifier + keyword matching approach. Adaptation simplified for mobile (heuristic-only).
-- **Competitive analysis** — ChatGPT Android (WebView, language header, copy button, dark-only), Claude Android (copy button, no language header, dark-only), LM Studio Desktop (language header, copy button, follows app theme). Based on personal usage observation.
-
-### Tertiary (LOW confidence)
-- **Android syntax highlighting library landscape** — Secondary search of Maven Central may surface niche alternatives beyond those evaluated. Likelihood of finding a better fit: LOW. This is a genuinely underserved niche on Android.
+1. **LiteRT-LM 0.13.1 `EngineConfig.cacheDir` exact parameter name** (Phase 40, ARCHITECTURE §Open Q #1) — verify in AAR source.
+2. **`Message.thinking` accessor in LiteRT-LM 0.13.1** (Phase 40, FEATURES §Open Q #1) — `message.thinking` vs `message.channels["thought"]` vs other.
+3. **LiteRT-LM 0.13.1 `ToolProvider` Kotlin API** (Phase 44 gating, FEATURES §Open Q #2) — does the local engine actually wire `tools`, or is it AICore-only?
+4. **`LlmModelHelper` `ResultListener` suspend vs sync** (Phase 40, ARCHITECTURE §Open Q #2) — for Flow backpressure.
+5. **LM Studio `reasoning_content` exact JSON path** (Phase 41, FEATURES §Open Q #1) — top-level vs nested in `message`.
+6. **WorkManager `setForeground()` reliability** on Xiaomi/Oppo/ColorOS ROMs (Phase 41, PITFALLS Critical #12) — needs real-device test matrix.
+7. **Compose 1.11 strong-skipping behavior** with `@Immutable` annotations (Phase 43, ARCHITECTURE §Open Q #6).
+8. **Macrobenchmark baseline numbers** on Pixel 7 (Phase 43, PITFALLS "Looks Done" #13, #14) — required for Performance exit criteria.
+9. **Model allowlist schema subset** (Phase 40, FEATURES §Open Q #6) — full Gallery schema copy or Warped-specific leaner subset.
+10. **Prompt Lab template content** (Phase 42, FEATURES §Open Q #7) — 5–8 templates selection.
+11. **SQLCipher threat model re-evaluation** (Phase 43, PITFALLS Security row 7) — measure first, decide removal.
 
 ---
 
-*Research completed: 2026-05-14*
-*Ready for roadmap: yes*
+## Sources (Aggregated)
+
+### Primary (HIGH confidence)
+
+**Gallery source tree** (verified 2026-06-05):
+- [google-ai-edge/gallery](https://github.com/google-ai-edge/gallery) — main branch, versionCode 34, 1.0.16
+- [`runtime/LlmModelHelper.kt`](https://raw.githubusercontent.com/google-ai-edge/gallery/main/Android/src/app/src/main/java/com/google/ai/edge/gallery/runtime/LlmModelHelper.kt) — interface signature
+- [`ui/llmchat/LlmChatModelHelper.kt`](https://raw.githubusercontent.com/google-ai-edge/gallery/main/Android/src/app/src/main/java/com/google/ai/edge/gallery/ui/llmchat/LlmChatModelHelper.kt) — 340-line impl wrapping Engine + Conversation
+- [`data/Model.kt`](https://raw.githubusercontent.com/google-ai-edge/gallery/main/Android/src/app/src/main/java/com/google/ai/edge/gallery/data/Model.kt) — Model data class with capabilities, runtimeHelper
+- [`model_allowlists/1_0_15.json`](https://github.com/google-ai-edge/gallery/raw/refs/heads/main/model_allowlists/1_0_15.json) — versioned allowlist schema
+- [`libs.versions.toml`](https://github.com/google-ai-edge/gallery/blob/main/Android/src/gradle/libs.versions.toml) — confirmed kapt, Gson, Moshi, kotlin-reflect, Firebase, Ktor, MCP, TFLite, mlkit-genai-prompt, AppAuth, CameraX, compose-richtext, commonmark, Proto DataStore
+- [`AndroidManifest.xml`](https://github.com/google-ai-edge/gallery/blob/main/Android/src/app/src/main/AndroidManifest.xml) — configChanges, uses-native-library, splash screen
+
+**Library version sources:**
+- [LiteRT-LM Maven metadata](https://dl.google.com/android/maven2/com/google/ai/edge/litertlm/litertlm-android/maven-metadata.xml) — 0.13.1 latest 2026-06-04
+- [Compose BOM mapping](https://developer.android.com/jetpack/compose/bom/bom-mapping) — 2026.05.01 = Compose 1.11.0
+- [Compose Testing v2 migration](https://developer.android.com/develop/ui/compose/testing/migrations/testing-v2)
+- [Android Developers Blog — R8 Keep Rules](https://developer.android.com/blog/posts/configure-and-troubleshoot-r8-keep-rules) (Nov 2025)
+- [Android Developer Guide — Migrate Room DB](https://developer.android.com/training/data-storage/room/migrating-db-versions)
+- [LiteRT-LM Android getting started](https://developers.google.com/edge/litert-lm/android) — `Backend.GPU()`, `cacheDir`, Engine.initialize() blocking warning
+- [LiteRT-LM v0.13 release notes](https://github.com/google-ai-edge/LiteRT-LM/releases) — ToolProvider, MTP, speculative decoding
+- [LiteRT-LM open issue #2454](https://github.com/google-ai-edge/LiteRT-LM/issues/2454) — 0.12 → 0.13 file format breaking change
+- [Dagger Hilt KSP support](https://dagger.dev/dev-guide/ksp) — stable since Hilt 2.48
+- [Hilt 2.59 release notes](https://github.com/google/dagger/releases) — AGP 9+ requirement
+
+### Secondary (MEDIUM confidence)
+
+- [SoftwareDevs mvpfactory.io — Compose Recomposition at Scale](https://dev.to/software_mvp-factory/jetpack-compose-recomposition-at-scale-how-strong-skipping-mode-changes-the-stability-rules-you-4a80) (Mar 2026)
+- [Davide Agostini — Hilt Deep Dive](https://www.davideagostini.com/android/2026-02-18-hilt-di-deep-dive) (Feb 2026)
+- [Davide Agostini — Baseline Profiles](https://www.davideagostini.com/android/2026-02-25-baseline-profiles) (Feb 2026)
+- [Google Developers Blog — Blazing fast on-device GenAI with LiteRT-LM](https://developers.googleblog.com/blazing-fast-on-device-genai-with-litert-lm/) (May 2026)
+- [Google Cloud Blog — Benchmark LLMs on-device with AI Edge Portal](https://cloud.google.com/blog/products/ai-machine-learning/benchmark-llms-on-device-with-ai-edge-portal) (May 2026)
+- [StackOverflow — kotlinx-serialization ProGuard rules](https://stackoverflow.com/questions/70663076/how-to-make-proguard-keep-kotlinx-serializers-for-objects)
+
+### Warped internal (HIGH confidence)
+
+- [PROJECT.md](.planning/PROJECT.md) — v2.0 milestone, scope, out-of-scope boundaries
+- [REQUIREMENTS.md](.planning/REQUIREMENTS.md) — v1.8 feature surface, v2 deferred list
+- [STACK.md](.planning/research/STACK.md) — confirmed stack (Kotlin 2.3.20, AGP 9.2.1, Hilt 2.59.2, etc.)
+- [FEATURES.md](.planning/research/FEATURES.md) — v2.0 feature plan + Gallery surface map
+- [ARCHITECTURE.md](.planning/research/ARCHITECTURE.md) — refactor candidates + side-by-side comparison
+- [PITFALLS.md](.planning/research/PITFALLS.md) — critical pitfalls + Gallery anti-patterns
+
+---
+
+*Research completed: 2026-06-05*
+*Ready for requirements definition: yes — v2.0 phase plan (40–44) is concrete, dependencies are mapped, and Gallery anti-patterns are explicitly enumerated for rejection.*
