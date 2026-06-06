@@ -211,9 +211,11 @@ private fun OutputColumn(
                 }
             } else {
                 val scroll = rememberScrollState()
-                Text(
-                    text = ui.output.ifEmpty { "" },
-                    style = MaterialTheme.typography.bodyMedium,
+                com.warped.ui.chat.components.MarkdownText(
+                    text = ui.output,
+                    codeTheme = codeTheme,
+                    codeFontScale = codeFontScale,
+                    isStreaming = ui.isRunning,
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(scroll),
