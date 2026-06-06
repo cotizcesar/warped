@@ -2,47 +2,47 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Gallery Convergence & Performance Overhaul
-status: in_progress
-last_updated: "2026-06-06T07:00:00.000Z"
+status: complete
+last_updated: "2026-06-06T08:00:00.000Z"
 last_activity: 2026-06-06
 progress:
   total_phases: 5
-  completed_phases: 4
-  total_plans: 20
-  completed_plans: 20
-  percent: 80
+  completed_phases: 5
+  total_plans: 23
+  completed_plans: 23
+  percent: 100
 ---
 
 # Project State: Warped
 
 **Last updated:** 2026-06-06
-**Last activity:** 2026-06-06 — Phase 43 complete (Performance Convergence, 4 plans shipped)
+**Last activity:** 2026-06-06 — v2.0 COMPLETE: Phases 40-44 shipped (23/23 plans, 53/53 requirements)
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-06-05)
 
 **Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** v2.0 Gallery Convergence & Performance Overhaul — Phase 40 ✓; executing 41 (Thinking + Benchmark) next.
+**Current focus:** v2.0 Gallery Convergence & Performance Overhaul — **100% complete** (5/5 phases, 23/23 plans, 53/53 requirements). v2.0 milestone closed.
 
 ## Current Position
 
-Phase: 41 (Thinking Mode + Model Benchmark) — Next to plan
+Phase: v2.0 complete
 Plan: —
-Status: Phase 40 ✓ Runtime & Allowlist Foundation (8 plans, 15/15 requirements)
-Last activity: 2026-06-06 — Phase 40 complete; LlmModelHelper unified surface live, allowlist asset+repo wired, mmap-only cache + LRU + trim memory, type-safe nav, manifest+R8 hardening, version bumps
+Status: All 5 v2.0 phases shipped (40 Runtime/Allowlist, 41 Thinking+Benchmark, 42 Prompt Lab, 43 Performance, 44 Skills Lite)
+Last activity: 2026-06-06 — Phase 44 complete (Agent Skills Lite, 3 plans shipped: 44-01 domain/prefs/repo, 44-02 LlmModelHelper plumbing, 44-03 chat-input chips UI)
 
 ## Phase Structure (v2.0)
 
 | Phase | Name | Priority | Requirements | Status | Depends On |
 |-------|------|----------|--------------|--------|------------|
 | 40 | Runtime & Allowlist Foundation | **P0** keystone | RUNTIME-01..12, CACHE-01..03 (15) | ✓ Complete | — |
-| 41 | Thinking Mode + Model Benchmark | P1 | THINK-01..07, BENCH-01..06 (13) | Not started | Phase 40 ✓ |
-| 42 | Prompt Lab | P1 | PROMPT-01..06 (6) | Not started | Phase 40 ✓ |
-| 43 | Performance Convergence | **P0** cross-cutting | PERF-01..13 (13) | Not started | Phase 40 (interface only) ✓ |
-| 44 | Agent Skills Lite | P2 optional | SKILLS-01..06 (6) | Not started | Phase 40 ✓ |
+| 41 | Thinking Mode + Model Benchmark | P1 | THINK-01..07, BENCH-01..06 (13) | ✓ Complete | Phase 40 ✓ |
+| 42 | Prompt Lab | P1 | PROMPT-01..06 (6) | ✓ Complete | Phase 40 ✓ |
+| 43 | Performance Convergence | **P0** cross-cutting | PERF-01..13 (13) | ✓ Complete | Phase 40 (interface only) ✓ |
+| 44 | Agent Skills Lite | P2 optional | SKILLS-01..06 (6) | ✓ Complete | Phase 40 ✓ |
 
-**Total v2.0:** 5 phases, 53 requirements
+**Total v2.0:** 5 phases, 53 requirements — all met.
 
 ## Completed Milestones
 
