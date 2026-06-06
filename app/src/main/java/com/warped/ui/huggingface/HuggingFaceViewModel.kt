@@ -34,6 +34,7 @@ class HuggingFaceViewModel @Inject constructor(
     }
 
     init {
+        loadInitialModels()
         viewModelScope.launch(coroutineExceptionHandler) {
             downloadManager.downloadStates.collect { states ->
                 val activeId = _uiState.value.activeDownloadId
@@ -62,12 +63,33 @@ class HuggingFaceViewModel @Inject constructor(
 
     fun search(query: String) {
         val trimmedQuery = query.trim()
-
         if (trimmedQuery.length < MIN_SEARCH_LENGTH) return
         searchJob?.cancel()
         _uiState.update { it.copy(searchQuery = trimmedQuery, isLoading = true, error = null) }
+        searchJob = performSearch(trimmedQuery)
+    }
+
+    private fun loadInitialModels() {
+        _uiState.update { it.copy(isLoading = true) }
         searchJob = viewModelScope.launch(coroutineExceptionHandler) {
-            val author: String? = "litert-community"
+            val result = huggingFaceRepository.searchModels(
+                query = null,
+                author = "warped-community"
+            )
+            result.onSuccess { models ->
+                val sortedModels = models.sortedByDescending { it.downloads }
+                _uiState.update {
+                    it.copy(searchResults = sortedModels, isLoading = false)
+                }
+            }.onFailure { e ->
+                _uiState.update { it.copy(error = e.message, isLoading = false) }
+            }
+        }
+    }
+
+    private fun performSearch(trimmedQuery: String): Job {
+        return viewModelScope.launch(coroutineExceptionHandler) {
+            val author: String? = "warped-community"
             val result = huggingFaceRepository.searchModels(
                 query = trimmedQuery.ifBlank { null },
                 author = author
