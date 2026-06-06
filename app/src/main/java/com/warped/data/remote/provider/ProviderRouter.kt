@@ -3,19 +3,31 @@ package com.warped.data.remote.provider
 import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.local.inference.LiteRTLmProvider
 import com.warped.data.local.security.ApiKeyStore
+import com.warped.di.LlmHelperQualifiers
+import com.warped.domain.llm.LlmModelHelper
 import com.warped.domain.model.Endpoint
 import com.warped.domain.model.ProviderType
 import com.warped.domain.provider.LlmProvider
 import dagger.Lazy
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 @Singleton
 class ProviderRouter @Inject constructor(
     private val apiKeyStore: ApiKeyStore,
     private val inputSanitizer: InputSanitizer,
-    private val liteRTLmProvider: dagger.Lazy<LiteRTLmProvider>
+    private val liteRTLmProvider: dagger.Lazy<LiteRTLmProvider>,
+    @Named(LlmHelperQualifiers.LITE_RT_LM)
+    private val liteRtLmHelper: dagger.Lazy<LlmModelHelper>,
+    @Named(LlmHelperQualifiers.LM_STUDIO)
+    private val lmStudioHelper: dagger.Lazy<LmStudioHelper>,
 ) {
+    /**
+     * Legacy RPC path: returns the per-endpoint [LlmProvider] used for
+     * `listModels()` / `testConnection()` calls. Kept for backward compatibility —
+     * the chat flow now goes through [resolveHelper] / [resolveLocalHelper].
+     */
     fun resolve(endpoint: Endpoint, modelId: String): LlmProvider {
         val key = apiKeyStore.getKey(endpoint.id)
         val keyStr = if (key != null && key.isNotEmpty()) String(key).also { key.fill('0') } else null
@@ -56,6 +68,45 @@ class ProviderRouter @Inject constructor(
     fun resolveLocal(providerType: ProviderType, modelId: String): LlmProvider {
         return when (providerType) {
             ProviderType.LOCAL, ProviderType.LITE_RT_LM -> liteRTLmProvider.get()
+            else -> error("Provider $providerType is not local")
+        }
+    }
+
+    // --- Phase 40 unified chat path (RUNTIME-04) ---
+
+    /**
+     * Resolve the [LlmModelHelper] for a remote endpoint. The endpoint is bound to
+     * the LM Studio helper before returning so subsequent `initialize` / `runInference`
+     * calls are addressed to the right backend.
+     *
+     * Currently only LM Studio is wired in. Other remote providers (OpenAI, Anthropic,
+     * Ollama, Custom) were removed in v1.8 (ENDPT-04) and the LlmModelHelper surface
+     * is not yet extended for them. They still work via [resolve] for `listModels` /
+     * `testConnection`.
+     */
+    fun resolveHelper(endpoint: Endpoint, modelId: String): LlmModelHelper {
+        return when (endpoint.apiType) {
+            ProviderType.LM_STUDIO -> {
+                val helper = lmStudioHelper.get()
+                helper.setEndpoint(endpoint)
+                helper
+            }
+            ProviderType.LOCAL, ProviderType.LITE_RT_LM -> liteRtLmHelper.get()
+            else -> error(
+                "ProviderRouter.resolveHelper: ${endpoint.apiType} is not yet " +
+                    "supported via the LlmModelHelper surface. Use resolve() for the " +
+                    "legacy LlmProvider path."
+            )
+        }
+    }
+
+    /**
+     * Resolve the [LlmModelHelper] for a local provider (LiteRT-LM only). The
+     * `modelId` is informational here — the helper loads via [LlmModelHelper.initialize].
+     */
+    fun resolveLocalHelper(providerType: ProviderType, modelId: String): LlmModelHelper {
+        return when (providerType) {
+            ProviderType.LOCAL, ProviderType.LITE_RT_LM -> liteRtLmHelper.get()
             else -> error("Provider $providerType is not local")
         }
     }
