@@ -1,10 +1,12 @@
 package com.warped.di
 
+import com.warped.data.repository.BenchmarkRepositoryImpl
 import com.warped.data.repository.ChatRepositoryImpl
 import com.warped.data.repository.EndpointRepositoryImpl
 import com.warped.data.repository.ModelAllowlistRepositoryImpl
 import com.warped.data.repository.ModelRepositoryImpl
 import com.warped.data.repository.PresetRepositoryImpl
+import com.warped.domain.repository.BenchmarkRepository
 import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.ModelAllowlistRepository
@@ -39,4 +41,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindModelAllowlistRepository(impl: ModelAllowlistRepositoryImpl): ModelAllowlistRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindBenchmarkRepository(impl: BenchmarkRepositoryImpl): BenchmarkRepository
 }

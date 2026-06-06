@@ -183,8 +183,8 @@ dependencies {
     testImplementation(libs.turbine)
     testImplementation(libs.truth)
     testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.room.testing)
     androidTestImplementation(libs.compose.ui.test)
+    androidTestImplementation(libs.room.testing)
 }
 
 tasks.withType<Test> {

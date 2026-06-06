@@ -34,6 +34,11 @@ abstract class LlmHelperModule {
     @Singleton
     @Named(LlmHelperQualifiers.LM_STUDIO)
     abstract fun bindLmStudioHelper(impl: LmStudioHelper): LlmModelHelper
+
+    @Binds
+    @Singleton
+    @Named(LlmHelperQualifiers.LM_STUDIO)
+    abstract fun bindLmStudioHelperConcrete(impl: LmStudioHelper): LmStudioHelper
 }
 
 object LlmHelperQualifiers {

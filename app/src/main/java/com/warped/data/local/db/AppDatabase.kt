@@ -1,13 +1,16 @@
 package com.warped.data.local.db
 
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import com.warped.data.local.db.dao.BenchmarkResultDao
 import com.warped.data.local.db.dao.ConversationDao
 import com.warped.data.local.db.dao.DownloadCheckpointDao
 import com.warped.data.local.db.dao.LocalModelDao
 import com.warped.data.local.db.dao.MessageDao
 import com.warped.data.local.db.dao.PresetDao
 import com.warped.data.local.db.dao.RemoteEndpointDao
+import com.warped.data.local.db.entity.BenchmarkResultEntity
 import com.warped.data.local.db.entity.ConversationEntity
 import com.warped.data.local.db.entity.DownloadCheckpointEntity
 import com.warped.data.local.db.entity.LocalModelEntity
@@ -22,10 +25,12 @@ import com.warped.data.local.db.entity.RemoteEndpointEntity
         RemoteEndpointEntity::class,
         LocalModelEntity::class,
         PresetEntity::class,
-        DownloadCheckpointEntity::class
+        DownloadCheckpointEntity::class,
+        BenchmarkResultEntity::class
     ],
-    version = 10,
-    exportSchema = false
+    version = 12,
+    exportSchema = true,
+    autoMigrations = [AutoMigration(from = 11, to = 12)]
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun conversationDao(): ConversationDao
@@ -34,4 +39,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun localModelDao(): LocalModelDao
     abstract fun presetDao(): PresetDao
     abstract fun downloadCheckpointDao(): DownloadCheckpointDao
+    abstract fun benchmarkResultDao(): BenchmarkResultDao
 }

@@ -11,6 +11,8 @@ import com.warped.data.local.db.MIGRATION_6_7
 import com.warped.data.local.db.MIGRATION_7_8
 import com.warped.data.local.db.MIGRATION_8_9
 import com.warped.data.local.db.MIGRATION_9_10
+import com.warped.data.local.db.MIGRATION_10_11
+import com.warped.data.local.db.dao.BenchmarkResultDao
 import com.warped.data.local.db.dao.ConversationDao
 import com.warped.data.local.db.dao.DownloadCheckpointDao
 import com.warped.data.local.db.dao.LocalModelDao
@@ -43,7 +45,7 @@ object DatabaseModule {
         val factory = SupportFactory(passphrase)
         return Room.databaseBuilder(context, AppDatabase::class.java, "warped.db")
             .openHelperFactory(factory)
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
             .fallbackToDestructiveMigration(false)
             .build()
     }
@@ -82,6 +84,9 @@ object DatabaseModule {
 
     @Provides
     fun provideDownloadCheckpointDao(db: AppDatabase): DownloadCheckpointDao = db.downloadCheckpointDao()
+
+    @Provides
+    fun provideBenchmarkResultDao(db: AppDatabase): BenchmarkResultDao = db.benchmarkResultDao()
 
     @Provides
     @Singleton
