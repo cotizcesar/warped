@@ -28,9 +28,9 @@ import com.warped.data.local.db.entity.RemoteEndpointEntity
         DownloadCheckpointEntity::class,
         BenchmarkResultEntity::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 11, to = 12)]
+    autoMigrations = [AutoMigration(from = 11, to = 12), AutoMigration(from = 12, to = 13)]
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun conversationDao(): ConversationDao

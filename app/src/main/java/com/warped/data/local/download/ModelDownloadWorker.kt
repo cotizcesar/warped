@@ -19,6 +19,7 @@ import com.warped.data.local.db.entity.DownloadCheckpointEntity
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.domain.model.LocalModel
 import com.warped.domain.repository.LocalModelRepository
+import com.warped.util.lifecycle.AppLifecycleProvider
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import okhttp3.OkHttpClient
@@ -35,7 +36,10 @@ class ModelDownloadWorker @AssistedInject constructor(
     private val okHttpClient: OkHttpClient,
     private val localModelRepository: LocalModelRepository,
     private val checkpointDao: DownloadCheckpointDao,
-    private val apiKeyStore: ApiKeyStore
+    private val apiKeyStore: ApiKeyStore,
+    // PERF-10: skip the foreground notification when the user is already
+    // looking at the in-app download progress UI.
+    private val appLifecycle: AppLifecycleProvider,
 ) : CoroutineWorker(context, workerParams) {
 
     companion object {
@@ -93,14 +97,19 @@ class ModelDownloadWorker @AssistedInject constructor(
 
         var foregroundUpdatesAllowed = true
 
-        // Show foreground notification before the HTTP call when Android allows it.
-        try {
-            setForeground(
-                createForegroundInfo(modelId, localFileName, 0, resumeOffset, fileSizeBytes)
-            )
-        } catch (e: Exception) {
+        // Show foreground notification before the HTTP call when Android allows it
+        // AND the user isn't already looking at the in-app progress UI.
+        if (appLifecycle.isAppInForeground) {
             foregroundUpdatesAllowed = false
-            Timber.w(e, "ModelDownloadWorker: foreground notification unavailable; continuing download")
+        } else {
+            try {
+                setForeground(
+                    createForegroundInfo(modelId, localFileName, 0, resumeOffset, fileSizeBytes)
+                )
+            } catch (e: Exception) {
+                foregroundUpdatesAllowed = false
+                Timber.w(e, "ModelDownloadWorker: foreground notification unavailable; continuing download")
+            }
         }
 
         return try {
@@ -114,10 +123,15 @@ class ModelDownloadWorker @AssistedInject constructor(
                 } else fileUrl
             } else fileUrl
 
-            val request = Request.Builder()
-                .url(authUrl)
-                .header("Range", "bytes=$resumeOffset-")
-                .build()
+            val requestBuilder = Request.Builder().url(authUrl)
+            // Only send Range on resume. A fresh download is a plain GET so the
+            // server returns 200 OK with the full body chunked. Sending
+            // `Range: bytes=0-` on files > ~2GB gets rejected with 416 by HF's
+            // XetHub-backed CloudFront edge (32-bit byte-position limit).
+            if (resumeOffset > 0) {
+                requestBuilder.header("Range", "bytes=$resumeOffset-")
+            }
+            val request = requestBuilder.build()
 
             val response = okHttpClient.newCall(request).execute()
             Timber.d("ModelDownloadWorker: HTTP ${response.code} for $fileUrl")
@@ -127,7 +141,7 @@ class ModelDownloadWorker @AssistedInject constructor(
                 } else null
                 Timber.e("ModelDownloadWorker: HF error body — $hfErrorBody")
                 val errorMsg = when (response.code) {
-                    401 -> "Not authenticated — add your HuggingFace token in Settings → Hugging Face."
+                    401 -> "Not authenticated — add your HuggingFace token in Settings -> Hugging Face."
                     403 -> {
                         if (!hfErrorBody.isNullOrBlank()) {
                             val modelId = hfErrorBody.substringAfter("model ").substringBefore(" is restricted").ifBlank { null }
