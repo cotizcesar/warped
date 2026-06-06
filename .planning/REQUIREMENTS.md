@@ -1,7 +1,7 @@
 # Requirements: Warped
 
 **Defined:** 2026-06-05
-**Last updated:** 2026-06-05 after milestone v2.0 requirements definition
+**Last updated:** 2026-06-06 after v2.0 roadmap creation (ROADMAP.md Phases 40-44)
 **Core Value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
 
 ## v2.0 Requirements
