@@ -19,7 +19,6 @@ import com.warped.data.local.db.entity.DownloadCheckpointEntity
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.domain.model.LocalModel
 import com.warped.domain.repository.LocalModelRepository
-import com.warped.util.lifecycle.AppLifecycleProvider
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import okhttp3.OkHttpClient
@@ -37,10 +36,6 @@ class ModelDownloadWorker @AssistedInject constructor(
     private val localModelRepository: LocalModelRepository,
     private val checkpointDao: DownloadCheckpointDao,
     private val apiKeyStore: ApiKeyStore,
-    // PERF-10: skip the foreground notification when the user is already
-    // looking at the in-app download progress UI. Nullable to avoid
-    // blocking worker creation if ProcessLifecycleOwner is unavailable.
-    private val appLifecycle: AppLifecycleProvider?,
 ) : CoroutineWorker(context, workerParams) {
 
     companion object {
@@ -98,12 +93,7 @@ class ModelDownloadWorker @AssistedInject constructor(
 
         var foregroundUpdatesAllowed = true
 
-        // Show foreground notification before the HTTP call when Android allows it
-        // AND the user isn't already looking at the in-app progress UI.
-        if (appLifecycle?.isAppInForeground == true) {
-            foregroundUpdatesAllowed = false
-        } else {
-            try {
+        try {
                 setForeground(
                     createForegroundInfo(modelId, localFileName, 0, resumeOffset, fileSizeBytes)
                 )
@@ -111,7 +101,6 @@ class ModelDownloadWorker @AssistedInject constructor(
                 foregroundUpdatesAllowed = false
                 Timber.w(e, "ModelDownloadWorker: foreground notification unavailable; continuing download")
             }
-        }
 
         return try {
             val authUrl = if (effectiveGated && fileUrl.contains("huggingface.co")) {

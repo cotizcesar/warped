@@ -81,349 +81,348 @@
 40-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:17:9-54
 41        android:supportsRtl="true"
 41-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:21:9-35
-42        android:testOnly="true"
-43        android:theme="@style/Theme.Warped.Splash" >
-43-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:22:9-51
-44
-45        <!-- LiteRT-LM GPU backend support (LITE-08) -->
-46        <uses-native-library
-46-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:27:9-90
-47            android:name="libvndksupport.so"
-47-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:27:30-62
-48            android:required="false" />
-48-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:27:63-87
-49        <uses-native-library
-49-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:27:9-90
-50            android:name="libOpenCL.so"
-50-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:27:30-62
-51            android:required="false" />
-51-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:27:63-87
-52        <uses-native-library
-52-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:27:9-90
-53            android:name="libcdsprpc.so"
-53-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:27:30-62
-54            android:required="false" />
-54-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:27:63-87
-55
-56        <!-- Timer tool receiver -->
-57        <receiver
-57-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:32:9-34:40
-58            android:name="com.warped.data.local.inference.tools.TimerReceiver"
-58-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:33:13-79
-59            android:exported="false" />
-59-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:34:13-37
-60
-61        <activity
-61-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:36:9-46:20
-62            android:name="com.warped.MainActivity"
-62-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:37:13-41
-63            android:configChanges="uiMode|orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden"
-63-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:41:13-113
-64            android:exported="true"
-64-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:39:13-36
-65            android:theme="@style/Theme.Warped"
-65-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:38:13-48
-66            android:windowSoftInputMode="adjustResize" >
-66-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:40:13-55
-67            <intent-filter>
-67-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:42:13-45:29
-68                <action android:name="android.intent.action.MAIN" />
-68-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:43:17-69
-68-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:43:25-66
-69
-70                <category android:name="android.intent.category.LAUNCHER" />
-70-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:44:17-77
-70-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:44:27-74
-71            </intent-filter>
-72        </activity>
-73
-74        <!-- WorkManager foreground service type for downloads (API 34+) -->
-75        <service
-75-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:49:9-52:34
-76            android:name="androidx.work.impl.foreground.SystemForegroundService"
-76-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:50:13-81
-77            android:directBootAware="false"
-77-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:55:13-44
-78            android:enabled="@bool/enable_system_foreground_service_default"
-78-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:56:13-77
-79            android:exported="false"
-79-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:57:13-37
-80            android:foregroundServiceType="dataSync" />
-80-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:51:13-53
-81
-82        <!-- Disable default WorkManager initializer (HiltWorkerFactory replaces it) -->
-83        <provider
-83-->INJECTED
-84            android:name="androidx.startup.InitializationProvider"
-84-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:56:13-67
-85            android:authorities="com.warped.app.androidx-startup"
-85-->INJECTED
-86            android:exported="false" >
-86-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:58:13-37
-87            <meta-data
-87-->[androidx.emoji2:emoji2:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/532ecb58735828af942c97ae104d3158/transformed/emoji2-1.4.0/AndroidManifest.xml:29:13-31:52
-88                android:name="androidx.emoji2.text.EmojiCompatInitializer"
-88-->[androidx.emoji2:emoji2:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/532ecb58735828af942c97ae104d3158/transformed/emoji2-1.4.0/AndroidManifest.xml:30:17-75
-89                android:value="androidx.startup" />
-89-->[androidx.emoji2:emoji2:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/532ecb58735828af942c97ae104d3158/transformed/emoji2-1.4.0/AndroidManifest.xml:31:17-49
-90            <meta-data
-90-->[androidx.lifecycle:lifecycle-process:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/2c1dff8ea5652f693826db48ddfb851a/transformed/lifecycle-process-2.10.0/AndroidManifest.xml:29:13-31:52
-91                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
-91-->[androidx.lifecycle:lifecycle-process:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/2c1dff8ea5652f693826db48ddfb851a/transformed/lifecycle-process-2.10.0/AndroidManifest.xml:30:17-78
-92                android:value="androidx.startup" />
-92-->[androidx.lifecycle:lifecycle-process:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/2c1dff8ea5652f693826db48ddfb851a/transformed/lifecycle-process-2.10.0/AndroidManifest.xml:31:17-49
-93            <meta-data
-93-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:29:13-31:52
-94                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
-94-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:30:17-85
-95                android:value="androidx.startup" />
-95-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:31:17-49
-96        </provider>
-97
-98        <activity
-98-->[androidx.compose.ui:ui-test-manifest:1.11.2] /home/cotizcesar/.gradle/caches/9.4.1/transforms/6dd3454c5bea76ae3a9c632bd8f47603/transformed/ui-test-manifest-1.11.2/AndroidManifest.xml:23:9-26:79
-99            android:name="androidx.activity.ComponentActivity"
-99-->[androidx.compose.ui:ui-test-manifest:1.11.2] /home/cotizcesar/.gradle/caches/9.4.1/transforms/6dd3454c5bea76ae3a9c632bd8f47603/transformed/ui-test-manifest-1.11.2/AndroidManifest.xml:24:13-63
-100            android:exported="true"
-100-->[androidx.compose.ui:ui-test-manifest:1.11.2] /home/cotizcesar/.gradle/caches/9.4.1/transforms/6dd3454c5bea76ae3a9c632bd8f47603/transformed/ui-test-manifest-1.11.2/AndroidManifest.xml:25:13-36
-101            android:theme="@android:style/Theme.Material.Light.NoActionBar" />
-101-->[androidx.compose.ui:ui-test-manifest:1.11.2] /home/cotizcesar/.gradle/caches/9.4.1/transforms/6dd3454c5bea76ae3a9c632bd8f47603/transformed/ui-test-manifest-1.11.2/AndroidManifest.xml:26:13-76
-102        <activity
-102-->[androidx.compose.ui:ui-tooling-android:1.11.2] /home/cotizcesar/.gradle/caches/9.4.1/transforms/f1dfe870a154dbc782ad8a8b2489db9b/transformed/ui-tooling/AndroidManifest.xml:23:9-25:39
-103            android:name="androidx.compose.ui.tooling.PreviewActivity"
-103-->[androidx.compose.ui:ui-tooling-android:1.11.2] /home/cotizcesar/.gradle/caches/9.4.1/transforms/f1dfe870a154dbc782ad8a8b2489db9b/transformed/ui-tooling/AndroidManifest.xml:24:13-71
-104            android:exported="true" />
-104-->[androidx.compose.ui:ui-tooling-android:1.11.2] /home/cotizcesar/.gradle/caches/9.4.1/transforms/f1dfe870a154dbc782ad8a8b2489db9b/transformed/ui-tooling/AndroidManifest.xml:25:13-36
-105
-106        <service
-106-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:39:9-45:35
-107            android:name="androidx.work.impl.background.systemalarm.SystemAlarmService"
-107-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:40:13-88
-108            android:directBootAware="false"
-108-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:41:13-44
-109            android:enabled="@bool/enable_system_alarm_service_default"
-109-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:42:13-72
-110            android:exported="false" />
-110-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:43:13-37
-111        <service
-111-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:46:9-52:35
-112            android:name="androidx.work.impl.background.systemjob.SystemJobService"
-112-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:47:13-84
-113            android:directBootAware="false"
-113-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:48:13-44
-114            android:enabled="@bool/enable_system_job_service_default"
-114-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:49:13-70
-115            android:exported="true"
-115-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:50:13-36
-116            android:permission="android.permission.BIND_JOB_SERVICE" />
-116-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:51:13-69
-117
-118        <receiver
-118-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:61:9-66:35
-119            android:name="androidx.work.impl.utils.ForceStopRunnable$BroadcastReceiver"
-119-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:62:13-88
-120            android:directBootAware="false"
-120-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:63:13-44
-121            android:enabled="true"
-121-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:64:13-35
-122            android:exported="false" />
-122-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:65:13-37
-123        <receiver
-123-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:67:9-77:20
-124            android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$BatteryChargingProxy"
-124-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:68:13-106
-125            android:directBootAware="false"
-125-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:69:13-44
-126            android:enabled="false"
-126-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:70:13-36
-127            android:exported="false" >
-127-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:71:13-37
-128            <intent-filter>
-128-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:73:13-76:29
-129                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
-129-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:74:17-87
-129-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:74:25-84
-130                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
-130-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:75:17-90
-130-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:75:25-87
-131            </intent-filter>
-132        </receiver>
-133        <receiver
-133-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:78:9-88:20
-134            android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$BatteryNotLowProxy"
-134-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:79:13-104
-135            android:directBootAware="false"
-135-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:80:13-44
-136            android:enabled="false"
-136-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:81:13-36
-137            android:exported="false" >
-137-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:82:13-37
-138            <intent-filter>
-138-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:84:13-87:29
-139                <action android:name="android.intent.action.BATTERY_OKAY" />
-139-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:85:17-77
-139-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:85:25-74
-140                <action android:name="android.intent.action.BATTERY_LOW" />
-140-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:86:17-76
-140-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:86:25-73
-141            </intent-filter>
-142        </receiver>
-143        <receiver
-143-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:89:9-99:20
-144            android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$StorageNotLowProxy"
-144-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:90:13-104
-145            android:directBootAware="false"
-145-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:91:13-44
-146            android:enabled="false"
-146-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:92:13-36
-147            android:exported="false" >
-147-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:93:13-37
-148            <intent-filter>
-148-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:95:13-98:29
-149                <action android:name="android.intent.action.DEVICE_STORAGE_LOW" />
-149-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:96:17-83
-149-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:96:25-80
-150                <action android:name="android.intent.action.DEVICE_STORAGE_OK" />
-150-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:97:17-82
-150-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:97:25-79
-151            </intent-filter>
-152        </receiver>
-153        <receiver
-153-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:100:9-109:20
-154            android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$NetworkStateProxy"
-154-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:101:13-103
-155            android:directBootAware="false"
-155-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:102:13-44
-156            android:enabled="false"
-156-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:103:13-36
-157            android:exported="false" >
-157-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:104:13-37
-158            <intent-filter>
-158-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:106:13-108:29
-159                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
-159-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:107:17-79
-159-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:107:25-76
-160            </intent-filter>
-161        </receiver>
-162        <receiver
-162-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:110:9-121:20
-163            android:name="androidx.work.impl.background.systemalarm.RescheduleReceiver"
-163-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:111:13-88
-164            android:directBootAware="false"
-164-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:112:13-44
-165            android:enabled="false"
-165-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:113:13-36
-166            android:exported="false" >
-166-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:114:13-37
-167            <intent-filter>
-167-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:116:13-120:29
-168                <action android:name="android.intent.action.BOOT_COMPLETED" />
-168-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:117:17-79
-168-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:117:25-76
-169                <action android:name="android.intent.action.TIME_SET" />
-169-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:118:17-73
-169-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:118:25-70
-170                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
-170-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:119:17-81
-170-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:119:25-78
-171            </intent-filter>
-172        </receiver>
-173        <receiver
-173-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:122:9-131:20
-174            android:name="androidx.work.impl.background.systemalarm.ConstraintProxyUpdateReceiver"
-174-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:123:13-99
-175            android:directBootAware="false"
-175-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:124:13-44
-176            android:enabled="@bool/enable_system_alarm_service_default"
-176-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:125:13-72
-177            android:exported="false" >
-177-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:126:13-37
-178            <intent-filter>
-178-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:128:13-130:29
-179                <action android:name="androidx.work.impl.background.systemalarm.UpdateProxies" />
-179-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:129:17-98
-179-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:129:25-95
-180            </intent-filter>
-181        </receiver>
-182        <receiver
-182-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:132:9-142:20
-183            android:name="androidx.work.impl.diagnostics.DiagnosticsReceiver"
-183-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:133:13-78
-184            android:directBootAware="false"
-184-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:134:13-44
-185            android:enabled="true"
-185-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:135:13-35
-186            android:exported="true"
-186-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:136:13-36
-187            android:permission="android.permission.DUMP" >
-187-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:137:13-57
-188            <intent-filter>
-188-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:139:13-141:29
-189                <action android:name="androidx.work.diagnostics.REQUEST_DIAGNOSTICS" />
-189-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:140:17-88
-189-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:140:25-85
-190            </intent-filter>
-191        </receiver>
-192
-193        <uses-library
-193-->[androidx.window:window:1.5.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/93cd1d8beb54189feab9f804ea654c6b/transformed/window-1.5.0/AndroidManifest.xml:23:9-25:40
-194            android:name="androidx.window.extensions"
-194-->[androidx.window:window:1.5.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/93cd1d8beb54189feab9f804ea654c6b/transformed/window-1.5.0/AndroidManifest.xml:24:13-54
-195            android:required="false" />
-195-->[androidx.window:window:1.5.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/93cd1d8beb54189feab9f804ea654c6b/transformed/window-1.5.0/AndroidManifest.xml:25:13-37
-196        <uses-library
-196-->[androidx.window:window:1.5.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/93cd1d8beb54189feab9f804ea654c6b/transformed/window-1.5.0/AndroidManifest.xml:26:9-28:40
-197            android:name="androidx.window.sidecar"
-197-->[androidx.window:window:1.5.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/93cd1d8beb54189feab9f804ea654c6b/transformed/window-1.5.0/AndroidManifest.xml:27:13-51
-198            android:required="false" />
-198-->[androidx.window:window:1.5.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/93cd1d8beb54189feab9f804ea654c6b/transformed/window-1.5.0/AndroidManifest.xml:28:13-37
-199
-200        <service
-200-->[androidx.room:room-runtime-android:2.8.4] /home/cotizcesar/.gradle/caches/9.4.1/transforms/232223cff414c7338c66840fa75335e0/transformed/room-runtime/AndroidManifest.xml:24:9-28:63
-201            android:name="androidx.room.MultiInstanceInvalidationService"
-201-->[androidx.room:room-runtime-android:2.8.4] /home/cotizcesar/.gradle/caches/9.4.1/transforms/232223cff414c7338c66840fa75335e0/transformed/room-runtime/AndroidManifest.xml:25:13-74
-202            android:directBootAware="true"
-202-->[androidx.room:room-runtime-android:2.8.4] /home/cotizcesar/.gradle/caches/9.4.1/transforms/232223cff414c7338c66840fa75335e0/transformed/room-runtime/AndroidManifest.xml:26:13-43
-203            android:exported="false" />
-203-->[androidx.room:room-runtime-android:2.8.4] /home/cotizcesar/.gradle/caches/9.4.1/transforms/232223cff414c7338c66840fa75335e0/transformed/room-runtime/AndroidManifest.xml:27:13-37
-204
-205        <receiver
-205-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:34:9-52:20
-206            android:name="androidx.profileinstaller.ProfileInstallReceiver"
-206-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:35:13-76
-207            android:directBootAware="false"
-207-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:36:13-44
-208            android:enabled="true"
-208-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:37:13-35
-209            android:exported="true"
-209-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:38:13-36
-210            android:permission="android.permission.DUMP" >
-210-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:39:13-57
-211            <intent-filter>
-211-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:40:13-42:29
-212                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
-212-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:41:17-91
-212-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:41:25-88
-213            </intent-filter>
-214            <intent-filter>
-214-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:43:13-45:29
-215                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
-215-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:44:17-85
-215-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:44:25-82
-216            </intent-filter>
-217            <intent-filter>
-217-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:46:13-48:29
-218                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
-218-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:47:17-88
-218-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:47:25-85
-219            </intent-filter>
-220            <intent-filter>
-220-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:49:13-51:29
-221                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
-221-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:50:17-95
-221-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:50:25-92
-222            </intent-filter>
-223        </receiver>
-224    </application>
-225
-226</manifest>
+42        android:theme="@style/Theme.Warped.Splash" >
+42-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:22:9-51
+43
+44        <!-- LiteRT-LM GPU backend support (LITE-08) -->
+45        <uses-native-library
+45-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:27:9-90
+46            android:name="libvndksupport.so"
+46-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:27:30-62
+47            android:required="false" />
+47-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:27:63-87
+48        <uses-native-library
+48-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:27:9-90
+49            android:name="libOpenCL.so"
+49-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:27:30-62
+50            android:required="false" />
+50-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:27:63-87
+51        <uses-native-library
+51-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:27:9-90
+52            android:name="libcdsprpc.so"
+52-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:27:30-62
+53            android:required="false" />
+53-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:27:63-87
+54
+55        <!-- Timer tool receiver -->
+56        <receiver
+56-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:32:9-34:40
+57            android:name="com.warped.data.local.inference.tools.TimerReceiver"
+57-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:33:13-79
+58            android:exported="false" />
+58-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:34:13-37
+59
+60        <activity
+60-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:36:9-46:20
+61            android:name="com.warped.MainActivity"
+61-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:37:13-41
+62            android:configChanges="uiMode|orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden"
+62-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:41:13-113
+63            android:exported="true"
+63-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:39:13-36
+64            android:theme="@style/Theme.Warped"
+64-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:38:13-48
+65            android:windowSoftInputMode="adjustResize" >
+65-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:40:13-55
+66            <intent-filter>
+66-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:42:13-45:29
+67                <action android:name="android.intent.action.MAIN" />
+67-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:43:17-69
+67-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:43:25-66
+68
+69                <category android:name="android.intent.category.LAUNCHER" />
+69-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:44:17-77
+69-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:44:27-74
+70            </intent-filter>
+71        </activity>
+72
+73        <!-- WorkManager foreground service type for downloads (API 34+) -->
+74        <service
+74-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:49:9-52:34
+75            android:name="androidx.work.impl.foreground.SystemForegroundService"
+75-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:50:13-81
+76            android:directBootAware="false"
+76-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:55:13-44
+77            android:enabled="@bool/enable_system_foreground_service_default"
+77-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:56:13-77
+78            android:exported="false"
+78-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:57:13-37
+79            android:foregroundServiceType="dataSync" />
+79-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:51:13-53
+80
+81        <!-- Disable default WorkManager initializer (HiltWorkerFactory replaces it) -->
+82        <provider
+82-->INJECTED
+83            android:name="androidx.startup.InitializationProvider"
+83-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:56:13-67
+84            android:authorities="com.warped.app.androidx-startup"
+84-->INJECTED
+85            android:exported="false" >
+85-->/home/cotizcesar/Documents/warped/app/src/main/AndroidManifest.xml:58:13-37
+86            <meta-data
+86-->[androidx.emoji2:emoji2:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/532ecb58735828af942c97ae104d3158/transformed/emoji2-1.4.0/AndroidManifest.xml:29:13-31:52
+87                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+87-->[androidx.emoji2:emoji2:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/532ecb58735828af942c97ae104d3158/transformed/emoji2-1.4.0/AndroidManifest.xml:30:17-75
+88                android:value="androidx.startup" />
+88-->[androidx.emoji2:emoji2:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/532ecb58735828af942c97ae104d3158/transformed/emoji2-1.4.0/AndroidManifest.xml:31:17-49
+89            <meta-data
+89-->[androidx.lifecycle:lifecycle-process:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/2c1dff8ea5652f693826db48ddfb851a/transformed/lifecycle-process-2.10.0/AndroidManifest.xml:29:13-31:52
+90                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+90-->[androidx.lifecycle:lifecycle-process:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/2c1dff8ea5652f693826db48ddfb851a/transformed/lifecycle-process-2.10.0/AndroidManifest.xml:30:17-78
+91                android:value="androidx.startup" />
+91-->[androidx.lifecycle:lifecycle-process:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/2c1dff8ea5652f693826db48ddfb851a/transformed/lifecycle-process-2.10.0/AndroidManifest.xml:31:17-49
+92            <meta-data
+92-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:29:13-31:52
+93                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+93-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:30:17-85
+94                android:value="androidx.startup" />
+94-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:31:17-49
+95        </provider>
+96
+97        <activity
+97-->[androidx.compose.ui:ui-test-manifest:1.11.2] /home/cotizcesar/.gradle/caches/9.4.1/transforms/6dd3454c5bea76ae3a9c632bd8f47603/transformed/ui-test-manifest-1.11.2/AndroidManifest.xml:23:9-26:79
+98            android:name="androidx.activity.ComponentActivity"
+98-->[androidx.compose.ui:ui-test-manifest:1.11.2] /home/cotizcesar/.gradle/caches/9.4.1/transforms/6dd3454c5bea76ae3a9c632bd8f47603/transformed/ui-test-manifest-1.11.2/AndroidManifest.xml:24:13-63
+99            android:exported="true"
+99-->[androidx.compose.ui:ui-test-manifest:1.11.2] /home/cotizcesar/.gradle/caches/9.4.1/transforms/6dd3454c5bea76ae3a9c632bd8f47603/transformed/ui-test-manifest-1.11.2/AndroidManifest.xml:25:13-36
+100            android:theme="@android:style/Theme.Material.Light.NoActionBar" />
+100-->[androidx.compose.ui:ui-test-manifest:1.11.2] /home/cotizcesar/.gradle/caches/9.4.1/transforms/6dd3454c5bea76ae3a9c632bd8f47603/transformed/ui-test-manifest-1.11.2/AndroidManifest.xml:26:13-76
+101        <activity
+101-->[androidx.compose.ui:ui-tooling-android:1.11.2] /home/cotizcesar/.gradle/caches/9.4.1/transforms/f1dfe870a154dbc782ad8a8b2489db9b/transformed/ui-tooling/AndroidManifest.xml:23:9-25:39
+102            android:name="androidx.compose.ui.tooling.PreviewActivity"
+102-->[androidx.compose.ui:ui-tooling-android:1.11.2] /home/cotizcesar/.gradle/caches/9.4.1/transforms/f1dfe870a154dbc782ad8a8b2489db9b/transformed/ui-tooling/AndroidManifest.xml:24:13-71
+103            android:exported="true" />
+103-->[androidx.compose.ui:ui-tooling-android:1.11.2] /home/cotizcesar/.gradle/caches/9.4.1/transforms/f1dfe870a154dbc782ad8a8b2489db9b/transformed/ui-tooling/AndroidManifest.xml:25:13-36
+104
+105        <service
+105-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:39:9-45:35
+106            android:name="androidx.work.impl.background.systemalarm.SystemAlarmService"
+106-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:40:13-88
+107            android:directBootAware="false"
+107-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:41:13-44
+108            android:enabled="@bool/enable_system_alarm_service_default"
+108-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:42:13-72
+109            android:exported="false" />
+109-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:43:13-37
+110        <service
+110-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:46:9-52:35
+111            android:name="androidx.work.impl.background.systemjob.SystemJobService"
+111-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:47:13-84
+112            android:directBootAware="false"
+112-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:48:13-44
+113            android:enabled="@bool/enable_system_job_service_default"
+113-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:49:13-70
+114            android:exported="true"
+114-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:50:13-36
+115            android:permission="android.permission.BIND_JOB_SERVICE" />
+115-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:51:13-69
+116
+117        <receiver
+117-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:61:9-66:35
+118            android:name="androidx.work.impl.utils.ForceStopRunnable$BroadcastReceiver"
+118-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:62:13-88
+119            android:directBootAware="false"
+119-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:63:13-44
+120            android:enabled="true"
+120-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:64:13-35
+121            android:exported="false" />
+121-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:65:13-37
+122        <receiver
+122-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:67:9-77:20
+123            android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$BatteryChargingProxy"
+123-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:68:13-106
+124            android:directBootAware="false"
+124-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:69:13-44
+125            android:enabled="false"
+125-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:70:13-36
+126            android:exported="false" >
+126-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:71:13-37
+127            <intent-filter>
+127-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:73:13-76:29
+128                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
+128-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:74:17-87
+128-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:74:25-84
+129                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
+129-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:75:17-90
+129-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:75:25-87
+130            </intent-filter>
+131        </receiver>
+132        <receiver
+132-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:78:9-88:20
+133            android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$BatteryNotLowProxy"
+133-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:79:13-104
+134            android:directBootAware="false"
+134-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:80:13-44
+135            android:enabled="false"
+135-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:81:13-36
+136            android:exported="false" >
+136-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:82:13-37
+137            <intent-filter>
+137-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:84:13-87:29
+138                <action android:name="android.intent.action.BATTERY_OKAY" />
+138-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:85:17-77
+138-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:85:25-74
+139                <action android:name="android.intent.action.BATTERY_LOW" />
+139-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:86:17-76
+139-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:86:25-73
+140            </intent-filter>
+141        </receiver>
+142        <receiver
+142-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:89:9-99:20
+143            android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$StorageNotLowProxy"
+143-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:90:13-104
+144            android:directBootAware="false"
+144-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:91:13-44
+145            android:enabled="false"
+145-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:92:13-36
+146            android:exported="false" >
+146-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:93:13-37
+147            <intent-filter>
+147-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:95:13-98:29
+148                <action android:name="android.intent.action.DEVICE_STORAGE_LOW" />
+148-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:96:17-83
+148-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:96:25-80
+149                <action android:name="android.intent.action.DEVICE_STORAGE_OK" />
+149-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:97:17-82
+149-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:97:25-79
+150            </intent-filter>
+151        </receiver>
+152        <receiver
+152-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:100:9-109:20
+153            android:name="androidx.work.impl.background.systemalarm.ConstraintProxy$NetworkStateProxy"
+153-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:101:13-103
+154            android:directBootAware="false"
+154-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:102:13-44
+155            android:enabled="false"
+155-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:103:13-36
+156            android:exported="false" >
+156-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:104:13-37
+157            <intent-filter>
+157-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:106:13-108:29
+158                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+158-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:107:17-79
+158-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:107:25-76
+159            </intent-filter>
+160        </receiver>
+161        <receiver
+161-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:110:9-121:20
+162            android:name="androidx.work.impl.background.systemalarm.RescheduleReceiver"
+162-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:111:13-88
+163            android:directBootAware="false"
+163-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:112:13-44
+164            android:enabled="false"
+164-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:113:13-36
+165            android:exported="false" >
+165-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:114:13-37
+166            <intent-filter>
+166-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:116:13-120:29
+167                <action android:name="android.intent.action.BOOT_COMPLETED" />
+167-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:117:17-79
+167-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:117:25-76
+168                <action android:name="android.intent.action.TIME_SET" />
+168-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:118:17-73
+168-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:118:25-70
+169                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+169-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:119:17-81
+169-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:119:25-78
+170            </intent-filter>
+171        </receiver>
+172        <receiver
+172-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:122:9-131:20
+173            android:name="androidx.work.impl.background.systemalarm.ConstraintProxyUpdateReceiver"
+173-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:123:13-99
+174            android:directBootAware="false"
+174-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:124:13-44
+175            android:enabled="@bool/enable_system_alarm_service_default"
+175-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:125:13-72
+176            android:exported="false" >
+176-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:126:13-37
+177            <intent-filter>
+177-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:128:13-130:29
+178                <action android:name="androidx.work.impl.background.systemalarm.UpdateProxies" />
+178-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:129:17-98
+178-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:129:25-95
+179            </intent-filter>
+180        </receiver>
+181        <receiver
+181-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:132:9-142:20
+182            android:name="androidx.work.impl.diagnostics.DiagnosticsReceiver"
+182-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:133:13-78
+183            android:directBootAware="false"
+183-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:134:13-44
+184            android:enabled="true"
+184-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:135:13-35
+185            android:exported="true"
+185-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:136:13-36
+186            android:permission="android.permission.DUMP" >
+186-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:137:13-57
+187            <intent-filter>
+187-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:139:13-141:29
+188                <action android:name="androidx.work.diagnostics.REQUEST_DIAGNOSTICS" />
+188-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:140:17-88
+188-->[androidx.work:work-runtime:2.10.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/e312bfbfffb37be08777cdcc456dae3b/transformed/work-runtime-2.10.0/AndroidManifest.xml:140:25-85
+189            </intent-filter>
+190        </receiver>
+191
+192        <uses-library
+192-->[androidx.window:window:1.5.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/93cd1d8beb54189feab9f804ea654c6b/transformed/window-1.5.0/AndroidManifest.xml:23:9-25:40
+193            android:name="androidx.window.extensions"
+193-->[androidx.window:window:1.5.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/93cd1d8beb54189feab9f804ea654c6b/transformed/window-1.5.0/AndroidManifest.xml:24:13-54
+194            android:required="false" />
+194-->[androidx.window:window:1.5.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/93cd1d8beb54189feab9f804ea654c6b/transformed/window-1.5.0/AndroidManifest.xml:25:13-37
+195        <uses-library
+195-->[androidx.window:window:1.5.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/93cd1d8beb54189feab9f804ea654c6b/transformed/window-1.5.0/AndroidManifest.xml:26:9-28:40
+196            android:name="androidx.window.sidecar"
+196-->[androidx.window:window:1.5.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/93cd1d8beb54189feab9f804ea654c6b/transformed/window-1.5.0/AndroidManifest.xml:27:13-51
+197            android:required="false" />
+197-->[androidx.window:window:1.5.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/93cd1d8beb54189feab9f804ea654c6b/transformed/window-1.5.0/AndroidManifest.xml:28:13-37
+198
+199        <service
+199-->[androidx.room:room-runtime-android:2.8.4] /home/cotizcesar/.gradle/caches/9.4.1/transforms/232223cff414c7338c66840fa75335e0/transformed/room-runtime/AndroidManifest.xml:24:9-28:63
+200            android:name="androidx.room.MultiInstanceInvalidationService"
+200-->[androidx.room:room-runtime-android:2.8.4] /home/cotizcesar/.gradle/caches/9.4.1/transforms/232223cff414c7338c66840fa75335e0/transformed/room-runtime/AndroidManifest.xml:25:13-74
+201            android:directBootAware="true"
+201-->[androidx.room:room-runtime-android:2.8.4] /home/cotizcesar/.gradle/caches/9.4.1/transforms/232223cff414c7338c66840fa75335e0/transformed/room-runtime/AndroidManifest.xml:26:13-43
+202            android:exported="false" />
+202-->[androidx.room:room-runtime-android:2.8.4] /home/cotizcesar/.gradle/caches/9.4.1/transforms/232223cff414c7338c66840fa75335e0/transformed/room-runtime/AndroidManifest.xml:27:13-37
+203
+204        <receiver
+204-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:34:9-52:20
+205            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+205-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:35:13-76
+206            android:directBootAware="false"
+206-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:36:13-44
+207            android:enabled="true"
+207-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:37:13-35
+208            android:exported="true"
+208-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:38:13-36
+209            android:permission="android.permission.DUMP" >
+209-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:39:13-57
+210            <intent-filter>
+210-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:40:13-42:29
+211                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+211-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:41:17-91
+211-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:41:25-88
+212            </intent-filter>
+213            <intent-filter>
+213-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:43:13-45:29
+214                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+214-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:44:17-85
+214-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:44:25-82
+215            </intent-filter>
+216            <intent-filter>
+216-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:46:13-48:29
+217                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+217-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:47:17-88
+217-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:47:25-85
+218            </intent-filter>
+219            <intent-filter>
+219-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:49:13-51:29
+220                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+220-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:50:17-95
+220-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/cotizcesar/.gradle/caches/9.4.1/transforms/a1071bd210dc557486a114b3ed10ce63/transformed/profileinstaller-1.4.0/AndroidManifest.xml:50:25-92
+221            </intent-filter>
+222        </receiver>
+223    </application>
+224
+225</manifest>
