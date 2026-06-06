@@ -4,6 +4,8 @@
 -keepclassmembers class kotlinx.serialization.json.** { *** Companion; }
 -keepclasseswithmembers class kotlinx.serialization.json.** { kotlinx.serialization.KSerializer serializer(...); }
 -keep,includedescriptorclasses class com.warped.**$$serializer { *; }
+-keep,allowobfuscation,allowshrinking class **$$serializer { *; }
+-keep,allowobfuscation,allowshrinking class com.warped.**$$serializer { *; }
 -keepclassmembers class com.warped.** { *** Companion; }
 -keepclasseswithmembers class com.warped.** { kotlinx.serialization.KSerializer serializer(...); }
 
@@ -16,6 +18,10 @@
 -keepclassmembers class com.google.ai.edge.litertlm.** { *; }
 -keepnames class com.google.ai.edge.litertlm.** { *; }
 -keepclassmembernames class com.google.ai.edge.litertlm.** { *; }
+-keep interface com.google.ai.edge.litertlm.MessageCallback { *; }
+-keep interface com.google.ai.edge.litertlm.ToolProvider { *; }
+-keep class com.google.ai.edge.litertlm.MessageCallback$* { *; }
+-keep class com.google.ai.edge.litertlm.ToolProvider$* { *; }
 -dontoptimize
 -dontobfuscate
 
@@ -35,10 +41,17 @@
 -keep class dagger.** { *; }
 -keep class javax.inject.** { *; }
 -keep class * extends dagger.hilt.android.internal.managers.ViewComponentManager$FragmentContextWrapper { *; }
+-keep,allowobfuscation @interface dagger.hilt.android.HiltAndroidApp
+-keep,allowobfuscation @interface dagger.hilt.android.AndroidEntryPoint
+-keep,allowobfuscation @interface dagger.hilt.android.lifecycle.HiltViewModel
 
 # Kotlin Coroutines
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
+
+# Compose stability annotations
+-keep,allowobfuscation @interface androidx.compose.runtime.Immutable
+-keep,allowobfuscation @interface androidx.compose.runtime.Stable
 
 # Keep attributes for reflective access
 -keepattributes InnerClasses,EnclosingMethod
