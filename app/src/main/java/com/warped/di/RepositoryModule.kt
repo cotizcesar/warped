@@ -6,12 +6,14 @@ import com.warped.data.repository.EndpointRepositoryImpl
 import com.warped.data.repository.ModelAllowlistRepositoryImpl
 import com.warped.data.repository.ModelRepositoryImpl
 import com.warped.data.repository.PresetRepositoryImpl
+import com.warped.data.repository.SkillRepositoryImpl
 import com.warped.domain.repository.BenchmarkRepository
 import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.ModelAllowlistRepository
 import com.warped.domain.repository.ModelRepository
 import com.warped.domain.repository.PresetRepository
+import com.warped.domain.repository.SkillRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -45,4 +47,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindBenchmarkRepository(impl: BenchmarkRepositoryImpl): BenchmarkRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSkillRepository(impl: SkillRepositoryImpl): SkillRepository
 }
