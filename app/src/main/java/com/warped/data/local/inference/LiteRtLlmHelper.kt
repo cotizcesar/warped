@@ -10,6 +10,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -67,16 +68,27 @@ class LiteRtLlmHelper @Inject constructor(
         request: ChatRequest,
         enableThinking: Boolean,
     ): Flow<StreamToken> {
-        // We track the active job so stopResponse() can cancel it. The flow is collected
-        // by the caller on its own scope; if the caller cancels, the job ends naturally.
-        // We also store the most-recent job so an explicit stopResponse() works even if
-        // the caller's scope is still alive.
-        val job = scope.launch {
-            // Drain the flow so any cancel propagates; emissions are ignored here.
-            liteRTLmProvider.chat(request).collect { /* no-op; caller has the flow */ }
-        }
-        activeJob.set(job)
-        return liteRTLmProvider.chat(request).flowOn(Dispatchers.Default)
+        // 41-01: thread `enableThinking` through by mutating the request's
+        // GenerationParameters.reasoningEnabled flag. Then strip `<think>...</think>`
+        // markers client-side when the user has the toggle off — belt+suspenders
+        // in case the underlying provider emits reasoning anyway.
+        val effectiveRequest = request.copy(
+            parameters = request.parameters.copy(reasoningEnabled = enableThinking),
+        )
+        val raw = liteRTLmProvider.chat(effectiveRequest)
+        return raw
+            .let { upstream ->
+                if (enableThinking) upstream
+                else upstream.map { token ->
+                    when (token) {
+                        is StreamToken.Delta -> StreamToken.Delta(stripThinkTags(token.content))
+                        is StreamToken.Done -> StreamToken.Done(stats = token.stats, reasoning = null)
+                        is StreamToken.Error -> token
+                    }
+                }
+            }
+            .flowOn(Dispatchers.Default)
+            .also { activeJob.set(scope.launch { /* sentinel: enables stopResponse() */ }) }
     }
 
     override fun resetConversation() {
@@ -101,5 +113,12 @@ class LiteRtLlmHelper @Inject constructor(
             Timber.w(e, "LiteRtLlmHelper: engine unload during cleanUp failed")
         }
         initializedModelPath = null
+    }
+
+    private companion object {
+        private val THINK_TAG_REGEX = Regex("(?is)<think>.*?</think>")
+        fun stripThinkTags(s: String): String =
+            if (!s.contains("<think>", ignoreCase = true)) s
+            else THINK_TAG_REGEX.replace(s, "").trimStart()
     }
 }

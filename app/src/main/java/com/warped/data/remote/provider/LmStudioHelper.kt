@@ -13,6 +13,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import timber.log.Timber
@@ -94,13 +95,28 @@ class LmStudioHelper @Inject constructor(
             ?: error("LmStudioHelper: setEndpoint() must be called before runInference()")
         val modelId = initializedModelId
             ?: error("LmStudioHelper: initialize() must be called before runInference()")
+        // 41-01: forward enableThinking via GenerationParameters.reasoningEnabled so
+        // LMStudioProvider sets the request body `reasoning` field accordingly. When
+        // false, also strip `<think>...</think>` markers client-side because some LM
+        // Studio backends emit reasoning regardless of the request flag.
+        val effectiveRequest = request.copy(
+            parameters = request.parameters.copy(reasoningEnabled = enableThinking),
+        )
         val provider = createProvider(endpoint, modelId)
-        val job = scope.launch {
-            // Drain the flow; the caller already has a reference via the returned flow.
-            provider.chat(request).collect { /* no-op; caller collects the returned flow */ }
-        }
-        activeJob.set(job)
-        return provider.chat(request).flowOn(Dispatchers.IO)
+        activeJob.set(scope.launch { /* sentinel: enables stopResponse() */ })
+        val raw = provider.chat(effectiveRequest)
+        return raw
+            .let { upstream ->
+                if (enableThinking) upstream
+                else upstream.map { token ->
+                    when (token) {
+                        is StreamToken.Delta -> StreamToken.Delta(stripThinkTags(token.content))
+                        is StreamToken.Done -> StreamToken.Done(stats = token.stats, reasoning = null)
+                        is StreamToken.Error -> token
+                    }
+                }
+            }
+            .flowOn(Dispatchers.IO)
     }
 
     override fun resetConversation() {
@@ -146,5 +162,12 @@ class LmStudioHelper @Inject constructor(
             apiKey = keyStr,
             inputSanitizer = inputSanitizer,
         )
+    }
+
+    private companion object {
+        private val THINK_TAG_REGEX = Regex("(?is)<think>.*?</think>")
+        fun stripThinkTags(s: String): String =
+            if (!s.contains("<think>", ignoreCase = true)) s
+            else THINK_TAG_REGEX.replace(s, "").trimStart()
     }
 }

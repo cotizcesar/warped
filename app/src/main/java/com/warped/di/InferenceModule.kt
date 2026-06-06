@@ -7,6 +7,7 @@ import com.warped.data.local.inference.LiteRTLmProvider
 import com.warped.data.local.inference.BackendDetector
 import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.LiteRTLmEngine
+import com.warped.data.local.inference.LiteRtLmCacheManager
 import com.warped.data.local.inference.ModelImportManager
 import com.warped.data.repository.LocalModelRepositoryImpl
 import com.warped.domain.repository.LocalModelRepository
@@ -31,8 +32,9 @@ object InferenceModule {
     fun provideEngineManager(
         liteRTLmEngine: LiteRTLmEngine,
         backendDetector: BackendDetector,
-        @ApplicationContext context: Context
-    ): EngineManager = EngineManager(liteRTLmEngine, backendDetector, context)
+        @ApplicationContext context: Context,
+        cacheManager: LiteRtLmCacheManager,
+    ): EngineManager = EngineManager(liteRTLmEngine, backendDetector, context, cacheManager)
 
     @Provides
     @Singleton

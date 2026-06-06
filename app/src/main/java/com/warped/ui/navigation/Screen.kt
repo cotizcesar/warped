@@ -10,10 +10,9 @@ import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.navigation.NavKey
 import kotlinx.serialization.Serializable
 
-sealed interface Screen : NavKey {
+sealed interface Screen {
     @Serializable
     data object Chat : Screen
 
