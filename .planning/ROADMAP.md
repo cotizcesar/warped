@@ -18,7 +18,7 @@ v1.8 shipped 2026-06-05 with 5 phases (35–39) and 30 requirements. The full ar
 
 ## Phases
 
-- [ ] **Phase 40: Runtime & Allowlist Foundation** [P0, keystone] — Unify local + remote chat behind `LlmModelHelper`, ship `assets/model_allowlist.json`, apply mechanical stack bumps, add R8 keep rules
+- [x] **Phase 40: Runtime & Allowlist Foundation** [P0, keystone] — Unify local + remote chat behind `LlmModelHelper`, ship `assets/model_allowlist.json`, apply mechanical stack bumps, add R8 keep rules ✓ 2026-06-06 (8 plans)
 - [ ] **Phase 41: Thinking Mode + Model Benchmark** [P1] — Surface model reasoning trace as collapsible panel; ship on-device init/prefill/decode/peak-memory benchmark
 - [ ] **Phase 42: Prompt Lab** [P1] — Side-by-side single-turn prompt workspace with 5–8 curated templates
 - [ ] **Phase 43: Performance Convergence** [P0, cross-cutting] — File-by-line perf overhaul: mmap-only cache, Compose state split, AppLifecycleProvider, splash, Macrobenchmark baseline
@@ -156,7 +156,7 @@ Phase 40 (keystone)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 40. Runtime & Allowlist Foundation | 0/TBD | Not started | — |
+| 40. Runtime & Allowlist Foundation | 8/8 | ✓ Complete | 2026-06-06 |
 | 41. Thinking Mode + Model Benchmark | 0/TBD | Not started | — |
 | 42. Prompt Lab | 0/TBD | Not started | — |
 | 43. Performance Convergence | 0/TBD | Not started | — |

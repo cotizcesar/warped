@@ -2,45 +2,45 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Gallery Convergence & Performance Overhaul
-status: planning
-last_updated: "2026-06-06T03:08:41.408Z"
+status: in_progress
+last_updated: "2026-06-06T04:00:00.000Z"
 last_activity: 2026-06-06
 progress:
   total_phases: 5
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 8
+  completed_plans: 8
+  percent: 20
 ---
 
 # Project State: Warped
 
 **Last updated:** 2026-06-06
-**Last activity:** 2026-06-06 — v2.0 roadmap created (Phases 40-44, 53 requirements, 5 phases)
+**Last activity:** 2026-06-06 — Phase 40 complete (Runtime & Allowlist Foundation, 8 plans shipped)
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-06-05)
 
 **Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** v2.0 Gallery Convergence & Performance Overhaul — roadmap defined; entering plan phase.
+**Current focus:** v2.0 Gallery Convergence & Performance Overhaul — Phase 40 ✓; executing 41 (Thinking + Benchmark) next.
 
 ## Current Position
 
-Phase: 40 (Runtime & Allowlist Foundation) — Not started (roadmap created, awaiting `/gsd-plan-phase 40`)
+Phase: 41 (Thinking Mode + Model Benchmark) — Next to plan
 Plan: —
-Status: Planning
-Last activity: 2026-06-06 — v2.0 roadmap created; 53 requirements mapped across 5 phases (40-44)
+Status: Phase 40 ✓ Runtime & Allowlist Foundation (8 plans, 15/15 requirements)
+Last activity: 2026-06-06 — Phase 40 complete; LlmModelHelper unified surface live, allowlist asset+repo wired, mmap-only cache + LRU + trim memory, type-safe nav, manifest+R8 hardening, version bumps
 
 ## Phase Structure (v2.0)
 
 | Phase | Name | Priority | Requirements | Status | Depends On |
 |-------|------|----------|--------------|--------|------------|
-| 40 | Runtime & Allowlist Foundation | **P0** keystone | RUNTIME-01..12, CACHE-01..03 (15) | Not started | — |
-| 41 | Thinking Mode + Model Benchmark | P1 | THINK-01..07, BENCH-01..06 (13) | Not started | Phase 40 |
-| 42 | Prompt Lab | P1 | PROMPT-01..06 (6) | Not started | Phase 40 |
-| 43 | Performance Convergence | **P0** cross-cutting | PERF-01..13 (13) | Not started | Phase 40 (interface only) |
-| 44 | Agent Skills Lite | P2 optional | SKILLS-01..06 (6) | Not started | Phase 40 |
+| 40 | Runtime & Allowlist Foundation | **P0** keystone | RUNTIME-01..12, CACHE-01..03 (15) | ✓ Complete | — |
+| 41 | Thinking Mode + Model Benchmark | P1 | THINK-01..07, BENCH-01..06 (13) | Not started | Phase 40 ✓ |
+| 42 | Prompt Lab | P1 | PROMPT-01..06 (6) | Not started | Phase 40 ✓ |
+| 43 | Performance Convergence | **P0** cross-cutting | PERF-01..13 (13) | Not started | Phase 40 (interface only) ✓ |
+| 44 | Agent Skills Lite | P2 optional | SKILLS-01..06 (6) | Not started | Phase 40 ✓ |
 
 **Total v2.0:** 5 phases, 53 requirements
 
@@ -140,10 +140,10 @@ Items acknowledged and deferred at milestone close on 2026-05-15. **All 12 quick
 
 ## Session Continuity
 
-Last session: 2026-06-05T16:00:00.000Z
-Stopped at: Milestone v2.0 roadmap defined — 5 phases (40-44), 53 requirements mapped, 100% coverage, Gallery anti-patterns explicitly rejected. Ready to plan Phase 40.
+Last session: 2026-06-06T04:00:00.000Z
+Stopped at: Phase 40 complete (Runtime & Allowlist Foundation, 8 plans, RUNTIME-01..12 + CACHE-01..03). Verification written to `.planning/phases/40-runtime-allowlist-foundation/40-VERIFICATION.md`. Next: plan + execute Phase 41 (Thinking + Benchmark).
 Resume file: None
 
 ## Next Step
 
-Run `/gsd-plan-phase 40` to start planning the Runtime & Allowlist Foundation phase. Phase 40 is the v2.0 keystone — its `LlmModelHelper` interface unblocks Phases 41, 42, 43, and 44.
+Run `/gsd-plan-phase 41` to plan Thinking Mode + Model Benchmark. Phase 41 surfaces reasoning trace as a collapsible panel and ships an on-device benchmark screen for downloaded models.
