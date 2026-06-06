@@ -195,3 +195,16 @@ tasks.withType<Test> {
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
+
+tasks.register<Exec>("auditDependencies") {
+    description = "Fails if any Gallery anti-pattern dependency is present (kapt, firebase, moshi, gson, kotlin-reflect, ktor, mcp, tflite, mlkit-genai, appauth, compose-richtext, cameraX, datastore-proto)."
+    group = "verification"
+    commandLine("./scripts/audit-dependencies.sh")
+    workingDir = rootProject.projectDir
+    standardOutput = System.out
+    errorOutput = System.out
+}
+
+tasks.named("check") {
+    dependsOn("auditDependencies")
+}
