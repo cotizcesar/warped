@@ -1,239 +1,284 @@
-# Feature Research: Code Syntax Highlighting for Android Chat App
+# Feature Research: Warped v2.0 — Gallery Convergence & Performance Overhaul
 
-**Domain:** Code syntax highlighting in an Android AI chat application (Warped)
-**Researched:** 2026-05-14
+**Domain:** On-device LLM chat for Android (Kotlin + Jetpack Compose + LiteRT-LM + LM Studio)
+**Researched:** 2026-06-05
 **Confidence:** HIGH
+**Reference implementation:** [google-ai-edge/gallery](https://github.com/google-ai-edge/gallery) v1.0.15 (commit on main, May 2026), 23.6k stars, 91.9% Kotlin
 
-## Feature Landscape
+---
 
-### Table Stakes (Users Expect These)
+## Executive Summary
 
-Features users assume exist. Missing these = product feels incomplete.
+Google AI Edge Gallery is a near-ideal reference for Warped: same engine (LiteRT-LM), same language (Kotlin), same UI toolkit (Compose), same domain (run LLMs on Android). The 23.6k-star codebase has converged on a clean `LlmModelHelper` runtime abstraction, a `Model` data class with rich metadata (capabilities, task types, accelerators), a `CustomTask` extension model for adding new "use cases" (Chat, Prompt Lab, Agent Chat, Mobile Actions, Tiny Garden), a versioned JSON `model_allowlists/1_0_X.json` pattern, and a Proto-based DataStore for benchmark history. The architectural surface maps ~85% onto Warped's existing structure.
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| **Language-aware syntax coloring** | Users see ````python` fences and expect colored keywords, strings, comments — not monochrome monospace text. This is what differentiates "code rendering" from "syntax highlighting." Every LLM chat app (ChatGPT, Claude, LM Studio) does this. | MEDIUM | Requires custom tokenizer — no maintained Android library exists. Build regex-based tokenizer for 10–15 most common languages. |
-| **Fence language detection** | When an LLM writes ````python`, users expect the Python code to be highlighted as Python. The fence specifier is the primary language source (covers ~90% of LLM responses). | LOW | Parse the string after ` ``` ` on the opening fence line. Alias mapping needed (e.g., `js` → `javascript`, `py` → `python`, `sh` → `bash`). |
-| **Monospace font for code** | Already exists in current `MarkdownText`. Must be preserved. Non-negotiable for code readability. | LOW | `FontFamily.Monospace` on code spans. Already implemented as `SpanStyle(fontFamily = FontFamily.Monospace)`. |
-| **Distinct code block visual separation** | Code blocks need background color, padding, and visual distinction from surrounding markdown text. Users expect a "card" feel for code blocks. | LOW | Already partially implemented via `codeTheme.bgCode` on `SpanStyle`. Needs upgrade to full `Surface`-based rendering. |
-| **Persistent theme selection** | The code theme setting must survive app restart. Users invest time choosing a theme and expect it to stick. | LOW | Already implemented: `AdvancedPreferences.setCodeTheme()` persists via DataStore, flows through `ChatViewModel`/`SettingsViewModel` to `ChatUiState.codeTheme`. |
+Of Gallery's user-facing features, the text-only subset that fits Warped's "chat + LM Studio v1" scope is small but high-value: **Thinking Mode toggle**, **Model Benchmark**, **Prompt Lab**, and a **function-calling/agent skills** infrastructure that targets LM Studio's tool-calling API (already in scope per PROJECT.md). Multimodal features (Ask Image, Audio Scribe), the game (Tiny Garden), and the calendar/notification system (Mobile Actions) are explicitly out of Warped scope per PROJECT.md. The biggest win is not any single feature — it is **the runtime abstraction layer** (`LlmModelHelper`) that unifies local LiteRT-LM and remote LM Studio behind a single message-streaming API, which enables the other features to slot in cleanly.
 
-### Differentiators (Competitive Advantage)
+A "performance overhaul" is the second half of v2.0 and is largely orthogonal to the feature ports. The 6 axes to attack — cold start, time-to-first-token, UI smoothness, memory footprint, APK size, network efficiency — each map to concrete files in the codebase. The companion STACK.md, ARCHITECTURE.md, and PITFALLS.md research outputs will surface the specific migration candidates per axis.
 
-Features that set Warped apart. Not universally expected, but valuable for a developer-focused LLM chat app.
+---
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| **Language header bar on every code block** | Shows the detected language name (e.g., "Python", "JavaScript") in a small header above each code block. Surfaces what the LLM intended. ChatGPT's Android app does this; many third-party apps don't. | MEDIUM | Requires restructuring from single `Text(AnnotatedString)` to composable block model. Header is a `Row` with language label inside the code block `Surface`. |
-| **Copy-to-clipboard button per code block** | One-tap copy of the entire code block content. Essential developer workflow — copying generated code is a primary action. ChatGPT, Claude, and LM Studio all have this. | LOW | Android `ClipboardManager` API. Button placed in the language header bar. `contentResolver` not needed — just `ClipboardManager.setText()`. |
-| **Auto language detection when fence is blank** | When an LLM writes ```` ` without a language specifier, the app heuristically detects the language from the code content. Few chat apps do this; most just render unstyled. | MEDIUM | Heuristic pattern matching on first 5–10 lines: check for shebangs, language-specific keywords (`def`, `function`, `class`, `import`), and syntax patterns. Fallback to "plain text" if confidence low. |
-| **Light/dark theme auto-adaptation** | Each preset theme (Monokai, One Dark, GitHub, Dracula) has both light and dark variants. The app selects the variant matching the system theme. This means GitHub theme looks correct in light mode and dark mode — not just one or the other. Most desktop apps (VS Code, IntelliJ) do this; mobile chat apps rarely bother. | MEDIUM | Each theme stores two color maps (light + dark). Detect via `isSystemInDarkTheme()` at the composable level. GitHub theme's light variant is the authentic GitHub light background (#FFFFFF); dark variant is GitHub dark (#0D1117). |
-| **4 curated preset themes** | Monokai, One Dark, GitHub, and Dracula cover the most popular code editor themes. Users recognize these from VS Code, IntelliJ, and Sublime Text — immediate familiarity. | LOW (existing enum extended) | Extend `CodeTheme` enum from 2 color fields to full token-color maps. Remove NORD and SOLARIZED_DARK (not in user's requested set of 4). Each theme defines ~12 token-type colors. |
-| **Applied everywhere code blocks appear** | Chat messages, model card descriptions, README previews, onboarding content — any rendered markdown with code fences gets syntax highlighting. Consistency across the app. | MEDIUM | Requires `MarkdownText` (or its replacement) to be reusable anywhere. The current `MarkdownText` is only used in `MessageBubble.kt`. Need to ensure it works in `LazyColumn` items (chat, model list) and `Column` layouts (readmes, cards). |
-| **Streaming-aware rendering** | During LLM streaming, code blocks are incomplete. The renderer handles partial fences (e.g., ````pyt` mid-token) gracefully without crashing or flickering. | MEDIUM | The current `MarkdownText` already handles unterminated code fences (flushes buffer at end). Extend to handle partial language specifiers and incremental tokenization with debouncing. |
+## Reference: Gallery's Feature Surface (extracted from the repo)
 
-### Anti-Features (Commonly Requested, Often Problematic)
+| Gallery Feature | Source in repo | Mapping to Warped v2.0 |
+|-----------------|----------------|------------------------|
+| **AI Chat with Thinking Mode** | `capabilities: ["llm_thinking"]` in `model_allowlists/1_0_15.json`; `Message` with optional thinking content from `com.google.ai.edge.litertlm` | Tier 1 differentiator |
+| **Model Benchmark** | `ui/benchmark/`, `BenchmarkResultsSerializer.kt`, Proto `BenchmarkResults` stored in DataStore | Tier 1 differentiator |
+| **Prompt Lab** | `ui/llmsingleturn/` (Screen, ViewModel, `PromptTemplatesPanel.kt`, `PromptTemplateConfigs.kt`) | Tier 1 differentiator |
+| **Agent Skills** | `customtasks/agentchat/`, `SkillsSerializer.kt`, `IntentHandler.kt`, `skills/built-in/*/SKILL.md` | Tier 2 differentiator (Lite variant) |
+| **MCP (Model Context Protocol)** | `mcp/README.md` (experimental); G4-E4B recommended | Tier 2 (LM Studio MCP bridge) |
+| **LlmModelHelper runtime abstraction** | `runtime/LlmModelHelper.kt` | Tier 1 — **enables all of the above** |
+| **Model allowlist (versioned JSON)** | `model_allowlists/1_0_X.json`, `model_allowlist.json` legacy | Tier 1 — improves existing v1.8 list |
+| **Multimodal Ask Image / Audio Scribe** | `ui/llmchat/` + `Bitmap`/`ByteArray` inputs in `LlmModelHelper.runInference` | **Out of scope** (PROJECT.md) |
+| **Mobile Actions (native intents)** | `customtasks/mobileactions/`, `IntentHandler.kt` (send_email, send_sms, calendar) | **Out of scope** (PROJECT.md — autonomous tool use deferred) |
+| **Tiny Garden (game)** | `customtasks/tinygarden/`, FunctionGemma 270m | **Out of scope** (novelty) |
+| **Scheduled Notifications** | `notifications/`, deep-link to chat | **Out of scope** (notification system complexity) |
+| **AICore system service** | `runtime/aicore/` (Android 14+ system LLM) | **Out of scope** (narrow device support) |
+| **"Best for" model pinning per task** | `bestForTaskTypes` field in allowlist | Skip — adds curation complexity |
+| **Multi-tab model browser** | Removed in v1.5 of Warped | Skip — explicit OOS |
 
-Features that seem good but would create problems for this milestone.
+---
 
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| **WebView-based rendering (highlight.js in a WebView)** | "Just use highlight.js — it supports 190 languages and has themes built in." | WebView per code block is extremely heavy on Android (each WebView is a separate render process). Breaks Compose composition, causes scroll jank, creates memory pressure, and makes copy-paste unreliable. Also bloats APK with JS/CSS assets. | Custom Kotlin regex-based tokenizer rendering to Compose `Text` with colored `SpanStyle`. Fast, native, scroll-smooth. |
-| **Full 190+ language support** | "Support every language highlight.js supports." | Each language grammar requires regex patterns that must be tested. 190 languages would require ~200KB+ of regex definitions, massive test surface, and maintenance burden. Most LLM chats use 10–15 languages (Python, JavaScript, TypeScript, Java, Kotlin, C, C++, Go, Rust, Bash, SQL, JSON, YAML, HTML, CSS). | Support the 12–15 most common languages in chat contexts. Add languages incrementally based on actual usage data. |
-| **Line numbers in code blocks** | "Show line numbers like GitHub or VS Code." | Mobile screens are narrow (360–400dp). Line numbers consume ~40dp of horizontal space, leaving less room for code. Also adds layout complexity (two synchronized scroll columns). ChatGPT and Claude mobile apps don't show line numbers. | Skip line numbers. If needed later, add as a toggle in Settings. |
-| **Custom theme builder/editor** | "Let users create their own syntax color themes." | Massive UX complexity: color pickers, token-type mapping, preview, import/export. Users who want this use desktop IDEs. On mobile, preset themes cover 99% of needs. | Provide 4 high-quality preset themes that look great out of the box. |
-| **Syntax error highlighting (red squiggles)** | "Show syntax errors in red like an IDE." | Requires full language parsers (not just regex tokenizers), adds significant latency per code block, and is actively misleading for LLM-generated code (which often has minor syntax issues but is conceptually correct). | Just highlight the syntax that's there. Don't judge correctness. |
-| **Code folding (collapse/expand code blocks)** | "Let users collapse long code blocks." | Adds gesture handling, animation complexity, and state management per code block. LLM code blocks are typically short (10–50 lines in chat). Not worth the complexity for this use case. | Let code blocks scroll naturally. Users can scroll past them. |
-| **Per-language theme overrides** | "Let me use Monokai for Python but One Dark for JavaScript." | Configuration explosion. Settings UI becomes a matrix. Users don't think this granularly about code themes in a chat app. | One theme for all code blocks. Simple, predictable, sufficient. |
-| **Using Prism4j library directly** | "Prism4j is a Java port of Prism.js — use it." | Prism4j is **archived since July 2023** (repository is read-only). Last release was June 2019 (v2.0.0). No updates for 7 years. Uses old Java patterns, no Kotlin coroutine support, no Compose integration. Dead dependency. | Build a lightweight custom tokenizer inspired by Prism.js token types but written in idiomatic Kotlin. |
+## Feature Landscape for Warped v2.0
+
+### Table Stakes (v2.0 must include — competitive baseline with Gallery)
+
+| Feature | Why Expected | Complexity | v2.0 deps |
+|---------|--------------|------------|-----------|
+| **LlmModelHelper runtime abstraction** | Without this, every other feature (Thinking, Benchmark, Skills, MCP) is bolted on to the existing local/remote split. Gallery's clean `interface LlmModelHelper { initialize, runInference, resetConversation, cleanUp, stopResponse }` is the seam. Warped has two parallel chat paths today (local LiteRT-LM, remote LM Studio) that duplicate streaming, history, and tool plumbing. Unify them. | **L** | New `domain/runtime/LlmModelHelper.kt` interface, `data/runtime/LiteRtLlmHelper.kt` (wrap existing `LiteRtLlmEngine`), `data/runtime/LmStudioLlmHelper.kt` (wrap existing `LmStudioProvider`). ChatViewModel swaps implementations. Foundational — must land first. |
+| **Thinking Mode toggle** | Newer Gemma 4 E2B/E4B and DeepSeek-R1-Distill models expose `llm_thinking` capability. The `Message` type in `com.google.ai.edge.litertlm` carries a separate `thinking` field. Users running reasoning models (DeepSeek-R1-Distill-Qwen-1.5B is already in Gallery's allowlist) expect to see the model's reasoning. LM Studio's `/api/v1/chat` response includes `reasoning_content` (OpenAI-compatible extended field). Both engines support it. | **M** | LlmModelHelper plumbs `enableThinking` and `partialThinkingResult` (already part of Gallery's `ResultListener` typealias). UI: collapsible "Thinking" panel above the response. Applies to both local and LM Studio remote. |
+| **Model Benchmark** | A user with three models on a phone needs to know which is fastest. Gallery's benchmark measures `init time` (ms), `prefill speed` (tok/s), `decode speed` (tok/s), and `peak memory` (MB) and stores results in a Proto-backed DataStore. Without this, the model browser's "best for" is just static text. | **M** | New `ui/benchmark/`, `worker/ModelBenchmarkWorker.kt` (WorkManager, foreground service for long benchmarks), Proto schema for `BenchmarkResults`. Reads from the same model allowlist as the browser. |
+| **Prompt Lab (single-turn)** | Gallery ships Prompt Lab as a distinct use case from chat — it is a workspace for one-shot prompts (rewrite, summarize, extract, code-explain) with no conversation state. Warped's existing **presets** system handles generation params but has no curated template library. Adding 5–8 prompt templates per model fills the "I just want to test the model" gap. | **M** | New `ui/promptlab/` (Screen, ViewModel, `PromptTemplateConfigs.kt`, `PromptTemplatesPanel.kt`). Reuses LlmModelHelper. Templates ship as a static asset (Kotlin constant) — no API scraping, fits existing REC-03 pattern. |
+| **Versioned Model Allowlist (JSON)** | Gallery ships `model_allowlists/1_0_X.json` keyed by app version. Warped's v1.8 ships a hardcoded Kotlin `RecommendedModels` list. Porting the JSON pattern means future model additions do not require an app release — but for v2.0, the JSON is bundled as an asset (no remote fetch, per v1.8 REC-03 explicit decision). | **S** | New `assets/model_allowlist.json` matching Gallery's schema (`name`, `modelId`, `modelFile`, `description`, `sizeInBytes`, `taskTypes`, `defaultConfig`, `capabilities`). ModelsScreen replaces `RecommendedModels` constant. Folds in `taskTypes`, `capabilities` for future Thinking/Benchmark gating. |
+| **Performance/Architecture Convergence (the second half of v2.0)** | "File-by-file, line-by-line optimization" is the explicit v2.0 mandate. Gallery's `GalleryLifecycleProvider.kt`, single-source-of-truth ViewModel state, and DataStore-based `UserDataSerializer.kt` are the architectural anchors to converge toward. Specific audit areas: Hilt module graph (do all `@Provides` belong in app or feature modules?), Room query indexing (the `messages` table needs a `conversation_id + created_at` composite index for fast scroll-rebuild), OkHttp `Interceptor` chain (logger + auth + gzip order), Compose recomposition hot paths (`MessageBubble`, `CodeBlock`), JNI/engine init blocking. | **L** | Across codebase. No new features, but re-architecture of state ownership, removal of legacy v1.0 patterns, and JNI init off the main thread (already done in v1.0 but worth verifying). |
+
+### Differentiators (v2.0 candidates that move Warped forward)
+
+| Feature | Value Proposition | Complexity | v2.0 deps |
+|---------|-------------------|------------|-----------|
+| **Agent Skills (Lite)** | A Warped user can ask the model "summarize the model card" or "convert to JSON" and the model can call a local tool that runs in-process (no JS webview, no HTTP fetch, no external MCP server). Gallery's full Skills system is huge (JavaScript webview, native intents, MCP, 100+ community skills). Warped's Lite variant ships 3–5 built-in Kotlin skills (calculator, JSON-formatter, text-summarizer-with-template, current-time, code-block-extractor). Each is a simple `@Tool`-annotated function. | **XL** | LiteRT-LM v0.13.1 added `ToolProvider` support. LlmModelHelper already has `tools: List<ToolProvider>` in the interface. New `skills/` package, per-skill class, skill registry. UI: skill chips under the chat input (Gallery pattern). **MCP tool calling via LM Studio is in scope per PROJECT.md** — when the user routes to LM Studio, route tool calls via LM Studio's MCP server config instead. |
+| **LM Studio MCP Bridge** | A user running LM Studio v1 with an MCP server (e.g., the official `fetch` server) can use those tools from Warped. Project context (`mcp/README.md`) says "MCP integration is currently experimental" in Gallery, but LM Studio's MCP support is stable. Warped can adopt the experimental status — it's a power-user feature. | **L** | New `data/mcp/` package, MCP server config CRUD (URL + custom headers), tool schema discovery via JSON-RPC over StreamableHTTP, tool routing when LM Studio is the active provider. Reuse LM Studio's `/api/v1/chat` for the actual round-trip (no separate LLM call needed). |
+| **Cold start budget** | Warped's v1.0 cold start was acceptable for v1.5 hard launch; the 8-step onboarding wizard + 5 main screens + Hilt graph mean first frame is heavier than necessary. A measured budget: <1.5s to first frame on a Pixel 7, <800ms warm. Defer non-critical Hilt init (`WorkManager` configuration) to `Application.onCreate` background coroutine. | **M** | Touches `GalleryApplication.kt`-equivalent, `Application.onCreate`, Hilt module ordering, baseline profile. Cold start tracking via Macrobenchmark (new project) — already best practice. |
+| **Speculative Decoding toggle** | LiteRT-LM v0.13 supports `--enable-speculative-decoding=true` and Gemma 4 E2B/E4B are trained for it. Gallery exposes this as a per-model `capability: ["speculative_decoding"]` flag. In Warped, a chat-screen gear-icon config can toggle speculative decoding per conversation (off by default — adds memory overhead). | **S** | New `Config` in `ui/llmchat/`, litertlm `ConversationOptions` plumbing. Only enabled for models whose allowlist entry has `capabilities: ["speculative_decoding"]`. |
+| **Benchmark history viewer** | After running benchmarks, the user can see a line chart of `decode_tok_per_sec` over the last N runs of model X. Gallery has `BenchmarkValueSeriesViewer.kt`. Lightweight analytics feature that makes the benchmark tool feel finished. | **S** | Compose Canvas line chart, Proto `BenchmarkResults.latestRuns` history. |
+
+### Anti-Features (commonly requested from Gallery, but wrong for Warped)
+
+| Feature | Why Tempting | Why Problematic | What to Do Instead |
+|---------|--------------|-----------------|-------------------|
+| **Ask Image (multimodal vision)** | It's a flagship Gallery feature, demos beautifully. | Explicitly **out of scope** in PROJECT.md: "Image/multimodal models — defer, focus on text LLMs." v2.0 is text-only by design. Adding `Bitmap` inputs to the chat path would also touch `LlmModelHelper.runInference` signature. | Skip entirely. Revisit v3.0+ when multimodal is in scope. |
+| **Audio Scribe (audio input + transcription)** | Flagship Gallery feature. | Explicitly **out of scope** per PROJECT.md (voice I/O deferred). Requires audio capture, PCM ByteArray plumbing, and ASR-capable models. | Skip. Voice I/O is a separate v3+ milestone. |
+| **Tiny Garden (mini-game using FunctionGemma 270m)** | Quirky, demoable, showcases on-device agentic workflows. | Off-topic for an "LM Studio for mobile" app. Warped is a chat/utility tool, not a games platform. Requires a separate 270M model download and a custom task UI. | Skip. Not part of the chat + LM Studio value proposition. |
+| **Mobile Actions (native intents: email, SMS, calendar, contacts)** | Gallery ships flashlight, contacts, email, Wi-Fi, calendar as FunctionGemma 270m actions. | Each intent needs a runtime permission grant, an Android `Intent` dispatcher, a permission-revocation flow, and a confirmation dialog per action. Total scope is **XL** plus UX overhead. PROJECT.md says "AI agents / autonomous tool use — defer, MCP tool calling via LM Studio API is in scope." Mobile Actions is exactly the "autonomous tool use" that's deferred. | Skip. The Agent Skills Lite variant covers text-only tools; the LM Studio MCP bridge covers remote tools. Mobile intent dispatch is a v3+ concern. |
+| **Scheduled notifications from chat** | Gallery lets the model schedule a reminder via `IntentHandler.schedule_notification` with deeplink. | Adds `AlarmManager` + `WorkManager` complexity, notification channels, deep-link parser. PROJECT.md scope is text chat; reminders are a personal-assistant feature. | Skip. |
+| **JavaScript webview skill runtime** | Gallery's killer Skills demo is "spin a wheel" or "show a map" inside a hidden WebView. | Requires embedding a JS engine (`androidx.webkit`) per skill invocation, security review of arbitrary `index.html` (XSS surface), and a Skills marketplace format. **XL** scope. | Skip. The Agent Skills Lite variant covers text-only tools with zero webview. |
+| **Community Skills marketplace (load from URL, browse on GitHub Discussions)** | Gallery's "share with the community" pitch. | Adds URL fetching, ZIP extraction, signature verification. Warped is offline-first — fetching skills over the network violates that. | Skip. If skills land v2.x, ship curated built-ins only. |
+| **AICore system service backend** | Gallery has `runtime/aicore/` — uses the system-level LLM on Pixel 8+. | Android 14+ only, Pixel only, still preview per Gallery's allowlist (`aicoreReleaseStage: PREVIEW`). Zero coverage for Warped's broader user base. | Skip. Already tracked as v2 deferred in REQUIREMENTS.md. |
+| **"Best for" model pinning per task** | Gallery's `bestForTaskTypes` field shows a "best overall" banner. | Adds curation coupling between the allowlist author and the UI. Warped's "Recommended Models" is already hand-curated. Adding a per-task best-for overlay duplicates that curation. | Skip. The Recommended section is enough. |
+| **Multi-tab model browser (Staff Picks, Trending, Recent)** | Gallery's pre-removal UX. | Explicitly removed in v1.5 of Warped: "Staff Picks tab and multi-tab model browser — REMOVED in v1.5. Single search bar replaces tabbed browsing." | Stay removed. |
+| **Public "trending" or "most downloaded" model scraping** | Gallery doesn't do this (it ships curated lists). | Explicitly out of scope per REQUIREMENTS.md: "Auto-scraped 'trending' models list — REC-01 uses a hand-curated static list — no API scraping, no ranking algorithms." | Stay out. |
+| **Public model allowlist hosting (remote fetch)** | Gallery's `model_allowlists/1_0_15.json` lives in the repo, but is shipped as a bundled asset. | A remote allowlist adds a network dependency and a CDN/security concern. Violates offline-first. | Bundle the JSON as an asset (Gallery's effective behavior in production). |
+| **iOS feature parity / cross-platform abstraction** | Gallery also targets iOS, so the codebase has iOS-specific branches. | Warped is Android-only per PROJECT.md: "Platform: Android only (no iOS, no desktop)." | Don't import iOS-only patterns. The `runtime/LlmModelHelper.kt` interface happens to be iOS-portable, but that's incidental, not a goal. |
+
+---
 
 ## Feature Dependencies
 
 ```
-Syntax Highlighting (colored token spans)
-    └──requires──> Language Detection (what language to tokenize as?)
-                        ├──primary──> Fence specifier parsing (```python)
-                        └──fallback──> Heuristic auto-detection
+Foundation
+└── LlmModelHelper runtime abstraction (Tier 1)
+    ├── enables → Thinking Mode (Tier 1)
+    │   └── requires ← LiteRT-LM v0.13.1+ for `Message.thinking`; LM Studio `/api/v1/chat` `reasoning_content`
+    ├── enables → Model Benchmark (Tier 1)
+    │   ├── requires ← LlmModelHelper.resetConversation / cleanUp
+    │   └── produces → Proto BenchmarkResults in DataStore
+    │       └── consumed by → Benchmark history viewer (S)
+    ├── enables → Prompt Lab (Tier 1)
+    │   └── requires ← static PromptTemplate assets (Kotlin constant or JSON)
+    ├── enables → Agent Skills Lite (Tier 2, differentiator)
+    │   ├── requires ← LiteRT-LM v0.13.1 `ToolProvider` for local
+    │   ├── requires ← LM Studio MCP support for remote (separate path)
+    │   └── produces → skill chips under chat input
+    ├── enables → LM Studio MCP Bridge (Tier 2, differentiator)
+    │   ├── requires ← Agent Skills Lite (or independent — see notes)
+    │   └── requires ← OkHttp + JSON-RPC client
+    └── enables → Speculative Decoding toggle (S)
+        └── requires ← `capabilities: ["speculative_decoding"]` in allowlist
 
-Syntax Highlighting
-    └──requires──> Theme System (which colors for which tokens?)
-                        └──requires──> Token Type → Color mapping per theme
-                                           ├──light variant (for light mode)
-                                           └──dark variant (for dark mode)
-                        └──requires──> Persistent theme selection (existing DataStore flow)
+Architecture
+└── Performance Convergence (Tier 1, cross-cutting)
+    ├── touches → Hilt graph (Application.onCreate ordering)
+    ├── touches → Room (composite index on messages)
+    ├── touches → OkHttp (interceptor chain audit)
+    ├── touches → Compose (MessageBubble / CodeBlock / ChatInput)
+    ├── touches → JNI / engine init (verify off main thread)
+    ├── touches → APK size (R8 keep rules, asset compression)
+    └── requires ← baseline measurement (Macrobenchmark cold start, TTFT, jank)
 
-Code Block UI (header bar + copy button)
-    └──requires──> Composable block rendering model (not AnnotatedString)
-    └──enhances──> Syntax Highlighting (header shows detected language)
-
-Copy-to-clipboard button
-    └──requires──> Android ClipboardManager API (platform)
-    └──requires──> Code block composable (to attach button)
-
-Streaming-aware rendering
-    └──enhances──> Syntax Highlighting (partial tokenization)
-    └──enhances──> Code Block UI (partial fences)
+Data
+└── Model Allowlist JSON (S)
+    ├── consumed by → Models & Endpoints screen (existing, refactor)
+    ├── consumed by → Model Benchmark (capability gating)
+    ├── consumed by → Thinking Mode (capability gating)
+    ├── consumed by → Speculative Decoding (capability gating)
+    └── produced by → static `assets/model_allowlist.json` (no network)
 ```
 
-### Dependency Notes
+### Dependency notes
 
-- **Syntax Highlighting requires Language Detection:** You can't tokenize code without knowing the language grammar to apply. The fence specifier (` ```python `) is the primary source. Auto-detection is the fallback.
-- **Syntax Highlighting requires Theme System:** Token types (keyword, string, comment, etc.) must map to actual colors. This mapping is what a "theme" is. The existing `CodeTheme` enum only has background colors — it must be expanded to full token-color maps.
-- **Code Block UI requires Composable Blocks:** The current `MarkdownText` renders everything as a single `Text(annotatedString)`. A language header bar (`Row` with label) and copy button (`IconButton`) can't be embedded in `AnnotatedString`. The rendering must shift from a single `Text` to a `Column` of composable blocks (text paragraphs + code block surfaces).
-- **Copy-to-clipboard depends on Code Block UI:** The button needs a composable surface to live on. Can't exist on a raw `SpanStyle`.
-- **Streaming-aware rendering enhances everything:** LLM streaming means code blocks arrive token by token. The renderer must handle incomplete fences (` ``` ` opened but not closed), partial language specifiers, and incremental content growth without layout jumps or flicker.
+- **LlmModelHelper is the keystone.** Without it, Thinking Mode / Benchmark / Prompt Lab / Skills all need their own bespoke plumbing for local vs LM Studio. With it, they share the streaming + tool + state surface.
+- **Model Allowlist JSON is independent** of the runtime — it is a static asset, can land in any phase.
+- **Agent Skills Lite and LM Studio MCP Bridge are siblings**, not parent/child. Skills Lite is the local-tools story; MCP Bridge is the remote-tools story via LM Studio. They share a UI surface (tool chips) but different transports. Land Skills Lite first, then MCP Bridge.
+- **Performance Convergence is parallel** — does not block or depend on the feature ports. Can run as a dedicated phase near the end.
+- **Speculative Decoding is a quick win** if the LlmModelHelper exists; defer to v2.1 if scope is tight.
 
-### Existing System Dependencies
+---
 
-- **`CodeTheme` enum** (`MarkdownText.kt` line 21–28): Currently has only `bgCode` and `bgInline` color fields + `label`. Must be expanded to include `lightTokenColors: Map<TokenType, Color>` and `darkTokenColors: Map<TokenType, Color>`.
-- **`AdvancedPreferences`** (`AdvancedPreferences.kt` line 60–69): Persists `codeTheme` as a string name via DataStore. Flow-based observation already wired to `ChatViewModel` and `SettingsViewModel`. No changes needed — just extend the serialization scope.
-- **Settings code theme dropdown** (`SettingsScreen.kt` line 198–219): Already renders a dropdown with `CodeTheme.entries`. Will automatically pick up new/removed enum entries.
-- **`MarkdownText` composable** (`MarkdownText.kt` line 31–89): Must be significantly restructured. The line-by-line `AnnotatedString` builder becomes a block parser that emits a list of `MarkdownBlock` sealed classes (TextBlock, CodeBlock). CodeBlock gets rendered as a `Surface` with syntax-highlighted content.
-- **`MessageBubble`** (`MessageBubble.kt` line 166–175): Wraps `MarkdownText` in `SelectionContainer`. After restructuring, `SelectionContainer` must wrap only text blocks (not code blocks where the copy button handles selection).
-- **`ChatUiState.codeTheme`** (`ChatUiState.kt` line 36): Already flows from `ChatViewModel` → `ChatScreen` → `MessageBubble` → `MarkdownText`. No changes needed.
+## v2.0 Scope Recommendation
 
-## MVP Definition
+**Phase 40 — Runtime & Allowlist Foundation** (Tier 1, 5–7 days)
+- Port `LlmModelHelper` interface. Implement `LiteRtLlmHelper` (wrap existing) and `LmStudioLlmHelper` (wrap existing). ChatViewModel accepts `LlmModelHelper` instead of `LiteRtLlmEngine | LmStudioProvider`.
+- Replace `RecommendedModels` Kotlin constant with `assets/model_allowlist.json` matching Gallery's schema.
 
-### This Milestone Delivers (v1.6)
+**Phase 41 — Thinking Mode + Benchmark** (Tier 1, 7–10 days)
+- Plumb `enableThinking` and `partialThinkingResult` through LlmModelHelper. Render "Thinking" panel above the response in chat.
+- Add `ui/benchmark/` with `BenchmarkViewModel`, `BenchmarkScreen`, `BenchmarkResultsViewer`, `BenchmarkValueSeriesViewer`. WorkManager worker for foreground-execution benchmark runs. Proto `BenchmarkResults` in DataStore.
+- Wire allowlist `capabilities` to gate Thinking on/off per model.
 
-Minimum viable syntax highlighting — what's needed to validate users actually value this feature.
+**Phase 42 — Prompt Lab** (Tier 1, 5–7 days)
+- New `ui/promptlab/` mirroring Gallery's `ui/llmsingleturn/`. Side-by-side prompt input + output. 5–8 curated templates per common task (rewrite, summarize, extract-key-points, code-explain, translate, sentiment, table-to-json).
+- Reuses LlmModelHelper. No new persistence — single-turn outputs are ephemeral.
 
-- [ ] **Fence language detection** — Parse ` ```language ` specifiers from code fences with alias mapping (10–15 languages)
-- [ ] **Syntax-highlighted code blocks** — Tokenized rendering with distinct colors for keywords, strings, comments, numbers, functions, types, operators, punctuation
-- [ ] **4 preset themes** — Monokai, One Dark, GitHub, Dracula — selectable in Settings. Each with light and dark variants.
-- [ ] **Light/dark auto-adaptation** — Theme variant selected based on system dark mode (`isSystemInDarkTheme()`)
-- [ ] **Language header bar** — Small header on each code block showing detected language name
-- [ ] **Copy-to-clipboard button** — In the header bar, copies entire code block content
-- [ ] **Applied in chat messages** — Syntax highlighting visible in AI responses during and after streaming
-- [ ] **Composable block rendering** — Restructured `MarkdownText` to support mixed text + code UI blocks
+**Phase 43 — Performance Convergence** (Tier 1, 7–10 days, cross-cutting)
+- Cold start audit + baseline profile.
+- Room composite index on `messages(conversation_id, created_at)`.
+- Hilt module ordering and lazy init.
+- Compose recomposition audit on hot paths (MessageBubble, ChatInput, CodeBlock, ModelsList).
+- OkHttp interceptor order + connection pool tuning.
+- JNI init path verification.
+- Measure: cold start (ms), TTFT (ms), FPS during streaming, peak memory (MB), APK size (MB).
 
-**Supported languages for v1.6:** Python, JavaScript, TypeScript, Kotlin, Java, C, C++, Go, Rust, Bash/Shell, SQL, JSON, YAML, HTML/XML, CSS. (15 languages covering >95% of LLM chat code output.)
+**Phase 44 — Agent Skills Lite (if time permits)** (Tier 2, XL — 10–14 days, optional)
+- 3–5 built-in Kotlin skills (calculator, JSON-formatter, text-summarizer-template, current-time, code-block-extractor).
+- LlmModelHelper `tools: List<ToolProvider>` plumbed to LiteRT-LM v0.13+.
+- Skill chips under chat input. Tap a skill → it gets appended to the system prompt and the model can call it.
 
-### Deferred (v1.7+)
+**Defer to v2.1+**: LM Studio MCP Bridge (large scope, can land after Skills Lite validates the tool-calling UX), Speculative Decoding toggle (small but peripheral), Benchmark history viewer (small but blocked on enough benchmark data accumulating), Ask Image / Audio Scribe / Mobile Actions / Tiny Garden / Scheduled Notifications (all explicitly out of Warped scope per PROJECT.md).
 
-Features that complement syntax highlighting but aren't required for the initial experience.
-
-- [ ] **Heuristic auto-detection** — Detect language from code content when fence specifier is missing. Adds noticeable polish but LLMs specify language >90% of the time.
-- [ ] **Applied everywhere** — Extend to model card descriptions, README previews, onboarding content. Chat messages are the 80/20 case.
-- [ ] **More languages** — Add Ruby, Swift, PHP, Dart, Lua, Makefile, Dockerfile, Markdown based on user feedback.
-- [ ] **Theme preview in Settings** — Show a sample code block with current theme colors so users can preview before selecting.
-- [ ] **Syntax highlight in user messages too** — Currently only AI messages get markdown rendering. User code blocks could also benefit.
-
-### Future Consideration (v2+)
-
-- [ ] **Custom theme import** — Load TextMate `.tmTheme` or VS Code `.json` theme files
-- [ ] **Line numbers toggle** — Opt-in setting
-- [ ] **Per-language grammar extensibility** — Plugin system for community-contributed language definitions
+---
 
 ## Feature Prioritization Matrix
 
 | Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| Fence language detection | HIGH | LOW | P1 |
-| Syntax-highlighted code blocks (colored tokens) | HIGH | MEDIUM | P1 |
-| 4 preset themes (Monokai, One Dark, GitHub, Dracula) | HIGH | MEDIUM | P1 |
-| Light/dark auto-adaptation | HIGH | MEDIUM | P1 |
-| Language header bar | MEDIUM | MEDIUM | P1 |
-| Copy-to-clipboard button | HIGH | LOW | P1 |
-| Applied in chat messages | HIGH | LOW | P1 |
-| Composable block rendering | HIGH | MEDIUM | P1 |
-| Heuristic auto-detection | MEDIUM | MEDIUM | P2 |
-| Applied everywhere (model cards, readmes) | MEDIUM | MEDIUM | P2 |
-| More languages (beyond 15) | LOW | LOW (incremental) | P3 |
-| Theme preview in Settings | LOW | LOW | P3 |
-| Syntax highlight in user messages | LOW | LOW | P3 |
+|---------|-----------|---------------------|----------|
+| LlmModelHelper runtime abstraction | HIGH | HIGH | **P0** — v2.0 keystone |
+| Model Allowlist JSON | MEDIUM | LOW | **P0** — v2.0, required for capability gating |
+| Thinking Mode toggle | HIGH | MEDIUM | **P1** — v2.0 showcase |
+| Model Benchmark | MEDIUM | MEDIUM | **P1** — v2.0, fits mobile use case |
+| Prompt Lab | MEDIUM | MEDIUM | **P1** — v2.0, fits preset/template story |
+| Performance Convergence | HIGH | HIGH | **P0** — v2.0 explicit mandate |
+| Agent Skills Lite | HIGH | XL | **P2** — v2.0 if scope allows, else v2.1 |
+| LM Studio MCP Bridge | MEDIUM | L | **P2** — v2.1 |
+| Speculative Decoding toggle | LOW | S | **P3** — v2.1 |
+| Benchmark history viewer | LOW | S | **P3** — v2.1, needs benchmark data first |
+| Ask Image / Audio Scribe | HIGH | XL | **EXCLUDED** — out of scope |
+| Mobile Actions (native intents) | MEDIUM | XL | **EXCLUDED** — out of scope |
+| Tiny Garden | LOW | L | **EXCLUDED** — off-topic |
+| Scheduled Notifications | LOW | L | **EXCLUDED** — out of scope |
+| AICore system service | LOW | L | **EXCLUDED** — narrow device support |
+| JS webview skill runtime | MEDIUM | XL | **EXCLUDED** — security/complexity |
+| Community Skills marketplace | LOW | XL | **EXCLUDED** — violates offline-first |
 
 **Priority key:**
-- P1: Must ship in v1.6
-- P2: Ship if time allows; otherwise v1.7
-- P3: Defer to future milestone
+- **P0** = must ship in v2.0
+- **P1** = should ship in v2.0
+- **P2** = nice to have in v2.0, push to v2.1 if scope tight
+- **P3** = v2.1+
+- **EXCLUDED** = explicitly out of scope
 
-## Competitor Feature Analysis
+---
 
-| Feature | ChatGPT Android | Claude Android | LM Studio Desktop | Warped v1.6 Target |
-|---------|----------------|----------------|-------------------|---------------------|
-| Syntax highlighting | Yes (highlight.js-based) | Yes | Yes | Yes (custom Kotlin tokenizer) |
-| Language header bar | Yes ("Python" label) | No (just copy button) | Yes (language label in header) | Yes |
-| Copy button per block | Yes (top-right header) | Yes (top-right) | Yes (header bar) | Yes (header bar, right-aligned) |
-| Theme selection | No (one dark theme) | No (one theme) | No (follows app theme) | Yes (4 preset themes) |
-| Light/dark adaptation | No (dark only) | No (dark only) | Yes | Yes |
-| Auto language detection | Yes (highlight.js auto) | Unknown | No (fence-only) | P2 |
-| Line numbers | No | No | No | No (anti-feature) |
-| Streaming resilience | Yes | Yes | Yes | Yes (required) |
-| Rendering approach | WebView (React Native WebView) | Native? | Qt/C++ custom | Compose native (Column of blocks) |
+## Competitor / Reference Feature Analysis
 
-### Key Competitive Insights
+| Feature | Google AI Edge Gallery | Warped v1.8 (today) | Warped v2.0 (plan) |
+|---------|------------------------|---------------------|---------------------|
+| Local LLM runtime | LiteRT-LM v0.13.x | LiteRT-LM v0.12.0 | LiteRT-LM v0.13.x + `LlmModelHelper` interface |
+| Remote provider | None — local only | LM Studio v1 | LM Studio v1 (unchanged) |
+| Unified chat runtime | `LlmModelHelper` | Two parallel paths | One `LlmModelHelper` with two impls |
+| Model allowlist | `model_allowlists/1_0_X.json` (versioned) | Static Kotlin constant | Bundled JSON asset matching Gallery schema |
+| Thinking mode | `capabilities: ["llm_thinking"]` + `Message.thinking` | Not exposed | Toggle in chat, collapsible panel |
+| Benchmark | Init/prefill/decode/peak memory, proto DataStore | None | Same as Gallery |
+| Prompt Lab | Single-turn workspace + 5+ template categories | None (presets are param-only) | Single-turn + curated templates |
+| Agent Skills | JS webview + native intents + MCP (XL) | None (out of scope v1.x) | Lite variant: 3–5 built-in Kotlin skills |
+| Model browser | Single search + curated list | Single search + Recommended section | Same UX, allowlist-driven |
+| Multimodal (image/audio) | Yes — Ask Image, Audio Scribe | Out of scope | Out of scope |
+| iOS support | Yes (shared architecture) | No (Android only) | No (Android only) |
+| Offline-first | Yes | Yes | Yes (preserved) |
 
-1. **No chat app offers theme selection on mobile.** ChatGPT and Claude use a single hardcoded dark theme. Warped's 4-theme selector is a genuine differentiator for developers who have strong theme preferences from their IDEs.
+---
 
-2. **Language header bar is inconsistent.** ChatGPT shows it; Claude doesn't. LM Studio shows it. Warped showing it puts us in the "polished" camp.
+## Confidence Assessment
 
-3. **Copy button is table stakes.** Every major chat app has it. Not having it would feel broken.
+| Area | Confidence | Notes |
+|------|------------|-------|
+| Gallery feature surface map | **HIGH** | Verified by direct repo exploration: README, `model_allowlist.json`, `model_allowlists/1_0_15.json`, `runtime/LlmModelHelper.kt`, `data/Model.kt`, `customtasks/*/`, `ui/*/`, `mcp/README.md`, `Function_Calling_Guide.md`, `skills/README.md` |
+| LiteRT-LM v0.13 capabilities (thinking, tools, speculative decoding) | **HIGH** | Confirmed via Google Developers Blog (May 2026) and LiteRT-LM Maven listings (v0.13.1 current) |
+| Gallery benchmark metrics (init, prefill, decode, peak memory) | **HIGH** | Confirmed by Google Cloud Blog "Benchmark LLMs on-device with AI Edge Portal" (May 2026) and `BenchmarkResultsSerializer.kt` in repo |
+| Warped v1.8 feature inventory | **HIGH** | Verified against PROJECT.md, REQUIREMENTS.md, STATE.md (39 phases, 234 requirements) |
+| Out-of-scope boundaries (multimodal, voice, image) | **HIGH** | Explicit in PROJECT.md "Out of Scope" section and REQUIREMENTS.md "Out of Scope" table |
+| `LlmModelHelper.tools: List<ToolProvider>` API stability | **MEDIUM** | Visible in `LlmModelHelper.kt` interface. Specific ToolProvider Kotlin API surface should be verified against the LiteRT-LM Android SDK before committing to Skills Lite scope. |
+| `Message.thinking` field name in LiteRT-LM v0.13 | **MEDIUM** | Inferred from Gallery's `ResultListener` typealias signature `(partialResult, done, partialThinkingResult)`. Actual field name on `Message` should be verified in the LiteRT-LM artifact. |
+| LM Studio `/api/v1/chat` `reasoning_content` field | **LOW-MEDIUM** | OpenAI-compatible convention; not yet confirmed for LM Studio specifically. Verify in LM Studio's API docs or via integration test before promising Thinking Mode for remote. |
+| Gallery benchmark UI scope (the 4 source files: `BenchmarkScreen`, `BenchmarkViewModel`, `BenchmarkResultsViewer`, `BenchmarkValueSeriesViewer`) | **HIGH** | Direct from repo tree |
+| `LlmModelHelper.runInference(images: List<Bitmap>, audioClips: List<ByteArray>)` signature | **HIGH** | Direct from source — confirms multimodal is part of the runtime interface (even though we will not use it) |
 
-4. **Light/dark adaptation is rare.** Most chat apps are dark-only on mobile. Warped adapting to system theme is a quality-of-life differentiator.
+---
 
-5. **Native rendering (Compose) vs WebView.** ChatGPT's Android app uses React Native WebView for markdown rendering — this is why scrolling feels slightly janky in long code blocks. Warped's native Compose approach should deliver smoother scrolling.
+## Open Questions for Phase-Specific Research
 
-## Technical Architecture Decisions
+These gaps cannot be resolved without deeper investigation during the relevant phase:
 
-### Why Custom Tokenizer Instead of a Library
+1. **Exact `Message.thinking` field in LiteRT-LM 0.13.x** — what is the type, how is it populated by `runInference` callbacks, does LM Studio return it as a top-level `reasoning_content` or nested in `message`? Verify against the LiteRT-LM Android SDK and LM Studio's `/api/v1/chat` response schema.
+2. **`ToolProvider` Kotlin API stability** — what does a Warped-built `ToolProvider` look like in code, how is its function schema exposed to the model, and how is the model's tool-call response routed back? Verify by building a 1-skill prototype.
+3. **Benchmark memory profiling** — what Android API does Gallery use to measure peak memory (`Debug.MemoryInfo`, `Runtime.totalMemory`, `ActivityManager.MemoryInfo`)? Confirm in `BenchmarkViewModel.kt` source.
+4. **Cold start baseline numbers on a typical device** — needs a Macrobenchmark run on a Pixel 6/7/8 reference device. Defer to Phase 43 measurement phase.
+5. **MCP server discovery and JSON-RPC over StreamableHTTP** — Gallery's implementation is private. Verify the `modelcontextprotocol` Kotlin SDK or implement a minimal client from spec.
+6. **Model allowlist schema evolution** — Gallery's `1_0_15.json` has fields Warped doesn't need (`ios_*`, `aicore*`, `extraDataFiles`). Decide: full schema copy or leaner Warped-specific subset. Lean toward a Warped-specific subset for clarity.
+7. **Prompt Lab template content** — which 5–8 templates best cover LM Studio + local chat use cases? "Rewrite" and "Summarize" are universal; "Code explain" fits Warped's developer-friendly posture; "Extract key points" fits productivity. Decide during phase planning.
 
-The research found no maintained Android syntax highlighting library:
-
-| Candidate | Status | Verdict |
-|-----------|--------|---------|
-| **Prism4j** | Archived July 2023. Last release June 2019. README explicitly says "no themes, no rendering." | ❌ Dead dependency |
-| **Sora Editor** | Active Android code editor. Uses TextMate grammars (.tmLanguage JSON) and TreeSitter. | ❌ Full code editor, overkill for read-only rendering. Adds MBs of native .so files. |
-| **highlight.js in WebView** | Full-featured, 190 languages, themes built in. | ❌ WebView per code block = heavy, janky, breaks Compose. |
-| **Chaquopy + Pygments** | Python on Android via Chaquopy. | ❌ ~50MB APK increase for Python runtime. |
-| **Custom regex tokenizer** | Lightweight, Kotlin-native, Compose-friendly. | ✅ Best fit. ~30KB of regex definitions for 15 languages. |
-
-### Token Type Taxonomy
-
-Based on Prism.js standard tokens (industry consensus):
-
-| Token Type | What It Covers | Example |
-|-----------|----------------|---------|
-| `keyword` | Reserved words | `def`, `class`, `if`, `return`, `import`, `fun`, `val` |
-| `string` | String literals | `"hello world"`, `'single'`, `` `template` `` |
-| `number` | Numeric literals | `42`, `3.14`, `0xFF`, `1e10` |
-| `comment` | Single/multi-line comments | `// line`, `/* block */`, `# hash` |
-| `function` | Function/method names | `def **foo**():`, `function **bar**()` |
-| `type` | Class/type names | `class **Foo**`, `List<String>`, `interface **Bar**` |
-| `operator` | Operators | `+`, `-`, `*`, `/`, `=`, `==`, `->`, `::` |
-| `punctuation` | Brackets, parens, commas | `{ } [ ] ( ) , ; . :` |
-| `boolean` | Boolean literals | `true`, `false`, `True`, `False` |
-| `builtin` | Built-in functions/types | `print`, `len`, `console.log`, `println` |
-| `variable` | Special variables | `this`, `self`, `super`, `$VAR` |
-| `constant` | Constants | `PI`, `MAX_SIZE`, `NULL`, `None` |
-| `plain` | Unmatched text | Everything else |
-
-### Per-Thene Token Colors
-
-Each of the 4 themes maps the 12 token types to colors for both light and dark variants. This is ~96 color values total (4 themes × 12 token types × 2 variants). Brightness and contrast tested for WCAG AA readability on mobile.
-
-Colors sourced from the canonical theme definitions (Monokai from TextMate, One Dark from Atom, GitHub from Primer Design, Dracula from dracula-theme).
+---
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- **Prism.js token documentation:** https://prismjs.com/tokens.html — Standard token types, the industry consensus for syntax highlighting token taxonomy.
-- **Prism4j GitHub (archived):** https://github.com/noties/Prism4j — Confirmed archived since July 2023. Last release June 2019. Read-only repository.
-- **Warped codebase inspection:** `MarkdownText.kt`, `MessageBubble.kt`, `AdvancedPreferences.kt`, `SettingsScreen.kt` — Confirmed existing `CodeTheme` enum structure, DataStore persistence, Compose rendering approach.
+- [google-ai-edge/gallery repository](https://github.com/google-ai-edge/gallery) — repo root
+- [Android source tree](https://github.com/google-ai-edge/gallery/tree/main/Android/src/app/src/main/java/com/google/ai/edge/gallery) — `runtime/`, `data/`, `ui/`, `customtasks/`, `worker/`, `notifications/`
+- [model_allowlist.json](https://github.com/google-ai-edge/gallery/blob/main/model_allowlist.json) — legacy allowlist format
+- [model_allowlists/1_0_15.json](https://github.com/google-ai-edge/gallery/raw/refs/heads/main/model_allowlists/1_0_15.json) — current versioned allowlist with capabilities and task types
+- [runtime/LlmModelHelper.kt](https://raw.githubusercontent.com/google-ai-edge/gallery/main/Android/src/app/src/main/java/com/google/ai/edge/gallery/runtime/LlmModelHelper.kt) — runtime abstraction
+- [data/Model.kt](https://raw.githubusercontent.com/google-ai-edge/gallery/main/Android/src/app/src/main/java/com/google/ai/edge/gallery/data/Model.kt) — Model data class, RuntimeType, capabilities
+- [customtasks/agentchat/IntentHandler.kt](https://raw.githubusercontent.com/google-ai-edge/gallery/main/Android/src/app/src/main/java/com/google/ai/edge/gallery/customtasks/agentchat/IntentHandler.kt) — native intent dispatch (Mobile Actions, send_email, etc.)
+- [customtasks/mobileactions/Actions.kt](https://raw.githubusercontent.com/google-ai-edge/gallery/main/Android/src/app/src/main/java/com/google/ai/edge/gallery/customtasks/mobileactions/Actions.kt) — FunctionGemma 270m action types
+- [BenchmarkResultsSerializer.kt](https://raw.githubusercontent.com/google-ai-edge/gallery/main/Android/src/app/src/main/java/com/google/ai/edge/gallery/BenchmarkResultsSerializer.kt) — Proto DataStore pattern for benchmark persistence
+- [UserDataSerializer.kt](https://raw.githubusercontent.com/google-ai-edge/gallery/main/Android/src/app/src/main/java/com/google/ai/edge/gallery/UserDataSerializer.kt) — Proto DataStore pattern for user state
+- [mcp/README.md](https://github.com/google-ai-edge/gallery/blob/main/mcp/README.md) — Model Context Protocol integration guide
+- [skills/README.md](https://github.com/google-ai-edge/gallery/blob/main/skills/README.md) — Agent Skills system documentation
+- [Function_Calling_Guide.md](https://github.com/google-ai-edge/gallery/blob/main/Function_Calling_Guide.md) — extending Gallery with custom FunctionGemma actions
 
 ### Secondary (MEDIUM confidence)
-- **Sora Editor (rosemoe/sora-editor):** Context7 docs — Confirmed TextMate/TreeSitter approach exists for Android but is designed for code editors, not read-only rendering. Overkill for chat app code blocks.
-- **Highlight.js auto-detection:** https://highlightjs.org/ — Industry-standard language detection approach. Uses Bayesian classifier + keyword matching. Adaptation simplified for mobile (heuristic-only, no ML).
+- [Google Developers Blog — "Blazing fast on-device GenAI with LiteRT-LM"](https://developers.googleblog.com/blazing-fast-on-device-genai-with-litert-lm/) (May 2026) — speculative decoding, MTP, accelerator details
+- [LiteRT-LM Maven listing](https://libraries.io/maven/com.google.ai.edge.litertlm%3Alitertlm-android) — v0.13.1 release notes, ToolProvider support
+- [Google Cloud Blog — "Benchmark LLMs on-device with AI Edge Portal"](https://cloud.google.com/blog/products/ai-machine-learning/benchmark-llms-on-device-with-ai-edge-portal) (May 2026) — confirms benchmark metrics: init time, prefill, decode, peak memory
+- [LiteRT-LM Overview](https://developers.google.cn/edge/litert-lm/overview) — Gemma 4 E2B/E4B benchmark table (S26 Ultra: 52 tok/s GPU decode, 0.3s TTFT)
+- [DEV.to — "Gemma 4 on Android: Tricks for Faster On-Device Inference"](https://dev.to/samdude/gemma-4-on-android-tricks-for-faster-on-device-inference-3kj5) (May 2026) — CPU/GPU/NPU backend selection, fallback behavior
 
-### Competitive Analysis (MEDIUM confidence)
-- **ChatGPT Android app** — Observed: WebView-based rendering, language header bar, copy button, dark-only theme. Source: personal usage.
-- **Claude Android app** — Observed: Copy button but no language header bar, dark-only theme. Source: personal usage.
-- **LM Studio desktop** — Observed: Language header bar, copy button, follows app theme. Source: personal usage.
-
-### LOW confidence (needs validation)
-- **Android syntax highlighting library landscape** — No maintained library found via Context7, GitHub topics, or web search. A deeper search of Maven Central may surface niche alternatives. Likelihood of finding one: LOW (this is a genuinely underserved niche on Android).
+### Warped internal (HIGH confidence)
+- [PROJECT.md](.planning/PROJECT.md) — current state, v2.0 milestone, out-of-scope boundaries
+- [REQUIREMENTS.md](.planning/REQUIREMENTS.md) — v1.8 feature surface, deferred v2 features
+- [STATE.md](.planning/STATE.md) — current phase structure
+- [research/STACK.md](.planning/research/STACK.md) — confirmed tech stack (Kotlin 2.1.10, Compose BOM 2025.04, Hilt 2.59.2, OkHttp 4.12, LiteRT-LM)
 
 ---
 
-*Feature research for: Warped v1.6 code syntax highlighting*
-*Researched: 2026-05-14*
+*Feature research for: Warped v2.0 Gallery Convergence & Performance Overhaul*
+*Researched: 2026-06-05*
+*Reference: google-ai-edge/gallery v1.0.15 (May 2026), 23.6k stars, 91.9% Kotlin*
