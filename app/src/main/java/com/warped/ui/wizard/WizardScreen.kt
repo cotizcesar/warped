@@ -20,6 +20,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.R
 import com.warped.ui.components.PageIndicator
 import com.warped.ui.components.WarpedAlertDialog
+import com.warped.ui.navigation.Screen
 
 private val Accent = Color(0xFFD97757)
 private val TextPrimary = Color(0xFFECECEC)
@@ -29,7 +30,7 @@ private val TextSecondary = Color(0xFF9CA3AF)
 @Composable
 fun WizardScreen(
     onWizardComplete: () -> Unit,
-    onNavigate: (String) -> Unit = {},
+    onNavigate: (Screen) -> Unit = {},
     isReEntry: Boolean = false,
     onBackFromReEntry: () -> Unit = {},
     viewModel: WizardViewModel = hiltViewModel()
@@ -272,9 +273,7 @@ fun WizardScreen(
                 step = step,
                 contextData = uiState.contextData,
                 onCtaClick = {
-                    if (step.ctaRoute.isNotEmpty()) {
-                        onNavigate(step.ctaRoute)
-                    }
+                    step.ctaRoute?.let(onNavigate)
                 }
             )
         }

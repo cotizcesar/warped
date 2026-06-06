@@ -75,7 +75,7 @@ fun StepContent(
 
         Spacer(Modifier.height(24.dp))
 
-        if (step.ctaRoute.isNotEmpty()) {
+        if (step.ctaRoute != null) {
             Button(
                 onClick = onCtaClick,
                 colors = ButtonDefaults.buttonColors(containerColor = Accent),
