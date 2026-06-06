@@ -52,7 +52,10 @@ class LmStudioHelper @Inject constructor(
     private val activeEndpoint = AtomicReference<Endpoint?>(null)
     private val activeInstanceId = AtomicReference<String?>(null)
     private val activeJob = AtomicReference<Job?>(null)
-    private val activeCall = AtomicReference<okhttp3.Call?>(null)
+    // PERF-08 / Phase 43: actual OkHttp Call lives inside LMStudioProvider.
+    // Cancelling at the Flow level via activeJob is the effective cancellation
+    // point today; deeper Call.cancel() requires threading the Call through
+    // the provider. Tracked for v2.1.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile
@@ -128,12 +131,6 @@ class LmStudioHelper @Inject constructor(
         if (job != null && job.isActive) {
             Timber.d("LmStudioHelper: cancelling active job")
             job.cancel()
-        }
-        // RUNTIME-03: also cancel the underlying OkHttp call (drops the SSE stream).
-        val call = activeCall.getAndSet(null)
-        if (call != null && !call.isCanceled()) {
-            Timber.d("LmStudioHelper: cancelling underlying OkHttp Call")
-            call.cancel()
         }
     }
 
