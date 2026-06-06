@@ -5,7 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.warped.data.local.download.ModelDownloadManager
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.data.remote.dto.HuggingFaceModel
+import com.warped.data.remote.dto.HuggingFaceSibling
+import com.warped.domain.model.AllowlistEntry
 import com.warped.domain.repository.HuggingFaceRepository
+import com.warped.domain.repository.ModelAllowlistRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +24,7 @@ import timber.log.Timber
 @HiltViewModel
 class HuggingFaceViewModel @Inject constructor(
     private val huggingFaceRepository: HuggingFaceRepository,
+    private val modelAllowlistRepository: ModelAllowlistRepository,
     private val downloadManager: ModelDownloadManager,
     private val apiKeyStore: ApiKeyStore
 ) : ViewModel() {
@@ -34,7 +38,7 @@ class HuggingFaceViewModel @Inject constructor(
     }
 
     init {
-        search("")
+        loadRecommended()
         viewModelScope.launch(coroutineExceptionHandler) {
             downloadManager.downloadStates.collect { states ->
                 val activeId = _uiState.value.activeDownloadId
@@ -87,38 +91,13 @@ class HuggingFaceViewModel @Inject constructor(
         }
     }
 
-    fun selectModel(model: HuggingFaceModel) {
-        _uiState.update { it.copy(isLoading = true) }
-        viewModelScope.launch(coroutineExceptionHandler) {
-            val result = huggingFaceRepository.getModelDetail(model.id)
-            result.onSuccess { detail ->
-                val filteredSiblings = detail.siblings.filter {
-                    it.rfilename.endsWith(".litertlm", ignoreCase = true)
-                }
-                val sortedFiles = filteredSiblings.sortedBy { sibling ->
-                    sibling.size.takeIf { it > 0 } ?: sibling.lfs?.size ?: 0L
-                }
-                _uiState.update {
-                    it.copy(
-                        selectedModel = detail,
-                        modelSiblings = sortedFiles,
-                        isLoading = false
-                    )
-                }
-            }.onFailure { e ->
-                _uiState.update { it.copy(error = e.message, isLoading = false) }
-            }
-        }
-    }
-
-    fun downloadFile(modelId: String, fileName: String, fileSize: Long) {
-        val gated = _uiState.value.selectedModel?.gated ?: "false"
-        if (gated != "false") {
+    fun downloadFile(modelId: String, fileName: String, fileSize: Long, isGated: Boolean = false) {
+        if (isGated) {
             val hasToken = try { apiKeyStore.getHuggingFaceToken() != null } catch (_: Exception) { false }
             if (!hasToken) {
                 _uiState.update {
                     it.copy(
-                        downloadError = "Gated model — get an Access Token at huggingface.co/settings/tokens then add it in Settings → Hugging Face.",
+                        downloadError = "Gated model — get an Access Token at huggingface.co/settings/tokens then add it in Settings -> Hugging Face.",
                         isDownloading = false
                     )
                 }
@@ -148,7 +127,7 @@ class HuggingFaceViewModel @Inject constructor(
             fileName = fileName,
             fileUrl = fileUrl,
             fileSizeBytes = fileSize,
-            isGated = gated != "false"
+            isGated = isGated
         )
     }
 
@@ -156,6 +135,20 @@ class HuggingFaceViewModel @Inject constructor(
         val activeId = _uiState.value.activeDownloadId ?: return
         downloadManager.pauseDownload(activeId)
         _uiState.update { it.copy(isDownloading = false, isDownloadPaused = true) }
+    }
+
+    fun cancelDownload() {
+        val activeId = _uiState.value.activeDownloadId ?: return
+        downloadManager.cancelDownload(activeId)
+        _uiState.update {
+            it.copy(
+                isDownloading = false,
+                isDownloadPaused = true,
+                downloadError = "Cancelled",
+                activeDownloadId = null,
+                downloadingFileName = ""
+            )
+        }
     }
 
     fun resumeDownload() {
@@ -168,17 +161,74 @@ class HuggingFaceViewModel @Inject constructor(
         _uiState.update { it.copy(searchQuery = text) }
     }
 
-    fun clearSearch() {
-        _uiState.update { it.copy(searchQuery = "", searchResults = emptyList(), error = null) }
+    fun selectTab(tab: HuggingFaceTab) {
+        _uiState.update { it.copy(selectedTab = tab) }
+        if (tab == HuggingFaceTab.Recommended && _uiState.value.recommendedResults.isEmpty() && !_uiState.value.isLoadingRecommended) {
+            loadRecommended()
+        }
     }
 
-    fun clearDetail() {
-        _uiState.update {
-            it.copy(
-                selectedModel = null,
-                modelSiblings = emptyList()
-            )
+    /**
+     * Populate the Recommended tab from the curated `assets/model_allowlist.json`
+     * asset. The allowlist is the source of truth for which models are
+     * recommended — it removes the runtime HF API call and guarantees offline
+     * availability of the Recommended tab on first launch.
+     */
+    fun loadRecommended() {
+        if (_uiState.value.isLoadingRecommended) return
+        _uiState.update { it.copy(isLoadingRecommended = true, error = null) }
+        viewModelScope.launch(coroutineExceptionHandler) {
+            val entries = modelAllowlistRepository.getAll()
+            val mapped = entries.map { it.toHuggingFaceModel() }
+            _uiState.update {
+                it.copy(
+                    recommendedResults = mapped,
+                    isLoadingRecommended = false
+                )
+            }
         }
+    }
+
+    private fun AllowlistEntry.toHuggingFaceModel(): HuggingFaceModel {
+        val author = name.substringBefore('/')
+        val capList = capabilities
+        val tags = buildList {
+            add("litertlm")
+            if ("llm_chat" in capList) add("conversational")
+            if ("llm_vision" in capList) add("image-text-to-text")
+        }
+        return HuggingFaceModel(
+            id = name,
+            modelIdAlias = name,
+            author = author,
+            tags = tags,
+            downloads = 0,
+            likes = 0,
+            description = displayName,
+            pipelineTag = if ("llm_vision" in capList) "image-text-to-text" else "text-generation",
+            gated = "false",
+            lastModified = "",
+            siblings = listOf(
+                HuggingFaceSibling(
+                    rfilename = modelFile,
+                    size = sizeInBytes,
+                    blobId = null,
+                    lfs = null
+                )
+            )
+        )
+    }
+
+    /**
+     * Start a download directly from a card's dropdown — no detail sheet.
+     * The card itself shows progress inline once the download starts.
+     */
+    fun startDirectDownload(model: HuggingFaceModel, fileName: String, fileSize: Long) {
+        downloadFile(model.id, fileName, fileSize, isGated = model.gated != "false")
+    }
+
+    fun clearSearch() {
+        _uiState.update { it.copy(searchQuery = "", searchResults = emptyList(), error = null) }
     }
 
     fun clearError() {

@@ -1,0 +1,100 @@
+{
+  "models": [
+    {
+      "name": "litertlm-community/Gemma3-1B-IT",
+      "displayName": "Gemma 3 1B Instruct",
+      "modelFile": "Gemma3-1B-IT.litertlm",
+      "sizeInBytes": 892345678,
+      "capabilities": ["llm_chat", "llm_vision"],
+      "llmPromptTemplates": {
+        "user": "<start_of_turn>user\n{prompt}<end_of_turn>\n<start_of_turn>model\n",
+        "model": "{response}<end_of_turn>\n"
+      },
+      "taskTypes": ["llm_chat"]
+    },
+    {
+      "name": "litertlm-community/Gemma3-4B-IT",
+      "displayName": "Gemma 3 4B Instruct",
+      "modelFile": "Gemma3-4B-IT.litertlm",
+      "sizeInBytes": 3410123456,
+      "capabilities": ["llm_chat", "llm_vision"],
+      "llmPromptTemplates": {
+        "user": "<start_of_turn>user\n{prompt}<end_of_turn>\n<start_of_turn>model\n",
+        "model": "{response}<end_of_turn>\n"
+      },
+      "taskTypes": ["llm_chat"]
+    },
+    {
+      "name": "litertlm-community/Phi-4-mini-instruct",
+      "displayName": "Phi-4 Mini Instruct",
+      "modelFile": "Phi-4-mini-instruct.litertlm",
+      "sizeInBytes": 2387654321,
+      "capabilities": ["llm_chat", "llm_spec_decoding"],
+      "llmPromptTemplates": {
+        "user": "<|user|>\n{prompt}<|end|>\n<|assistant|>",
+        "model": "{response}<|end|>\n"
+      },
+      "taskTypes": ["llm_chat"]
+    },
+    {
+      "name": "litertlm-community/Qwen2.5-1.5B-Instruct",
+      "displayName": "Qwen 2.5 1.5B Instruct",
+      "modelFile": "Qwen2.5-1.5B-Instruct.litertlm",
+      "sizeInBytes": 1112345678,
+      "capabilities": ["llm_chat"],
+      "llmPromptTemplates": {
+        "user": "<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n",
+        "model": "{response}<|im_end|>\n"
+      },
+      "taskTypes": ["llm_chat"]
+    },
+    {
+      "name": "litertlm-community/Qwen2.5-3B-Instruct",
+      "displayName": "Qwen 2.5 3B Instruct",
+      "modelFile": "Qwen2.5-3B-Instruct.litertlm",
+      "sizeInBytes": 1976543210,
+      "capabilities": ["llm_chat", "llm_spec_decoding"],
+      "llmPromptTemplates": {
+        "user": "<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n",
+        "model": "{response}<|im_end|>\n"
+      },
+      "taskTypes": ["llm_chat"]
+    },
+    {
+      "name": "litertlm-community/Llama-3.2-1B-Instruct",
+      "displayName": "Llama 3.2 1B Instruct",
+      "modelFile": "Llama-3.2-1B-Instruct.litertlm",
+      "sizeInBytes": 1387654321,
+      "capabilities": ["llm_chat"],
+      "llmPromptTemplates": {
+        "user": "<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+        "model": "{response}<|eot_id|>"
+      },
+      "taskTypes": ["llm_chat"]
+    },
+    {
+      "name": "litertlm-community/Llama-3.2-3B-Instruct",
+      "displayName": "Llama 3.2 3B Instruct",
+      "modelFile": "Llama-3.2-3B-Instruct.litertlm",
+      "sizeInBytes": 2245678901,
+      "capabilities": ["llm_chat", "llm_vision"],
+      "llmPromptTemplates": {
+        "user": "<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+        "model": "{response}<|eot_id|>"
+      },
+      "taskTypes": ["llm_chat"]
+    },
+    {
+      "name": "litertlm-community/DeepSeek-R1-Distill-Qwen-1.5B",
+      "displayName": "DeepSeek R1 Distill Qwen 1.5B",
+      "modelFile": "DeepSeek-R1-Distill-Qwen-1.5B.litertlm",
+      "sizeInBytes": 1512345678,
+      "capabilities": ["llm_chat", "llm_thinking"],
+      "llmPromptTemplates": {
+        "user": "<|begin▁of▁sentence|>user\n{prompt}<|end▁of▁sentence|>\n<|begin▁of▁sentence|>assistant\n",
+        "model": "{response}<|end▁of▁sentence|>"
+      },
+      "taskTypes": ["llm_chat"]
+    }
+  ]
+}

@@ -2,10 +2,12 @@ package com.warped.di
 
 import com.warped.data.repository.ChatRepositoryImpl
 import com.warped.data.repository.EndpointRepositoryImpl
+import com.warped.data.repository.ModelAllowlistRepositoryImpl
 import com.warped.data.repository.ModelRepositoryImpl
 import com.warped.data.repository.PresetRepositoryImpl
 import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
+import com.warped.domain.repository.ModelAllowlistRepository
 import com.warped.domain.repository.ModelRepository
 import com.warped.domain.repository.PresetRepository
 import dagger.Binds
@@ -33,4 +35,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindPresetRepository(impl: PresetRepositoryImpl): PresetRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindModelAllowlistRepository(impl: ModelAllowlistRepositoryImpl): ModelAllowlistRepository
 }
