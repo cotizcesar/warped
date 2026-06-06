@@ -120,6 +120,7 @@ dependencies {
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.lifecycle.runtime.ktx)
+    implementation(libs.lifecycle.process)
 
     // Navigation
     implementation(libs.navigation.compose)
@@ -167,6 +168,9 @@ dependencies {
 
     // Highlights — syntax tokenization engine for code highlighting
     implementation(libs.highlights)
+
+    // Immutable collections
+    implementation(libs.kotlinx.collections.immutable)
 
     // Logging
     implementation(libs.timber)
