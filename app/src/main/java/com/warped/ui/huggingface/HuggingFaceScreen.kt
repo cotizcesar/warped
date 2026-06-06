@@ -337,13 +337,7 @@ private fun ModelListCard(
                     }
                 )
             } else {
-                Text(
-                    text = "${fileName.substringAfterLast("/")}  ·  ${formatFileSize(fileSize)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
-                )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(4.dp))
                 OutlinedButton(
                     onClick = onDownload,
                     modifier = Modifier.align(Alignment.End)

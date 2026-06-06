@@ -45,6 +45,14 @@
 -keep,allowobfuscation @interface dagger.hilt.android.AndroidEntryPoint
 -keep,allowobfuscation @interface dagger.hilt.android.lifecycle.HiltViewModel
 
+# Hilt WorkManager — keep @HiltWorker classes and their generated
+# WorkerAssistedFactory so HiltWorkerFactory can create them at runtime.
+-keep,allowobfuscation @interface androidx.hilt.work.HiltWorker
+-keep @androidx.hilt.work.HiltWorker class * {
+    @dagger.assisted.AssistedInject <init>(...);
+}
+-keep class * extends androidx.hilt.work.WorkerAssistedFactory { *; }
+
 # Kotlin Coroutines
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
