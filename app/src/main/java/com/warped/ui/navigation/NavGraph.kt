@@ -407,7 +407,7 @@ fun WarpedNavGraph() {
                 PromptLabPlaceholderScreen()
             }
             composable<Screen.Benchmark> {
-                BenchmarkPlaceholderScreen()
+                com.warped.ui.benchmark.BenchmarkScreen()
             }
         }
     }

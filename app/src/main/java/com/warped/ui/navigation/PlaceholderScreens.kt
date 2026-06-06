@@ -21,14 +21,6 @@ fun PromptLabPlaceholderScreen() {
 }
 
 @Composable
-fun BenchmarkPlaceholderScreen() {
-    PlaceholderContent(
-        title = "Benchmark",
-        subtitle = "Coming in Phase 41"
-    )
-}
-
-@Composable
 private fun PlaceholderContent(title: String, subtitle: String) {
     Surface(
         modifier = Modifier.fillMaxSize(),
