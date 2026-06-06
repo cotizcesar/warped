@@ -185,6 +185,9 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.compose.ui.test)
     androidTestImplementation(libs.room.testing)
+    androidTestImplementation("androidx.benchmark:benchmark-macro-junit4:1.3.3")
+    androidTestImplementation("androidx.benchmark:benchmark-junit4:1.3.3")
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
 }
 
 tasks.withType<Test> {
