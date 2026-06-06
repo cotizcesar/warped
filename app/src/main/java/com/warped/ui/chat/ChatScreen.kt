@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.collections.immutable.toPersistentList
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -148,6 +149,9 @@ fun ChatScreen(
         val effectiveProvider = if (uiState.selectedLocalModelId != null) ProviderType.LITE_RT_LM
             else uiState.selectedRemoteProvider
         val local = uiState.localModels.firstOrNull { it.filePath == effectiveModelId }
+        val messages = remember(uiState.messages) { uiState.messages.toPersistentList() }
+        val localModels = remember(uiState.localModels) { uiState.localModels.toPersistentList() }
+        val endpoints = remember(uiState.endpoints) { uiState.endpoints.toPersistentList() }
         val endpoint = uiState.endpoints.firstOrNull {
             it.modelId == effectiveModelId && it.apiType == effectiveProvider
         }
@@ -210,12 +214,18 @@ fun ChatScreen(
         ) {
 
             // CHAT-02/04/05: Inline model selector bar above messages
+            // PERF-04: derivedStateOf wraps the traffic-light derivation so the inline
+            // model selector doesn't re-derive it on every recomposition (e.g. when
+            // a single streaming character arrives).
+            val trafficLight by remember(uiState) {
+                derivedStateOf { uiState.trafficLightState() }
+            }
             InlineModelSelectorBar(
                 selectedModelName = selectedModelName,
                 isLocal = uiState.selectedLocalModelId != null,
                 isLoading = uiState.isLoadingModel,
                 loadingModelName = uiState.loadingModelName,
-                trafficLight = uiState.trafficLightState(),
+                trafficLight = trafficLight,
                 onClick = {
                     showModelPicker = true
                     viewModel.fetchAllEndpointModels()

@@ -20,6 +20,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import com.warped.ui.components.WarpedAlertDialog
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -75,7 +80,10 @@ fun MessageBubble(
                 .widthIn(max = 340.dp)
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                modifier = Modifier.padding(
+                    horizontal = if (isUser) 12.dp else 0.dp,
+                    vertical = 10.dp
+                )
             ) {
                 if (!isUser && !message.reasoning.isNullOrBlank()) {
                     Row(
@@ -90,10 +98,11 @@ fun MessageBubble(
                             color = Color(0xFF545450)
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text(
-                            text = if (showReasoning) "▼" else "▶",
-                            color = Color(0xFF545450),
-                            style = MaterialTheme.typography.bodySmall
+                        Icon(
+                            imageVector = if (showReasoning) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = if (showReasoning) "Hide reasoning" else "Show reasoning",
+                            tint = Color(0xFF545450),
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                     AnimatedVisibility(
@@ -136,53 +145,11 @@ fun MessageBubble(
                     Spacer(Modifier.height(4.dp))
                 }
 
-                // Images in user messages
+                // PERF-03: extracted subcomposable. Decoding images lives in
+                // its own remember(dataUrl) scope so streaming-text recomposition
+                // doesn't churn the image bitmaps.
                 if (isUser && message.imageUris.isNotEmpty()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        message.imageUris.forEach { dataUrl ->
-                            var showFullImage by remember { mutableStateOf(false) }
-                            val bitmap = remember(dataUrl) {
-                                try {
-                                    val base64 = dataUrl.substringAfter("base64,")
-                                    val bytes = Base64.decode(base64, Base64.DEFAULT)
-                                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                                } catch (_: Exception) { null }
-                            }
-                            if (showFullImage) {
-                                WarpedAlertDialog(
-                                    onDismissRequest = { showFullImage = false },
-                                    confirmButton = {},
-                                    dismissButton = {
-                                        TextButton(onClick = { showFullImage = false }) {
-                                            Text("✕", color = androidx.compose.ui.graphics.Color.White)
-                                        }
-                                    },
-                                    text = {
-                                        bitmap?.let {
-                                            Image(
-                                                bitmap = it.asImageBitmap(),
-                                                contentDescription = "Full image",
-                                                modifier = Modifier.fillMaxWidth()
-                                            )
-                                        }
-                                    }
-                                )
-                            }
-                            bitmap?.let {
-                                Image(
-                                    bitmap = it.asImageBitmap(),
-                                    contentDescription = "Image (tap to enlarge)",
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .heightIn(max = 200.dp)
-                                        .clip(MaterialTheme.shapes.medium)
-                                        .clickable { showFullImage = true },
-                                    contentScale = ContentScale.FillWidth
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(6.dp))
-                    }
+                    MessageImageStack(imageUris = message.imageUris)
                 }
 
                 if (message.content.isNotBlank()) {
@@ -220,5 +187,58 @@ fun MessageBubble(
                 modifier = Modifier.padding(bottom = 4.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun MessageImageStack(imageUris: List<String>) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        imageUris.forEach { dataUrl ->
+            var showFullImage by remember { mutableStateOf(false) }
+            val bitmap = remember(dataUrl) {
+                try {
+                    val base64 = dataUrl.substringAfter("base64,")
+                    val bytes = Base64.decode(base64, Base64.DEFAULT)
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                } catch (_: Exception) { null }
+            }
+            if (showFullImage) {
+                WarpedAlertDialog(
+                    onDismissRequest = { showFullImage = false },
+                    confirmButton = {},
+                    dismissButton = {
+                        TextButton(onClick = { showFullImage = false }) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "Close",
+                                tint = androidx.compose.ui.graphics.Color.White
+                            )
+                        }
+                    },
+                    text = {
+                        bitmap?.let {
+                            Image(
+                                bitmap = it.asImageBitmap(),
+                                contentDescription = "Full image",
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                )
+            }
+            bitmap?.let {
+                Image(
+                    bitmap = it.asImageBitmap(),
+                    contentDescription = "Image (tap to enlarge)",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 200.dp)
+                        .clip(MaterialTheme.shapes.medium)
+                        .clickable { showFullImage = true },
+                    contentScale = ContentScale.FillWidth
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
     }
 }
