@@ -20,15 +20,11 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -38,20 +34,15 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.warped.R
 import com.warped.domain.model.SyntaxTheme
 import com.warped.ui.chat.components.MarkdownText
 import kotlinx.coroutines.delay
@@ -114,14 +105,10 @@ fun HuggingFaceScreen(
                     viewModel.onSearchTextChanged(it)
                 },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.search_models)) },
+                label = { Text("Search models") },
                 supportingText = {
                     Text(
-                        if (canSearch) {
-                            stringResource(R.string.search_models_hint)
-                        } else {
-                            stringResource(R.string.search_minimum_length)
-                        }
+                        if (canSearch) "Enter 3+ characters to search" else "Type to search..."
                     )
                 },
                 singleLine = true
@@ -196,25 +183,24 @@ private fun SearchResults(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(results, key = { it.id }) { model ->
-                    val chips = buildList {
-                        add("LiteRT-LM")
-                        add("${model.downloads} downloads")
-                        add("${model.likes} likes")
-                        model.tags.firstOrNull()?.let { add(it) }
-                    }
-                    val litertlmFiles = model.siblings
-                        .filter { it.rfilename.endsWith(".litertlm", ignoreCase = true) }
-                        .sortedBy { it.size.takeIf { s -> s > 0 } ?: it.lfs?.size ?: 0L }
+                    val capabilities = deriveCapabilities(model.tags, model.pipelineTag)
+                    val litertlmFile = model.siblings
+                        .firstOrNull { it.rfilename.endsWith(".litertlm", ignoreCase = true) }
+                    val fileSize = litertlmFile?.size?.takeIf { it > 0 }
+                        ?: litertlmFile?.lfs?.size ?: 0L
                     ModelListCard(
                         title = model.id.substringAfterLast("/"),
                         subtitle = model.id,
-                        chips = chips,
+                        capabilities = capabilities,
                         description = model.description.takeIf { it.isNotBlank() },
                         descriptionAsMarkdown = true,
-                        files = litertlmFiles,
+                        fileName = litertlmFile?.rfilename,
+                        fileSize = fileSize,
                         isActive = activeModelId == model.id,
                         downloadState = downloadState,
-                        onDownload = { fileName, size -> onDownload(model, fileName, size) },
+                        onDownload = {
+                            if (litertlmFile != null) onDownload(model, litertlmFile.rfilename, fileSize)
+                        },
                         onPause = onPause,
                         onResume = onResume,
                         onCancel = onCancel
@@ -237,7 +223,7 @@ private fun SearchResults(
                         TextButton(onClick = onClearError) { Text("Dismiss") }
                     } else {
                         Text(
-                            if (searchQuery.isNotBlank()) "No results found" else "Search Hugging Face to find models",
+                            if (searchQuery.isNotBlank()) "No results found" else "Loading warped-community models...",
                             style = MaterialTheme.typography.bodyLarge
                         )
                     }
@@ -247,24 +233,32 @@ private fun SearchResults(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+private fun deriveCapabilities(tags: List<String>, pipelineTag: String): List<String> {
+    val caps = mutableListOf<String>()
+    if (pipelineTag == "image-text-to-text") caps.add("vision")
+    val lower = tags.map { it.lowercase() }
+    if (lower.any { it.contains("audio") }) caps.add("audio")
+    if (lower.any { it in listOf("tool_use", "function-calling", "tools") || it.contains("tool") }) caps.add("tools")
+    if (lower.any { it in listOf("thinking", "reasoning") || it.contains("think") }) caps.add("thinking")
+    return caps
+}
+
 @Composable
 private fun ModelListCard(
     title: String,
     subtitle: String,
-    chips: List<String>,
+    capabilities: List<String>,
     description: String?,
     descriptionAsMarkdown: Boolean,
-    files: List<com.warped.data.remote.dto.HuggingFaceSibling>,
+    fileName: String?,
+    fileSize: Long,
     isActive: Boolean,
     downloadState: DownloadCardState,
-    onDownload: (fileName: String, fileSize: Long) -> Unit,
+    onDownload: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onCancel: () -> Unit
 ) {
-    var selectedIndex by remember { mutableIntStateOf(0) }
-    var dropdownExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     Card(
@@ -298,11 +292,11 @@ private fun ModelListCard(
                     )
                 }
             }
-            if (chips.isNotEmpty()) {
+            if (capabilities.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    chips.forEach { chip ->
-                        if (chip == "LiteRT-LM") FormatBadge() else AssistInfoChip(text = chip)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    capabilities.forEach { cap ->
+                        CapabilityBadge(capability = cap)
                     }
                 }
             }
@@ -326,9 +320,9 @@ private fun ModelListCard(
 
             Spacer(Modifier.height(10.dp))
 
-            if (files.isEmpty()) {
+            if (fileName == null) {
                 Text(
-                    text = "No LiteRT-LM files in this model",
+                    text = "No .litertlm file found",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -343,69 +337,44 @@ private fun ModelListCard(
                     }
                 )
             } else {
-                val selectedFile = files.getOrNull(selectedIndex) ?: files.first()
-                val selectedSize = selectedFile.size.takeIf { it > 0 } ?: selectedFile.lfs?.size ?: 0L
-                val selectedLabel = buildString {
-                    append(selectedFile.rfilename.substringAfterLast("/"))
-                    if (selectedSize > 0) append("  ·  ").append(formatFileSize(selectedSize))
-                }
-                ExposedDropdownMenuBox(
-                    expanded = dropdownExpanded,
-                    onExpandedChange = { dropdownExpanded = !dropdownExpanded }
-                ) {
-                    OutlinedTextField(
-                        value = selectedLabel,
-                        onValueChange = {},
-                        readOnly = true,
-                        singleLine = true,
-                        label = { Text("File") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = files.size > 1)
-                    )
-                    ExposedDropdownMenu(
-                        expanded = dropdownExpanded,
-                        onDismissRequest = { dropdownExpanded = false }
-                    ) {
-                        files.forEachIndexed { i, file ->
-                            val size = file.size.takeIf { it > 0 } ?: file.lfs?.size ?: 0L
-                            DropdownMenuItem(
-                                text = {
-                                    Column {
-                                        Text(
-                                            text = file.rfilename.substringAfterLast("/"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        if (size > 0) {
-                                            Text(
-                                                text = formatFileSize(size),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                },
-                                onClick = {
-                                    selectedIndex = i
-                                    dropdownExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
+                Text(
+                    text = "${fileName.substringAfterLast("/")}  ·  ${formatFileSize(fileSize)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(
-                    onClick = { onDownload(selectedFile.rfilename, selectedSize) },
-                    modifier = Modifier.align(Alignment.End),
-                    enabled = files.size > 0
+                    onClick = onDownload,
+                    modifier = Modifier.align(Alignment.End)
                 ) {
                     Text("Download")
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CapabilityBadge(capability: String) {
+    val color = when (capability) {
+        "vision" -> androidx.compose.ui.graphics.Color(0xFF2196F3)
+        "audio" -> androidx.compose.ui.graphics.Color(0xFFFF9800)
+        "tools" -> androidx.compose.ui.graphics.Color(0xFF9C27B0)
+        "thinking" -> androidx.compose.ui.graphics.Color(0xFF00BCD4)
+        else -> MaterialTheme.colorScheme.primary
+    }
+    androidx.compose.material3.Surface(
+        shape = MaterialTheme.shapes.extraSmall,
+        color = color.copy(alpha = 0.15f),
+        contentColor = color
+    ) {
+        Text(
+            text = capability,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1
+        )
     }
 }
 
@@ -461,39 +430,6 @@ private fun InlineDownloadProgress(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun FormatBadge() {
-    val color = Color(0xFF4CAF50) // green for LiteRT-LM
-    androidx.compose.material3.Surface(
-        shape = MaterialTheme.shapes.extraSmall,
-        color = color.copy(alpha = 0.15f),
-        contentColor = color
-    ) {
-        Text(
-            text = "LiteRT-LM",
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-            style = MaterialTheme.typography.labelSmall,
-            maxLines = 1
-        )
-    }
-}
-
-@Composable
-private fun AssistInfoChip(text: String) {
-    androidx.compose.material3.Surface(
-        shape = MaterialTheme.shapes.extraSmall,
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-    ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.labelSmall,
-            maxLines = 1
-        )
     }
 }
 
