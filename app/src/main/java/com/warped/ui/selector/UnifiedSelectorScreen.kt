@@ -1,8 +1,5 @@
 package com.warped.ui.selector
 
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -48,12 +45,6 @@ fun UnifiedSelectorScreen(
     var editingModel by remember { mutableStateOf<LocalModel?>(null) }
     val isEndpointFormOpen = uiState.isEndpointFormVisible || uiState.isEditingEndpoint
 
-    val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        uri?.let { viewModel.importModel(it) }
-    }
-
     if (showMemoryWarning != null) {
         WarpedAlertDialog(
             onDismissRequest = { showMemoryWarning = null },
@@ -91,45 +82,6 @@ fun UnifiedSelectorScreen(
         )
     }
 
-    if (uiState.showAddWizard) {
-        WarpedAlertDialog(
-            onDismissRequest = { viewModel.dismissAddWizard() },
-            title = { Text("Add Model", style = MaterialTheme.typography.titleLarge) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(onClick = { viewModel.dismissAddWizard(); onOpenHuggingFace() }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Filled.Search, null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Download from Hugging Face", style = MaterialTheme.typography.bodyLarge)
-                            Text("Browse and download LiteRT-LM models", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                    HorizontalDivider()
-                    TextButton(onClick = { viewModel.dismissAddWizard(); filePickerLauncher.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Filled.Storage, null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Import Model File", style = MaterialTheme.typography.bodyLarge)
-                            Text("Import a .litertlm file from your device", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                    HorizontalDivider()
-                    TextButton(onClick = { viewModel.dismissAddWizard(); viewModel.showEndpointForm() }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Filled.Dns, null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Connect to an API", style = MaterialTheme.typography.bodyLarge)
-                            Text("Add a remote LM Studio server", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = { TextButton(onClick = { viewModel.dismissAddWizard() }) { Text("Cancel") } }
-        )
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -151,16 +103,6 @@ fun UnifiedSelectorScreen(
                 }
             )
         },
-        floatingActionButton = {
-            if (!isEndpointFormOpen) {
-                FloatingActionButton(
-                    onClick = { viewModel.showAddWizard() },
-                    containerColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Icon(Icons.Filled.Add, "Add", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(28.dp))
-                }
-            }
-        }
     ) { padding ->
         if (isEndpointFormOpen) {
             Column(modifier = Modifier.padding(padding)) {
@@ -180,20 +122,6 @@ fun UnifiedSelectorScreen(
                     isFetchingModels = uiState.isFetchingEndpointModels,
                     onFetchModels = { viewModel.fetchEndpointModels() }
                 )
-            }
-        } else if (uiState.localModels.isEmpty() && uiState.endpoints.isEmpty() && uiState.activeDownloads.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("No models or endpoints yet", style = MaterialTheme.typography.bodyLarge, color = Color(0xFF9CA3AF))
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = { viewModel.showAddWizard() },
-                        shape = RoundedCornerShape(8.dp)
-                    ) { Text("Add Model") }
-                }
             }
         } else {
             LazyColumn(
@@ -220,8 +148,14 @@ fun UnifiedSelectorScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Local Models", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("${uiState.localModels.size}", style = MaterialTheme.typography.labelMedium, color = Color(0xFF9CA3AF))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Local Models", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.width(8.dp))
+                            Text("${uiState.localModels.size}", style = MaterialTheme.typography.labelMedium, color = Color(0xFF9CA3AF))
+                        }
+                        IconButton(onClick = onOpenHuggingFace) {
+                            Icon(Icons.Filled.Add, "Add model", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                        }
                     }
                 }
 
@@ -250,17 +184,22 @@ fun UnifiedSelectorScreen(
                     )
                 }
 
-                if (uiState.endpoints.isNotEmpty()) {
-                    item(key = "remote-header") {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Network Endpoints", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                item(key = "remote-header") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Endpoints", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.width(8.dp))
                             Text("${uiState.endpoints.size}", style = MaterialTheme.typography.labelMedium, color = Color(0xFF9CA3AF))
                         }
+                        IconButton(onClick = { viewModel.showEndpointForm() }) {
+                            Icon(Icons.Filled.Add, "Add endpoint", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                        }
                     }
+                }
 
                     items(uiState.endpoints, key = { "endpoint-${it.id}" }) { endpoint ->
                         EndpointSelectorCard(
@@ -274,7 +213,6 @@ fun UnifiedSelectorScreen(
                             onDelete = { viewModel.deleteEndpoint(endpoint) }
                         )
                     }
-                }
             }
         }
 

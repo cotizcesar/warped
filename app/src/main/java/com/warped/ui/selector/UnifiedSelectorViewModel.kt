@@ -1,6 +1,5 @@
 package com.warped.ui.selector
 
-import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.warped.data.local.download.DownloadState
@@ -264,10 +263,6 @@ class UnifiedSelectorViewModel @Inject constructor(
         }
     }
 
-    fun importModel(uri: Uri) {
-        _uiState.update { it.copy(error = null) }
-    }
-
     fun shouldWarnAboutMemory(modelSizeBytes: Long): Boolean =
         memoryChecker.shouldWarn(modelSizeBytes)
 
@@ -419,14 +414,6 @@ class UnifiedSelectorViewModel @Inject constructor(
                 _uiState.update { it.copy(error = e.message) }
             }
         }
-    }
-
-    fun showAddWizard() {
-        _uiState.update { it.copy(showAddWizard = true) }
-    }
-
-    fun dismissAddWizard() {
-        _uiState.update { it.copy(showAddWizard = false) }
     }
 
     private fun refreshActiveBackend() {

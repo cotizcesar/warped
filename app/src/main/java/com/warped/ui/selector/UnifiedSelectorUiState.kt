@@ -37,5 +37,4 @@ data class UnifiedSelectorUiState(
     val availableEndpointModels: List<String> = emptyList(),
     val availableEndpointModelsData: List<com.warped.data.remote.dto.LmStudioModelData> = emptyList(),
     val isFetchingEndpointModels: Boolean = false,
-    val showAddWizard: Boolean = false
 )
