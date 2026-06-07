@@ -757,69 +757,34 @@ class ChatViewModel @Inject constructor(
 
     private fun parseThinkBlocks(raw: String, enabled: Boolean = true, modelMayThink: Boolean = false): Pair<String, String> {
         if (!enabled) {
-            Timber.d("ChatVM: parseThinkBlocks disabled — raw=%d chars, mayThink=%b", raw.length, modelMayThink)
-            val closeThink = raw.lowercase().lastIndexOf("<｜end▁of▁thinking｜>.)**")
-            val clean = if (closeThink >= 0) {
-                // Gemma 4: thinking ends with "response.)**" transition
-                val after = raw.substring(closeThink + " response.)**".length)
-                // Skip any leading whitespace/newlines, then return
-                after.trimStart()
-            } else {
-                // Check for <think>/</think> or <channel|>/<|channel> patterns
-                val closeIdx = raw.lowercase().lastIndexOf("</think>")
-                if (closeIdx >= 0) {
-                    raw.substring(closeIdx + "</think>".length).trim()
-                } else {
-                    val channelClose = raw.lastIndexOf("<|channel>")
-                    if (channelClose >= 0) {
-                        raw.substring(channelClose + "<|channel>".length).trim()
-                    } else if (!modelMayThink) {
-                        Regex("<[/]?think>", setOf(RegexOption.IGNORE_CASE)).replace(raw, "").trim()
-                    } else if (raw.length > 400) {
-                        // Model can think but no tags — strip any markers we can
-                        Regex("<[/]?think>|<[/]?channel\\|?>", setOf(RegexOption.IGNORE_CASE)).replace(raw, "").trim()
-                    } else {
-                        ""
-                    }
-                }
-            }
-            Timber.d("ChatVM: parseThinkBlocks disabled result — clean=%d chars", clean.length)
+            // Thinking disabled: strip any tags and show everything as clean
+            val clean = Regex("<[/]?think>|<[/]?channel\\|?>", setOf(RegexOption.IGNORE_CASE))
+                .replace(raw, "").trim()
             return Pair(clean, "")
         }
-        Timber.d("ChatVM: parseThinkBlocks raw (%d chars) last 200: %s", raw.length, raw.takeLast(200))
-        // Check for Gemma 4 channel-based thinking: <channel|>...<|channel>
-        val channelRegex = Regex("<channel\\|>([\\s\\S]*?)<\\|channel>", setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE))
+        // Thinking enabled: extract channel-based and think-based reasoning
         val reasoning = StringBuilder()
         var clean = raw
-        val hasChannels = channelRegex.containsMatchIn(clean)
-        channelRegex.findAll(clean).forEach { match -> reasoning.append(match.groupValues[1].trim()).append("\n") }
+
+        // Gemma 4: <channel|>...<|channel>
+        val channelRegex = Regex("<channel\\|>([\\s\\S]*?)<\\|channel>",
+            setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE))
+        channelRegex.findAll(clean).forEach { m -> reasoning.append(m.groupValues[1].trim()).append("\n") }
         clean = channelRegex.replace(clean, "")
-        // Handle <think> tags as fallback (e.g. DeepSeek models)
-        val thinkRegex = Regex("<think>([\\s\\S]*?)</think>", setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE))
-        val hasThinkTags = thinkRegex.containsMatchIn(clean)
-        thinkRegex.findAll(clean).forEach { match -> reasoning.append(match.groupValues[1].trim()).append("\n") }
+
+        // DeepSeek: <think>...</think>
+        val thinkRegex = Regex("<think>([\\s\\S]*?)</think>",
+            setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE))
+        thinkRegex.findAll(clean).forEach { m -> reasoning.append(m.groupValues[1].trim()).append("\n") }
         clean = thinkRegex.replace(clean, "")
-        // Handle incomplete tags
-        val lastThinkOpen = clean.lowercase().lastIndexOf("<think>")
-        if (lastThinkOpen >= 0) {
-            val beforeTag = clean.substring(0, lastThinkOpen)
-            val afterTag = clean.substring(lastThinkOpen + "<think>".length)
-            reasoning.append(afterTag.trim())
-            clean = beforeTag
+
+        // Incomplete <think> tag at the end (still streaming)
+        val openIdx = clean.lowercase().lastIndexOf("<think>")
+        if (openIdx >= 0) {
+            reasoning.append(clean.substring(openIdx + "<think>".length).trim())
+            clean = clean.substring(0, openIdx)
         }
-        if (reasoning.isEmpty()) {
-            val closeIdx = clean.lowercase().lastIndexOf("</think>")
-            if (closeIdx >= 0) {
-                reasoning.append(clean.substring(0, closeIdx).trim())
-                clean = clean.substring(closeIdx + "</think>".length)
-            }
-        }
-        // If model can think and no tags found, treat entire content as reasoning
-        if (reasoning.isEmpty() && modelMayThink && !hasThinkTags && !hasChannels &&
-            !raw.contains("<think>", ignoreCase = true) && !raw.contains("</think>", ignoreCase = true)) {
-            reasoning.append(clean.trim())
-            clean = ""
-        }
+
         Timber.d("ChatVM: parseThinkBlocks result — clean=%d reasoning=%d", clean.length, reasoning.length)
         return Pair(clean.trim(), reasoning.toString().trim())
     }
