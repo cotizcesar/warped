@@ -32,8 +32,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.R
-import com.warped.data.local.inference.tools.ToolCategory
-import com.warped.data.local.inference.tools.ToolDefinitions
 import com.warped.domain.model.SyntaxTheme
 import com.warped.domain.model.TokenType
 import com.warped.ui.components.WarpedAlertDialog
@@ -43,7 +41,6 @@ import com.warped.ui.components.WarpedAlertDialog
 fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
     onOpenDrawer: () -> Unit = {},
-    onNavigateToTools: () -> Unit = {},
     onNavigateToWizard: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -112,7 +109,6 @@ fun SettingsScreen(
 
             when (uiState.selectedTab) {
                 SettingsTab.General -> GeneralTab(uiState, viewModel, onNavigateToWizard)
-                SettingsTab.Tools -> ToolsTab(uiState, viewModel)
             }
         }
 
@@ -376,144 +372,6 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
 
 // =========================================
 // TOOLS TAB
-// =========================================
-@Composable
-private fun ToolsTab(uiState: SettingsUiState, viewModel: SettingsViewModel) {
-    val enabledCount = uiState.toolStates.count { it.enabled }
-    val enabledTokenSum = uiState.toolStates.filter { it.enabled }.sumOf { it.tokenEstimate }
-    val contextSize = uiState.contextSize
-    val maxOutTokens = uiState.maxTokens
-    val availableForConv = contextSize - enabledTokenSum - maxOutTokens
-    val toolsRatio = (enabledTokenSum.toFloat() / contextSize.toFloat() * 100).toInt()
-    val totalRatio = ((enabledTokenSum + maxOutTokens).toFloat() / contextSize.toFloat() * 100).toInt()
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(0.dp),
-        contentPadding = PaddingValues(vertical = 12.dp)
-    ) {
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFF2B2B29)
-                )
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.Info, null, tint = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Token Budget", fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Context window: $contextSize tokens. Max output: $maxOutTokens tokens. " +
-                            "Each tool you enable consumes tokens from what's left for conversation history.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    // Progress bar: tools / total
-                    LinearProgressIndicator(
-                        progress = { (enabledTokenSum.toFloat() / contextSize).coerceIn(0f, 1f) },
-                        modifier = Modifier.fillMaxWidth().height(6.dp),
-                        color = when { toolsRatio > 25 -> Color(0xFFFF4444); toolsRatio > 10 -> Color(0xFFFF9800); else -> Color(0xFF4CAF50) },
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Column {
-                            Text(
-                                "$enabledCount / ${ToolDefinitions.all.size}",
-                                fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary
-                            )
-                            Text("tools on", style = MaterialTheme.typography.labelSmall)
-                        }
-                        Column {
-                            Text(
-                                "~$enabledTokenSum",
-                                fontWeight = FontWeight.Bold,
-                                color = if (toolsRatio > 25) Color(0xFFFF4444)
-                                    else if (toolsRatio > 10) Color(0xFFFF9800)
-                                    else Color(0xFF4CAF50)
-                            )
-                            Text("tool tokens ($toolsRatio%)", style = MaterialTheme.typography.labelSmall)
-                        }
-                        Column {
-                            Text(
-                                "$maxOutTokens",
-                                fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text("max output", style = MaterialTheme.typography.labelSmall)
-                        }
-                        Column {
-                            Text(
-                                "$availableForConv",
-                                fontWeight = FontWeight.Bold,
-                                color = if (availableForConv < 1000) Color(0xFFFF4444)
-                                    else if (availableForConv < 4096) Color(0xFFFF9800)
-                                    else Color(0xFF4CAF50)
-                            )
-                            Text("for history (${100 - totalRatio}%)", style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-        }
-
-        val categories = ToolDefinitions.all.groupBy { it.category }
-        categories.forEach { (category, tools) ->
-            item {
-                Text(
-                    category.displayName,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
-                )
-            }
-            items(tools, key = { it.id }) { tool ->
-                val toolState = uiState.toolStates.find { it.id == tool.id }
-                val enabled = toolState?.enabled ?: tool.defaultEnabled
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (enabled) Color(0xFF2B2B29)
-                            else Color(0xFF2B2B29).copy(alpha = 0.4f)
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                tool.name, style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = if (enabled) FontWeight.Medium else FontWeight.Normal,
-                                color = if (enabled) MaterialTheme.colorScheme.onSurface
-                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                            )
-                            Text(
-                                tool.description, style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2
-                            )
-                            Text(
-                                "~${tool.tokenEstimate} tokens",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                            )
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Switch(checked = enabled, onCheckedChange = { viewModel.toggleTool(tool.id) })
-                    }
-                }
-            }
-        }
-        item { Spacer(Modifier.height(24.dp)) }
-    }
-}
-
 // =========================================
 // ADVANCED TAB (removed) — params are now per-model
 // =========================================

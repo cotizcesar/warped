@@ -6,15 +6,10 @@ import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Message
-import com.google.ai.edge.litertlm.OpenApiTool
 import com.google.ai.edge.litertlm.SamplerConfig
 import com.google.ai.edge.litertlm.LiteRtLmJniException
-import com.google.ai.edge.litertlm.tool
-import com.warped.data.local.inference.tools.ToolRegistry
 import com.warped.domain.model.ActiveModelSelection
 import com.warped.domain.model.ChatRequest
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.GenerationParameters
 import com.warped.domain.model.ModelInfo
@@ -36,7 +31,6 @@ import javax.inject.Singleton
 class LiteRTLmProvider @Inject constructor(
     private val engineManager: EngineManager,
     private val inputSanitizer: InputSanitizer,
-    private val toolRegistry: ToolRegistry,
     private val activeModelSelection: ActiveModelSelection
 ) : LlmProvider {
 
@@ -139,10 +133,8 @@ class LiteRTLmProvider @Inject constructor(
             initialMessages = historyMessages,
             samplerConfig = samplerConfig,
             extraContext = emptyMap(),
-            tools = toolRegistry.buildOpenApiTools(
-                runBlocking { toolRegistry.enabledToolIds.first() }
-            ).map { tool(it) },
-            automaticToolCalling = true
+            tools = emptyList(),
+            automaticToolCalling = false
         )
 
         // Step 7: Send content with retry loop

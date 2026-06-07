@@ -50,10 +50,6 @@ fun ChatInputBar(
     modelHasAudio: Boolean = false,
     onAudioRecorded: ((ByteArray) -> Unit)? = null,
     onAudioRecordingChanged: ((Boolean) -> Unit)? = null,
-    // 44-03: skill chips row
-    skills: List<com.warped.domain.skill.Skill> = emptyList(),
-    selectedSkillIds: Set<String> = emptySet(),
-    onToggleSkill: (com.warped.domain.skill.Skill) -> Unit = {},
 ) {
     Surface(
         color = Color(0xFF2B2B29),
@@ -64,16 +60,6 @@ fun ChatInputBar(
             .padding(start = 10.dp, end = 10.dp, top = 5.dp, bottom = 0.dp)
     ) {
         Column(modifier = Modifier.padding(10.dp)) {
-            // 44-03: skill chips above the input field
-            if (skills.isNotEmpty()) {
-                SkillChipsRow(
-                    skills = skills,
-                    selectedSkillIds = selectedSkillIds,
-                    onToggleSkill = onToggleSkill,
-                    modifier = Modifier.padding(bottom = 6.dp),
-                )
-            }
-
             // Image previews
             if (attachedImages.isNotEmpty()) {
                 LazyRow(

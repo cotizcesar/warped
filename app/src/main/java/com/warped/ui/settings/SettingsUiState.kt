@@ -20,7 +20,5 @@ data class SettingsUiState(
     val codeFontScale: Float = 1.0f,
     val contextSize: Int = 4096,
     val maxTokens: Int = 2048,
-    val toolStates: List<ToolState> = emptyList(),
-    val enabledToolIds: Set<String> = emptySet(),
     val selectedTab: SettingsTab = SettingsTab.General,
 )

@@ -11,7 +11,6 @@ import com.warped.domain.model.ParameterStore;
 import com.warped.domain.repository.ChatRepository;
 import com.warped.domain.repository.EndpointRepository;
 import com.warped.domain.repository.LocalModelRepository;
-import com.warped.domain.repository.SkillRepository;
 import dagger.internal.DaggerGenerated;
 import dagger.internal.Factory;
 import dagger.internal.Provider;
@@ -56,8 +55,6 @@ public final class ChatViewModel_Factory implements Factory<ChatViewModel> {
 
   private final Provider<AdvancedPreferences> advancedPreferencesProvider;
 
-  private final Provider<SkillRepository> skillRepositoryProvider;
-
   private final Provider<Context> contextProvider;
 
   private ChatViewModel_Factory(Provider<ChatRepository> chatRepositoryProvider,
@@ -69,7 +66,7 @@ public final class ChatViewModel_Factory implements Factory<ChatViewModel> {
       Provider<ParameterStore> parameterStoreProvider,
       Provider<EngineManager> engineManagerProvider, Provider<MemoryChecker> memoryCheckerProvider,
       Provider<AdvancedPreferences> advancedPreferencesProvider,
-      Provider<SkillRepository> skillRepositoryProvider, Provider<Context> contextProvider) {
+      Provider<Context> contextProvider) {
     this.chatRepositoryProvider = chatRepositoryProvider;
     this.endpointRepositoryProvider = endpointRepositoryProvider;
     this.localModelRepositoryProvider = localModelRepositoryProvider;
@@ -80,13 +77,12 @@ public final class ChatViewModel_Factory implements Factory<ChatViewModel> {
     this.engineManagerProvider = engineManagerProvider;
     this.memoryCheckerProvider = memoryCheckerProvider;
     this.advancedPreferencesProvider = advancedPreferencesProvider;
-    this.skillRepositoryProvider = skillRepositoryProvider;
     this.contextProvider = contextProvider;
   }
 
   @Override
   public ChatViewModel get() {
-    return newInstance(chatRepositoryProvider.get(), endpointRepositoryProvider.get(), localModelRepositoryProvider.get(), activeModelSelectionProvider.get(), providerRouterProvider.get(), savedStateHandleProvider.get(), parameterStoreProvider.get(), engineManagerProvider.get(), memoryCheckerProvider.get(), advancedPreferencesProvider.get(), skillRepositoryProvider.get(), contextProvider.get());
+    return newInstance(chatRepositoryProvider.get(), endpointRepositoryProvider.get(), localModelRepositoryProvider.get(), activeModelSelectionProvider.get(), providerRouterProvider.get(), savedStateHandleProvider.get(), parameterStoreProvider.get(), engineManagerProvider.get(), memoryCheckerProvider.get(), advancedPreferencesProvider.get(), contextProvider.get());
   }
 
   public static ChatViewModel_Factory create(Provider<ChatRepository> chatRepositoryProvider,
@@ -98,16 +94,15 @@ public final class ChatViewModel_Factory implements Factory<ChatViewModel> {
       Provider<ParameterStore> parameterStoreProvider,
       Provider<EngineManager> engineManagerProvider, Provider<MemoryChecker> memoryCheckerProvider,
       Provider<AdvancedPreferences> advancedPreferencesProvider,
-      Provider<SkillRepository> skillRepositoryProvider, Provider<Context> contextProvider) {
-    return new ChatViewModel_Factory(chatRepositoryProvider, endpointRepositoryProvider, localModelRepositoryProvider, activeModelSelectionProvider, providerRouterProvider, savedStateHandleProvider, parameterStoreProvider, engineManagerProvider, memoryCheckerProvider, advancedPreferencesProvider, skillRepositoryProvider, contextProvider);
+      Provider<Context> contextProvider) {
+    return new ChatViewModel_Factory(chatRepositoryProvider, endpointRepositoryProvider, localModelRepositoryProvider, activeModelSelectionProvider, providerRouterProvider, savedStateHandleProvider, parameterStoreProvider, engineManagerProvider, memoryCheckerProvider, advancedPreferencesProvider, contextProvider);
   }
 
   public static ChatViewModel newInstance(ChatRepository chatRepository,
       EndpointRepository endpointRepository, LocalModelRepository localModelRepository,
       ActiveModelSelection activeModelSelection, ProviderRouter providerRouter,
       SavedStateHandle savedStateHandle, ParameterStore parameterStore, EngineManager engineManager,
-      MemoryChecker memoryChecker, AdvancedPreferences advancedPreferences,
-      SkillRepository skillRepository, Context context) {
-    return new ChatViewModel(chatRepository, endpointRepository, localModelRepository, activeModelSelection, providerRouter, savedStateHandle, parameterStore, engineManager, memoryChecker, advancedPreferences, skillRepository, context);
+      MemoryChecker memoryChecker, AdvancedPreferences advancedPreferences, Context context) {
+    return new ChatViewModel(chatRepository, endpointRepository, localModelRepository, activeModelSelection, providerRouter, savedStateHandle, parameterStore, engineManager, memoryChecker, advancedPreferences, context);
   }
 }

@@ -204,10 +204,6 @@ fun ChatScreen(
                 modelHasAudio = uiState.localModels.firstOrNull { it.filePath == uiState.selectedLocalModelId }?.capabilities?.audio == true,
                 onAudioRecorded = { bytes -> audioBytes = bytes },
                 onAudioRecordingChanged = { isRecording = it },
-                // 44-03: skill chips
-                skills = uiState.skills,
-                selectedSkillIds = uiState.selectedSkillIds,
-                onToggleSkill = { viewModel.toggleSkill(it) }
             )
         }
     ) { padding ->

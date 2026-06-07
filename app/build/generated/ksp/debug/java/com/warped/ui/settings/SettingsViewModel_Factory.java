@@ -1,6 +1,5 @@
 package com.warped.ui.settings;
 
-import com.warped.data.local.inference.tools.ToolPreferences;
 import com.warped.data.local.preferences.AdvancedPreferences;
 import com.warped.data.local.security.ApiKeyStore;
 import com.warped.domain.repository.ChatRepository;
@@ -43,27 +42,23 @@ public final class SettingsViewModel_Factory implements Factory<SettingsViewMode
 
   private final Provider<AdvancedPreferences> advancedPreferencesProvider;
 
-  private final Provider<ToolPreferences> toolPreferencesProvider;
-
   private SettingsViewModel_Factory(Provider<ChatRepository> chatRepositoryProvider,
       Provider<EndpointRepository> endpointRepositoryProvider,
       Provider<LocalModelRepository> localModelRepositoryProvider,
       Provider<PresetRepository> presetRepositoryProvider,
       Provider<ApiKeyStore> apiKeyStoreProvider,
-      Provider<AdvancedPreferences> advancedPreferencesProvider,
-      Provider<ToolPreferences> toolPreferencesProvider) {
+      Provider<AdvancedPreferences> advancedPreferencesProvider) {
     this.chatRepositoryProvider = chatRepositoryProvider;
     this.endpointRepositoryProvider = endpointRepositoryProvider;
     this.localModelRepositoryProvider = localModelRepositoryProvider;
     this.presetRepositoryProvider = presetRepositoryProvider;
     this.apiKeyStoreProvider = apiKeyStoreProvider;
     this.advancedPreferencesProvider = advancedPreferencesProvider;
-    this.toolPreferencesProvider = toolPreferencesProvider;
   }
 
   @Override
   public SettingsViewModel get() {
-    return newInstance(chatRepositoryProvider.get(), endpointRepositoryProvider.get(), localModelRepositoryProvider.get(), presetRepositoryProvider.get(), apiKeyStoreProvider.get(), advancedPreferencesProvider.get(), toolPreferencesProvider.get());
+    return newInstance(chatRepositoryProvider.get(), endpointRepositoryProvider.get(), localModelRepositoryProvider.get(), presetRepositoryProvider.get(), apiKeyStoreProvider.get(), advancedPreferencesProvider.get());
   }
 
   public static SettingsViewModel_Factory create(Provider<ChatRepository> chatRepositoryProvider,
@@ -71,15 +66,14 @@ public final class SettingsViewModel_Factory implements Factory<SettingsViewMode
       Provider<LocalModelRepository> localModelRepositoryProvider,
       Provider<PresetRepository> presetRepositoryProvider,
       Provider<ApiKeyStore> apiKeyStoreProvider,
-      Provider<AdvancedPreferences> advancedPreferencesProvider,
-      Provider<ToolPreferences> toolPreferencesProvider) {
-    return new SettingsViewModel_Factory(chatRepositoryProvider, endpointRepositoryProvider, localModelRepositoryProvider, presetRepositoryProvider, apiKeyStoreProvider, advancedPreferencesProvider, toolPreferencesProvider);
+      Provider<AdvancedPreferences> advancedPreferencesProvider) {
+    return new SettingsViewModel_Factory(chatRepositoryProvider, endpointRepositoryProvider, localModelRepositoryProvider, presetRepositoryProvider, apiKeyStoreProvider, advancedPreferencesProvider);
   }
 
   public static SettingsViewModel newInstance(ChatRepository chatRepository,
       EndpointRepository endpointRepository, LocalModelRepository localModelRepository,
       PresetRepository presetRepository, ApiKeyStore apiKeyStore,
-      AdvancedPreferences advancedPreferences, ToolPreferences toolPreferences) {
-    return new SettingsViewModel(chatRepository, endpointRepository, localModelRepository, presetRepository, apiKeyStore, advancedPreferences, toolPreferences);
+      AdvancedPreferences advancedPreferences) {
+    return new SettingsViewModel(chatRepository, endpointRepository, localModelRepository, presetRepository, apiKeyStore, advancedPreferences);
   }
 }

@@ -95,25 +95,17 @@ class LmStudioHelper @Inject constructor(
     override fun runInference(
         request: ChatRequest,
         enableThinking: Boolean,
-        skills: List<com.warped.domain.skill.Skill>,
     ): Flow<StreamToken> {
         val endpoint = activeEndpoint.get()
             ?: error("LmStudioHelper: setEndpoint() must be called before runInference()")
         val modelId = initializedModelId
             ?: error("LmStudioHelper: initialize() must be called before runInference()")
-        // 41-01: forward enableThinking via GenerationParameters.reasoningEnabled so
-        // LMStudioProvider sets the request body `reasoning` field accordingly. When
-        // false, also strip `<think>...</think>` markers client-side because some LM
-        // Studio backends emit reasoning regardless of the request flag.
         val effectiveRequest = request.copy(
             parameters = request.parameters.copy(reasoningEnabled = enableThinking),
         )
-        // 44-02: map Tool-category skills to LM Studio tools[] entries; pass
-        // PromptTemplate skills through the existing system-prompt path.
-        val effectiveRequestWithSkills = applySkills(effectiveRequest, skills)
         val provider = createProvider(endpoint, modelId)
         activeJob.set(scope.launch { /* sentinel: enables stopResponse() */ })
-        val raw = provider.chat(effectiveRequestWithSkills)
+        val raw = provider.chat(effectiveRequest)
         return raw
             .let { upstream ->
                 if (enableThinking) upstream
@@ -165,36 +157,6 @@ class LmStudioHelper @Inject constructor(
             apiKey = keyStr,
             inputSanitizer = inputSanitizer,
         )
-    }
-
-    /**
-     * 44-02: apply the active skills to the request. Tool-category skills
-     * currently log (real tool-call execution is gated on the LM Studio
-     * server-side tool runner; Warped surfaces them as metadata for now).
-     * PromptTemplate-category skills append their `systemPrompt` to the
-     * first system message in the request, creating one if absent.
-     */
-    private fun applySkills(
-        request: ChatRequest,
-        skills: List<com.warped.domain.skill.Skill>,
-    ): ChatRequest {
-        if (skills.isEmpty()) return request
-        Timber.d("LmStudioHelper: runInference with ${skills.size} skills: ${skills.joinToString { it.id }}")
-
-        val promptSkills = skills.filter { it.category == com.warped.domain.skill.SkillCategory.PromptTemplate }
-        if (promptSkills.isEmpty()) return request
-
-        val systemAddition = promptSkills.mapNotNull { it.systemPrompt }.joinToString("\n\n")
-        val existingSystem = request.messages.firstOrNull { it.role == Role.SYSTEM }
-        val newMessages = if (existingSystem != null) {
-            val combined = (existingSystem.content + "\n\n" + systemAddition).trim()
-            request.messages.toMutableList().apply {
-                this[indexOf(existingSystem)] = existingSystem.copy(content = combined)
-            }
-        } else {
-            listOf(com.warped.domain.model.ChatMessage(role = Role.SYSTEM, content = systemAddition)) + request.messages
-        }
-        return request.copy(messages = newMessages)
     }
 
     companion object {

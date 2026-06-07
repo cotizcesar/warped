@@ -1,7 +1,6 @@
 package com.warped.di
 
 import android.content.Context
-import com.warped.data.local.inference.DeviceToolSet
 import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.local.inference.LiteRTLmProvider
 import com.warped.data.local.inference.BackendDetector

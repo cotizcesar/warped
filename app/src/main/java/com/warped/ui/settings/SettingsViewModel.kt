@@ -3,8 +3,6 @@ package com.warped.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.warped.data.local.preferences.AdvancedPreferences
-import com.warped.data.local.inference.tools.ToolDefinitions
-import com.warped.data.local.inference.tools.ToolPreferences
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.domain.model.SyntaxTheme
 import com.warped.domain.repository.ChatRepository
@@ -31,7 +29,6 @@ class SettingsViewModel @Inject constructor(
     private val presetRepository: PresetRepository,
     private val apiKeyStore: ApiKeyStore,
     private val advancedPreferences: AdvancedPreferences,
-    private val toolPreferences: ToolPreferences
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -69,25 +66,6 @@ class SettingsViewModel @Inject constructor(
             }
         }
         viewModelScope.launch(coroutineExceptionHandler) {
-            toolPreferences.enabledTools.collect { enabledIds ->
-                _uiState.update { current ->
-                    current.copy(
-                        enabledToolIds = enabledIds,
-                        toolStates = ToolDefinitions.all.map { tool ->
-                            ToolState(
-                                id = tool.id,
-                                name = tool.name,
-                                description = tool.description,
-                                tokenEstimate = tool.tokenEstimate,
-                                defaultEnabled = tool.defaultEnabled,
-                                enabled = tool.id in enabledIds
-                            )
-                        }
-                    )
-                }
-            }
-        }
-        viewModelScope.launch(coroutineExceptionHandler) {
             advancedPreferences.syntaxTheme.collect { theme ->
                 _uiState.update { it.copy(codeTheme = theme) }
             }
@@ -96,13 +74,6 @@ class SettingsViewModel @Inject constructor(
             advancedPreferences.codeFontScale.collect { scale ->
                 _uiState.update { it.copy(codeFontScale = scale) }
             }
-        }
-    }
-
-    fun toggleTool(toolId: String) {
-        viewModelScope.launch(coroutineExceptionHandler) {
-            val current = _uiState.value.toolStates.find { it.id == toolId } ?: return@launch
-            toolPreferences.setEnabled(toolId, !current.enabled)
         }
     }
 
