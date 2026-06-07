@@ -630,13 +630,8 @@ class ChatViewModel @Inject constructor(
      * Local model id has priority; falls back to the remote model id.
      * Returns false when no model is selected.
      */
-    private fun supportsThinkingFor(localId: String?, remoteId: String?): Boolean {
-        if (localId != null) {
-            val model = _uiState.value.localModels.firstOrNull { it.filePath == localId }
-            return model?.capabilities?.reasoning == true
-        }
-        return remoteId != null
-    }
+    private fun supportsThinkingFor(localId: String?, remoteId: String?): Boolean =
+        localId != null || remoteId != null
 
     /**
      * 41-02: Flip the "Thinking" toggle and persist via DataStore. The actual UI
