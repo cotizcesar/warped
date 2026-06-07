@@ -129,10 +129,12 @@ class LiteRTLmProvider @Inject constructor(
         )
 
         // Step 6: Create conversation config with history, tools, and auto tool calling
+        val thinkingEnabled = request.parameters.reasoningEnabled
+        val extraContext = if (thinkingEnabled) mapOf("enable_thinking" to true) else emptyMap()
         val conversationConfig = ConversationConfig(
             initialMessages = historyMessages,
             samplerConfig = samplerConfig,
-            extraContext = emptyMap(),
+            extraContext = extraContext,
             tools = emptyList(),
             automaticToolCalling = false
         )

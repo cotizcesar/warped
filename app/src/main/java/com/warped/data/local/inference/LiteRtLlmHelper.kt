@@ -1,10 +1,8 @@
 package com.warped.data.local.inference
 
 import com.warped.domain.llm.LlmModelHelper
-import com.warped.domain.model.ChatMessage
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.ProviderType
-import com.warped.domain.model.Role
 import com.warped.domain.model.StreamToken
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -70,26 +68,10 @@ class LiteRtLlmHelper @Inject constructor(
         request: ChatRequest,
         enableThinking: Boolean,
     ): Flow<StreamToken> {
-        // Gemma 4 chat_template.jinja: inject <|think|> before system
-        // content to enable chain-of-thought reasoning.
-        val requestWithThinking = if (enableThinking) {
-            val messages = request.messages.toMutableList()
-            val sysIdx = messages.indexOfFirst { it.role == Role.SYSTEM }
-            if (sysIdx >= 0) {
-                messages[sysIdx] = messages[sysIdx].copy(
-                    content = "<|think|> " + messages[sysIdx].content
-                )
-            } else {
-                messages.add(0, ChatMessage(role = Role.SYSTEM, content = "<|think|>"))
-            }
-            request.copy(
-                messages = messages,
-                parameters = request.parameters.copy(reasoningEnabled = true),
-            )
-        } else {
-            request.copy(parameters = request.parameters.copy(reasoningEnabled = false))
-        }
-        val raw = liteRTLmProvider.chat(requestWithThinking)
+        val effectiveRequest = request.copy(
+            parameters = request.parameters.copy(reasoningEnabled = enableThinking),
+        )
+        val raw = liteRTLmProvider.chat(effectiveRequest)
         return raw
             .let { upstream ->
                 if (enableThinking) upstream
