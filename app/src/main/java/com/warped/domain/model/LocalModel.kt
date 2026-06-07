@@ -22,7 +22,7 @@ data class LocalModel(
             ModelCapabilities(
                 vision = true,
                 reasoning = lower.containsAny("r1", "reasoning", "qwq", "o1-", "o3-",
-                    "thinking", "thinker", "deep-thought"),
+                    "thinking", "thinker", "deep-thought", "gemma"),
                 tools = true,
                 audio = true
             )
@@ -31,7 +31,7 @@ data class LocalModel(
                 vision = lower.containsAny("vision", "vl", "multimodal", "llava", "qwen-vl",
                     "gemini", "pixtral", "qwen2-vl", "llama-vision", "phi-vision", "paligemma"),
                 reasoning = lower.containsAny("r1", "reasoning", "qwq", "o1-", "o3-",
-                    "thinking", "thinker", "deep-thought"),
+                    "thinking", "thinker", "deep-thought", "gemma"),
                 tools = lower.containsAny("tool", "function-calling", "hermes", "command-r"),
                 audio = false
             )

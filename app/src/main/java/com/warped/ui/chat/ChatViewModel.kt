@@ -631,9 +631,11 @@ class ChatViewModel @Inject constructor(
      * Returns false when no model is selected.
      */
     private fun supportsThinkingFor(localId: String?, remoteId: String?): Boolean {
-        val active = localId ?: remoteId ?: return false
-        val model = _uiState.value.localModels.firstOrNull { it.filePath == active }
-        return model?.capabilities?.reasoning == true
+        if (localId != null) {
+            val model = _uiState.value.localModels.firstOrNull { it.filePath == localId }
+            return model?.capabilities?.reasoning == true
+        }
+        return remoteId != null
     }
 
     /**
