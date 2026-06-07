@@ -471,26 +471,29 @@ private fun InlineModelSelectorBar(
                 color = Color.Transparent
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = pillColor.copy(alpha = 0.15f)
-                    ) {
-                        Text(
-                            text = pillText,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = pillColor
-                        )
+                    if (selectedModelName != null) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = pillColor.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = pillText,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = pillColor,
+                                maxLines = 1
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
                     }
-                    Spacer(Modifier.width(8.dp))
                     Text(
                         text = selectedModelName ?: stringResource(R.string.select_model),
                         style = MaterialTheme.typography.titleSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
+                        modifier = Modifier.weight(1f)
                     )
-                    Spacer(Modifier.weight(1f))
+                    Spacer(Modifier.width(8.dp))
                     Icon(
                         Icons.Filled.Circle,
                         contentDescription = "Connection status",
