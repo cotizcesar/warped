@@ -93,23 +93,7 @@ fun SettingsScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            // Tab row
-            PrimaryTabRow(
-                selectedTabIndex = uiState.selectedTab.ordinal,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                SettingsTab.entries.forEach { tab ->
-                    Tab(
-                        selected = uiState.selectedTab == tab,
-                        onClick = { viewModel.selectTab(tab) },
-                        text = { Text(tab.name) }
-                    )
-                }
-            }
-
-            when (uiState.selectedTab) {
-                SettingsTab.General -> GeneralTab(uiState, viewModel, onNavigateToWizard)
-            }
+            GeneralTab(uiState, viewModel, onNavigateToWizard)
         }
 
         if (uiState.message != null) {
