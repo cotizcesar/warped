@@ -106,7 +106,7 @@ class AdvancedPreferences @Inject constructor(
     }
 
     val thinkingEnabled: Flow<Boolean> = context.advancedPreferencesStore.data.map { prefs ->
-        prefs[KEY_THINKING_ENABLED] ?: true
+        prefs[KEY_THINKING_ENABLED] ?: false
     }.distinctUntilChanged()
 
     suspend fun setThinkingEnabled(enabled: Boolean) {

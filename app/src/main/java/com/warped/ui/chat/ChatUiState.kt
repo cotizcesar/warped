@@ -38,7 +38,7 @@ data class ChatUiState(
     val modelLoadError: String? = null,
     val loadedInstanceId: String? = null,
     val reasoningEnabled: Boolean = true,
-    val enableThinking: Boolean = true,
+    val enableThinking: Boolean = false,
     val supportsThinking: Boolean = false,
     val activeBackend: BackendType? = null,  // null unless LITE_RT_LM is loaded
     val isLocalModelLoaded: Boolean = false,
