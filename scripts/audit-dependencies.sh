@@ -1,6 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# RUNTIME-12 dependency audit.
+#
+# Gate: Warped must not adopt Gallery anti-pattern libraries as DIRECT
+# dependencies, and no SNAPSHOT/-alpha artifact may enter the release graph.
+#
+# Scope note (Phase 45-01): the banned list is checked against DIRECT
+# declarations in gradle/libs.versions.toml (the single source of truth for
+# every coordinate). Transitive hits are explicitly NOT counted — gson
+# (via tink-android <- security-crypto, and via litertlm-android),
+# kotlin-reflect (via litertlm-android), moshi (via benchmark-common <-
+# benchmark-macro-junit4 androidTest), and datastore-preferences-proto
+# (via datastore-preferences itself) are unavoidable transitive deps of
+# required first-party Google libraries and cannot be removed without
+# dropping security-crypto / litertlm / benchmark / datastore.
+
 BANNED_PATTERNS=(
   "kapt"
   "firebase"
@@ -19,31 +34,33 @@ BANNED_PATTERNS=(
 
 cd "$(dirname "$0")/.."
 
-echo "==> Running dependency audit (banned Gallery patterns)..."
-REPORT=$(./gradlew :app:dependencies --no-daemon 2>&1) || {
+FAIL=0
+
+echo "==> [1/2] Checking direct declarations (gradle/libs.versions.toml)..."
+DECLARED=$(cat gradle/libs.versions.toml)
+for pattern in "${BANNED_PATTERNS[@]}"; do
+  if echo "$DECLARED" | grep -iE "(\\b|\\.|_)${pattern}(\\b|:|-|_)"; then
+    echo "FAIL: banned direct dependency pattern '${pattern}' in gradle/libs.versions.toml"
+    FAIL=1
+  fi
+done
+
+echo "==> [2/2] Checking release graph for SNAPSHOT/-alpha..."
+REPORT=$(./gradlew :app:dependencies --configuration releaseRuntimeClasspath --no-daemon 2>&1) || {
   echo "FAIL: gradle :app:dependencies did not succeed"
   echo "$REPORT" | tail -40
   exit 1
 }
 
-HITS=()
-for pattern in "${BANNED_PATTERNS[@]}"; do
-  if echo "$REPORT" | grep -iE "(\\b|\\.)${pattern}(\\b|:|-)" >/dev/null 2>&1; then
-    HITS+=("$pattern")
-  fi
-done
+if echo "$REPORT" | grep -iE 'SNAPSHOT|alpha'; then
+  echo "FAIL: SNAPSHOT/-alpha artifact in releaseRuntimeClasspath (see match above)"
+  FAIL=1
+fi
 
-if [ ${#HITS[@]} -gt 0 ]; then
+if [ "$FAIL" -ne 0 ]; then
   echo ""
-  echo "FAIL: Banned dependencies detected:"
-  for hit in "${HITS[@]}"; do
-    echo "  - $hit"
-  done
-  echo ""
-  echo "Run with --report for full match details:"
-  PATTERN_ALT=$(IFS='|'; echo "${BANNED_PATTERNS[*]}")
-  echo "$REPORT" | grep -iE "(\\b|\\.)${PATTERN_ALT}(\\b|:|-)" | head -20
+  echo "FAIL: dependency audit found banned entries (see above)"
   exit 1
 fi
 
-echo "OK: no banned dependencies found"
+echo "OK: no banned direct dependencies, no SNAPSHOT/-alpha in release graph"
