@@ -1,16 +1,16 @@
 ---
-gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: Gallery Convergence & Performance Overhaul
-status: archived
-last_updated: "2026-06-06T09:30:00.000Z"
-last_activity: 2026-06-06 — v2.0 milestone archived (audit passed, roadmap archived, MILESTONES.md updated)
+gsd_state_version: "1.0"
+milestone: v2.1
+milestone_name: Finish v2.0 Leftovers
+status: planning
+last_updated: "2026-09-27T02:57:28.498Z"
+last_activity: 2026-09-26
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 23
-  completed_plans: 23
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State: Warped
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-06-05)
 
 ## Current Position
 
-Phase: v2.0 archived
+Phase: Not started (defining requirements)
 Plan: —
-Status: v2.0 milestone lifecycle complete — `LlmModelHelper` keystone + allowlist asset + thinking mode + benchmark + prompt lab + performance sweep + skills lite all shipped. Audit: `.planning/v2.0-MILESTONE-AUDIT.md` → **passed** (48 MET + 5 PARTIAL). Archive: `.planning/milestones/v2.0-ROADMAP.md`.
-Last activity: 2026-06-06 — v2.0 archived (audit + complete + state update).
+Status: Defining requirements
+Last activity: 2026-09-26 — Milestone v2.1 started
 
 ## Phase Structure (v2.0)
 

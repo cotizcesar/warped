@@ -32,16 +32,23 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 **Known deferred:** 3 verification gaps in Phase 35 (compile gate not run, no unit test for conversation reuse, multi-turn smoke test pending) — user/CI verification required. 6 pre-existing verification gaps (Phases 06-10, 29) remain.
 
-## Current Milestone: v2.0 Gallery Convergence & Performance Overhaul
+## Previous Milestone: v2.0 Gallery Convergence & Performance Overhaul — COMPLETE ✅
 
-**Goal:** Download and study the Google AI Edge Gallery repo, port its best patterns and any fitting features into Warped, and apply a file-by-file performance/efficiency overhaul so the app is as fast, smooth, and resource-light as possible. Major version bump signals architectural/feature convergence with the reference implementation.
+**Shipped:** 2026-06-06 | [Archive →](.planning/milestones/v2.0-ROADMAP.md)
 
-**Target features (tentative — refined after research):**
-- Performance audit across all axes: cold start, UI smoothness (60fps scrolling, no jank during streaming), memory footprint, time-to-first-token, APK size
-- Port Gallery-aligned features that fit Warped's scope (Prompt Lab, Thinking Mode toggle, Model Benchmark, Agent Skills infrastructure, mobile-first model allowlist patterns — refined by research)
-- Architectural pattern convergence: DI structure, state management, navigation, theming, model-loading pipeline
-- File-by-file, line-by-line optimization of every hot path (Hilt graph, Room queries, OkHttp interceptors, Compose recomposition, JNI/engine init)
-- Research output: 4 parallel researchers (Stack, Features, Architecture, Pitfalls) analyze the Gallery repo and surface concrete migration candidates
+5 phases (40-44), 23 plans, 53 requirements — 48 MET, 5 PARTIAL (Phase 43 PERF-01, PERF-05, PERF-06, PERF-12, PERF-13) + 2 carry-overs (Phase 44 SKILLS-02 Tool execution, SKILLS-03 LM Studio tools[] mapping). LlmModelHelper keystone interface, model allowlist asset, thinking mode, model benchmark, Prompt Lab, performance convergence sweep, and Agent Skills Lite.
+
+**Known deferred:** 7 items carried into v2.1 (see STATE.md Blockers/Concerns). PERF-12/13 benchmark numbers stay CI-gated (require Pixel 7 reference device).
+
+## Current Milestone: v2.1 Finish v2.0 Leftovers
+
+**Goal:** Complete the deferred v2.0 PARTIALs and carry-overs so every shipped feature is fully done — no partials left.
+
+**Target features:**
+- ChatUiState sub-state split (PERF-01) for Phase 45+ scale
+- Chat message list on LazyColumn with stable keys (PERF-06)
+- Real tool execution: LiteRT-LM @Tool registration (SKILLS-02) + LM Studio tools[] mapping (SKILLS-03)
+- Runtime hardening: runInference double-collect refactor (shareIn) + true OkHttp Call.cancel() plumbing
 
 ## Requirements
 
@@ -85,7 +92,7 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 ### Active
 
-- [ ] v2.0 Gallery Convergence & Performance Overhaul — major version: research Gallery repo, port best patterns, file-by-file perf overhaul (see Current Milestone above)
+- [ ] v2.1 Finish v2.0 Leftovers — PERF-01 sub-state split, PERF-06 LazyColumn keys, SKILLS-02/03 real tool execution, runInference double-collect refactor, Call.cancel() plumbing (see Current Milestone above)
 
 ### Out of Scope
 
@@ -103,7 +110,7 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 The Android ecosystem lacks a polished, production-grade app that combines local LLM inference with remote provider connectivity in a single interface. Existing solutions are either CLI-only, desktop-only (LM Studio), or limited to one provider. There is growing demand for running LLMs on flagship Android phones with 8-16GB RAM.
 
-Warped has shipped 8 milestones (v1.0 through v1.8) across 39 phases and 234 requirements. The app supports LiteRT-LM local inference, LM Studio v1 REST API, Hugging Face model search/download with background downloads and progress, chat with streaming, presets, history, an 8-step onboarding wizard, and syntax-highlighted code blocks with 4 themes. Production hardening is applied (ProGuard, Keystore encryption, input sanitization, crash resilience, network security).
+Warped has shipped 10 milestones (v1.0 through v2.0) across 44 phases and 287 requirements. The app supports LiteRT-LM local inference, LM Studio v1 REST API, Hugging Face model search/download with background downloads and progress, chat with streaming, presets, history, an 8-step onboarding wizard, and syntax-highlighted code blocks with 4 themes. Production hardening is applied (ProGuard, Keystore encryption, input sanitization, crash resilience, network security).
 
 **v1.8 (2026-06-05):** Hugging Face model browser bugfixes (sibling file rendering, search persistence, post-download nav, background downloads with progress + cancel), chat UI redesign (rounded pill input, no TopAppBar, unified model+endpoint picker with traffic-light status), endpoint CRUD with LM Studio native v1 API, and a hand-curated recommended models section.
 
@@ -114,6 +121,10 @@ Warped has shipped 8 milestones (v1.0 through v1.8) across 39 phases and 234 req
 **Known issue:** JUnit Platform launcher classpath — `./gradlew :app:testDebugUnitTest` fails with "Failed to load JUnit Platform" (pre-existing, not introduced by v1.6).
 
 **v1.8 verification gaps:** 3 gaps in Phase 35 (compile gate not run, no unit test for conversation reuse, multi-turn smoke test pending) — user/CI verification required.
+
+**v2.0 (2026-06-06):** LlmModelHelper keystone interface unifying local/remote chat, model allowlist asset, thinking mode, model benchmark with WorkManager, Prompt Lab, performance convergence sweep, and Agent Skills Lite. 48 MET + 5 PARTIAL + 2 carry-overs → all 7 deferred into v2.1.
+
+**v2.0 verification gaps:** PERF-12/13 benchmark numbers require a Pixel 7 reference device — CI-gated, stay deferred through v2.1.
 
 ## Constraints
 
@@ -144,6 +155,7 @@ Warped has shipped 8 milestones (v1.0 through v1.8) across 39 phases and 234 req
 | v1.8 LM Studio native v1 only | Simplify provider surface, use native REST + native DTOs, drop OpenAI/Anthropic/Ollama/Custom | ✓ Good |
 | v1.8 hand-curated recommended models | Static asset shipping with the app, no API scraping, no ranking algorithms | ✓ Good |
 | v2.0 references Google AI Edge Gallery (2026-06-05) | Reference implementation in same domain (Kotlin + LiteRT-LM on Android, 23.6k stars). Largest, most active OSS in the space. | — Pending |
+| v2.1 finishes v2.0 PARTIALs/carry-overs (2026-09-27) | No new features until every shipped feature is fully done — PERF-01, PERF-06, SKILLS-02/03, double-collect, Call.cancel(). PERF-12/13 numbers stay CI-gated (Pixel 7 hardware required). | — Pending |
 
 ## Evolution
 
@@ -163,4 +175,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-05 after v2.0 Gallery Convergence & Performance Overhaul milestone start*
+*Last updated: 2026-09-27 after v2.1 Finish v2.0 Leftovers milestone start*
