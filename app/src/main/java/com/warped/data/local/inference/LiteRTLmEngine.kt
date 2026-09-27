@@ -10,6 +10,7 @@ import com.google.ai.edge.litertlm.ExperimentalApi
 import com.google.ai.edge.litertlm.ExperimentalFlags
 import com.google.ai.edge.litertlm.LiteRtLmJniException
 import com.google.ai.edge.litertlm.LogSeverity
+import com.google.ai.edge.litertlm.ThinkingConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
 import javax.inject.Inject
@@ -65,12 +66,21 @@ class LiteRTLmEngine @Inject constructor(
                 ExperimentalFlags.enableSpeculativeDecoding = true
                 Backend.GPU()
             }
-            BackendType.NPU -> Backend.GPU() // fallback: NPU not yet supported by EngineConfig
+            // 45-02 LRT-09 (0.17.x re-verification): Backend.NPU(nativeLibraryDir) is a
+            // real 0.17.x option (verified in litertlm-android-0.17.1 AAR bytecode), so the
+            // old NPU->GPU fallback is replaced with a proper NPU backend. CHOICE RECORDED:
+            // adopt-proper-NPU rather than keep-fallback, because the API exists and the
+            // manifest keeps libcdsprpc.so (Hexagon DSP RPC) for this path. Dead path today
+            // (BackendDetector.probeBackend() only ever emits CPU/GPU), so no behavior
+            // change until NPU probing lands; libcdsprpc.so stays required=false.
+            BackendType.NPU -> Backend.NPU(
+                nativeLibraryDir = context.applicationInfo.nativeLibraryDir
+            )
         }
 
         val cacheDir = java.io.File(
             context.cacheDir,
-            "litertlm/${com.warped.BuildConfig.LITERTLM_VERSION}"
+            LiteRtLmCache.namespaceFor(com.warped.BuildConfig.LITERTLM_VERSION)
         ).also { it.mkdirs() }
 
         val config = EngineConfig(
@@ -103,12 +113,27 @@ class LiteRTLmEngine @Inject constructor(
 
     /**
      * Create a new conversation session from the initialized engine.
+     *
+     * 45-02 LRT-09 (0.17.x re-verification): optional [thinkingConfig] and [maxOutputToken]
+     * surface the 0.17.x `ConversationConfig(thinkingConfig, maxOutputToken)` delta
+     * (verified in litertlm-android-0.17.1 AAR bytecode). Both default to null, which
+     * preserves the pre-0.17 behavior (engine defaults apply). Tool wiring
+     * (`tools`/`automaticToolCalling`) stays Phase-47 owned — this overload only exposes
+     * thinking/output-length, it does not attach any ToolSet.
+     *
      * @throws IllegalStateException if engine is not initialized
      */
     @Synchronized
-    fun createConversation(config: ConversationConfig = ConversationConfig()): Conversation {
+    fun createConversation(
+        config: ConversationConfig = ConversationConfig(),
+        thinkingConfig: ThinkingConfig? = null,
+        maxOutputToken: Int? = null
+    ): Conversation {
         val e = engine ?: error("LiteRTLmEngine is not initialized. Call init() first.")
-        return e.createConversation(config)
+        if (thinkingConfig == null && maxOutputToken == null) return e.createConversation(config)
+        return e.createConversation(
+            config.copy(thinkingConfig = thinkingConfig, maxOutputToken = maxOutputToken)
+        )
     }
 
     /**

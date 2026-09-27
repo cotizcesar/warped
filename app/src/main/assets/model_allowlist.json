@@ -1,0 +1,46 @@
+{
+  "meta": {
+    "engine": "litertlm-android",
+    "engineVersion": "0.17.1",
+    "verifiedOn": "2026-09-27",
+    "note": "Capability flags reflect ONLY features verified against 0.17.x on Android (45-02 LRT-09, D-allowlist). Unverified 0.17.0 features (MTP, extended context) and per-model thinking / function-calling are explicitly false until device-verified. File sizes verified via Hugging Face CDN HEAD on verified date."
+  },
+  "models": [
+    {
+      "name": "gemma-3n-E2B-it-int4",
+      "displayName": "Gemma 3n E2B IT (int4)",
+      "modelFile": "gemma-3n-E2B-it-int4.task",
+      "sizeInBytes": 3136226711,
+      "capabilities": {
+        "text": true,
+        "vision": true,
+        "audio": true,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": true,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"]
+    },
+    {
+      "name": "gemma-3n-E4B-it-int4",
+      "displayName": "Gemma 3n E4B IT (int4)",
+      "modelFile": "gemma-3n-E4B-it-int4.task",
+      "sizeInBytes": 4405655031,
+      "capabilities": {
+        "text": true,
+        "vision": true,
+        "audio": true,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": true,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"]
+    }
+  ]
+}

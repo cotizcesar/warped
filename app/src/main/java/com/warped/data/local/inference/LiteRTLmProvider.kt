@@ -36,6 +36,11 @@ class LiteRTLmProvider @Inject constructor(
 
     override val type = ProviderType.LITE_RT_LM
 
+    companion object {
+        /** 0.17.x reasoning channel name (see [extractThoughtContent]). */
+        const val THOUGHT_CHANNEL = "thought"
+    }
+
     @Volatile
     private var activeConversation: Conversation? = null
 
@@ -282,6 +287,24 @@ class LiteRTLmProvider @Inject constructor(
             ""
         }
         return Normalizer.normalize(raw, Normalizer.Form.NFC)
+    }
+
+    /**
+     * 45-02 LRT-09 (0.17.x re-verification): read the reasoning stream from
+     * `response.channels["thought"]` (verified: `Message.getChannels()` returns
+     * `Map<String, String>` in litertlm-android-0.17.1). Returns null when the active
+     * conversation has no thinking enabled. NOT wired into the chat path here — thought
+     * tokens must never be interleaved into answer Deltas; thinking UX (THINK-02) and
+     * the ThinkingConfig enablement belong to a later phase. Safe by construction:
+     * with thinking disabled the channel is absent and this returns null.
+     */
+    fun extractThoughtContent(message: Message): String? {
+        return try {
+            message.channels[THOUGHT_CHANNEL]?.takeIf { it.isNotEmpty() }
+        } catch (e: Exception) {
+            Timber.w(e, "LiteRTLmProvider: failed to extract thought channel")
+            null
+        }
     }
 
     private fun clamp(value: Int, min: Int, max: Int, paramName: String): Int {

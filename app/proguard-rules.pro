@@ -22,6 +22,19 @@
 -keep interface com.google.ai.edge.litertlm.ToolProvider { *; }
 -keep class com.google.ai.edge.litertlm.MessageCallback$* { *; }
 -keep class com.google.ai.edge.litertlm.ToolProvider$* { *; }
+# 45-02 LRT-09: explicit keeps for 0.17.x tool entry points (verified present in
+# litertlm-android-0.17.1 AAR classes.jar: ToolSet, OpenApiTool, Tool/ToolParam
+# annotations, ReflectionTool, ToolKt tool() wrapper, Capabilities). The broad
+# com.google.ai.edge.litertlm.** keeps above already cover these, but explicit
+# rules protect the Phase-47 tool-wiring surface against future keep narrowing.
+-keep interface com.google.ai.edge.litertlm.ToolSet { *; }
+-keep interface com.google.ai.edge.litertlm.OpenApiTool { *; }
+-keep @interface com.google.ai.edge.litertlm.Tool { *; }
+-keep @interface com.google.ai.edge.litertlm.ToolParam { *; }
+-keep class com.google.ai.edge.litertlm.ReflectionTool { *; }
+-keep class com.google.ai.edge.litertlm.ToolKt { *; }
+-keep class com.google.ai.edge.litertlm.Capabilities { *; }
+-keepattributes *Annotation*
 -dontoptimize
 -dontobfuscate
 

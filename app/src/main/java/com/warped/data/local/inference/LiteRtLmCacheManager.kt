@@ -17,7 +17,7 @@ class LiteRtLmCacheManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val advancedPreferences: AdvancedPreferences,
 ) {
-    val cacheRoot: File = File(context.cacheDir, "litertlm/${BuildConfig.LITERTLM_VERSION}").also { it.mkdirs() }
+    val cacheRoot: File = File(context.cacheDir, LiteRtLmCache.namespaceFor(BuildConfig.LITERTLM_VERSION)).also { it.mkdirs() }
 
     fun cacheDirForModel(modelPath: String): File = File(cacheRoot, File(modelPath).name)
 
@@ -29,7 +29,7 @@ class LiteRtLmCacheManager @Inject constructor(
     }
 
     suspend fun ensureWithinCap() = withContext(Dispatchers.IO) {
-        val cap = advancedPreferences.cacheMaxSizeBytes.firstOrNull() ?: DEFAULT_CAP_BYTES
+        val cap = advancedPreferences.cacheMaxSizeBytes.firstOrNull() ?: LiteRtLmCache.DEFAULT_CAP_BYTES
         var current = currentSizeBytesInternal()
         if (current <= cap) return@withContext
         val files = cacheRoot.walkTopDown()
@@ -66,9 +66,5 @@ class LiteRtLmCacheManager @Inject constructor(
         return cacheRoot.walkTopDown()
             .filter { it.isFile }
             .sumOf { it.length() }
-    }
-
-    private companion object {
-        const val DEFAULT_CAP_BYTES: Long = 500L * 1024L * 1024L
     }
 }
