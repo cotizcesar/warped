@@ -1,0 +1,38 @@
+{
+  "contract": "1.0.0",
+  "flavor": "core",
+  "milestone": "v2.1 — +, tracked in REQUIREMENTS.md)",
+  "phases": [
+    {
+      "number": "40",
+      "name": "Runtime & Allowlist Foundation",
+      "status": "pending"
+    },
+    {
+      "number": "41",
+      "name": "Thinking Mode + Model Benchmark",
+      "status": "pending"
+    },
+    {
+      "number": "42",
+      "name": "Prompt Lab",
+      "status": "pending"
+    },
+    {
+      "number": "43",
+      "name": "Performance Convergence",
+      "status": "pending"
+    },
+    {
+      "number": "44",
+      "name": "Agent Skills Lite",
+      "status": "pending"
+    }
+  ],
+  "next": {
+    "command": "/gsd:discuss-phase",
+    "label": "Discuss the first phase",
+    "reason": "Project initialized — plan your first phase"
+  },
+  "updated_at": "2026-09-27T02:57:28.501Z"
+}

@@ -1,7 +1,7 @@
 [versions]
 kotlin = "2.3.20"
 agp = "9.3.0"
-litertlm = "0.13.1"  # v1.8 LRT-01: bump from 0.13.0 — verify against Maven Central / GitHub releases before release
+litertlm = "0.17.1"  # 45-02 LRT-07: 0.13.1 -> 0.17.1 pinned stable (2026-09-16, latest on Google Maven; verified vs maven-metadata.xml)
 compose-bom = "2026.06.01"  # newest BOM on compileSdk<=36 line (2026.08.00+ needs android-37 platform, not yet released)
 hilt = "2.60.1"
 hilt-navigation-compose = "1.3.0"  # HOLD: 1.4.0 needs compileSdk 37 (no stable android-37 platform in SDK repo)
