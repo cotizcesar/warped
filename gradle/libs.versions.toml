@@ -22,7 +22,7 @@ kotlinx-collections-immutable = "0.4.0"
 sqlcipher = "4.5.4"
 timber = "5.0.1"
 highlights = "1.1.0"
-ksp = "2.3.7"
+ksp = "2.3.12"
 # Testing
 junit5 = "5.11.4"
 mockk = "1.13.16"
