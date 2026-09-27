@@ -35,8 +35,9 @@
 -keep class com.google.ai.edge.litertlm.ToolKt { *; }
 -keep class com.google.ai.edge.litertlm.Capabilities { *; }
 -keepattributes *Annotation*
--dontoptimize
--dontobfuscate
+# NOTE: no global -dontoptimize/-dontobfuscate — release hardening stays on.
+# If a 0.17.x native crash ever requires an exemption, scope it narrowly to the
+# crashing class with a stack-trace citation and re-verify assembleRelease.
 
 # OkHttp
 -dontwarn okhttp3.**
