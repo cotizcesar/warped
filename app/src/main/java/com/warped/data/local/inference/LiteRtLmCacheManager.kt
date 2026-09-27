@@ -21,7 +21,15 @@ class LiteRtLmCacheManager @Inject constructor(
         if (!it.exists() && !it.mkdirs()) throw java.io.IOException("Cannot create cache dir: $it")
     }
 
-    fun cacheDirForModel(modelPath: String): File = File(cacheRoot, File(modelPath).name)
+    /**
+     * Per-model compiled-cache dir. Keyed by full-path hash + filename so two
+     * distinct models sharing a bare filename (e.g. old vs new
+     * `gemma-3n-E2B-it-int4.task` in different dirs) never share a slot.
+     * String.hashCode() is specified (stable across processes) — no runtime
+     * registration needed.
+     */
+    fun cacheDirForModel(modelPath: String): File =
+        File(cacheRoot, "${modelPath.hashCode()}-${File(modelPath).name}")
 
     suspend fun currentSizeBytes(): Long = withContext(Dispatchers.IO) {
         if (!cacheRoot.exists()) return@withContext 0L
