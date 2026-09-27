@@ -101,7 +101,7 @@ tasks.configureEach {
 
 dependencies {
     // Force Kotlin library versions to match the compiler
-    implementation(platform("org.jetbrains.kotlin:kotlin-bom:2.3.20"))
+    implementation(platform(libs.kotlin.bom))
 
     // Compose BOM governs all Compose library versions
     val composeBom = platform(libs.compose.bom)
@@ -178,7 +178,7 @@ dependencies {
 
     // Testing
     testImplementation(libs.junit5)
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.14.4")
+    testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
     testImplementation(libs.truth)
