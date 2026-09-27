@@ -22,7 +22,10 @@ kotlinx-collections-immutable = "0.5.2"
 sqlcipher = "4.5.4"
 timber = "5.0.1"
 highlights = "1.1.0"
-ksp = "2.3.12"
+ksp = "2.3.12"  # VERIFIED 2026-09-27 via Maven Central plugin-marker metadata
+  # (com.google.devtools.ksp.gradle.plugin): KSP uses unified bare 2.3.x versioning
+  # since 2.3.0 (no <kotlin>-<ksp> suffix); 2.3.12 is the latest release in the
+  # 2.3.x line and targets the Kotlin 2.3.x compiler family (incl. 2.3.20).
 # Testing
 junit5 = "5.14.4"  # latest 5.x line (JUnit 6 major held: Gradle/MockK compat risk)
 junit-platform = "1.14.4"  # lockstep with junit5 5.14.4 (platform 1.x <-> jupiter 5.x)
