@@ -35,8 +35,8 @@ class MigrationTest {
             close()
         }
 
-        // Run the auto-migration v11 -> v12 and verify data is intact + new table exists.
-        helper.runMigrationsAndValidate(dbName, 12, true).use { db ->
+        // Run the manual migration v11 -> v12 and verify data is intact + new table exists.
+        helper.runMigrationsAndValidate(dbName, 12, true, MIGRATION_11_12).use { db ->
             db.query("SELECT COUNT(*) FROM messages WHERE conversation_id = 1").use { cur ->
                 cur.moveToFirst()
                 assertEquals("All 50 messages must survive migration", 50, cur.getInt(0))

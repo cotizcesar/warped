@@ -1,6 +1,5 @@
 package com.warped.data.local.db
 
-import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import com.warped.data.local.db.dao.BenchmarkResultDao
@@ -29,8 +28,7 @@ import com.warped.data.local.db.entity.RemoteEndpointEntity
         BenchmarkResultEntity::class
     ],
     version = 13,
-    exportSchema = true,
-    autoMigrations = [AutoMigration(from = 11, to = 12), AutoMigration(from = 12, to = 13)]
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun conversationDao(): ConversationDao

@@ -12,7 +12,6 @@ local.properties
 # Android
 /app/build
 /app/.cxx
-app/schemas
 
 # IDE
 .idea/
