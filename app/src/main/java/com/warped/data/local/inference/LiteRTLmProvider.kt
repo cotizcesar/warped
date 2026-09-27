@@ -80,6 +80,7 @@ class LiteRTLmProvider @Inject constructor(
         } catch (e: LiteRtLmJniException) {
             Timber.e(e, "LiteRTLmProvider: JNI native error — ${e.message}")
             emit(StreamToken.Error("LiteRT-LM native error: ${e.message ?: "Unknown JNI error"}"))
+            return@flow
         } catch (e: Exception) {
                     emit(StreamToken.Error("Failed to load LiteRT-LM engine: ${e.message}"))
                     return@flow
