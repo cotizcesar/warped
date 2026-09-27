@@ -9,15 +9,13 @@ import com.warped.domain.model.Endpoint
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.Role
 import com.warped.domain.model.StreamToken
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.runBlocking
+import okhttp3.Call
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
@@ -36,10 +34,11 @@ import javax.inject.Singleton
  *  - [initialize] dispatches `LMStudioProvider.loadModel` on `Dispatchers.IO` and stores
  *    the returned `instanceId`.
  *  - [runInference] creates a fresh `LMStudioProvider` per call (matching the existing
- *    per-endpoint pattern in `ProviderRouter`) and runs `chat()` on `Dispatchers.IO`.
- *  - [stopResponse] cancels the in-flight `Job`; LM Studio has no native cancellation
- *    on the server, so the active OkHttp `Call` continues but its results are dropped.
- *    A future improvement is to track the `Call` reference and call `Call.cancel()`.
+ *    per-endpoint pattern in `ProviderRouter`), retains the live OkHttp `Call` via
+ *    the provider's `onCallCreated` hook, and runs `chat()` on `Dispatchers.IO`.
+ *  - [stopResponse] calls `Call.cancel()` on the retained handle: the socket is
+ *    torn down immediately and the SSE read loop exits with no trailing tokens
+ *    and no fake Error bubble. Safe when idle (no-op).
  *  - [cleanUp] calls `LMStudioProvider.unloadModel` with the stored `instanceId` so the
  *    server releases the model.
  */
@@ -53,12 +52,10 @@ class LmStudioHelper @Inject constructor(
 
     private val activeEndpoint = AtomicReference<Endpoint?>(null)
     private val activeInstanceId = AtomicReference<String?>(null)
-    private val activeJob = AtomicReference<Job?>(null)
-    // PERF-08 / Phase 43: actual OkHttp Call lives inside LMStudioProvider.
-    // Cancelling at the Flow level via activeJob is the effective cancellation
-    // point today; deeper Call.cancel() requires threading the Call through
-    // the provider. Tracked for v2.1.
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // 46-01 RUNTIME-14: the real cancellable handle — the live OkHttp Call retained
+    // via the provider's onCallCreated hook. No sentinel Job: stopResponse() must
+    // reach the socket, not a no-op coroutine.
+    private val activeCall = AtomicReference<Call?>(null)
 
     @Volatile
     private var initializedModelId: String? = null
@@ -104,9 +101,9 @@ class LmStudioHelper @Inject constructor(
             parameters = request.parameters.copy(reasoningEnabled = enableThinking),
         )
         val provider = createProvider(endpoint, modelId)
-        activeJob.set(scope.launch { /* sentinel: enables stopResponse() */ })
-        val raw = provider.chat(effectiveRequest)
+        val raw = provider.chat(effectiveRequest) { call -> activeCall.set(call) }
         return raw
+            .onCompletion { activeCall.set(null) } // no stale handle: follow-up turns are safe (pitfall 2)
             .let { upstream ->
                 if (enableThinking) upstream
                 else upstream.map { token ->
@@ -125,10 +122,15 @@ class LmStudioHelper @Inject constructor(
     }
 
     override fun stopResponse() {
-        val job = activeJob.getAndSet(null)
-        if (job != null && job.isActive) {
-            Timber.d("LmStudioHelper: cancelling active job")
-            job.cancel()
+        // 46-01 RUNTIME-14: immediate socket teardown. Safe when idle (no-op).
+        val call = activeCall.getAndSet(null)
+        if (call != null) {
+            Timber.d("LmStudioHelper: cancelling active Call")
+            try {
+                call.cancel()
+            } catch (e: Exception) {
+                Timber.w(e, "LmStudioHelper: Call.cancel failed")
+            }
         }
     }
 

@@ -4,17 +4,12 @@ import com.warped.domain.llm.LlmModelHelper
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.StreamToken
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
-import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -30,9 +25,10 @@ import javax.inject.Singleton
  *    per-token collection on `Dispatchers.Default`. We re-`flowOn(Dispatchers.Default)`
  *    for clarity.
  *  - [resetConversation] delegates to `LiteRTLmProvider.resetConversation`.
- *  - [stopResponse] cancels the active [Job] tracked by the helper. The underlying
- *    `conversation.sendMessageAsync` Flow is collected on the cancelled scope and
- *    completes immediately.
+ *  - [stopResponse] delegates to `LiteRTLmProvider.cancelActiveGeneration`, which
+ *    halts native generation via `Conversation.cancelProcess()` while keeping the
+ *    conversation reusable for the next turn. No sentinel Job: Stop must reach the
+ *    native handle.
  *  - [cleanUp] resets the conversation and unloads the engine. After this, the helper
  *    is unusable until [initialize] is called again.
  */
@@ -43,9 +39,6 @@ class LiteRtLlmHelper @Inject constructor(
 ) : LlmModelHelper {
 
     override val type: ProviderType = ProviderType.LITE_RT_LM
-
-    private val activeJob = AtomicReference<Job?>(null)
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     @Volatile
     private var initializedModelPath: String? = null
@@ -84,7 +77,6 @@ class LiteRtLlmHelper @Inject constructor(
                 }
             }
             .flowOn(Dispatchers.Default)
-            .also { activeJob.set(scope.launch { /* sentinel: enables stopResponse() */ }) }
     }
 
     override fun resetConversation() {
@@ -92,10 +84,12 @@ class LiteRtLlmHelper @Inject constructor(
     }
 
     override fun stopResponse() {
-        val job = activeJob.getAndSet(null)
-        if (job != null && job.isActive) {
-            Timber.d("LiteRtLlmHelper: cancelling active job")
-            job.cancel()
+        // 46-01 RUNTIME-14: halt native generation, keep the conversation alive.
+        // Never throws: Stop must be safe when idle.
+        try {
+            liteRTLmProvider.cancelActiveGeneration()
+        } catch (e: Exception) {
+            Timber.w(e, "LiteRtLlmHelper: cancelActiveGeneration failed")
         }
     }
 

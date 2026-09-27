@@ -14,15 +14,24 @@ import com.warped.domain.model.ProviderType
 import com.warped.domain.model.Role
 import com.warped.domain.model.StreamToken
 import com.warped.domain.provider.LlmProvider
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -67,7 +76,44 @@ class LMStudioProvider(
 
     override fun chat(request: ChatRequest): Flow<StreamToken> = chat(request, emptyList())
 
-    fun chat(request: ChatRequest, integrations: List<LmStudioIntegration>): Flow<StreamToken> = flow {
+    /**
+     * 46-01 RUNTIME-14: raw-OkHttp SSE chat with a retained cancellable [Call].
+     *
+     * The request body is built from the SAME [LmStudioChatRequest] DTO and the SAME
+     * sanitized content as before (threat T-46-01: never rebuild from unsanitized
+     * fields). Logging stays at BASIC — never BODY/HEADERS, the x-api-key
+     * interceptor is reused unchanged (threat T-46-02).
+     *
+     * Cancellation contract:
+     * - [onCallCreated] hands the live [Call] to the caller (the helper retains it
+     *   and invokes [Call.cancel] from `stopResponse()`).
+     * - [CancellationException] is rethrown FIRST — Stop must terminate, never
+     *   surface as a fake `StreamToken.Error` (defect 6).
+     * - `Call.cancel()` while blocked in `readUtf8Line()` surfaces as
+     *   `IOException("Canceled")`, handled silently like any read failure.
+     * - The teardown watcher bridges structured-concurrency cancellation to the
+     *   socket: a bare collector-cancel also tears down the Call, because
+     *   `readUtf8Line()` is blocking and would otherwise ignore cancellation and
+     *   leak the connection until the server sends again.
+     *
+     * 46-01 Phase 47 hook contract (hooks only, no loop): every tool-round
+     * boundary in the future tool loop must call
+     * `currentCoroutineContext().ensureActive()` and enforce the round cap with
+     * `>=` semantics (`check(round >= MAX_TOOL_ROUNDS)`). Full loop is Phase 47.
+     */
+    @Volatile
+    private var currentCall: Call? = null
+
+    /** Belt-and-braces teardown of the in-flight SSE call, if any. Safe when idle. */
+    fun cancelChat() {
+        currentCall?.cancel()
+    }
+
+    fun chat(
+        request: ChatRequest,
+        integrations: List<LmStudioIntegration> = emptyList(),
+        onCallCreated: (Call) -> Unit = {},
+    ): Flow<StreamToken> = callbackFlow {
         val systemMessage = request.messages.firstOrNull { it.role == Role.SYSTEM }?.content
         val chatMessages = request.messages
             .filter { it.role != Role.SYSTEM }
@@ -93,94 +139,136 @@ class LMStudioProvider(
             reasoning = if (request.parameters.reasoningEnabled != false) null else "off",
             integrations = integrations
         )
+        val call = client.newCall(
+            Request.Builder()
+                .url("${baseUrl.trimEnd('/')}/api/v1/chat")
+                .post(Json.encodeToString(LmStudioChatRequest.serializer(), body).toRequestBody("application/json".toMediaType()))
+                .build()
+        )
+        currentCall = call
+        onCallCreated(call)
+        // Bridge collector cancellation to the socket: readUtf8Line() is blocking,
+        // so without this a bare cancel would leak the connection until the next
+        // server chunk. Transport-stop (helper.stopResponse -> Call.cancel) is the
+        // primary path; this watcher is the structured-concurrency backstop.
+        val teardown = launch {
+            try {
+                awaitCancellation()
+            } finally {
+                call.cancel()
+            }
+        }
         try {
-            val response = api.chat(body)
-            if (response.isSuccessful) {
-                val responseBody = response.body() ?: run {
-                    emit(StreamToken.Error("Empty response"))
-                    return@flow
-                }
-                val source = responseBody.source()
-                var currentEvent = ""
-                var statsText: String? = null
-                var hasTokens = false
-                var sawSse = false
-                val bodyAccumulator = StringBuilder()
+            call.execute().use { response ->
+                if (!response.isSuccessful) {
+                    val errorBody = try {
+                        response.body?.string()
+                    } catch (e: Exception) {
+                        response.message
+                    } ?: response.message
+                    send(StreamToken.Error("HTTP ${response.code}: $errorBody"))
+                } else {
+                    val responseBody = response.body
+                    if (responseBody == null) {
+                        send(StreamToken.Error("Empty response"))
+                    } else {
+                        val source = responseBody.source()
+                        var currentEvent = ""
+                        var statsText: String? = null
+                        var hasTokens = false
+                        var sawSse = false
+                        val bodyAccumulator = StringBuilder()
 
-                try {
-                    while (!source.exhausted()) {
-                        val line = source.readUtf8Line() ?: break
-                        bodyAccumulator.appendLine(line)
-                        when {
-                            line.startsWith("event: ") -> {
-                                currentEvent = line.removePrefix("event: ").trim()
-                                sawSse = true
-                            }
-                            line.startsWith("data: ") -> {
-                                sawSse = true
-                                val data = line.removePrefix("data: ").trim()
-                                if (data == "[DONE]") break
-                                try {
-                                    val eventType = currentEvent.ifBlank {
-                                        val obj = json.decodeFromString<JsonObject>(data)
-                                        obj["type"]?.jsonPrimitive?.content ?: ""
+                        try {
+                            while (!source.exhausted()) {
+                                val line = source.readUtf8Line() ?: break
+                                bodyAccumulator.appendLine(line)
+                                when {
+                                    line.startsWith("event: ") -> {
+                                        currentEvent = line.removePrefix("event: ").trim()
+                                        sawSse = true
                                     }
-                                    val event = json.decodeFromString<LmStudioSseEvent>(data)
-                                    if (eventType == "tool_call.success") {
-                                        val obj = json.decodeFromString<JsonObject>(data)
-                                        val out = obj["output"]?.jsonPrimitive?.content ?: ""
-                                        emit(StreamToken.Delta("$out"))
-                                        hasTokens = true
-                                    } else {
-                                        handleSseEvent(eventType, event).forEach {
-                                            emit(it)
-                                            if (it is StreamToken.Delta) hasTokens = true
+                                    line.startsWith("data: ") -> {
+                                        sawSse = true
+                                        val data = line.removePrefix("data: ").trim()
+                                        if (data == "[DONE]") break
+                                        try {
+                                            val eventType = currentEvent.ifBlank {
+                                                val obj = json.decodeFromString<JsonObject>(data)
+                                                obj["type"]?.jsonPrimitive?.content ?: ""
+                                            }
+                                            val event = json.decodeFromString<LmStudioSseEvent>(data)
+                                            if (eventType == "tool_call.success") {
+                                                val obj = json.decodeFromString<JsonObject>(data)
+                                                val out = obj["output"]?.jsonPrimitive?.content ?: ""
+                                                send(StreamToken.Delta("$out"))
+                                                hasTokens = true
+                                            } else {
+                                                // 46-01 Phase 47 hook site: tool_call.* events are
+                                                // round boundaries of the future tool loop —
+                                                // ensureActive() + >= round-cap check land here.
+                                                handleSseEvent(eventType, event).forEach {
+                                                    send(it)
+                                                    if (it is StreamToken.Delta) hasTokens = true
+                                                }
+                                            }
+                                            if (eventType == "chat.end") {
+                                                event.result?.stats?.let { stats ->
+                                                    statsText = "${stats.totalOutputTokens} tokens · ${stats.inputTokens} in · ${String.format("%.0f", stats.tokensPerSecond)} tok/s · ${String.format("%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first"
+                                                }
+                                            }
+                                        } catch (e: Exception) { Timber.e(e, "LMStudio: SSE event parse failed") }
+                                    }
+                                    line.isEmpty() -> { currentEvent = "" }
+                                }
+                            }
+                        } catch (e: IOException) { Timber.e(e, "LMStudio: SSE stream read failed") }
+
+                        // Fallback: non-streaming JSON response
+                        if (!sawSse || !hasTokens) {
+                            val rawBody = bodyAccumulator.toString()
+                            try {
+                                val event = json.decodeFromString<LmStudioSseEvent>(rawBody)
+                                val s = event.stats ?: event.result?.stats
+                                s?.let { stats ->
+                                    statsText = "${stats.totalOutputTokens} tokens · ${stats.inputTokens} in · ${String.format("%.0f", stats.tokensPerSecond)} tok/s · ${String.format("%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first"
+                                }
+                                val out = event.output ?: event.result?.output
+                                out?.forEach { item ->
+                                    when (item.type) {
+                                        "reasoning" -> if (item.content.isNotEmpty()) {
+                                            send(StreamToken.Delta("<think>${item.content}</think>"))
+                                            hasTokens = true
+                                        }
+                                        "message" -> if (item.content.isNotEmpty()) {
+                                            send(StreamToken.Delta(item.content))
+                                            hasTokens = true
                                         }
                                     }
-                                    if (eventType == "chat.end") {
-                                        event.result?.stats?.let { stats ->
-                                            statsText = "${stats.totalOutputTokens} tokens · ${stats.inputTokens} in · ${String.format("%.0f", stats.tokensPerSecond)} tok/s · ${String.format("%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first"
-                                        }
-                                    }
-                                } catch (e: Exception) { Timber.e(e, "LMStudio: SSE event parse failed") }
-                            }
-                            line.isEmpty() -> { currentEvent = "" }
+                                }
+                            } catch (e: Exception) { Timber.e(e, "LMStudio: non-streaming JSON parse failed") }
+                        }
+                        if (currentCoroutineContext().isActive) {
+                            send(StreamToken.Done(statsText, null))
                         }
                     }
-                } catch (e: IOException) { Timber.e(e, "LMStudio: SSE stream read failed") }
-
-                // Fallback: non-streaming JSON response
-                if (!sawSse || !hasTokens) {
-                    val rawBody = bodyAccumulator.toString()
-                    try {
-                        val event = json.decodeFromString<LmStudioSseEvent>(rawBody)
-                        val s = event.stats ?: event.result?.stats
-                        s?.let { stats ->
-                            statsText = "${stats.totalOutputTokens} tokens · ${stats.inputTokens} in · ${String.format("%.0f", stats.tokensPerSecond)} tok/s · ${String.format("%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first"
-                        }
-                        val out = event.output ?: event.result?.output
-                        out?.forEach { item ->
-                            when (item.type) {
-                                "reasoning" -> if (item.content.isNotEmpty()) {
-                                    emit(StreamToken.Delta("<think>${item.content}</think>"))
-                                    hasTokens = true
-                                }
-                                "message" -> if (item.content.isNotEmpty()) {
-                                    emit(StreamToken.Delta(item.content))
-                                    hasTokens = true
-                                }
-                            }
-                        }
-                    } catch (e: Exception) { Timber.e(e, "LMStudio: non-streaming JSON parse failed") }
                 }
-                emit(StreamToken.Done(statsText, null))
-            } else {
-                val errorBody = response.errorBody()?.string() ?: response.message()
-                emit(StreamToken.Error("HTTP ${response.code()}: $errorBody"))
             }
+        } catch (e: CancellationException) {
+            // Stop means stop: never map coroutine cancellation to an Error token.
+            currentCall = null
+            throw e
+        } catch (e: IOException) {
+            // Includes IOException("Canceled") from Call.cancel() teardown — silent.
+            Timber.d(e, "LMStudio: chat transport closed")
         } catch (e: Exception) {
-            emit(StreamToken.Error("Connection failed: ${e.message}"))
+            Timber.e(e, "LMStudio: chat failed")
+            trySend(StreamToken.Error("Connection failed: ${e.message}"))
+        } finally {
+            currentCall = null
+            teardown.cancel()
         }
+        awaitClose { currentCall = null }
     }.flowOn(Dispatchers.IO)
 
     private fun handleSseEvent(eventType: String, event: LmStudioSseEvent): List<StreamToken> {

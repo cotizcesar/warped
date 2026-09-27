@@ -18,6 +18,9 @@ import com.warped.domain.model.Role
 import com.warped.domain.model.StreamToken
 import com.warped.domain.provider.LlmProvider
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
@@ -46,6 +49,20 @@ class LiteRTLmProvider @Inject constructor(
 
     @Volatile
     private var activeConversationConfig: ConversationConfig? = null
+
+    /**
+     * 46-01 RUNTIME-14: halt the in-flight native generation WITHOUT closing the
+     * conversation — `cancelProcess()` keeps the handle reusable for the next turn
+     * (close would force a full re-create). Safe when idle (no-op). Fire-and-forget
+     * best-effort alongside coroutine cancellation; failures are logged, never thrown.
+     */
+    fun cancelActiveGeneration() {
+        try {
+            activeConversation?.cancelProcess()
+        } catch (e: Exception) {
+            Timber.w(e, "LiteRTLm: cancelProcess failed")
+        }
+    }
 
     /**
      * Reset the active conversation. Called when the engine is reloaded or the model changes.
@@ -229,7 +246,24 @@ class LiteRTLmProvider @Inject constructor(
 
             emit(StreamToken.Done())
 
+        } catch (e: CancellationException) {
+            // Stop means stop: a cancelled turn terminates, never retries, never
+            // surfaces as a fake Error token.
+            throw e
         } catch (e: Exception) {
+            // 46-01 RUNTIME-14: a cancelled turn must never retry — Stop surfacing as
+            // an engine-flavored error must not resurrect the turn (pitfall 4).
+            // Active cancellation check (scope-inherited: throws
+            // CancellationException when this turn's job is cancelled) BEFORE any
+            // retry logic below. `coroutineScope` (not supervisorScope) inherits the
+            // cancelled job, so ensureActive() observes it.
+            //
+            // 46-01 Phase 47 hook contract (hooks only, no loop): every tool-round
+            // boundary in the future tool loop must call
+            // `currentCoroutineContext().ensureActive()` and enforce the round cap
+            // with `>=` semantics (`check(round >= MAX_TOOL_ROUNDS)`).
+            // Full loop is Phase 47.
+            coroutineScope { ensureActive() }
             val isEngineError = e is IllegalStateException ||
                 e.message?.contains("not alive", ignoreCase = true) == true ||
                 e.message?.contains("not initialized", ignoreCase = true) == true
