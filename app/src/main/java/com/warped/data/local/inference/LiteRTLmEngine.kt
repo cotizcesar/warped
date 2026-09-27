@@ -87,10 +87,22 @@ class LiteRTLmEngine @Inject constructor(
             modelPath = modelPath,
             backend = litertlmBackend,
             visionBackend = visionBackend?.let {
-                when (it) { BackendType.GPU -> Backend.GPU(); else -> Backend.CPU() }
+                when (it) {
+                    BackendType.GPU -> Backend.GPU()
+                    BackendType.NPU -> Backend.NPU(
+                        nativeLibraryDir = context.applicationInfo.nativeLibraryDir
+                    )
+                    else -> Backend.CPU()
+                }
             },
             audioBackend = audioBackend?.let {
-                when (it) { BackendType.GPU -> Backend.GPU(); else -> Backend.CPU() }
+                when (it) {
+                    BackendType.GPU -> Backend.GPU()
+                    BackendType.NPU -> Backend.NPU(
+                        nativeLibraryDir = context.applicationInfo.nativeLibraryDir
+                    )
+                    else -> Backend.CPU()
+                }
             },
             cacheDir = cacheDir.absolutePath
         )
