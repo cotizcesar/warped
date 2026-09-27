@@ -1,8 +1,52 @@
 # Requirements: Warped
 
 **Defined:** 2026-06-05
-**Last updated:** 2026-06-06 after v2.0 roadmap creation (ROADMAP.md Phases 40-44)
+**Last updated:** 2026-09-27 after v2.1 requirements definition (Phases 45+ roadmap pending)
 **Core Value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
+
+## v2.1 Requirements
+
+Requirements for the Finish v2.0 Leftovers milestone: close every v2.0 PARTIAL/carry-over (PERF-01, PERF-06, SKILLS-02/03, double-collect, Call.cancel()) plus upgrade LiteRT-LM 0.13.1 → 0.17.1 (latest stable 2026-09-16) and adopt its tool-calling fixes. Zero new dependencies — all work rides the pinned catalog (RUNTIME-12 audit stays green).
+
+### Skills Surface Recovery
+
+- [ ] **SKILLS-07**: Skills Lite surface is located in-tree or rebuilt Kotlin-only — sealed `Skill`, `SkillCategory { Tool, PromptTemplate }`, `SkillRepository` (+ Hilt binding), `SkillPreferences` DataStore (all-on defaults), `SkillChipsRow` above chat input (research 2026-09-27: no `*Skill*.kt` in tree vs v2.0 claims — verify first, rebuild if absent)
+
+### Tool Execution
+
+- [ ] **SKILLS-08**: Calculator, CurrentTime, JsonFormatter are registered as LiteRT-LM `@Tool`s via `ToolSet` + `ConversationConfig(tools=…)` wired from enabled chips with `automaticToolCalling = true`; Summarize stays a PromptTemplate skill (persona, not a function); user sees a graceful message when the loaded model lacks tool support
+- [ ] **SKILLS-09**: A single shared Skill→schema mapper feeds both `@ToolParam` descriptions (local) and `LmStudioToolFunction.parameters` JSON schema (remote) so the two surfaces cannot drift
+- [ ] **SKILLS-10**: `LmStudioHelper`/`LMStudioProvider` execute a multi-turn tool loop over `POST /v1/chat/completions` (never native `/api/v1/chat`): populate `tools[]`, detect `finish_reason: tool_calls` in streaming (index-keyed SSE accumulator) and non-streaming paths, execute locally, re-POST with `role: tool`, loop cap ~5, malformed-call fallback to plain `content`
+- [ ] **SKILLS-11**: Tool traffic persists as minimal transcript rows (tool name + summarized result, `role: tool` convention) so tool use is auditable and resumable — persist-vs-ephemeral decided here, not later
+- [ ] **SKILLS-12**: Tool progress and errors flow through the real execution path — "Using calculator…" status row while running, "Calculator failed: …" with fallback to a plain answer on error; tool executor sits behind an interface so a confirmation gate can be added later without rewiring
+
+### Runtime Hardening
+
+- [ ] **RUNTIME-13**: `runInference` double-collect is gone — a single shared Flow via `shareIn` (replay=1, per-turn scope); the sentinel no-op cancellation job is removed
+- [ ] **RUNTIME-14**: Stop actually stops — true OkHttp `Call.cancel()` (remote) + `cancelProcess()` (local) wired to the Stop button, fixing the `stopResponse()` no-op; the tool loop checks cancellation between rounds (25-round cap can never run away)
+
+### Chat Performance (atomic — never split)
+
+- [ ] **PERF-14**: `ChatUiState` is split into single-owner sub-states (messages/streaming vs input vs connection/models, `@Immutable`) so streaming tokens no longer recompose the input bar and keystrokes no longer recompose the list
+- [ ] **PERF-15**: Chat list renders on `LazyColumn` with `items(messages, key = { it.id })` (stable `ChatMessage.id` verified/added first), streaming message as keyed trailing item, auto-scroll sticks to bottom only when already at bottom
+
+### Engine Upgrade (LiteRT-LM 0.13.1 → 0.17.1)- [ ] **LRT-07**: `litertlm-android` bumps 0.13.1 → 0.17.1 (latest stable per [releases](https://github.com/google-ai-edge/LiteRT-LM/releases), 2026-09-16), version verified against Maven Central; compilation clean, dependency audit still green, no new artifacts
+- [ ] **LRT-08**: 0.14–0.17 tool-calling improvements are adopted in the SKILLS-08 path — v0.17.1 int-type tool-call fix, v0.14 streaming tool-call tokens, reasoning/thinking channels; Qwen3/Gemma tool-template bugs (reported vs 0.10–0.12) are re-tested on-device against 0.17.1 with per-model allowlist gating + prompt-injection fallback
+- [ ] **LRT-09**: `EngineConfig`/`ConversationConfig` API surface, R8 keep rules (`ToolProvider`, new entry points), and version-namespaced mmap cache are re-verified against 0.17.x with no silent schema drift; `model_allowlist.json` gains capability flags for new model features actually supported on Android (multi-token prediction, extended context) where verified
+
+### Full Dependency Refresh (entire catalog to latest stable)
+
+- [ ] **DEPS-01**: Every entry in `libs.versions.toml` is verified against its latest stable release and bumped where safe — Compose BOM, Hilt (+AGP/Gradle compatibility), Room, Lifecycle, Navigation, OkHttp, Retrofit, kotlinx-serialization, coroutines, DataStore, WorkManager, Splash, collections-immutable, testing (JUnit/MockK/Turbine/Truth); no SNAPSHOT or `-alpha` artifacts in the release graph
+- [ ] **DEPS-02**: Breaking-change sweep — release notes reviewed for each bump (especially Room migrations, Hilt/AGP requirements, Navigation type-safe API, OkHttp/Retrofit behavior); migrations and keep rules adjusted; compilation + unit tests green and dependency audit still green after the refresh
+
+### Hardening (as robust as possible)
+
+- [ ] **HARD-01**: Release hardening sweep — R8 full mode re-verified with 0.17.x plus new `ToolSet`/skill/mapper classes (`assembleRelease` smoke on a real device), dependency audit extended to any new transitive artifacts, no secrets/PII in release logs (tool arguments redacted), `network_security_config` and Keystore handling re-audited after the refresh
+- [ ] **HARD-02**: Tool-input trust boundary — every tool argument is validated and sanitized before execution (safe expression parser, JSON size caps, timezone-safe formatting), tool bodies are pure sync functions that never throw out (error-mapped returns), tool results are treated as untrusted text when fed back into the next turn; standalone unit tests per tool
+
+### Startup Performance (cold start < 1 second)
+
+- [ ] **PERF-16**: Cold start under 1 second on the Pixel 7 reference device — Baseline Profiles (Macrobenchmark-generated rules + `profileinstaller`) ship in release, no eager engine/helper init on the startup path (lazy `ProviderRouter` verified), splash cross-fade ≤200ms; measured numbers recorded in `BENCHMARKS.md` next to the PERF-12 targets
 
 ## v2.0 Requirements
 
@@ -118,8 +162,29 @@ Explicitly excluded — do not re-add without discussion.
 | OkHttp 5.x | API-breaking — defer |
 | SQLCipher removal without measurement | Measure first (PERF-13) |
 | Fallback destructive Room migration | NEVER — data loss risk for production users |
+| LiteRT-LM alpha/pre-release builds | Pin latest stable (0.17.1) — no `-alpha` artifacts in release builds |
+| Apple-only LiteRT-LM features (Metal residency, Apple FM adapter) | Android-only — not applicable |
+| LiteRT-LM C API prebuilts / YNNPACK delegate | Linux/C surface — Kotlin Android app rides the Maven AAR only |
+| Multimodal / vision / audio models (incl. Gemma 4 multimodal) | Still text-only — same scope as v2.0 |
 
-## Traceability
+## Traceability (v2.1)
+
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| SKILLS-07..12 | TBD | Pending |
+| RUNTIME-13..14 | TBD | Pending |
+| PERF-14..15 | TBD | Pending |
+| LRT-07..09 | TBD | Pending |
+| DEPS-01..02 | TBD | Pending |
+| HARD-01..02 | TBD | Pending |
+| PERF-16 | TBD | Pending |
+
+**Coverage:**
+- v2.1 requirements: 19 total
+- Mapped to phases: 0
+- Unmapped: 19 (roadmap pending)
 
 Which phases cover which requirements. Updated during roadmap creation.
 

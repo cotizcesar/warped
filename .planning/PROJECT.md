@@ -49,6 +49,9 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 - Chat message list on LazyColumn with stable keys (PERF-06)
 - Real tool execution: LiteRT-LM @Tool registration (SKILLS-02) + LM Studio tools[] mapping (SKILLS-03)
 - Runtime hardening: runInference double-collect refactor (shareIn) + true OkHttp Call.cancel() plumbing
+- Full dependency refresh: entire catalog to latest stable (incl. LiteRT-LM 0.13.1 → 0.17.1 with its tool-calling fixes)
+- Release hardening sweep + tool-input trust boundary (robust as possible)
+- Cold start under 1 second (Baseline Profiles, lazy init, measured on Pixel 7)
 
 ## Requirements
 
