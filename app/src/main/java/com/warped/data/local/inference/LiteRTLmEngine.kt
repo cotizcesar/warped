@@ -44,7 +44,7 @@ class LiteRTLmEngine @Inject constructor(
      * Initialize the LiteRT-LM engine with a .litertlm model and backends.
      * This is a blocking call (can take seconds) — caller must dispatch on Dispatchers.Default.
      *
-     * @param modelPath Absolute path to the .litertlm model file
+     * @param modelPath Absolute path to the .litertlm or .task model file
      * @param backend   Main backend (CPU or GPU)
      * @param visionBackend Backend for vision processing, or null to use main backend
      * @param audioBackend  Backend for audio processing, or null to use main backend

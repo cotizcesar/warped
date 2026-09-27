@@ -72,7 +72,9 @@ class LiteRTLmProvider @Inject constructor(
         if (activeEngine == null || activeEngine.type != EngineType.LITE_RT_LM) {
             // Try to load the engine from the active model path
             val modelPath = activeModelSelection.activeModel.value?.modelId
-            if (modelPath != null && modelPath.endsWith(".litertlm", ignoreCase = true)) {
+            // Engine-supported containers: .litertlm and .task (allowlist ships .task files).
+            if (modelPath != null && (modelPath.endsWith(".litertlm", ignoreCase = true) ||
+                modelPath.endsWith(".task", ignoreCase = true))) {
                 try {
                     engineManager.switchToLiteRT(modelPath)
         } catch (e: LiteRtLmJniException) {
@@ -83,7 +85,7 @@ class LiteRTLmProvider @Inject constructor(
                     return@flow
                 }
             } else {
-                emit(StreamToken.Error("No LiteRT-LM engine is loaded. Select a .litertlm model first."))
+                emit(StreamToken.Error("No LiteRT-LM engine is loaded. Select a .litertlm or .task model first."))
                 return@flow
             }
         }

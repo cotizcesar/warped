@@ -43,7 +43,7 @@ class EngineManager @Inject constructor(
      * cache directory used by EngineConfig is namespaced by the LiteRT-LM
      * version and capped via [LiteRtLmCacheManager].
      *
-     * @param modelPath Absolute path to the .litertlm model file
+     * @param modelPath Absolute path to the .litertlm or .task model file
      */
     @Synchronized
     fun switchToLiteRT(modelPath: String) {
