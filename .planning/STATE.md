@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 milestone: v2.1
 milestone_name: Finish v2.0 Leftovers
 status: planning
-last_updated: "2026-09-27T02:57:28.498Z"
-last_activity: 2026-09-26
+last_updated: "2026-09-27T00:00:00.000Z"
+last_activity: 2026-09-27
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -15,34 +15,33 @@ progress:
 
 # Project State: Warped
 
-**Last updated:** 2026-06-06
-**Last activity:** 2026-06-06 — v2.0 milestone **archived**: audit passed (53/53 reqs met or partial; 5 PARTIALs in Phase 43 + 2 carry-overs in Phase 44, all v2.1). Phases 40-44 shipped (23/23 plans).
+**Last updated:** 2026-09-27
+**Last activity:** 2026-09-27 — v2.1 roadmap created: 4 phases (45–48), 18 requirements mapped 18/18
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-05)
+See: .planning/PROJECT.md (updated 2026-09-27 after v2.1 milestone start)
 
 **Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** **Idle** — v2.0 Gallery Convergence & Performance Overhaul is **archived**. All 5/5 phases, 23/23 plans, 53/53 requirements met or partial. Awaiting next milestone (v2.1+).
+**Current focus:** **v2.1 Finish v2.0 Leftovers** — close every v2.0 PARTIAL/carry-over (PERF-01→PERF-14, PERF-06→PERF-15, SKILLS-02/03→SKILLS-08/10, double-collect→RUNTIME-13, Call.cancel()→RUNTIME-14) plus full catalog refresh (LiteRT-LM 0.17.1), release hardening, and sub-1s cold start. No partials left.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 45 (Foundation Refresh) — ready to plan
 Plan: —
-Status: Defining requirements
-Last activity: 2026-09-26 — Milestone v2.1 started
+Status: Roadmap approved-pending; next: `/gsd-plan-phase 45`
+Last activity: 2026-09-27 — Roadmap created
 
-## Phase Structure (v2.0)
+## Phase Structure (v2.1)
 
-| Phase | Name | Priority | Requirements | Status | Depends On |
-|-------|------|----------|--------------|--------|------------|
-| 40 | Runtime & Allowlist Foundation | **P0** keystone | RUNTIME-01..12, CACHE-01..03 (15) | ✓ Complete | — |
-| 41 | Thinking Mode + Model Benchmark | P1 | THINK-01..07, BENCH-01..06 (13) | ✓ Complete | Phase 40 ✓ |
-| 42 | Prompt Lab | P1 | PROMPT-01..06 (6) | ✓ Complete | Phase 40 ✓ |
-| 43 | Performance Convergence | **P0** cross-cutting | PERF-01..13 (13) | ✓ Complete | Phase 40 (interface only) ✓ |
-| 44 | Agent Skills Lite | P2 optional | SKILLS-01..06 (6) | ✓ Complete | Phase 40 ✓ |
+| Phase | Name | Requirements | Status | Depends On |
+|-------|------|--------------|--------|------------|
+| 45 | Foundation Refresh | DEPS-01..02, LRT-07, LRT-09 (4) | Not started | — |
+| 46 | Runtime Hardening | RUNTIME-13..14 (2) | Not started | Phase 45 |
+| 47 | Real Tool Execution | SKILLS-07..12, LRT-08, HARD-02 (8) | Not started | Phase 46 |
+| 48 | Chat Perf + Startup + Release | PERF-14..16, HARD-01 (4) | Not started | Phase 47 |
 
-**Total v2.0:** 5 phases, 53 requirements — 48 MET + 5 PARTIAL (Phase 43 PERF-01, PERF-05, PERF-06, PERF-12, PERF-13) + 2 carry-overs (Phase 44 SKILLS-02/03 Tool execution).
+**Total v2.1:** 4 phases, 18 requirements, 0 mapped-unmapped ✓
 
 ## Completed Milestones
 
@@ -54,11 +53,10 @@ Last activity: 2026-09-26 — Milestone v2.1 started
 - ✅ v1.5 Bug Hunt, Cleanup & Hardening — 5 phases, 26 requirements
 - ✅ v1.6 Code Syntax Highlighting — 3 phases, 20 requirements
 - ✅ v1.7 App Optimization & Smart Presets — 4 phases, 19 requirements
-- ✅ v1.8 LiteRT Update, Bugfix Round & Recommended Models — 5 phases, 30 requirements (3 verification gaps in Phase 35)
-- ✅ **v2.0 Gallery Convergence & Performance Overhaul — 5 phases, 53 requirements (48 MET, 5 PARTIAL)**
+- ✅ v1.8 LiteRT Update, Bugfix Round & Recommended Models — 5 phases, 30 requirements
+- ✅ v2.0 Gallery Convergence & Performance Overhaul — 5 phases (40–44), 53 requirements (48 MET, 5 PARTIAL + 2 carry-overs → all in v2.1)
 
 **Total across all milestones (archived):** 44 phases, 287 requirements
-**Cumulative state:** 10 milestones archived, 41/41 plans across v1.0–v2.0
 
 ## Performance Metrics
 
@@ -72,91 +70,24 @@ Last activity: 2026-09-26 — Milestone v2.1 started
 
 ### Decisions
 
-- [v1.6]: Highlights 1.1.0 selected as tokenization engine over custom regex tokenizer (~750-1,400 lines saved), Prism4j (archived 2023), and kotlin-textmate (v0.1.0, too new). Wrapped behind SyntaxHighlighter domain interface for swapability.
-- [v1.6]: Deferred highlighting strategy: flat monospace during streaming, full syntax coloring applied when closing ``` fence arrives. Prevents O(n²) streaming jank.
-- [v1.6]: CodeTheme enum → SyntaxTheme data class migration using existing DataStore key. Old enum names map to new theme objects.
-- [v1.6]: MarkdownText restructured from single Text(AnnotatedString) to block-based Column of composables to host language header bar and copy button.
-- [v1.6]: MarkdownBlock sealed hierarchy uses pure Kotlin data classes in domain/model/ with no Android/Compose dependencies
-- [v1.6]: parseMarkdown is a top-level pure function with LanguageDetector passed as parameter
-- [v1.6]: animateColorAsState applied per TokenType (13 calls) at composable scope
-- [v1.6]: codeFontScale follows same DataStore→UiState→component propagation pattern as syntaxTheme
-- [v1.6]: HuggingFaceModel.description uses SyntaxTheme.MONOKAI default when no user preference available
-- [v1.6]: INTG-03 (README preview): acknowledged as requiring new API endpoint and screen — out of scope for this integration phase
-- [v1.6]: INTG-06 (frame profiling): architectural protections (Dispatchers.Default, LRU cache, 500KB cap) provide sufficient confidence; real-device profiling deferred
-- [v1.6]: Coverage audit confirms canonical rendering: all FontFamily.Monospace usage flows through CodeBlock.kt or MarkdownText.kt — no orphaned code block rendering sites exist
-- [v1.8]: Long-lived `activeConversation` reused across `chat()` calls; `synchronized(this@LiteRTLmProvider)` protects lazy creation. `resetConversation()` is the public API to drop the conversation; called by `recoverEngine()`.
-- [v1.8]: TopAppBar removed; drawer remains reachable via swipe at the NavGraph level.
-- [v1.8]: Eager fetch — `fetchAllEndpointModels()` is called on every picker open (per user direction).
-- [v1.8]: Form restricted to `listOf(ProviderType.LM_STUDIO)`; OpenAI / Anthropic / Ollama / Custom removed.
-- [v1.8]: `base-config cleartextTrafficPermitted="true"` for LAN cleartext (Android XML doesn't support CIDR in `<domain>`).
-- [v1.8]: Static `object RecommendedModels` with 8 hand-picked `.litertlm` models; no API calls.
-- [v2.0]: Reference implementation = google-ai-edge/gallery v1.0.16 (23.6k stars, 91.9% Kotlin). Gallery is the only major OSS in the "LiteRT-LM + Compose + Android" niche, making it the most defensible convergence target.
-- [v2.0]: Adopt Gallery's `LlmModelHelper` interface shape (5 methods: initialize, runInference, resetConversation, cleanUp, stopResponse) as the v2.0 keystone.
-- [v2.0]: Drop Gallery's tech-debt surface — kapt, Moshi, Gson, kotlin-reflect, Firebase, Ktor, MCP SDK, compose-richtext, Proto DataStore, mlkit-genai, AppAuth, CameraX, JS webview skills. Verified by Phase 40's `dependencies` audit (RUNTIME-12).
-- [v2.0]: Warped is **already ahead** of Gallery on several axes (Hilt 2.59.2 vs 2.58, KSP-only, kotlinx-serialization only, per-screen VMs vs Gallery's 850-line mega-VM). v2.0 is a **convergence, not a copy**.
-- [v2.0]: Cache directory must be namespaced by `BuildConfig.LITERTLM_VERSION` (LiteRT-LM does not expose a cache-version API; cache is silently stale after `EngineConfig` schema change).
-- [v2.0]: LlmModelHelper is a **stateful runtime**; repositories are stateless or only-own-DB. Crossing the boundary is the bug.
-- [v2.0]: Use `@Binds @Singleton` for the `LlmModelHelper` interface — never `@Inject constructor` on a concrete helper class.
-- [v2.0]: `LiteRtLlmHelper.initialize()` MUST wrap `Engine.initialize()` in `withContext(Dispatchers.IO)`; the callback contract is "after the IO call completes", not "asynchronous from caller's POV".
-- [v2.0]: `EngineManager.getCachedModelPath()` file copy is REMOVED — `EngineConfig.cacheDir` gets `context.cacheDir.absolutePath/<version>` for mmap-only caching. Saves 1-3 GB/model + 3-10s cold start.
-- [v2.0]: Phase 44 (Agent Skills Lite) is P2 — defer to v2.1 if v2.0 timeline is tight. LiteRT-LM 0.13.1 `ToolProvider` API verification is the gating question.
+- [v2.1]: Phase order = runtime → tools → perf (ARCHITECTURE position). Rationale: tool loop runs through `runInference` — building it atop the sentinel no-op bakes unstoppable-tool-call bugs. Perf-last simultaneously satisfies PITFALLS (UI split accommodates existing tool-turn states). PERF-14+15 atomic; runtime/skills explicitly sequenced, never parallelized.
+- [v2.1]: LiteRT-LM target is **0.17.1** (latest stable 2026-09-16), superseding research SUMMARY's pinned 0.13.1. LRT-08 adopts 0.14–0.17 tool-calling fixes in the SKILLS-08 path.
+- [v2.1]: Summarize stays a PromptTemplate skill (persona, not a function) — SKILLS-08 is 3 real `@Tool`s (Calculator, CurrentTime, JsonFormatter).
+- [v2.1]: Zero new dependencies — all v2.1 work rides the refreshed catalog (RUNTIME-12 audit stays green).
 
-### Pending Todos
+### Todos
 
-None.
+- [ ] Plan Phase 45 (`/gsd-plan-phase 45`) — catalog refresh + engine bump
+- [ ] Phase 47 plan 1 must be "locate or rebuild Skills Lite surface" (no `*Skill*.kt` in tree vs v2.0 claims — verify first)
+- [ ] Pixel 7 reference-device measurements (PERF-16 + PERF-12/13 CI gate) need hardware/CI at Phase 48
 
-### Blockers/Concerns
+### Blockers / Concerns
 
-- v1.8 Phase 35 carry-over: 3 verification gaps remain (compile gate, conversation-reuse unit test, multi-turn smoke test) — user/CI verification required
-- v2.0 Phase 40 carry-over: `LlmModelHelper.runInference` double-collect (internal "drain" job + returned Flow); refactor to `shareIn` / `MutableSharedFlow`. v2.1.
-- v2.0 Phase 40 carry-over: `LMStudioProvider.Call` reference for true `Call.cancel()`. v2.1.
-- v2.0 Phase 43 PARTIALs (5): PERF-01 (sub-state split), PERF-05 (full audit covered), PERF-06 (LazyColumn switch), PERF-12 (cold-start numbers), PERF-13 (SQLCipher overhead). All v2.1.
-- v2.0 Phase 44 carry-overs (2): SKILLS-02 (LiteRT-LM `@Tool` registration), SKILLS-03 (LM Studio `tools[]` DTO mapping). v2.1.
-- MigrationTest is compile-only verified; runtime test needs a real device.
-
-## Deferred Items
-
-Items acknowledged and deferred at v2.0 milestone close on 2026-06-06. **12 v1.6 quick tasks were picked up and shipped in v1.8 (Phases 36–38) per the v1.8 audit.** Verification gaps remain pending until human runs them.
-
-| Category | Item | Status | Mapped Phase |
-|----------|------|--------|--------------|
-| verification_gap | Phase 06: 06-VERIFICATION.md | human_needed | — |
-| verification_gap | Phase 07: 07-VERIFICATION.md | human_needed | — |
-| verification_gap | Phase 08: 08-VERIFICATION.md | human_needed | — |
-| verification_gap | Phase 09: 09-VERIFICATION.md | human_needed | — |
-| verification_gap | Phase 10: 10-VERIFICATION.md | human_needed | — |
-| verification_gap | Phase 29: 29-VERIFICATION.md | human_needed | — |
-| verification_gap | v1.8 Phase 35 (compile gate + conv-reuse unit test + multi-turn smoke) | human_needed | — |
-| verification_gap | v2.0 Phase 41 MigrationTest runtime (compile-verified) | human_needed | — |
-| verification_gap | v2.0 Phase 43 macrobenchmarks (PERF-12/13 numbers) | human_needed | — |
-| verification_gap | v2.0 Phase 40 release-APK smoke (requires signing config) | human_needed | — |
-| milestone_partial | v2.0 PERF-01 (ChatUiState sub-state split) | deferred-v2.1 | v2.1 |
-| milestone_partial | v2.0 PERF-06 (LazyColumn key) | deferred-v2.1 | v2.1 |
-| milestone_partial | v2.0 PERF-12/13 (actual numbers) | deferred-CI | — |
-| milestone_carry | v2.0 LlmModelHelper.runInference double-collect | deferred-v2.1 | v2.1 |
-| milestone_carry | v2.0 LMStudioProvider.Call reference | deferred-v2.1 | v2.1 |
-| milestone_carry | v2.0 SKILLS-02 (LiteRT-LM @Tool registration) | deferred-v2.1 | v2.1 |
-| milestone_carry | v2.0 SKILLS-03 (LM Studio tools[] mapping) | deferred-v2.1 | v2.1 |
-| quick_task | 260430-qv6-no-salen-los-modelos-en-el-detalle-del-m | shipped-v1.8 | Phase 36 (HF-01) |
-| quick_task | 260430-rdt-unificar-diseno-detalle-con-listado-prin | shipped-v1.8 | Phase 36 (HF-02..04) |
-| quick_task | 260430-ryn-rediseno-chat-ocultar-topbar-selector-mo | shipped-v1.8 | Phase 37 (CHAT-01..03) |
-| quick_task | 260430-sx3-navegar-a-models-al-terminar-descarga-ar | shipped-v1.8 | Phase 36 (HF-05..06) |
-| quick_task | 260430-tac-descargas-en-segundo-plano-listar-modelo | shipped-v1.8 | Phase 36 (HF-07..09) |
-| quick_task | 260430-u5f-editar-y-borrar-endpoints-anthropic-prov | shipped-v1.8* | Phase 38 (ENDPT-01..02) — Anthropic portion removed in v1.8 scope |
-| quick_task | 260430-ulx-endpoints-en-selector-chat-titulo-models | shipped-v1.8 | Phase 37 (CHAT-04..06) |
-| quick_task | 260430-v7v-cargar-modelo-local-con-loading-listar-m | shipped-v1.8 | Phase 37 (CHAT-07..08) + Phase 38 (ENDPT-06) |
-| quick_task | 260430-vsl-lm-studio-nativo-v1-api-remover-openai-a | shipped-v1.8 | Phase 38 (ENDPT-04..05) |
-| quick_task | 260430-wgt-arreglar-delete-endpoints-dropdown-model | shipped-v1.8 | Phase 38 (ENDPT-02..04) |
-| quick_task | 260430-wtn-fix-real-delete-endpoints-y-fetch-modelo | shipped-v1.6 (commit 777f604) | — |
-| quick_task | 260504-lmi-litert-lm-solo-env-a-el-primer-mensaje-d | shipped-v1.8 | Phase 35 (LRT-02) |
-| quick_task | 260926-txv-hacer-que-compile-el-proyecto-fix-room-a | complete 2026-09-26 | Fix compilación: AutoMigration 11->12/12->13 → manual MIGRATION_11_12/12_13; .gitignore deja de ignorar app/schemas |
+- v2.0 carry-overs (7 items: 5 PARTIALs + SKILLS-02/03) — all mapped into v2.1 Phases 46–48, none left orphaned
+- PERF-12/13 benchmark numbers stay CI-gated (Pixel 7 hardware required) — out of v2.1 scope, unchanged
+- Model-family fragility in LiteRT tool calling (Qwen3/Gemma template bugs, version-sensitive) — mitigated via per-model gating + prompt-injection fallback (Phase 47)
+- Milestone brief said "19 reqs" but REQUIREMENTS.md contains 18 — counted and verified 18/18 mapped, no orphan
 
 ## Session Continuity
 
-Last session: 2026-06-06T09:30:00.000Z
-Stopped at: **v2.0 milestone lifecycle complete** — audit (`v2.0-MILESTONE-AUDIT.md` → passed), archive (`.planning/milestones/v2.0-ROADMAP.md`), MILESTONES.md updated, STATE.md set to `status: archived`. All 5 phases (40-44) shipped with 23/23 plans and 53/53 requirements met or partial. Awaiting next milestone planning.
-Resume file: None
-
-## Next Step
-
-Idle — v2.0 archived. Next user action: `/gsd-new-milestone` (or any equivalent) to scope the next milestone. v2.1 candidate items (from audit + STATE.md Blockers/Concerns): PERF-01 sub-state split, PERF-06 LazyColumn switch, SKILLS-02/03 tool execution, LlmModelHelper double-collect refactor, LMStudioProvider.Call reference, plus the deferred v2 requirements (LMSTUDIO-MCP-01, LRT-04 speculative decoding, BENCH-VIEW-01 history viewer, DEEPLINK-01, LRT-05 Vulkan, LRT-06 Hexagon NPU).
+- 2026-09-27: v2.1 roadmap created (Phases 45–48). Next action: user approves roadmap → `/gsd-plan-phase 45`.

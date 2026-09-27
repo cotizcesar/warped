@@ -173,18 +173,19 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SKILLS-07..12 | TBD | Pending |
-| RUNTIME-13..14 | TBD | Pending |
-| PERF-14..15 | TBD | Pending |
-| LRT-07..09 | TBD | Pending |
-| DEPS-01..02 | TBD | Pending |
-| HARD-01..02 | TBD | Pending |
-| PERF-16 | TBD | Pending |
+| DEPS-01, DEPS-02 | Phase 45 | Pending |
+| LRT-07, LRT-09 | Phase 45 | Pending |
+| RUNTIME-13..14 | Phase 46 | Pending |
+| SKILLS-07..12 | Phase 47 | Pending |
+| LRT-08 | Phase 47 | Pending |
+| HARD-02 | Phase 47 | Pending |
+| PERF-14..16 | Phase 48 | Pending |
+| HARD-01 | Phase 48 | Pending |
 
 **Coverage:**
-- v2.1 requirements: 19 total
-- Mapped to phases: 0
-- Unmapped: 19 (roadmap pending)
+- v2.1 requirements: 18 total (brief said 19 — actual count is 18)
+- Mapped to phases: 18
+- Unmapped: 0 ✓
 
 Which phases cover which requirements. Updated during roadmap creation.
 
