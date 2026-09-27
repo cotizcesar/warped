@@ -95,19 +95,21 @@ class LiteRTLmEngine @Inject constructor(
             cacheDir = cacheDir.absolutePath
         )
 
-        engine = Engine(config).also { e ->
-            Timber.d("LiteRTLmEngine: initializing backend=$backend vision=$visionBackend audio=$audioBackend cache=${cacheDir.absolutePath}")
-            try {
-                e.initialize()
-                Timber.d("LiteRTLmEngine: initialization complete")
-            } catch (jniEx: LiteRtLmJniException) {
-                Timber.e(jniEx, "LiteRTLmEngine: JNI init failed — ${jniEx.message}")
-                throw jniEx
-            } catch (ex: Exception) {
-                Timber.e(ex, "LiteRTLmEngine: init failed — ${ex.message}")
-                throw ex
-            }
+        val created = Engine(config)
+        Timber.d("LiteRTLmEngine: initializing backend=$backend vision=$visionBackend audio=$audioBackend cache=${cacheDir.absolutePath}")
+        try {
+            created.initialize()
+            Timber.d("LiteRTLmEngine: initialization complete")
+        } catch (jniEx: LiteRtLmJniException) {
+            Timber.e(jniEx, "LiteRTLmEngine: JNI init failed — ${jniEx.message}")
+            try { created.close() } catch (_: Exception) { /* best effort: release native handle */ }
+            throw jniEx
+        } catch (ex: Exception) {
+            Timber.e(ex, "LiteRTLmEngine: init failed — ${ex.message}")
+            try { created.close() } catch (_: Exception) { /* best effort: release native handle */ }
+            throw ex
         }
+        engine = created
         loadedModelPath = modelPath
     }
 
