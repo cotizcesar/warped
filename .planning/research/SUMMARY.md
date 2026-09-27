@@ -1,347 +1,166 @@
-# Research Summary — Warped v2.0 Gallery Convergence & Performance Overhaul
+# Project Research Summary
 
-**Project:** Warped (Android LM Studio equivalent — Kotlin + Jetpack Compose + LiteRT-LM + LM Studio v1)
-**Domain:** On-device LLM chat with remote provider bridge
-**Researched:** 2026-06-05
-**Confidence:** **HIGH** overall — version facts, Gallery repo architecture, LiteRT-LM API surface all verified against primary sources within 24 hours. **MEDIUM** on performance impact estimates (no Warped-hardware profiling yet).
-
-**Reference implementation:** [google-ai-edge/gallery](https://github.com/google-ai-edge/gallery) v1.0.16 main branch (23.6k stars, 91.9% Kotlin). Gallery is the only major OSS in the "LiteRT-LM + Compose + Android" niche, making it the most defensible convergence target.
-
----
+**Project:** Warped v2.1 — Finish v2.0 Leftovers (real tool execution + Compose perf completion)
+**Domain:** On-device LLM chat app (Android/Kotlin + LiteRT-LM 0.13.1 local + LM Studio v1 remote)
+**Researched:** 2026-09-27
+**Confidence:** HIGH
 
 ## Executive Summary
 
-Warped v2.0 is a **two-pronged milestone**: (1) **port Gallery's runtime abstraction** so that Thinking Mode, Model Benchmark, Prompt Lab, and (optionally) Agent Skills can plug in cleanly, and (2) **file-by-line performance overhaul** to make the app feel as fast, smooth, and resource-light as the reference implementation. The keystone of the feature work is a single `LlmModelHelper` interface (mirroring Gallery's `runtime/LlmModelHelper.kt`) that unifies `LiteRTLmProvider` and `LMStudioProvider` behind one streaming API. Without it, every v2.0 feature needs its own bespoke plumbing for local vs remote; with it, all four features share a surface. The keystone of the perf work is **dropping Warped's file-copy model cache** (1–3 GB of dead I/O in `EngineManager.getCachedModelPath()`) and keeping only LiteRT-LM's mmap cache — a 3–10 second cold-start win plus halved on-device storage footprint.
+Warped v2.1 is a **completion milestone, not a discovery milestone**: v2.0 shipped a Skills Lite surface whose Tool-category skills are prompt-injection only (they log/inject text, never execute), a chat list rendered as an unkeyed scrolling `Column`, a single 30-field `ChatUiState` consumed whole by `ChatScreen`, and a `runInference` path with a sentinel no-op cancellation job plus no true OkHttp `Call.cancel()`. Experts build this class of product with real function-calling on both backends (LiteRT-LM `@Tool`/`ToolSet` + `ConversationConfig(tools, automaticToolCalling)` locally; OpenAI-compatible `tools[]` + multi-turn `tool_calls` loop remotely), keyed `LazyColumn` with split sub-states for chat perf, and a single shared inference flow with per-turn scope and socket-level cancellation.
 
-**Warped is already ahead of Gallery on several axes** (Hilt 2.59.2 vs Gallery's 2.58, KSP-only vs Gallery's kapt, kotlinx-serialization only vs Gallery's triple-JSON mess, per-screen ViewModels vs Gallery's 850-line mega-VM, EncryptedSharedPreferences + Preferences DataStore vs Gallery's 5-Proto-DataStore approach). v2.0 is a **convergence, not a copy**: adopt Gallery's interface and manifest patterns, keep Warped's existing strengths, **do not import** Gallery's tech-debt surface (kapt, kotlin-reflect, Moshi, Gson, Firebase, Ktor, mlkit-genai-prompt, CameraX, TFLite, AppAuth, compose-richtext, Proto DataStore, JS webview skills).
+The recommended approach is **zero new dependencies**: every v2.1 work item (SKILLS-02, SKILLS-03, PERF-01, PERF-06, `shareIn` refactor, `Call.cancel()` plumbing) resolves to code patterns on the already-pinned catalog (litertlm-android 0.13.1, Retrofit 3.0.0 / OkHttp 4.12.0, coroutines 1.9.0, kotlinx-collections-immutable 0.4.0). No new layers either — all six completions are surgical modifications inside the existing keystone seams (`LlmModelHelper` 5-method interface unchanged, helpers own runtime state, `ProviderRouter` `dagger.Lazy` dispatch unchanged), with the v2.0 code carrying explicit `// v2.1` insertion comments at the exact edit points.
 
-**The biggest risks** are (a) R8 stripping LiteRT-LM JNI / kotlinx-serialization in release builds, (b) `Engine.initialize()` blocking the main thread if not dispatched to `Dispatchers.IO`, (c) Compose 1.11 strong-skipping mode silently making every `List<T>` parameter unstable, and (d) LiteRT-LM 0.12→0.13 file-format breakage leaving some existing user models unloadable. All four have known prevention recipes in the research and should be addressed in **Phase 40 — Runtime & Allowlist Foundation** before any feature work.
+The key risks are model-family fragility in LiteRT tool calling (Qwen3 empty `<tool_response>` + template-mismatch crash, Qwen 2.5 post-tool engine wedge, Gemma 3n `type: tool_response` omission — all version-sensitive upstream issues), silent LM Studio `tools[]` dialect mismatches (server ignores malformed schema; streaming `tool_calls` deltas need an index-keyed accumulator), and Compose refactor traps (duplicated sub-state fields drifting, unkeyed LazyColumn destroying streaming state, `shareIn` replay/scope misconfiguration duplicating or dropping tokens, `Call.cancel()` aimed at the wrong `Call` instance leaking sockets). Mitigation is per-model tool gating with prompt-injection fallback, golden-JSON schema tests + mock-server chunk-split SSE tests, single-owner sub-state fields with `@Immutable` + `ImmutableList`, and rotation/stop-latency/soak-test gates — detailed in PITFALLS.md's "Looks Done But Isn't" checklist.
 
----
+## Key Findings
 
-## Top 10 Actionable Items (Highest-ROI for v2.0)
+### Recommended Stack
 
-Ranked by leverage × risk-reduction. Each item has a STACK → FEATURE → PITFALL chain citation.
+Zero new dependencies for v2.1 — the pinned catalog already covers everything (see STACK.md). The headline decision is deliberate restraint: `litertlm-android` stays on **0.13.1** (the `ToolSet`/`@Tool`/`@ToolParam` + `ConversationConfig(tools, automaticToolCalling)` API ships inside it; 0.14.0 exists but is unverified against the Gallery reference), LM Studio tool use rides the existing Retrofit/OkHttp + kotlinx-serialization stack as new `@Serializable` DTOs over `POST /v1/chat/completions` (never the native `/api/v1/chat`, whose `integrations` field is MCP-only), and the `shareIn` + `Call.cancel()` + keyed-LazyColumn work is pure code patterns on coroutines 1.9.0 / immutable 0.4.0. Explicitly banned: `okhttp-sse` artifact, MCP client SDK, `litertlm` bump, kapt/Moshi/Gson/reflect/Ktor (RUNTIME-12 audit), closing the shared OkHttp dispatcher on cancel.
 
-| # | Action | Why It Matters | Cross-Reference |
-|---|--------|----------------|-----------------|
-| **1** | **Port `LlmModelHelper` interface + 2 impls** (`LiteRtLlmHelper`, `LmStudioHelper`) and refactor `ChatViewModel` to depend on the interface. | Keystone for all v2.0 features. Without it, Thinking/Benchmark/PromptLab/Skills each need their own local-vs-remote plumbing. Estimated 7–10 days; touches the chat hot path. | FEATURES §Table Stakes; ARCHITECTURE §5 (#MUST REFACTOR); PITFALLS Critical #2 (off-main), #7 (backpressure), #8 (Hilt cycle) |
-| **2** | **Drop the model file copy in `EngineManager.getCachedModelPath()`**; pass `context.cacheDir.absolutePath` (or external) directly to `EngineConfig.cacheDir` for mmap only. | Single biggest perf win: 1–3 GB disk savings per model + 3–10s cold-start I/O removed. Gallery's pattern. | STACK §3 (LiteRT-LM); ARCHITECTURE §8; PITFALLS Critical #4 (cache invalidation), Anti-Pattern A14 |
-| **3** | **Add `core-splashscreen:1.2.0-beta01`** + `installSplashScreen()` + cross-fade mask in `MainActivity`. Add `android:configChanges="uiMode"` + `<uses-native-library>` for `libvndksupport.so`/`libOpenCL.so`/`libcdsprpc.so` to manifest. | Eliminates cold-start flash. Required manifest entries unlock GPU/NPU backend on supported devices (no auto-detection without them). | STACK §13, §14, §3; ARCHITECTURE §4, §Cross-Cutting Manifest; PITFALLS Anti-Pattern A15, A16 |
-| **4** | **Bump dependencies**: compose-bom 2026.04.01→2026.05.01, hilt-navigation-compose/hilt-work 1.2.0→1.3.0, Room 2.7.1→2.8.4, Lifecycle 2.8.7→2.10.0, Navigation 2.8.8→2.9.x, LiteRT-LM 0.13.0→0.13.1, add `lifecycle-process:2.10.0`. | Aligns with Gallery's proven version matrix. Lifecycle-process enables app-wide foreground/background awareness. LiteRT-LM 0.13.1 adds ToolProvider + Agent Skills. | STACK §1, §2, §3, §4, §5, §6 (Version Compatibility Matrix); PITFALLS Critical #3 (0.13 file format) |
-| **5** | **Add `AppLifecycleProvider`** (interface + impl) and wire `LifecycleEventObserver` in `MainActivity` to gate download notifications. Use `ProcessLifecycleOwner` from `lifecycle-process`. | Suppresses download notifications when app is foregrounded. Warped has no such gate today. Gallery does this. | ARCHITECTURE §4 (#MUST REFACTOR #3); STACK §5; PITFALLS Critical #12 (battery optimizer) |
-| **6** | **Plumb `enableThinking` + `partialThinkingResult`** through `LlmModelHelper.runInference`. Render collapsible "Thinking" panel in `MessageBubble`. Gate by `capabilities: ["llm_thinking"]` in allowlist. | Newer reasoning models (Gemma 4 E2B/E4B, DeepSeek-R1-Distill) expose thinking; users running these expect it. LM Studio v1 `/api/v1/chat` returns `reasoning_content`. Both engines supported. | FEATURES §Table Stakes; ARCHITECTURE §5; PITFALLS Critical #7, UX Pitfall (toggle hidden) |
-| **7** | **Add `assets/model_allowlist.json`** matching Gallery's schema (`name`, `modelFile`, `sizeInBytes`, `capabilities`, `llmPromptTemplates`). Replace `RecommendedModels` Kotlin constant. New `ModelAllowlistRepository`. | Required for capability gating (Thinking, Speculative Decoding). Static asset = no network dep, aligns with v1.8 REC-03. | FEATURES §Table Stakes; ARCHITECTURE §6; PITFALLS "Looks Done" #5 |
-| **8** | **Add R8 keep rules** for `com.google.ai.edge.litertlm.**` (JNI), `MessageCallback`, `ToolProvider`, and canonical kotlinx-serialization `$$serializer` companions. Enable R8 full mode. | **Release builds only.** Without these, `UnsatisfiedLinkError` on first model load + `Serializer for class 'X' is not found` on first DTO. Verify with `aapt2 dump strings` on release APK. | PITFALLS Critical #5, #6; STACK §8; Anti-Pattern A1 |
-| **9** | **Split `ChatUiState` (50 fields) into 3 sub-states** + add `@Immutable` annotation. Audit `MessageBubble` / `CodeBlock` / `ChatInputBar` for hoisted state, stable lambdas, `key()` in `LazyColumn`. Add `kotlinx-collections-immutable:0.4.0` and convert `List<T>` params to `ImmutableList<T>`. | Compose 1.11 strong-skipping mode (default in BOM 2026.05.01) treats `List<T>` as unstable → every streaming token recomposes every row. ChatScreen during streaming will become visibly jankier. **Must be addressed before Thinking Mode is wired up** (Thinking adds a new StateFlow subscription = worst-case scenario). | ARCHITECTURE §2, §7; PITFALLS Critical #11; STACK §1 (BOM bump) |
-| **10** | **Add Room migration infrastructure** for v1.8 → v2.0 schema changes (new `BenchmarkResult` table in Phase 41, new `thinking` column on `Message`). Set `exportSchema = true`, commit `schemas/` to git, write a `MigrationTest` in `androidTest/`. **Never** use `fallbackToDestructiveMigration()`. | v2.0 install on a device with v1.8 chat history will silently wipe the DB if migration is missing. Warped now has production users (39 phases, 234 requirements shipped) — this is no longer a non-issue. | PITFALLS Critical #9; STACK §4; "Looks Done" #8 |
+**Core technologies:**
+- litertlm-android 0.13.1 (KEEP): local `@Tool` registration via `ToolSet` — tool API verified in-tree, no bump
+- Retrofit 3.0.0 + OkHttp 4.12.0 + kotlinx-serialization-json 1.7.3 (KEEP): LM Studio `tools[]` DTOs + `Call.cancel()` on existing stack
+- kotlinx-coroutines 1.9.0 (KEEP): `shareIn(WhileSubscribed(5000), replay=1)` double-collect fix + cancel plumbing
+- kotlinx-collections-immutable 0.4.0 (KEEP): stable `ImmutableList<Message>` for keyed LazyColumn + sub-state split (0.5.0 stable exists, optional post-verification bump)
+- Turbine 1.1.0 (KEEP): tests for shared-flow replay semantics and tool-call emissions
 
-**Run order (critical path):** 1, 4, 8, 2, 3, 5, 7 → 6, 9, 10 (6 and 9 are blocking-start for Phase 41/43; 10 is inline with Phase 41 schema work).
+### Expected Features
 
----
+v2.1 MVP = "no partials left": close SKILLS-02/03, PERF-01/06, and the runtime hardening items (see FEATURES.md). Note the scoping correction: **Summarize stays PromptTemplate** (it's a persona, not a function — forcing it into `@Tool` is a category error), so SKILLS-02 is 3 real `@Tool`s (Calculator, CurrentTime, JsonFormatter). Note also the tree gap: **no `*Skill*.kt` or `SkillChipsRow.kt` files exist in the working tree** despite v2.0 planning describing sealed `Skill` + `SkillPreferences` — the roadmap must include a "locate or rebuild Skills Lite surface" step before SKILLS-02/03.
 
-## Cross-Dimensional Dependencies (STACK → FEATURE → PITFALL chains)
+**Must have (table stakes):**
+- SKILLS-02: 3 Tool skills as LiteRT-LM `@Tool`s, `ConversationConfig(tools=…)` from enabled chips, `automaticToolCalling=true`, graceful degrade on non-capable models — chips do nothing real today
+- SKILLS-03: same skills mapped to LM Studio `tools[]` + app-side multi-turn loop (streaming accumulator, `role: tool` re-POST, ~5-round cap, malformed-call fallback) — remote parity
+- PERF-06: chat list on keyed LazyColumn (`key = { it.id }`, `contentType` streaming/settled) + stick-to-bottom-only-if-at-bottom — fixes O(n) per-token composition + scroll yanks
+- PERF-01: `ChatUiState` sub-state split (messages/streaming vs input vs connection) so tokens don't recompose the input bar — milestone goal is zero partials
+- Cancellable streaming on both backends (`Call.cancel()` remote + `cancelProcess()` local, tool loop aborts between rounds, single shared Flow)
+- Tool progress/error UX ("Using calculator…" row through the real path, error display with plain-answer fallback)
 
-The following chains show where a stack decision unlocks a feature that triggers a pitfall. Each chain is one decision to make consciously.
+**Should have (competitive):**
+- Offline tool skills as pure Kotlin functions (airplane-mode differentiator; calculator needs safe expr parser, no eval)
+- Unified skill surface: one `Skill → (ToolSet | LmStudioTool)` mapper so skills work wherever the model runs
+- Tool-result rendering decision (persist minimal tool rows vs ephemeral status — recommend persist name + summarized result; affects Room schema, decide upfront)
+- Manual-confirmation gate *interface* (auto-execute now for pure functions; shape the executor so a gate inserts later without rewiring)
 
-### Chain A: `LlmModelHelper` (keystone)
-- **STACK:** LiteRT-LM 0.13.1 adds `ToolProvider` + `MessageCallback` (STACK §3). PITFALLS Critical #2 requires `withContext(Dispatchers.IO)` wrap around `Engine.initialize()`.
-- **FEATURE:** Enables Thinking Mode (FEATURES §Thinking Mode), Model Benchmark (FEATURES §Model Benchmark), Prompt Lab (FEATURES §Prompt Lab), Agent Skills Lite (FEATURES §Agent Skills Lite). All four depend on the keystone.
-- **PITFALLS:** Critical #2 (off-Main init), #7 (callbackFlow backpressure with `Channel.UNLIMITED`), #8 (Hilt cycle — use `@Binds` for interface), #10 (SSE cancellation — `stopResponse` must cancel the read loop and `Call`). All must be addressed in the same phase.
-- **Verdict:** Phase 40 is non-negotiable. Touches the chat hot path; needs 7–10 days.
+**Defer (v2+):**
+- MCP bridge, JS/WebView custom skills, native intent skills (`run_intent`), `tool_choice` override, parallel tool calls, tool-result cards (rich rendering), benchmark history / speculative decoding / Vulkan/NPU / deep links — see FEATURES.md anti-features (unbounded loops, always-on tools, prompt-injection-as-execution)
 
-### Chain B: `EngineConfig.cacheDir` mmap-only
-- **STACK:** LiteRT-LM `EngineConfig` accepts `cacheDir: String?` for mmap warm-start (STACK §3).
-- **FEATURE:** Doesn't unlock a new feature but enables **5–10× faster warm starts** (FEATURES §Performance), and **1–3 GB disk savings** (ARCHITECTURE §8).
-- **PITFALLS:** Critical #4 — LiteRT-LM does NOT expose a cache-version API. The cache is silently stale after `EngineConfig` schema change. Must namespace by `BuildConfig.LITERTLM_VERSION` and cap at 500MB with LRU eviction. Anti-Pattern A14 (Gallery's mistake).
-- **Verdict:** Phase 43 (Performance). The cleanest single-file change in the v2.0 mandate.
+### Architecture Approach
 
-### Chain C: Compose BOM 2026.05.01 → strong-skipping mode
-- **STACK:** BOM 2026.05.01 includes Compose 1.11.0 with strong skipping as default (STACK §1).
-- **FEATURE:** Doesn't unlock a feature but **all v2.0 features assume the recomposition perf budget holds**. Adding Thinking Mode = new StateFlow subscription = worst case for unstable params.
-- **PITFALLS:** Critical #11 — every `List<T>` parameter becomes unstable. `kotlinx-collections-immutable:0.4.0` is the standard escape hatch. Layout Inspector in Android Studio is the verification tool.
-- **Verdict:** Phase 43 (Performance Convergence). Must be addressed **before** or **concurrent with** Phase 41 (Thinking Mode wiring) — not after.
+No new layers; six surgical modifications inside existing seams (see ARCHITECTURE.md). The `LlmModelHelper` 5-method interface is sufficient and stays unchanged; `LiteRTLmProvider.chat()` lines 132–138 (`tools = emptyList()` → skill-mapped tools, `automaticToolCalling` flip) and `LmStudioHelper.runInference()` (map `SkillTool → LmStudioTool`, pass into request body via a new dedicated `tools` param — not the `integrations` overload) are the two skill insertion points; `LmStudioDtos.tools[]` + SSE `tool_call.*` parse + `ChatViewModel` `[tool:NAME]` detection are already DONE. PERF-01 splits `ChatUiState` into 4 `@Immutable` sub-states (list/input/streaming/selection, merging dead `isGenerating`, deleting 2 `@Deprecated` fields) with `MessageBubble`/`ChatInputBar` signatures unchanged; PERF-06 is a mechanical 1-file `Column → LazyColumn` migration; the runtime fix replaces sentinel no-op jobs with `shareIn` single-flight shared upstreams and threads a raw `Call` through `LMStudioProvider` (`chatCall()` overload + `AtomicReference<Call>` + `cancelActiveCall()`). New code lives in `domain/skills/` (`SkillTool`, `SkillRegistry`) + `data/skills/` (`BuiltinSkills`, `SkillRegistryImpl`); registry exposes `StateFlow.value` (never `runBlocking`), takes no repository dependency, is consumed via `dagger.Lazy`. Watch the LRT-02 interaction: `ConversationConfig.tools` applies only at conversation creation, so enabled-skill changes must trigger `resetConversation()`.
 
-### Chain D: AndroidManifest `<uses-native-library>` + `largeHeap` + `extractNativeLibs="false"`
-- **STACK:** Native library declarations required for GPU/NPU/DSP auto-detection (STACK §3, §13).
-- **FEATURE:** Unlocks `Backend.GPU()` runtime selection → 2–5× faster inference on flagship devices (STACK §3, PITFALLS LiteRT-LM integration table).
-- **PITFALLS:** Critical #12 — `largeHeap="true"` is already in Warped but `extractNativeLibs="true"` would balloon APK by 10–20 MB (Anti-Pattern A16). `windowSoftInputMode="adjustResize"` is required for proper chat behavior.
-- **Verdict:** Phase 40 manifest changes. One manifest file edit; large downstream impact.
+**Major components:**
+1. `LiteRTLmProvider` / `LiteRtLlmHelper` (local runtime) — `ConversationConfig.tools` wiring, `shareIn` single-flight + real `stopResponse`
+2. `LMStudioProvider` / `LmStudioHelper` (remote runtime) — `tools[]` body mapping, Call-returning chat + `cancelActiveCall()`, `cleanUp` off `runBlocking`
+3. `ChatViewModel` + `ChatScreen` + `ChatUiState` (UI) — slice StateFlows, keyed LazyColumn, shared-flow collection, existing `[tool:NAME]` accretion path
+4. `domain/skills` + `data/skills` (NEW, small) — `SkillTool` interface, `BuiltinSkills`, `SkillRegistry` with per-call-mapped descriptors
 
-### Chain E: Room → benchmark history → migration risk
-- **STACK:** Room 2.8.4 stable, KSP-only (STACK §4).
-- **FEATURE:** Model Benchmark needs a `BenchmarkResult` table (FEATURES §Model Benchmark).
-- **PITFALLS:** Critical #9 — missing migration = silent data loss for all v1.8 users on upgrade. `@AutoMigration` for additive, `Migration` for breaking. `MigrationTest` in `androidTest/`. NEVER `fallbackToDestructiveMigration()`.
-- **Verdict:** Phase 41 inline. Address at table-add time, not as cleanup.
+### Critical Pitfalls
 
----
+Top items from PITFALLS.md (7 criticals; full prevention/verification matrix in the Pitfall-to-Phase Mapping table):
+
+1. **Blocking I/O or throwing `@Tool` bodies on the inference thread** — engine executes tools inline; stalls read as hangs, throws cross JNI as `LiteRtLmJniException`. Avoid: pure sync CPU-trivial bodies, try/catch → error map, `@ToolParam` types restricted to String/Int/Boolean/Float/Double/List thereof.
+2. **Assuming tool calling works uniformly across models** — Qwen3 empty-`<tool_response>` crash, Qwen 2.5 post-tool engine wedge (process-kill to recover), Gemma 3n `type` omission. Avoid: per-model `toolCalling` allowlist flag + on-device smoke test per capable model, prompt-injection fallback otherwise, tool-call cap + silence watchdog + degrade-to-no-tools retry.
+3. **LM Studio `tools[]` in the wrong schema dialect** — server silently ignores malformed tools; `finish_reason: tool_calls` dropped by content-only parser → empty bubble. Avoid: two tested mappers from one `Skill` source, golden-JSON unit test, index-keyed `arguments` accumulator, allowlist-name guard, 5-round cap.
+4. **Sub-state split duplicating source of truth** — `isStreaming` in two slices drifts (send/stop/spinner disagree). Avoid: one owner per field, cross-needs derived at screen level, all `@Immutable` + `ImmutableList`, migrate subcomposables one at a time.
+5. **LazyColumn without stable keys** — positional rebind loses code-block collapse/highlight/thinking state, scroll jumps, per-token flicker at 100+ messages. Avoid: `key = { it.id }` (update same row, never append-then-replace), `contentType` streaming/settled, `remember(message.id)`, highlight-once-on-settle, conditional auto-scroll.
+6. **`shareIn` replay/scope misconfiguration** — `replay=ALL` duplicates turns on rotation; `replay=0` + `Lazily` drops late-collector tokens; `viewModelScope` scope breaks Stop. Avoid: `replay=1`, per-turn child `Job`, persistence as independent from-turn-start collector, keep `Channel.UNLIMITED` producer buffer.
+7. **Wrong-`Call` `cancel()`** — Retrofit owns its internal `Call`; storing a nearby-but-different reference cancels nothing → socket leaks, pool exhaustion. Avoid: raw `newCall` ownership or `EventListener.callStart` capture, `AtomicReference.getAndSet(null)?.cancel()`, cooperative `ensureActive()` + cancelled-flag-gated `IOException` suppression ("Stopped" ≠ error).
+
+Plus cross-cutting: R8 strips new `@Tool`/`@Serializable` classes in release-only (keep rules + `assembleRelease` tool smoke test), Hilt cycles if a skill executor depends on a repository (tools stay stateless; config passed as data), tool-schema token inflation on small-context models (register only enabled skills, one-line descriptions, re-measure TTFT).
 
 ## Implications for Roadmap
 
-### Recommended Phase Structure (5 phases, 35–47 days)
+Suggested phase structure below. **Phase-order disagreement recorded (no forced consensus)** — the two researchers argue opposite orders with genuine rationale; the roadmapper decides:
 
-```
-Phase 40 — Runtime & Allowlist Foundation   [P0]  5–7 days   ← KEYS ALL OTHERS
-Phase 41 — Thinking Mode + Benchmark         [P1]  7–10 days
-Phase 42 — Prompt Lab                        [P1]  5–7 days
-Phase 43 — Performance Convergence          [P0]  7–10 days  ← can parallel 41/42
-Phase 44 — Agent Skills Lite (optional)      [P2]  10–14 days ← DEFER to v2.1 if scope tight
-```
+- **ARCHITECTURE.md position (runtime → skills → perf):** fix the pipe before pushing new traffic through it — skills execute *through* `runInference`, so building the tool loop on top of the sentinel-job no-op + socket-drain bugs bakes unstoppable-tool-call bugs into SKILLS-02/03. PERF-01+06 ship together atomically afterward (either alone gives ~zero measurable win) and are orthogonal enough to parallelize.
+- **PITFALLS.md position (tools → perf → runtime):** tools-first because tool execution defines what the streaming pipeline must carry (tool-activity rows, multi-round turns) — the UI split and LazyColumn work must accommodate those states, not the other way around; runtime hardening *last* because `shareIn` + `Call.cancel` mechanize the now-settled turn lifecycle and are verified against the final UI.
 
-**Total: 34–48 days** for all 5 phases, depending on Phase 44 inclusion.
+Both agree PERF-01 and PERF-06 must ship together (never split), and both agree the runtime work and skills work touch the same `runInference` flow and must be explicitly sequenced (not parallelized) wherever they land.
 
-### Phase 40 — Runtime & Allowlist Foundation [P0, keystone]
+### Phase A: Runtime hardening (shareIn + Call.cancel + runBlocking removal)
 
-**Rationale:** Without `LlmModelHelper`, every other feature phase is duplicated plumbing. This is the single biggest v2.0 leverage point. Also the cheapest place to do all the **mechanical stack bumps** and **R8 keep rules** before any feature code lands.
+**Rationale:** ARCHITECTURE.md order — the sentinel-job defect means `stopResponse()` is currently a no-op on both helpers and the OkHttp socket keeps draining after Stop (code admits it: `LmStudioHelper` lines 57–60). Fix the pipe before tool traffic flows through it. (PITFALLS.md would place this last — see ordering note above.)
+**Delivers:** `shareIn` single-flight shared upstream in both helpers with real `stopResponse()`; `LMStudioProvider.chatCall()` + `cancelActiveCall()` via raw `Call` ownership; `cleanUp` off `runBlocking`; `ChatViewModel.stopGeneration → helper.stopResponse()` wire-up. No UI change.
+**Addresses:** Cancellable streaming (table stakes); double-collect + socket-drain defects.
+**Avoids:** Critical 6 (replay/scope), Critical 7 (wrong-Call cancel), `runBlocking`-in-inference anti-pattern.
+**Uses:** coroutines 1.9.0 `shareIn` pattern; existing OkHttp 4.12.0 client (no `okhttp-sse` artifact); `AtomicReference<Call>` guard.
 
-**Delivers:**
-- `domain/runtime/LlmModelHelper.kt` interface (mirror Gallery's 5 methods + `ResultListener`/`CleanUpListener` typealiases, drop `image`/`audio` params).
-- `data/runtime/LiteRtLlmHelper.kt` (wraps `EngineManager` + `LiteRTLmEngine`).
-- `data/runtime/LmStudioHelper.kt` (wraps `LMStudioProvider`; SSE cancellation-aware).
-- `ChatViewModel` accepts `LlmModelHelper` (interface) via `ProviderRouter` factory.
-- `assets/model_allowlist.json` (Gallery schema subset: `name`, `displayName`, `modelFile`, `sizeInBytes`, `capabilities`, `llmPromptTemplates`, `taskTypes`).
-- `ModelAllowlistRepository` reads asset, surfaces capabilities.
-- Type-safe nav (`@Serializable` destinations) for 7 routes.
-- `app/src/main/AndroidManifest.xml`: add `configChanges="uiMode"`, `<uses-native-library>` x3, `windowSoftInputMode="adjustResize"`, `extractNativeLibs="false"`, `largeHeap="true"`, `theme="...SplashScreen"`.
-- `libs.versions.toml` bumps (compose-bom, hilt-nav, hilt-work, room, lifecycle, navigation, litertlm).
-- `gradle.properties`: `android.nonTransitiveRClass=true`, `-Xmx4g`, `kotlin.incremental=true`.
-- `proguard-rules.pro`: LiteRT-LM JNI keep rules + kotlinx-serialization $$serializer keep rules + R8 full mode.
+### Phase B: Real tool execution (SKILLS-02 + SKILLS-03)
 
-**Addresses:** All 4 STACK MUST-ADOPT buckets in one PR; FEATURES §LlmModelHelper + §Model Allowlist JSON (both P0); ARCHITECTURE §MUST REFACTOR #1, #4, #5, #7, #10; PITFALLS Critical #1, #2, #3 (defensive try/catch), #5, #6, #8, #10.
+**Rationale:** The milestone's headline gap — Tool-category skills currently only log/inject prompt text. Builds on Phase A in ARCHITECTURE order (tools execute through the fixed `runInference`); in PITFALLS order this would come first to define the turn lifecycle the UI must carry. Either way, sequence explicitly against Phase A (shared `runInference` flow — do not parallelize blindly).
+**Delivers:** `domain/skills` + `data/skills` (registry, 3 builtin pure-function `@Tool`s — Calculator, CurrentTime, JsonFormatter; Summarize stays PromptTemplate); `ConversationConfig.tools` + `automaticToolCalling` wiring with per-model `toolCalling` gating and conversation-reset-on-skill-change; LM Studio `tools[]` mapper + index-keyed streaming accumulator + 5-round app-side loop with `role: tool` re-POST; "locate or rebuild Skills Lite surface" step (chips + preferences missing from tree); tool-activity row through the real path.
+**Addresses:** SKILLS-02, SKILLS-03, tool progress/error UX, unified skill surface.
+**Avoids:** Critical 1 (tool purity), Critical 2 (per-model gating), Critical 3 (schema dialect), Security (pure-only surface, DEBUG-only tool logging, R8 keeps, single authenticated client for follow-ups).
 
-**Avoids:** All Gallery anti-patterns A1–A6, A11, A15, A16 (verified by `dependencies` audit empty for kapt/firebase/moshi/gson/kotlin-reflect/ktor + manifest audit + proguard audit).
+### Phase C: Compose perf (PERF-01 + PERF-06 together, atomic)
 
-**Research flag:** Needs `--research-phase` for: (a) exact `EngineConfig.cacheDir` parameter name (ARCHITECTURE §Open Q #1), (b) `Message.thinking` accessor name in LiteRT-LM 0.13.1 (FEATURES §Open Q #1, ARCHITECTURE §Open Q #3), (c) `@AutoMigration` schema design for `thinking` column (PITFALLS Critical #9).
-
-### Phase 41 — Thinking Mode + Benchmark [P1]
-
-**Rationale:** Both features ride on the `LlmModelHelper` keystone and need the same data plumbing (`partialThinkingResult` + benchmark history persistence). Co-locating them shares the Room migration work.
-
-**Delivers:**
-- `LlmModelHelper` extended with `enableThinking` via `extraContext: Map<String, String>` (per ARCHITECTURE §5; type-safe sealed class preferred over Map for benchmark hot path per PITFALLS Performance Traps row 12).
-- `ResultListener.partialThinkingResult: String?` plumbing in both impls.
-- UI: collapsible "Thinking..." panel in `MessageBubble` (above the response); chip in chat input bar shows "💭 Thinking ON/OFF" (PITFALLS UX Pitfall).
-- Capability gate: only show toggle if `model.capabilities.contains(LLM_THINKING)`.
-- `ui/benchmark/` package: `BenchmarkScreen`, `BenchmarkViewModel`, `BenchmarkResultsViewer`, `BenchmarkValueSeriesViewer` (mirrors Gallery's 4 files).
-- `worker/ModelBenchmarkWorker.kt` (WorkManager, `setForeground()` for long runs, `Constraints(UNMETERED, BATTERY_NOT_LOW)`).
-- `domain/repository/BenchmarkRepository.kt` + impl (Room table, NOT Proto DataStore per Anti-Pattern A7).
-- Room schema: add `BenchmarkResult` table (id, modelId, configHash, initTimeMs, prefillTokPerSec, decodeTokPerSec, peakMemoryBytes, createdAt) with `@AutoMigration(from=v1, to=v2)`. **NEVER** `fallbackToDestructiveMigration()`.
-- `MigrationTest` in `androidTest/` covering v1.8 → v2.0 (50 messages round-trip).
-- `lifecycle-process:2.10.0` added; `AppLifecycleProvider` interface in `domain/lifecycle/`.
-- `DownloadWorker` reads `appLifecycleProvider.isAppInForeground` before posting notification (PITFALLS Critical #12).
-
-**Addresses:** FEATURES §Thinking Mode + §Model Benchmark; ARCHITECTURE §MUST REFACTOR #3 (AppLifecycleProvider), #7 (per-feature module); PITFALLS Critical #9, #12.
-
-**Avoids:** Proto DataStore (Anti-Pattern A7), JS webview skills (Anti-Pattern A12), exposing thinking panel for non-reasoning models (PITFALLS "Looks Done" #3).
-
-**Research flag:** Needs `--research-phase` for: (a) exact `Message.thinking` API (carries over from Phase 40), (b) LM Studio's `reasoning_content` exact JSON path (FEATURES §Open Q #1), (c) WorkManager `setForeground()` reliability on Chinese OEM ROMs (PITFALLS Critical #12).
-
-### Phase 42 — Prompt Lab [P1]
-
-**Rationale:** Pure feature on top of the keystone. Independent from Phase 41 (no shared schema work). Reuses the existing `MarkdownText` renderer.
-
-**Delivers:**
-- `ui/promptlab/` package: `PromptLabScreen`, `PromptLabViewModel`, `PromptTemplateConfigs.kt` (5–8 templates: rewrite, summarize, extract-key-points, code-explain, translate, sentiment, table-to-json).
-- `PromptLabTaskModule` Hilt module with `@IntoSet` binding per Gallery pattern.
-- Side-by-side prompt input + output composable; single-turn, no conversation state.
-- Reuses `LlmModelHelper` from Phase 40 (no new inference plumbing).
-
-**Addresses:** FEATURES §Prompt Lab; ARCHITECTURE §MUST REFACTOR #7 (per-feature Hilt).
-
-**Avoids:** Gallery's `compose-richtext` + `commonmark` (Anti-Pattern A6) — reuse Warped's `MarkdownText` (v1.6).
-
-**Research flag:** Standard pattern. No research needed unless template content selection is contentious (FEATURES §Open Q #7 — decide during phase planning).
-
-### Phase 43 — Performance Convergence [P0, cross-cutting]
-
-**Rationale:** Explicit v2.0 mandate. Largely orthogonal to the feature ports; can run **in parallel** with Phase 41/42 once `LlmModelHelper` is interface-defined (even before Phase 40 ships — interface signature is the dependency, not the full impl).
-
-**Delivers (ranked by ROI):**
-1. **Drop `EngineManager.getCachedModelPath()`** file copy → mmap only. Pass `context.cacheDir.absolutePath` (or external) directly to `EngineConfig.cacheDir`. Namespaced by `BuildConfig.LITERTLM_VERSION` per Critical #4. **Biggest single win: 1–3 GB disk savings + 3–10s cold-start removed.**
-2. **Compose recomposition audit**: split `ChatUiState` (50 fields) into 3 sub-states (`ChatListState`, `ChatInputState`, `ChatStreamingState`). Add `@Immutable` annotation. Add `kotlinx-collections-immutable:0.4.0`. Convert `List<T>` → `ImmutableList<T>` on all public composable params. Extract subcomposables in `MessageBubble` and `CodeBlock` (565 lines, the largest composable). Hoist `codeTheme`, `codeFontScale`, `attachedImages` to parent. Add `derivedStateOf` for `trafficLightState` and `trafficLightStatusText`.
-3. **`AppLifecycleProvider` + `ProcessLifecycleOwner` + download notification gate** (also listed in Phase 41; can split — Phase 41 adds the interface, Phase 43 does the perf-side wiring).
-4. **`installSplashScreen()` + cross-fade mask** in `MainActivity`. `androidx.core:core-splashscreen:1.2.0-beta01` added.
-5. **Room composite index** on `messages(conversation_id, created_at)` (PITFALLS Performance Traps + Integration Gotchas). `EXPLAIN QUERY PLAN` to confirm.
-6. **Hilt graph audit**: every `@Provides` is either `@Singleton` (true singleton) or `@ViewModelScoped`. No eager `LiteRtLlmEngine` SingletonComponent injection (PITFALLS Performance Traps first row).
-7. **OkHttp interceptor chain audit**: `retryOnConnectionFailure(false)` for SSE, `callTimeout(60s)`, `Cache(50MB)` TTL (PITFALLS Performance Traps).
-8. **R8 full mode + ProGuard rule audit** (also Phase 40 for the keep rules; Phase 43 measures APK size and adds `Modifier.drawWithCache` audit per ARCHITECTURE §CONSIDER #2).
-9. **SQLCipher microbench** (with/without) — measure first, decide removal (STACK §4, PITFALLS Security row 7).
-10. **Macrobenchmark cold-start baseline** on Pixel 7 reference (target: < 1.5s cold, < 800ms warm, 60fps streaming, peak memory < 1.5× model size). Numbers recorded in `BENCHMARKS.md`.
-
-**Addresses:** STACK §12 gradle.properties + §13 manifest + §3 LiteRT-LM cacheDir; FEATURES §Performance Convergence; ARCHITECTURE §2, §7, §8 + §MUST REFACTOR #2, #6, #8, #9; PITFALLS Critical #4, #11, #12 + Performance Traps.
-
-**Avoids:** OkHttp 5.x (API-breaking, defer), SQLCipher removal without measurement (audit first).
-
-**Research flag:** Needs `--research-phase` for: (a) Compose 1.11 stability annotation behavior (ARCHITECTURE §Open Q #6), (b) Macrobenchmark setup (PITFALLS Sources — Android Dev Guide), (c) `EngineManager.handleTrimMemory` semantics after cache refactor (ARCHITECTURE §Open Q #7).
-
-### Phase 44 — Agent Skills Lite [P2, optional, defer to v2.1 if scope tight]
-
-**Rationale:** XL scope. High user value (calculator, JSON-formatter, etc.) but 10–14 days. Defer to v2.1 unless v2.0 timeline permits.
-
-**Delivers (Lite variant only):**
-- 3–5 built-in Kotlin `@Tool`-annotated skills (calculator, JSON-formatter, text-summarizer-template, current-time, code-block-extractor).
-- `LlmModelHelper.tools: List<ToolProvider>` plumbed to LiteRT-LM 0.13.1 (and to LM Studio's `/api/v1/chat` `tools` field).
-- UI: skill chips under chat input.
-- `domain/repository/SkillRepository.kt` + impl.
-- `skills/` package with one file per skill.
-
-**Addresses:** FEATURES §Agent Skills Lite (P2).
-
-**Avoids:** Gallery's full Agent Skills (JS webview, native intents, MCP) — Anti-Pattern A12, A13. PROJECT.md explicitly defers "autonomous tool use".
-
-**Research flag:** Needs `--research-phase` to verify `ToolProvider` Kotlin API surface in LiteRT-LM 0.13.1 (FEATURES §Open Q #2, ARCHITECTURE §Open Q #4) — this is the gating question for the whole phase.
-
-### Deferred to v2.1+
-
-- **LM Studio MCP Bridge** [L]: separate phase. Requires MCP Kotlin SDK or custom JSON-RPC-over-HTTP client. Reuses the `ToolProvider` plumbing from Agent Skills Lite.
-- **Speculative Decoding toggle** [S]: small but peripheral. Requires `capabilities: ["speculative_decoding"]` in allowlist. Land in Phase 40 if time.
-- **Benchmark history viewer** [S]: needs accumulated benchmark data. Land after Phase 41 ships and users have 1+ weeks of results.
-- **Deep links** (`warped://chat/<id>`) [M]: nice-to-have. Phase 40's type-safe nav migration makes it easy.
-- **Gallery `Model.runtimeHelper` extension property** [S]: cosmetic. Skip unless pattern is widely useful.
-
-### Excluded (Anti-Features, also excluded in v2.0)
-
-Per FEATURES §Anti-Features: Ask Image, Audio Scribe, Tiny Garden, Mobile Actions (native intents), Scheduled Notifications, JS webview skills, Community Skills marketplace, AICore system service, "Best for" model pinning, Multi-tab browser, Public trending scraping, Remote allowlist hosting, iOS feature parity.
+**Rationale:** Single `ChatUiState` + unkeyed `Column` = O(n) composition per streaming token with scroll jumps. The two completions are one surgical area (`ChatScreen` + ViewModel state exposure) — ship together or get ~zero measurable win from either alone. Orthogonal to A/B (different `ChatViewModel` functions), so parallelizable if capacity allows — but verify against final tool-turn UI (activity rows, multi-round states) per PITFALLS.
+**Delivers:** 4 `@Immutable` sub-states with single-field-ownership + slice StateFlows; `Column → LazyColumn` with `key = { it.id }` + `contentType` + `remember(id)`; `InlineModelSelectorBar` hoist; subcomposable signatures unchanged; conditional stick-to-bottom + "Jump to latest" pill; `isGenerating` merge + `@Deprecated` deletion.
+**Addresses:** PERF-01, PERF-06, scroll preservation, tool progress UX accommodation.
+**Avoids:** Critical 4 (field drift), Critical 5 (keyless state loss), perf traps (contentType-less recompose, highlight-per-token, main-thread argument accumulation).
+**Uses:** kotlinx-collections-immutable 0.4.0 `ImmutableList`; compose compiler metrics to verify `skippable` bubbles on release builds.
 
 ### Phase Ordering Rationale
 
-- **Phase 40 is keystone** — every other phase depends on `LlmModelHelper`. Must land first. Even Phase 43 (Performance) needs the interface signature defined to do the right `Lazy<LiteRtLlmEngine>` refactor (PITFALLS Performance Traps row 1).
-- **Phase 43 is parallel** — it touches engine plumbing, manifest, and Compose state but NOT the new `LlmModelHelper` surface. Can start as soon as Phase 40's interface is defined (could be day 3 of Phase 40). Hot path: `EngineManager.getCachedModelPath()` deletion, manifest updates, Compose state split.
-- **Phase 41 and 42 are independent** — both depend on Phase 40 but not on each other. Can run in parallel.
-- **Phase 44 is optional** — XL scope, defer to v2.1 if v2.0 timeline is tight. LiteRT-LM 0.13.1 ToolProvider API verification is the gating question (FEATURES §Open Q #2).
-- **Build order also respects data layer**: Room migration (Phase 41 schema work) must be the first thing touching `@Database` — schema changes are not reversible. Set `exportSchema = true` immediately in Phase 40, commit `schemas/` to git, even if no schema change yet.
+- **Dependency-driven core:** the tool loop and the sharing/cancellation refactor both change what `runInference`'s Flow emits — sequence them explicitly (ARCHITECTURE: runtime first; PITFALLS: tools first). The roadmapper picks the direction; what matters is they are not built concurrently on the same flow.
+- **Atomic perf pair:** PERF-01 without PERF-06 still recomposes all rows per token (state identity changes); PERF-06 without PERF-01 keeps O(n) layout with keyed slots. One phase, one verification (Layout Inspector skip audit + 150-message/200-line-code-block scroll test).
+- **Pitfall-gated exits:** every phase has a falsifiable gate (per-model smoke tests; golden-JSON + chunk-split SSE tests; rotation-single-Row + Stop-<200ms + pool-flat soak; release-build tool smoke for R8) — a phase is not done when code compiles but when its gate passes.
+- **Release close:** `assembleRelease` + tool smoke test ends the milestone (new `@Tool`/`@Serializable` keep rules), with PERF-12/13 benchmark numbers staying CI-gated out of scope.
 
 ### Research Flags
 
-Phases needing deeper research during planning (`/gsd-plan-phase --research-phase`):
-- **Phase 40:** EngineConfig `cacheDir` parameter exact name; `Message.thinking` accessor; Hilt `@Binds` scoping for the new interface.
-- **Phase 41:** LM Studio `reasoning_content` JSON path; WorkManager `setForeground()` reliability on Xiaomi/Oppo ROMs; `@AutoMigration` schema design.
-- **Phase 43:** Compose 1.11 strong-skipping behavior with `@Immutable`; Macrobenchmark setup; `EngineManager.handleTrimMemory` after cache refactor.
-- **Phase 44:** LiteRT-LM 0.13.1 `ToolProvider` Kotlin API surface; LM Studio `/api/v1/chat` `tools` field schema.
+Phases likely needing deeper research during planning (`/gsd-plan-phase --research-phase`):
+- **Phase B (tool execution):** LiteRT `ToolProvider` Kotlin API shape — which `com.google.ai.edge.litertlm` class backs `ConversationConfig.tools` and its JSON-schema format (30-min AAR inspection at phase start); `automaticToolCalling=true` local-execution-without-roundtrip verification on the pinned 0.13.1; Qwen3/Gemma issue currency against 0.13.1 (upstream issues are version-sensitive — re-check before gating decisions).
+- **Phase A (runtime hardening):** `shareIn` replay/start-mode/scope selection is load-bearing and version-sensitive (LOW-confidence API-semantics claims in PITFALLS) — validate against official coroutines docs during planning.
 
-Phases with standard patterns (skip `--research-phase`):
-- **Phase 42 (Prompt Lab):** Well-documented Gallery pattern. 5–8 template content is the only design question; no API research needed.
-
----
-
-## Gallery Anti-Patterns to NOT Copy
-
-These are Gallery's tech-debt items Warped must explicitly reject. Each is grounded in PITFALLS §Gallery Anti-Patterns and STACK §What NOT to Add.
-
-| # | Anti-Pattern | Why Gallery Has It | Why Warped Skips |
-|---|--------------|--------------------|------------------|
-| **A1** | kapt for Hilt compiler | Legacy pre-Hilt 2.48 (Dec 2023) | Hilt KSP stable since 2.48. Warped is KSP-only. Adding kapt = 2–5× slower builds. |
-| **A2** | Three JSON libs (kotlinx-serialization + Moshi + Gson) | Firebase uses Gson; HF OAuth uses Moshi | Warped has neither. kotlinx-serialization only. 4+ MB APK savings. |
-| **A3** | `kotlin-reflect:2.2.21` | Pulled by `compose-richtext` | Warped doesn't use `compose-richtext`. 2.5 MB savings. |
-| **A4** | Firebase BOM + Analytics + Messaging | Gallery uses for analytics + push | PROJECT.md §"Out of Scope" excludes Firebase/cloud sync. Zero Firebase. |
-| **A5** | Ktor 3.4.3 + MCP Kotlin SDK 0.8.0 | HF + MCP use Ktor | Warped has Retrofit + OkHttp. Adopting MCP SDK would force Ktor. PROJECT.md scopes MCP via LM Studio REST, not the SDK. |
-| **A6** | `compose-richtext` + `commonmark` | Gallery's markdown renderer | Warped has custom `MarkdownText` (v1.6). Per-block composables are critical. |
-| **A7** | Proto DataStore (5 instances) | Benchmark results, user data, cutout collection, skills | Warped has Preferences DataStore + Room. Add Proto only for deeply nested schemas. Use Room for benchmark history. |
-| **A8** | CameraX 1.4.2 | "Ask Image" task (multimodal) | PROJECT.md §"Out of Scope" — text-only. Zero CameraX. |
-| **A9** | AICore system service + `mlkit-genai-prompt` | Pixel 8+ system LLM | Pixel-only, preview, narrow support. v2 deferred in REQUIREMENTS.md. |
-| **A10** | `play-services-tflite-*` | Legacy TFLite for older devices | Warped uses LiteRT-LM directly via AAR. v1.5 already removed TFLite. |
-| **A11** | AppAuth 0.11.1 | HF OAuth | Warped has no OAuth. HF models are public; LM Studio uses API keys (EncryptedSharedPreferences). |
-| **A12** | JS webview skill runtime (full Skills) | "Spin a wheel", "show a map" demos | Heavy (200–500ms init per skill), XSS surface. Agent Skills Lite is Kotlin-only. |
-| **A13** | `com.google.mlkit:genai-prompt` | AICore backend | Same as A9. Pixel-only. |
-| **A14** | mmap cache shared across all models (no version namespacing) | `cacheDir = context.cacheDir.path` | LiteRT-LM bumps break cache. Warped must namespace by `BuildConfig.LITERTLM_VERSION`. |
-| **A15** | `android:configChanges` missing `uiMode` | Toggling dark mode recreates Activity | Compose can re-theme. 100–300ms savings. Add `uiMode|orientation|screenSize|smallestScreenSize|screenLayout`. |
-| **A16** | `extractNativeLibs="true"` | "Easier debugging" | 10–20 MB APK bloat. `extractNativeLibs="false"` is AGP 8+ default. |
-
-**Verification (Phase 40 exit criterion):**
-```bash
-# Must all return empty:
-./gradlew :app:dependencies --configuration kapt | grep -v "^$"
-./gradlew :app:dependencies | grep -E "(firebase|moshi|gson|kotlin-reflect|ktor|mcp|tflite|mlkit-genai|appauth|compose-richtext|cameraX|datastore.*proto)"
-# Must be present in libs.versions.toml:
-grep "litertlm-android" gradle/libs.versions.toml
-grep "core-splashscreen" gradle/libs.versions.toml
-grep "lifecycle-process" gradle/libs.versions.toml
-# Must be present in AndroidManifest.xml:
-grep "uses-native-library" app/src/main/AndroidManifest.xml
-grep "configChanges.*uiMode" app/src/main/AndroidManifest.xml
-grep "extractNativeLibs.*false" app/src/main/AndroidManifest.xml
-```
-
----
+Phases with standard patterns (skip research-phase):
+- **Phase C (Compose perf):** keyed LazyColumn + sub-state split + `derivedStateOf` scroll gating are well-documented official Android patterns (HIGH confidence); only open question is confirming `ChatMessage.id` type/nullability (5-min domain model read).
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack versions | **HIGH** | All verified against Google Maven, GitHub releases, Compose BOM mapping. Fetched within 24h of research. |
-| Feature surface mapping (Gallery → Warped) | **HIGH** | Direct repo exploration: README, `model_allowlist.json`, `LlmModelHelper.kt`, `Model.kt`, `customtasks/*/`, `ui/*/`, `mcp/README.md`, `skills/README.md`. |
-| Architecture refactor targets | **HIGH** | Warped source files directly inspected (line counts, signatures). Gallery patterns verified. |
-| LiteRT-LM 0.13.1 API surface | **HIGH** | Engine.initialize, cacheDir, Backend.GPU, MessageCallback, ToolProvider all confirmed in Maven listing + official docs. |
-| LiteRT-LM 0.12 → 0.13 file format breaking change | **MEDIUM** | One open issue (#2454) confirmed. Other breaking changes may emerge — needs regression smoke tests for all v1.8-era `.litertlm` files. |
-| Compose 1.11 strong-skipping impact | **MEDIUM** | Documented in dev.to article + Compose 1.11 release notes. Migration cost depends on how many `List<T>` params exist in Warped — needs Layout Inspector audit. |
-| `Message.thinking` exact accessor name | **MEDIUM** | Inferred from Gallery's `ResultListener` typealias. Actual field name on `Message` should be verified in the AAR. |
-| LM Studio `reasoning_content` exact JSON path | **LOW-MEDIUM** | OpenAI-compatible convention. Verify in LM Studio's API docs or via integration test before promising Thinking Mode for remote. |
-| `ToolProvider` Kotlin API stability | **MEDIUM** | Visible in `LlmModelHelper.kt` interface. Specific API surface should be verified before committing to Agent Skills Lite scope. |
-| Performance impact estimates (mmap 5–10×, SQLCipher 10–30%) | **LOW** | Well-documented in respective docs but not measured on Warped hardware. Verify with Macrobenchmark in Phase 43. |
-| WorkManager reliability on Chinese OEM ROMs | **LOW** | Anecdotal from Gallery's open issues. Needs real-device test in Phase 41. |
+| Stack | HIGH | LiteRT-LM tool API verified against official docs (2026-09-04); versions cross-checked against Maven Central + repo ground truth (`libs.versions.toml`, proguard rules, audit doc); only MEDIUM items are exact Compose BOM patch + KSP version (resolve at plan time) |
+| Features | HIGH | LiteRT-LM tool API + LM Studio tool docs verified against official sources; Compose guidance from official Android docs; Gallery behavior from repo + docs; scope grounded in Warped's own tree (verified 2026-09-27) + v2.0 audit |
+| Architecture | HIGH | Every claim verified by direct source read of shipped v2.0 code (file + line citations for all 6 insertion points); build order is dependency-driven |
+| Pitfalls | HIGH/MEDIUM/LOW (mixed) | HIGH: `@Tool`/`ToolSet`/`ConversationConfig` API + Warped's own defect facts (audit docs); MEDIUM: specific LiteRT-LM 0.13.x tool-calling bugs (multiple GitHub issues, version-sensitive); LOW: exact perf numbers, some coroutines/OkHttp/Compose API semantics without live doc verification |
 
-**Overall confidence:** **HIGH** for the strategic direction (what to port, what to skip, what to defer). **MEDIUM** for the precise implementation details that will be resolved in Phase 40's research-phase. **LOW** for performance impact numbers, which need Macrobenchmark validation.
+**Overall confidence:** HIGH
 
-### Gaps to Address During Implementation
+### Gaps to Address
 
-1. **LiteRT-LM 0.13.1 `EngineConfig.cacheDir` exact parameter name** (Phase 40, ARCHITECTURE §Open Q #1) — verify in AAR source.
-2. **`Message.thinking` accessor in LiteRT-LM 0.13.1** (Phase 40, FEATURES §Open Q #1) — `message.thinking` vs `message.channels["thought"]` vs other.
-3. **LiteRT-LM 0.13.1 `ToolProvider` Kotlin API** (Phase 44 gating, FEATURES §Open Q #2) — does the local engine actually wire `tools`, or is it AICore-only?
-4. **`LlmModelHelper` `ResultListener` suspend vs sync** (Phase 40, ARCHITECTURE §Open Q #2) — for Flow backpressure.
-5. **LM Studio `reasoning_content` exact JSON path** (Phase 41, FEATURES §Open Q #1) — top-level vs nested in `message`.
-6. **WorkManager `setForeground()` reliability** on Xiaomi/Oppo/ColorOS ROMs (Phase 41, PITFALLS Critical #12) — needs real-device test matrix.
-7. **Compose 1.11 strong-skipping behavior** with `@Immutable` annotations (Phase 43, ARCHITECTURE §Open Q #6).
-8. **Macrobenchmark baseline numbers** on Pixel 7 (Phase 43, PITFALLS "Looks Done" #13, #14) — required for Performance exit criteria.
-9. **Model allowlist schema subset** (Phase 40, FEATURES §Open Q #6) — full Gallery schema copy or Warped-specific leaner subset.
-10. **Prompt Lab template content** (Phase 42, FEATURES §Open Q #7) — 5–8 templates selection.
-11. **SQLCipher threat model re-evaluation** (Phase 43, PITFALLS Security row 7) — measure first, decide removal.
+- **Skills Lite surface missing from tree:** no `*Skill*.kt` / `SkillChipsRow.kt` found vs v2.0 planning claims — roadmap Phase B must start with "locate or rebuild" before SKILLS-02/03 (FEATURES.md dependency notes).
+- **`ChatMessage.id` existence/type:** FEATURES assumes verify-before-PERF-06; ARCHITECTURE found `id: String?` via `deleteMessage` usage — confirm nullability/default before Phase C key selection.
+- **LiteRT `ToolProvider` constructor + schema format:** confirm via AAR inspection at Phase B start (ARCHITECTURE open question 1).
+- **`automaticToolCalling=true` locality on 0.13.1:** verify one-skill smoke test executes without network round-trip (ARCHITECTURE open question 3).
+- **Upstream tool-calling issue currency:** issues #1027 / #2256 / #1181 predate or straddle 0.13.1 — re-verify which still reproduce before finalizing the per-model allowlist (treat as device-test gates, not settled facts).
+- **Perf numbers unmeasured:** no Warped-hardware baselines (TTFT with tools on/off, frame overruns at N messages) — measure during Phase C; PERF-12/13 CI gating stays out of scope.
+- **Phase order unresolved by design:** runtime-first vs tools-first — roadmapper decides (see ordering note); flag the chosen direction's risk (unstoppable tool calls vs UI retrofit) in the roadmap.
 
----
-
-## Sources (Aggregated)
+## Sources
 
 ### Primary (HIGH confidence)
-
-**Gallery source tree** (verified 2026-06-05):
-- [google-ai-edge/gallery](https://github.com/google-ai-edge/gallery) — main branch, versionCode 34, 1.0.16
-- [`runtime/LlmModelHelper.kt`](https://raw.githubusercontent.com/google-ai-edge/gallery/main/Android/src/app/src/main/java/com/google/ai/edge/gallery/runtime/LlmModelHelper.kt) — interface signature
-- [`ui/llmchat/LlmChatModelHelper.kt`](https://raw.githubusercontent.com/google-ai-edge/gallery/main/Android/src/app/src/main/java/com/google/ai/edge/gallery/ui/llmchat/LlmChatModelHelper.kt) — 340-line impl wrapping Engine + Conversation
-- [`data/Model.kt`](https://raw.githubusercontent.com/google-ai-edge/gallery/main/Android/src/app/src/main/java/com/google/ai/edge/gallery/data/Model.kt) — Model data class with capabilities, runtimeHelper
-- [`model_allowlists/1_0_15.json`](https://github.com/google-ai-edge/gallery/raw/refs/heads/main/model_allowlists/1_0_15.json) — versioned allowlist schema
-- [`libs.versions.toml`](https://github.com/google-ai-edge/gallery/blob/main/Android/src/gradle/libs.versions.toml) — confirmed kapt, Gson, Moshi, kotlin-reflect, Firebase, Ktor, MCP, TFLite, mlkit-genai-prompt, AppAuth, CameraX, compose-richtext, commonmark, Proto DataStore
-- [`AndroidManifest.xml`](https://github.com/google-ai-edge/gallery/blob/main/Android/src/app/src/main/AndroidManifest.xml) — configChanges, uses-native-library, splash screen
-
-**Library version sources:**
-- [LiteRT-LM Maven metadata](https://dl.google.com/android/maven2/com/google/ai/edge/litertlm/litertlm-android/maven-metadata.xml) — 0.13.1 latest 2026-06-04
-- [Compose BOM mapping](https://developer.android.com/jetpack/compose/bom/bom-mapping) — 2026.05.01 = Compose 1.11.0
-- [Compose Testing v2 migration](https://developer.android.com/develop/ui/compose/testing/migrations/testing-v2)
-- [Android Developers Blog — R8 Keep Rules](https://developer.android.com/blog/posts/configure-and-troubleshoot-r8-keep-rules) (Nov 2025)
-- [Android Developer Guide — Migrate Room DB](https://developer.android.com/training/data-storage/room/migrating-db-versions)
-- [LiteRT-LM Android getting started](https://developers.google.com/edge/litert-lm/android) — `Backend.GPU()`, `cacheDir`, Engine.initialize() blocking warning
-- [LiteRT-LM v0.13 release notes](https://github.com/google-ai-edge/LiteRT-LM/releases) — ToolProvider, MTP, speculative decoding
-- [LiteRT-LM open issue #2454](https://github.com/google-ai-edge/LiteRT-LM/issues/2454) — 0.12 → 0.13 file format breaking change
-- [Dagger Hilt KSP support](https://dagger.dev/dev-guide/ksp) — stable since Hilt 2.48
-- [Hilt 2.59 release notes](https://github.com/google/dagger/releases) — AGP 9+ requirement
+- Google AI Edge LiteRT-LM Android tool-use docs (developers.google.com/edge/litert-lm/android, 2026-09-04) — `ToolSet`/`@Tool`/`@ToolParam`, `ConversationConfig(tools, automaticToolCalling)`, manual `Message.tool` flow
+- LM Studio tool-use docs (lmstudio.ai/docs/developer/openai-compat/tools) — `/v1/chat/completions` `tools[]`, `tool_calls`, streaming accumulation by index, malformed-call fallback
+- Android Compose docs — lazy-layout keys, `rememberLazyListState` scroll preservation, stability/`Immutable` collections, `derivedStateOf`
+- Warped repo ground truth — `LlmModelHelper`, both helpers, both providers, `ProviderRouter`, `LlmHelperModule`, `ChatUiState`/`ChatScreen`/`ChatViewModel`, `LmStudioDtos`/`LmStudioApi`, `libs.versions.toml`, `proguard-rules.pro`, `.planning/v2.0-MILESTONE-AUDIT.md` (HIGH — local verification 2026-09-27)
+- LiteRT-LM `Conversation.kt` source — auto tool loop, `handleToolCalls`, `RECURRING_TOOL_CALL_LIMIT = 25`
+- OpenAI function-calling guide — 5-step loop, `role: tool` shape, streaming argument-delta accumulation
+- mvnrepository.com `litertlm-android` — 0.13.1 (Jun 04 2026) vs 0.14.0 (Jul 08 2026) version facts
 
 ### Secondary (MEDIUM confidence)
+- LiteRT-LM issues #1027 (Qwen3 empty tool_response), #2256 (Qwen 2.5 wedge), #1181 (Gemma 3n type omission) — version-sensitive bug reports
+- Gallery skills README + `LlmChatModelHelper` agent-chat diff — `SKILL.md` manifests, `ConversationConfig(tools=…)` precedent
+- Chanzmao (2026-08) monolithic-UiState split decision tree; Ramadan Sayed (2026-02) laggy-chat fix; Jetchat #696 + StackOverflow reverse-layout threads — community, consistent with official docs
+- LM Studio MCP-via-API docs — deferred context only
 
-- [SoftwareDevs mvpfactory.io — Compose Recomposition at Scale](https://dev.to/software_mvp-factory/jetpack-compose-recomposition-at-scale-how-strong-skipping-mode-changes-the-stability-rules-you-4a80) (Mar 2026)
-- [Davide Agostini — Hilt Deep Dive](https://www.davideagostini.com/android/2026-02-18-hilt-di-deep-dive) (Feb 2026)
-- [Davide Agostini — Baseline Profiles](https://www.davideagostini.com/android/2026-02-25-baseline-profiles) (Feb 2026)
-- [Google Developers Blog — Blazing fast on-device GenAI with LiteRT-LM](https://developers.googleblog.com/blazing-fast-on-device-genai-with-litert-lm/) (May 2026)
-- [Google Cloud Blog — Benchmark LLMs on-device with AI Edge Portal](https://cloud.google.com/blog/products/ai-machine-learning/benchmark-llms-on-device-with-ai-edge-portal) (May 2026)
-- [StackOverflow — kotlinx-serialization ProGuard rules](https://stackoverflow.com/questions/70663076/how-to-make-proguard-keep-kotlinx-serializers-for-objects)
-
-### Warped internal (HIGH confidence)
-
-- [PROJECT.md](.planning/PROJECT.md) — v2.0 milestone, scope, out-of-scope boundaries
-- [REQUIREMENTS.md](.planning/REQUIREMENTS.md) — v1.8 feature surface, v2 deferred list
-- [STACK.md](.planning/research/STACK.md) — confirmed stack (Kotlin 2.3.20, AGP 9.2.1, Hilt 2.59.2, etc.)
-- [FEATURES.md](.planning/research/FEATURES.md) — v2.0 feature plan + Gallery surface map
-- [ARCHITECTURE.md](.planning/research/ARCHITECTURE.md) — refactor candidates + side-by-side comparison
-- [PITFALLS.md](.planning/research/PITFALLS.md) — critical pitfalls + Gallery anti-patterns
+### Tertiary (LOW confidence)
+- `callbackFlow`/`shareIn`/replay semantics, OkHttp `Call.cancel()` + `EventListener` specifics, exact perf numbers — established API knowledge without live doc verification in-session; validate load-bearing claims during planning
+- DeepWiki LiteRT-LM Kotlin API summary (2026-05-21) — secondary source for reflection-loop internals
 
 ---
-
-*Research completed: 2026-06-05*
-*Ready for requirements definition: yes — v2.0 phase plan (40–44) is concrete, dependencies are mapped, and Gallery anti-patterns are explicitly enumerated for rejection.*
+*Research completed: 2026-09-27*
+*Ready for roadmap: yes*
