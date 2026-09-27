@@ -17,7 +17,9 @@ class LiteRtLmCacheManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val advancedPreferences: AdvancedPreferences,
 ) {
-    val cacheRoot: File = File(context.cacheDir, LiteRtLmCache.namespaceFor(BuildConfig.LITERTLM_VERSION)).also { it.mkdirs() }
+    val cacheRoot: File = File(context.cacheDir, LiteRtLmCache.namespaceFor(BuildConfig.LITERTLM_VERSION)).also {
+        if (!it.exists() && !it.mkdirs()) throw java.io.IOException("Cannot create cache dir: $it")
+    }
 
     fun cacheDirForModel(modelPath: String): File = File(cacheRoot, File(modelPath).name)
 

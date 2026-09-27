@@ -81,7 +81,9 @@ class LiteRTLmEngine @Inject constructor(
         val cacheDir = java.io.File(
             context.cacheDir,
             LiteRtLmCache.namespaceFor(com.warped.BuildConfig.LITERTLM_VERSION)
-        ).also { it.mkdirs() }
+        ).also {
+            if (!it.exists() && !it.mkdirs()) throw java.io.IOException("Cannot create cache dir: $it")
+        }
 
         val config = EngineConfig(
             modelPath = modelPath,
