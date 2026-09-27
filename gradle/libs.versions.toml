@@ -1,6 +1,6 @@
 [versions]
 kotlin = "2.3.20"
-agp = "9.2.1"
+agp = "9.3.0"
 litertlm = "0.13.1"  # v1.8 LRT-01: bump from 0.13.0 — verify against Maven Central / GitHub releases before release
 compose-bom = "2026.05.01"
 hilt = "2.59.2"
