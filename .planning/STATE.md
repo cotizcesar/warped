@@ -149,6 +149,7 @@ Items acknowledged and deferred at v2.0 milestone close on 2026-06-06. **12 v1.6
 | quick_task | 260430-wgt-arreglar-delete-endpoints-dropdown-model | shipped-v1.8 | Phase 38 (ENDPT-02..04) |
 | quick_task | 260430-wtn-fix-real-delete-endpoints-y-fetch-modelo | shipped-v1.6 (commit 777f604) | — |
 | quick_task | 260504-lmi-litert-lm-solo-env-a-el-primer-mensaje-d | shipped-v1.8 | Phase 35 (LRT-02) |
+| quick_task | 260926-txv-hacer-que-compile-el-proyecto-fix-room-a | complete 2026-09-26 | Fix compilación: AutoMigration 11->12/12->13 → manual MIGRATION_11_12/12_13; .gitignore deja de ignorar app/schemas |
 
 ## Session Continuity
 
