@@ -2,7 +2,7 @@
 kotlin = "2.3.20"
 agp = "9.3.0"
 litertlm = "0.13.1"  # v1.8 LRT-01: bump from 0.13.0 — verify against Maven Central / GitHub releases before release
-compose-bom = "2026.05.01"
+compose-bom = "2026.06.01"  # newest BOM on compileSdk<=36 line (2026.08.00+ needs android-37 platform, not yet released)
 hilt = "2.59.2"
 hilt-navigation-compose = "1.3.0"
 hilt-work = "1.3.0"
