@@ -1,5 +1,35 @@
 # Milestones
 
+## v2.2 Simplificación + Web Grounding (Shipped: 2026-09-28)
+
+**Phases completed:** 3 phases (49-51), 5 plans, 11 tasks, 14 requirements
+**Requirements:** 14 defined, 10 MET, 4 PARTIAL (DEL-06, WEB-05, WEB-06, THEME-01 — all 4 partials are deferred on-device smokes; zero code gaps)
+**Known verification overrides:** 4 partials accepted as release-UAT tech debt (user-approved); all automated gates pass (232/232 unit, assembleDebug + assembleRelease green, all grep gates green, dependency audit green)
+**Audit:** [`.planning/milestones/v2.2-MILESTONE-AUDIT.md`](milestones/v2.2-MILESTONE-AUDIT.md) → status: **gaps_found** (accepted)
+**Archived roadmap:** [`.planning/milestones/v2.2-ROADMAP.md`](milestones/v2.2-ROADMAP.md)
+**Archived requirements:** [`.planning/milestones/v2.2-REQUIREMENTS.md`](milestones/v2.2-REQUIREMENTS.md)
+**Closeout type:** override_closeout
+
+**Key accomplishments:**
+
+1. **Surface removal** — Entire skills/tool-execution surface deleted (26 files: local `@Tool` skills, chips/prefs/repo/gating, Summarize template, remote `tools[]` loop); `runInference` back to skill-free signature; legacy `Role.TOOL` rows render read-only with no Room migration
+2. **Static model catalog** — HF token field/headers/prefs deleted; model search surface deleted; `model_allowlist.json` catalog with direct unauthenticated downloads (progress/cancel) via new `CatalogViewModel`; R8 skills keeps narrowed with LiteRT-LM 0.17.x keeps intact; net −4721/+1378 lines
+3. **Web grounding pipeline** — `data/grounding/` package: first-URL detection, bounded cancelable OkHttp fetch (64KB cap, 3 redirects, 8/10/20s timeouts, browser UA, `Call.cancel()` on Stop), hand-rolled HTML→text (4000-char budget), hijack sanitizer, `[WEB CONTEXT]` augmentation; `LlmModelHelper`/providers unchanged; zero new dependencies
+4. **Grounding surfaces** — Transient "Leyendo página…" chip, numbered Fuentes list, UI-rendered model-only banner (offline vs failure copy), default-ON Web settings toggle (Data → Web → Display)
+5. **Syntax-theme fix** — `SyntaxHighlighter.highlight` accepts `theme` (was Monokai-hardcoded); `CodeBlock` threads `syntaxTheme` with theme-keyed `LaunchedEffect`; theme-aware cache key; all-4-preset regression tests (per-preset loop, cache separation, 6-test PresetDistinctness)
+
+### Known Gaps (accepted, release-UAT device smokes)
+- **DEL-06:** on-device release smoke (launch → allowlisted model → local turn → remote turn → legacy TOOL chat)
+- **WEB-05:** rendered model-only banner appearance (offline vs failure copy)
+- **WEB-06:** chip transient behavior, Fuentes rendering, E2E paste-URL flow
+- **THEME-01:** visible per-preset result in light + dark mode
+
+### Tech debt
+- Orphaned Keystore `huggingface_token` entry on upgraded installs (accepted, harmless, never read)
+- 49-01/49-02 SUMMARY.md files lack `requirements-completed` frontmatter (process debt)
+- Live-fetch behaviors code-reviewed/gate-checked but never exercised against a live server
+- Nyquist: no `VALIDATION.md` in any v2.2 phase — coverage TODO
+
 ## v2.1 Finish v2.0 Leftovers (Shipped: 2026-09-28)
 
 **Phases completed:** 4 phases (45-48), 10 plans, 18 requirements

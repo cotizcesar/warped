@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An Android application equivalent to LM Studio for mobile, enabling users to run large language models (LLMs) locally via LiteRT-LM and connect to remote LLM providers. The app downloads `.litertlm` models from the litertlm-community on Hugging Face, executes them on-device, and connects to OpenAI-compatible APIs, Anthropic, Ollama, LM Studio, and custom servers. Code blocks in AI responses render with language-aware syntax highlighting using 4 preset themes. Built with Kotlin + Jetpack Compose, targeting production quality with clean modular architecture.
+An Android application equivalent to LM Studio for mobile, enabling users to run large language models (LLMs) locally via LiteRT-LM and connect to remote LLM providers. The app ships a static curated model catalog with direct downloads, executes models on-device, and connects to OpenAI-compatible APIs, Anthropic, Ollama, LM Studio, and custom servers. Pasted URLs ground answers via a heuristic zero-dependency web-fetch hook with offline fallback. Code blocks in AI responses render with language-aware syntax highlighting using 4 preset themes. Built with Kotlin + Jetpack Compose, targeting production quality with clean modular architecture.
 
 ## Core Value
 
@@ -53,16 +53,27 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 **Known deferred:** Pixel 7 reference numbers (PERF-16 + PERF-12/13 gate) — emulator note in BENCHMARKS.md, CI-gated.
 
-## Current Milestone: v2.2 Simplificación + Web Grounding
+## Previous Milestone: v2.2 Simplificación + Web Grounding — COMPLETE ✅
 
-**Goal:** Simplificar la app quitando superficie innecesaria (skills, token HF, buscador) y agregar grounding web heurístico con fallback offline, además de arreglar los temas de código del chat.
+**Shipped:** 2026-09-28 | [Archive →](.planning/milestones/v2.2-ROADMAP.md) · [Audit →](milestones/v2.2-MILESTONE-AUDIT.md) (gaps_found, accepted)
 
-**Target features:**
-- Quitar skills: Calculator, CurrentTime, JsonFormatter (+ superficie Skills: chips, prefs, repo, gating, loops local/remoto)
-- Quitar access token de Hugging Face (campo, headers auth, settings, modelos con gate)
-- Quitar buscador de modelos (solo catálogo estático `model_allowlist.json` + descarga directa sin token)
-- Web grounding heurístico: system-prompt + fetch directo (sin API keys); sin internet → solo modelo local/remoto sin web
-- Fix temas de código en el chat (solo aplica Monokai; One Dark, GitHub, Dracula no se aplican)
+3 phases (49–51), 5 plans, 14 requirements — 10 MET, 4 PARTIAL (all device-smoke-bound, user-accepted):
+- Surface removal: skills/tool-loop deleted (26 files), HF token + model search deleted → static allowlist catalog with direct downloads (net −4721/+1378 lines)
+- Web grounding: heuristic single-fetch pipeline (`data/grounding/`) + chip/Fuentes/banner surfaces + default-ON toggle, zero new dependencies
+- Syntax-theme fix: all 4 presets apply in chat (was Monokai-only) with all-4-preset regression tests
+
+**Known deferred:** 4 release-UAT device smokes (DEL-06 release smoke, WEB-05 banner visual, WEB-06 chip/Fuentes/E2E, THEME-01 per-preset visual light+dark). Orphaned Keystore `huggingface_token` entry on upgrades (harmless).
+
+## Current Milestone: (planning next — run `/gsd-new-milestone`)
+
+**Goal:** TBD in next milestone definition. v2.2 closed with 4 accepted device-smoke partials (DEL-06, WEB-05, WEB-06, THEME-01) queued for release UAT.
+
+**Shipped in v2.2 (2026-09-28):**
+- Removed skills surface (Calculator, CurrentTime, JsonFormatter + chips, prefs, repo, gating, local/remote tool loops) — legacy TOOL rows still render read-only
+- Removed Hugging Face access token (settings field, download auth headers, encrypted prefs entry, gated models)
+- Removed model search — static `model_allowlist.json` catalog + direct token-free downloads only
+- Heuristic web grounding: URL detect → bounded fetch → `[WEB CONTEXT]` injection with hijack sanitization, offline model-only fallback, default-ON toggle
+- Fixed chat code themes (all 4 presets apply; was Monokai-only)
 
 ## Requirements
 
@@ -103,10 +114,15 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 - ✓ Syntax highlighting applied everywhere code blocks appear (chat, model cards, etc.) — v1.6
 - ✓ Smooth color transition when streaming code block completes — v1.6
 - ✓ No jank or frame drops during streaming — v1.6
+- ✓ User chats with no skills surface — local `@Tool` execution, skill chips/prefs, Summarize template, and remote `tools[]` loop removed; legacy tool rows render read-only — v2.2
+- ✓ No Hugging Face token anywhere — settings field, download auth, encrypted prefs, gated models all removed — v2.2
+- ✓ Model discovery is static-catalog-only — `model_allowlist.json` with direct token-free downloads (progress/cancel) — v2.2
+- ✓ Pasted URLs ground the answer — bounded fetch → `[WEB CONTEXT]` block with hijack sanitization, numbered sources, offline model-only fallback, default-ON toggle — v2.2 (device-smoke visuals deferred)
+- ✓ All 4 code presets apply in chat code blocks — Monokai-only hardcode fixed, all-4-preset regression tests — v2.2 (visual confirmation deferred)
 
 ### Active
 
-- [ ] v2.2 Simplificación + Web Grounding — quitar skills/token HF/buscador, web grounding heurístico con fallback offline, fix temas de código (see Current Milestone above)
+- [ ] Next milestone requirements — TBD via `/gsd-new-milestone` (REQUIREMENTS.md archived for v2.2; define fresh)
 
 ### Out of Scope
 
@@ -124,7 +140,7 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 The Android ecosystem lacks a polished, production-grade app that combines local LLM inference with remote provider connectivity in a single interface. Existing solutions are either CLI-only, desktop-only (LM Studio), or limited to one provider. There is growing demand for running LLMs on flagship Android phones with 8-16GB RAM.
 
-Warped has shipped 10 milestones (v1.0 through v2.0) across 44 phases and 287 requirements. The app supports LiteRT-LM local inference, LM Studio v1 REST API, Hugging Face model search/download with background downloads and progress, chat with streaming, presets, history, an 8-step onboarding wizard, and syntax-highlighted code blocks with 4 themes. Production hardening is applied (ProGuard, Keystore encryption, input sanitization, crash resilience, network security).
+Warped has shipped 12 milestones (v1.0 through v2.2) across 51 phases and 315 requirements. The app supports LiteRT-LM local inference, LM Studio v1 REST API, static-catalog model download with background downloads and progress, chat with streaming, heuristic web grounding with offline fallback, presets, history, an 8-step onboarding wizard, and syntax-highlighted code blocks with 4 themes. Production hardening is applied (ProGuard, Keystore encryption, input sanitization, crash resilience, network security).
 
 **v1.8 (2026-06-05):** Hugging Face model browser bugfixes (sibling file rendering, search persistence, post-download nav, background downloads with progress + cancel), chat UI redesign (rounded pill input, no TopAppBar, unified model+endpoint picker with traffic-light status), endpoint CRUD with LM Studio native v1 API, and a hand-curated recommended models section.
 
@@ -139,6 +155,10 @@ Warped has shipped 10 milestones (v1.0 through v2.0) across 44 phases and 287 re
 **v2.0 (2026-06-06):** LlmModelHelper keystone interface unifying local/remote chat, model allowlist asset, thinking mode, model benchmark with WorkManager, Prompt Lab, performance convergence sweep, and Agent Skills Lite. 48 MET + 5 PARTIAL + 2 carry-overs → all 7 deferred into v2.1.
 
 **v2.0 verification gaps:** PERF-12/13 benchmark numbers require a Pixel 7 reference device — CI-gated, stay deferred through v2.1.
+
+**v2.2 (2026-09-28):** Net-deletion milestone (−4721/+1378 lines across 87 files): skills/tool-loop surface removed, HF token + search removed in favor of the static catalog, heuristic web grounding added with zero new dependencies, all 4 syntax presets fixed. 232/232 unit tests green; `assembleDebug` + `assembleRelease` green. 4 device-smoke partials accepted into release UAT.
+
+---
 
 ## Constraints
 
@@ -170,7 +190,7 @@ Warped has shipped 10 milestones (v1.0 through v2.0) across 44 phases and 287 re
 | v1.8 hand-curated recommended models | Static asset shipping with the app, no API scraping, no ranking algorithms | ✓ Good |
 | v2.0 references Google AI Edge Gallery (2026-06-05) | Reference implementation in same domain (Kotlin + LiteRT-LM on Android, 23.6k stars). Largest, most active OSS in the space. | — Pending |
 | v2.1 finishes v2.0 PARTIALs/carry-overs (2026-09-27) | No new features until every shipped feature is fully done — PERF-01, PERF-06, SKILLS-02/03, double-collect, Call.cancel(). PERF-12/13 numbers stay CI-gated (Pixel 7 hardware required). | ✓ Good |
-| v2.2 removes v2.1 Skills surface (2026-09-28) | Calculator/CurrentTime/JsonFormatter + chips/prefs/repo/gating/tool-loops deleted one milestone after introduction — user found no value, simplifies codebase and R8 keeps. Zero new dependencies for web grounding (OkHttp fetch only). | — Pending |
+| v2.2 removes v2.1 Skills surface (2026-09-28) | Calculator/CurrentTime/JsonFormatter + chips/prefs/repo/gating/tool-loops deleted one milestone after introduction — user found no value, simplifies codebase and R8 keeps. Zero new dependencies for web grounding (OkHttp fetch only). | ✓ Good |
 
 ## Evolution
 
@@ -190,4 +210,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-28 after v2.2 Simplificación + Web Grounding milestone start*
+*Last updated: 2026-09-28 after v2.2 Simplificación + Web Grounding milestone close*

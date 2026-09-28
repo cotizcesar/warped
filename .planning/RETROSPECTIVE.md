@@ -45,6 +45,44 @@
 
 ---
 
+## Milestone: v2.2 — Simplificación + Web Grounding
+
+**Shipped:** 2026-09-28 (override closeout — 4 device-smoke partials accepted)
+**Phases:** 3 (49–51) | **Plans:** 5 | **Tasks:** 11
+
+### What Was Built
+- Surface removal: 26 files deleted (skills/tool-loop, HF token, model search); static allowlist catalog with direct downloads via `CatalogViewModel`; net −4721/+1378 lines
+- Web grounding pipeline (`data/grounding/`): first-URL detection, bounded cancelable fetch (64KB/3-redirect/8-10-20s), hand-rolled HTML→text, hijack sanitizer, `[WEB CONTEXT]` augmentation; zero new dependencies
+- Grounding surfaces: transient "Leyendo página…" chip, Fuentes list, model-only banner, default-ON Web settings toggle
+- Syntax-theme fix: theme-threaded highlight call path (was Monokai-hardcoded) + all-4-preset regression tests; 232/232 unit green, assembleDebug + assembleRelease green
+
+### What Worked
+- **Net-deletion discipline:** grep-zero gates made removal verifiable — every deleted surface had a machine-checked zero-residue gate, so "is it really gone?" was never a judgment call.
+- **Removals-first ordering:** grounding hooked into the post-removal transcript shape with no rework; theme fix verified against final call sites.
+- **Zero-dependency constraint:** existing OkHttp + ConnectivityManager covered the whole grounding pipeline; `audit-dependencies.sh` stayed green throughout.
+
+### What Was Inefficient
+- **Missing `requirements-completed` frontmatter:** 49-01/49-02 SUMMARYs lacked it, forcing coverage reconstruction from VERIFICATION must-have reviews during audit. Every plan summary must carry the frontmatter.
+- **Self-inflicted grep hits:** plan-written comments/docs tripped the plan's own grep gates twice (KDoc `body.string()`, catalog comment). Gate patterns should be validated against the plan text itself.
+- **No device in environment:** all 3 phases deferred their visual smoke, producing 4 milestone-level partials. A connected emulator would have closed v2.2 clean.
+
+### Patterns Established
+- **Removal plans pair code deletion with grep-zero gates** (skills gate, Summarize gate, HF-token gates, search-surface gate) — reuse for any future surface removal.
+- **Ephemeral grounding adornments render inside MessageBubble** so they scroll with their message; toggle takes effect next message, no restart.
+- **Theme threading via interface default param plus concrete overload** (Kotlin forbids defaults on overrides).
+
+### Key Lessons
+1. Plan SUMMARYs must always include `requirements-completed` frontmatter — audit depends on it.
+2. Deferred device smokes compound: 3 phases × no device = 4 milestone partials. Keep a release-UAT checklist per milestone.
+3. Net-deletion milestones need release-posture gates (R8 keeps, dependency audit, assembleRelease) in the plan, not as an afterthought.
+
+### Cost Observations
+- Model mix: AI-managed execution, single day (2026-09-28)
+- Plans: 5 across 3 phases, ~25 min each
+- Notable: highest deletion-to-addition ratio to date; docs/audit commits (~13) outnumber feat commits (4)
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
