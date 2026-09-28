@@ -43,7 +43,10 @@ class LiteRTLmEngine @Inject constructor(
                 System.loadLibrary("litertlm_jni")
                 Engine.setNativeMinLogSeverity(LogSeverity.ERROR)
                 nativeLoaded = true
-            } catch (e: UnsatisfiedLinkError) { Timber.e(e, "LiteRTLmEngine: native lib not found") }
+            } catch (e: UnsatisfiedLinkError) {
+                Timber.e(e, "LiteRTLmEngine: native lib not found")
+                throw IllegalStateException("Native litertlm_jni library unavailable", e)
+            }
         }
     }
 
