@@ -7,6 +7,7 @@ import com.warped.data.local.db.entity.toDomain
 import com.warped.data.local.db.entity.toEntity
 import com.warped.domain.model.ChatMessage
 import com.warped.domain.model.Conversation
+import com.warped.domain.model.GroundedSource
 import com.warped.domain.model.ProviderType
 import com.warped.domain.repository.ChatRepository
 import kotlinx.coroutines.flow.Flow
@@ -64,5 +65,23 @@ class ChatRepositoryImpl @Inject constructor(
 
     override suspend fun deleteMessage(messageId: Long) {
         messageDao.deleteById(messageId)
+    }
+
+    // Phase 53 (53-01 scaffolding): full source/override implementation lands in
+    // 53-02. These stubs keep the interface-first contracts compiling.
+    override suspend fun saveMessageWithSources(
+        conversationId: Long,
+        message: ChatMessage,
+        sources: List<GroundedSource>,
+    ): Long = throw NotImplementedError("53-02 implements source persistence")
+
+    override suspend fun getSourcesByMessage(messageId: Long): List<GroundedSource> =
+        throw NotImplementedError("53-02 implements source hydration")
+
+    override suspend fun getWebOverride(conversationId: Long): Boolean? =
+        throw NotImplementedError("53-02 implements override read")
+
+    override suspend fun setWebOverride(conversationId: Long, override: Boolean?) {
+        throw NotImplementedError("53-02 implements override write")
     }
 }
