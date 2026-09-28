@@ -7,6 +7,24 @@
   },
   "models": [
     {
+      "name": "gemma-4-E2B-it",
+      "displayName": "Gemma 4 E2B IT",
+      "modelFile": "gemma-4-E2B-it.litertlm",
+      "sizeInBytes": 2588147712,
+      "capabilities": {
+        "text": true,
+        "vision": false,
+        "audio": false,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"]
+    },
+    {
       "name": "gemma-3n-E2B-it-int4",
       "displayName": "Gemma 3n E2B IT (int4)",
       "modelFile": "gemma-3n-E2B-it-int4.task",
