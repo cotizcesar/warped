@@ -207,29 +207,31 @@ private fun CatalogModelCard(
         )
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
-            // Collapsed row 1: title + download-state icon cluster.
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+            // Collapsed row 1: title + download-state icon cluster (overlay:
+            // title alone defines the row height; actions float centered-end
+            // on top, free to bleed symmetrically into card padding).
+            Box(
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
                     text = entry.displayName,
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.padding(end = 52.dp)
                 )
-                Spacer(Modifier.width(4.dp))
-                CatalogDownloadActions(
-                    downloadState = downloadState,
-                    active = active,
-                    downloaded = downloaded,
-                    failed = failed,
-                    onDownload = onDownload,
-                    onPause = onPause,
-                    onResume = onResume,
-                    onCancelClick = { showCancelConfirm = true }
-                )
+                Box(Modifier.align(Alignment.CenterEnd)) {
+                    CatalogDownloadActions(
+                        downloadState = downloadState,
+                        active = active,
+                        downloaded = downloaded,
+                        failed = failed,
+                        onDownload = onDownload,
+                        onPause = onPause,
+                        onResume = onResume,
+                        onCancelClick = { showCancelConfirm = true }
+                    )
+                }
             }
             Spacer(Modifier.height(4.dp))
             // Collapsed row 2: capability icons + size.
@@ -338,12 +340,17 @@ private fun CatalogDownloadActions(
                 )
             }
         }
-        downloaded -> Icon(
-            imageVector = Icons.Filled.CheckCircle,
-            contentDescription = "Descargado",
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(12.dp).size(24.dp)
-        )
+        downloaded -> Box(
+            modifier = Modifier.size(48.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.CheckCircle,
+                contentDescription = "Descargado",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+        }
         else -> IconButton(onClick = onDownload) {
             Icon(
                 imageVector = Icons.Filled.Download,
