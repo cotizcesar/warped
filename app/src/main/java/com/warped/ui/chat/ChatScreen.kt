@@ -3,20 +3,18 @@ package com.warped.ui.chat
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Circle
@@ -25,7 +23,6 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import kotlinx.collections.immutable.toPersistentList
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -39,10 +36,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -70,18 +71,46 @@ fun ChatScreen(
     conversationId: Long = 0L,
     newChat: Boolean = false
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val scrollState = rememberScrollState()
+    // 48-01 (PERF-14): each region collects ONLY its sub-state flow — never
+    // the monolith. Streaming tokens recompose the list; keystrokes recompose
+    // only the input bar.
+    val transcript by viewModel.transcriptState.collectAsStateWithLifecycle()
+    val input by viewModel.inputState.collectAsStateWithLifecycle()
+    val connection by viewModel.connectionState.collectAsStateWithLifecycle()
+    // 48-01 (PERF-15): keyed LazyColumn state. isAtBottom follows 48-UI-SPEC
+    // §3 ("last item visible and within 48dp of the end").
+    val listState = rememberLazyListState()
+    val density = LocalDensity.current
+    val bottomThresholdPx = remember(density) { with(density) { 48.dp.roundToPx() } }
+    val isAtBottom by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            if (info.totalItemsCount == 0) return@derivedStateOf true
+            val lastVisible = info.visibleItemsInfo.lastOrNull() ?: return@derivedStateOf false
+            lastVisible.index == info.totalItemsCount - 1 &&
+                (lastVisible.offset + lastVisible.size - info.viewportEndOffset) <= bottomThresholdPx
+        }
+    }
+    // Latch for the Jump-to-latest pill: sets when content arrives while
+    // scrolled up; clears on reaching bottom, pill tap, or send.
+    var hasNewContentBelow by remember { mutableStateOf(false) }
+    // One-shot: send / conversation-open land at the bottom regardless of
+    // the current viewport.
+    var snapToBottomOnNextContent by remember { mutableStateOf(false) }
     var attachedImages by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var audioBytes by remember { mutableStateOf<ByteArray?>(null) }
     var isRecording by remember { mutableStateOf(false) }
     var showModelPicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(conversationId) {
-        if (conversationId > 0) viewModel.selectConversation(conversationId)
+        if (conversationId > 0) {
+            snapToBottomOnNextContent = true
+            viewModel.selectConversation(conversationId)
+        }
     }
     LaunchedEffect(Unit) {
         if (conversationId == 0L) {
+            snapToBottomOnNextContent = true
             if (newChat) {
                 viewModel.newConversation()
             } else {
@@ -96,8 +125,8 @@ fun ChatScreen(
     }
 
     // Memory warning dialog
-    if (uiState.memoryWarningModel != null) {
-        val model = uiState.memoryWarningModel!!
+    if (connection.memoryWarningModel != null) {
+        val model = connection.memoryWarningModel!!
         val context = androidx.compose.ui.platform.LocalContext.current
         val info = com.warped.data.local.inference.MemoryChecker(context).getMemoryInfo()
         AlertDialog(
@@ -151,14 +180,11 @@ fun ChatScreen(
     }
 
     val selectedModelName = run {
-        val effectiveModelId = uiState.selectedLocalModelId ?: uiState.selectedRemoteModelId
-        val effectiveProvider = if (uiState.selectedLocalModelId != null) ProviderType.LITE_RT_LM
-            else uiState.selectedRemoteProvider
-        val local = uiState.localModels.firstOrNull { it.filePath == effectiveModelId }
-        val messages = remember(uiState.messages) { uiState.messages.toPersistentList() }
-        val localModels = remember(uiState.localModels) { uiState.localModels.toPersistentList() }
-        val endpoints = remember(uiState.endpoints) { uiState.endpoints.toPersistentList() }
-        val endpoint = uiState.endpoints.firstOrNull {
+        val effectiveModelId = connection.selectedLocalModelId ?: connection.selectedRemoteModelId
+        val effectiveProvider = if (connection.selectedLocalModelId != null) ProviderType.LITE_RT_LM
+            else connection.selectedRemoteProvider
+        val local = connection.localModels.firstOrNull { it.filePath == effectiveModelId }
+        val endpoint = connection.endpoints.firstOrNull {
             it.modelId == effectiveModelId && it.apiType == effectiveProvider
         }
         when {
@@ -168,19 +194,40 @@ fun ChatScreen(
         }
     }
 
-    // Auto-scroll to bottom during streaming
-    LaunchedEffect(uiState.isStreaming, uiState.streamingContent.length) {
-        if (uiState.isStreaming) {
-            scrollState.animateScrollTo(scrollState.maxValue)
+    // 48-01 (PERF-15): stick-to-bottom gating. The viewport moves on new
+    // content ONLY when already at the bottom (scrollToItem pin — never the
+    // per-token animateScrollTo defect); otherwise the hasNewContentBelow
+    // latch sets and the pill takes over.
+    val showStreamingBubble = transcript.streamingContent.isNotEmpty() || transcript.streamingReasoning.isNotEmpty()
+    val showToolStatus = transcript.isStreaming && !showStreamingBubble
+    val trailingCount = (if (showStreamingBubble || showToolStatus) 1 else 0) +
+        (if (transcript.showNoToolSupportNotice) 1 else 0) +
+        (if (transcript.activeToolError != null) 1 else 0)
+    val totalItems = transcript.messages.size + trailingCount
+    LaunchedEffect(
+        transcript.messages.size,
+        transcript.streamingContent.length,
+        transcript.streamingReasoning.length,
+        transcript.toolCallActive,
+        transcript.activeToolError,
+        transcript.showNoToolSupportNotice,
+    ) {
+        if (totalItems == 0) return@LaunchedEffect
+        if (snapToBottomOnNextContent || isAtBottom) {
+            snapToBottomOnNextContent = false
+            hasNewContentBelow = false
+            listState.scrollToItem(totalItems - 1)
+        } else {
+            hasNewContentBelow = true
         }
     }
-
-    // Snap to bottom when a new message is added
-    LaunchedEffect(uiState.messages.size) {
-        if (!uiState.isStreaming) {
-            scrollState.animateScrollTo(scrollState.maxValue)
-        }
+    LaunchedEffect(isAtBottom) {
+        if (isAtBottom) hasNewContentBelow = false
     }
+    // 48-UI-SPEC §2 visibility rule: non-empty list AND scrolled up AND new
+    // content arrived since. Never on empty state, never at bottom.
+    val isEmpty = transcript.messages.isEmpty() && transcript.streamingContent.isEmpty()
+    val showPill = !isEmpty && !isAtBottom && hasNewContentBelow
 
     Scaffold(
         modifier = Modifier.imePadding(),
@@ -191,29 +238,31 @@ fun ChatScreen(
         },
         bottomBar = {
             ChatInputBar(
-                text = uiState.inputText,
-                isGenerating = uiState.isStreaming,
-                canSend = (uiState.selectedLocalModelId ?: uiState.selectedRemoteModelId) != null,
+                text = input.inputText,
+                isGenerating = input.isGenerating,
+                canSend = (connection.selectedLocalModelId ?: connection.selectedRemoteModelId) != null,
                 onTextChange = { viewModel.updateInput(it) },
                 onSend = {
-                    viewModel.sendMessage(uiState.inputText, attachedImages, audioBytes)
+                    snapToBottomOnNextContent = true
+                    hasNewContentBelow = false
+                    viewModel.sendMessage(input.inputText, attachedImages, audioBytes)
                     attachedImages = emptyList()
                     audioBytes = null
                 },
                 onStop = { viewModel.stopGeneration() },
-                reasoningEnabled = uiState.enableThinking,
+                reasoningEnabled = input.enableThinking,
                 onToggleReasoning = { viewModel.toggleThinking() },
-                modelHasReasoning = uiState.supportsThinking,
+                modelHasReasoning = input.supportsThinking,
                 onAddImage = { imagePickerLauncher.launch("image/*") },
                 attachedImages = attachedImages,
                 onRemoveImage = { i -> attachedImages = attachedImages.filterIndexed { idx, _ -> idx != i } },
-                modelHasAudio = uiState.localModels.firstOrNull { it.filePath == uiState.selectedLocalModelId }?.capabilities?.audio == true,
+                modelHasAudio = connection.localModels.firstOrNull { it.filePath == connection.selectedLocalModelId }?.capabilities?.audio == true,
                 onAudioRecorded = { bytes -> audioBytes = bytes },
                 onAudioRecordingChanged = { isRecording = it },
                 // 47-01 UI-SPEC §2: skill chips hoisted state.
-                skillEnabled = uiState.skillEnabled,
+                skillEnabled = input.skillEnabled,
                 onToggleSkill = { id ->
-                    viewModel.setSkillEnabled(id, !(uiState.skillEnabled[id] ?: true))
+                    viewModel.setSkillEnabled(id, !(input.skillEnabled[id] ?: true))
                 },
             )
         }
@@ -228,14 +277,16 @@ fun ChatScreen(
             // PERF-04: derivedStateOf wraps the traffic-light derivation so the inline
             // model selector doesn't re-derive it on every recomposition (e.g. when
             // a single streaming character arrives).
-            val trafficLight by remember(uiState) {
-                derivedStateOf { uiState.trafficLightState() }
+            // 48-01: derived over the two collected sub-states (combine-level,
+            // low-frequency) — never the monolith.
+            val trafficLight by remember(transcript, connection) {
+                derivedStateOf { trafficLightState(transcript, connection) }
             }
             InlineModelSelectorBar(
                 selectedModelName = selectedModelName,
-                isLocal = uiState.selectedLocalModelId != null,
-                isLoading = uiState.isLoadingModel,
-                loadingModelName = uiState.loadingModelName,
+                isLocal = connection.selectedLocalModelId != null,
+                isLoading = connection.isLoadingModel,
+                loadingModelName = connection.loadingModelName,
                 trafficLight = trafficLight,
                 onClick = {
                     showModelPicker = true
@@ -245,11 +296,11 @@ fun ChatScreen(
             )
 
             // CHAT-07: Model loading indicator
-            if (uiState.isLoadingModel) {
-                ModelLoadingIndicator(loadingModelName = uiState.loadingModelName)
+            if (connection.isLoadingModel) {
+                ModelLoadingIndicator(loadingModelName = connection.loadingModelName)
             }
 
-            if (uiState.messages.isEmpty() && uiState.streamingContent.isEmpty()) {
+            if (isEmpty) {
                 // Empty state
                 Box(
                     modifier = Modifier
@@ -273,68 +324,79 @@ fun ChatScreen(
                 }
             } else {
                 Box(modifier = Modifier.weight(1f)) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(scrollState)
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    // 48-01 (PERF-15): keyed LazyColumn. Role.TOOL transcript rows
+                    // are persisted ChatMessages with stable ids — keyed inline,
+                    // zero extra work. Transient trailing rows use the constant
+                    // ChatListKeys (never content hashes — T-48-01/T-48-02).
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        uiState.messages.forEach { message ->
-                            MessageBubble(message = message, codeTheme = uiState.codeTheme, codeFontScale = uiState.codeFontScale)
+                        items(transcript.messages, key = { it.id }) { message ->
+                            MessageBubble(message = message, codeTheme = connection.codeTheme, codeFontScale = connection.codeFontScale)
                         }
-                        if (uiState.streamingContent.isNotEmpty() || uiState.streamingReasoning.isNotEmpty()) {
-                            MessageBubble(
-                                message = com.warped.domain.model.ChatMessage(
-                                    role = Role.ASSISTANT,
-                                    content = uiState.streamingContent,
-                                    reasoning = uiState.streamingReasoning.ifEmpty { null }
-                                ),
-                                isStreaming = true,
-                                codeTheme = uiState.codeTheme,
-                                codeFontScale = uiState.codeFontScale
-                            )
-                        } else if (uiState.isStreaming) {
+                        if (showStreamingBubble) {
+                            item(key = ChatListKeys.STREAMING) {
+                                MessageBubble(
+                                    message = com.warped.domain.model.ChatMessage(
+                                        role = Role.ASSISTANT,
+                                        content = transcript.streamingContent,
+                                        reasoning = transcript.streamingReasoning.ifEmpty { null }
+                                    ),
+                                    isStreaming = true,
+                                    codeTheme = connection.codeTheme,
+                                    codeFontScale = connection.codeFontScale
+                                )
+                            }
+                        } else if (showToolStatus) {
                             // 47-01 UI-SPEC §3: exact "Using {display}…" copy via
                             // the shared toolDisplayName() mapping (never paraphrased).
-                            val statusText = uiState.toolCallActive?.let { tool ->
-                                formatToolStatus(tool)
-                            } ?: "Thinking..."
-                            val statusA11y = uiState.toolCallActive?.let { tool ->
-                                formatToolStatusA11y(tool)
-                            }
-                            Row(
-                                modifier = Modifier
-                                    .padding(vertical = 8.dp)
-                                    .then(
-                                        if (statusA11y != null) Modifier.semantics {
-                                            contentDescription = statusA11y
-                                        } else Modifier
-                                    ),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(14.dp),
-                                    strokeWidth = 2.dp,
-                                    color = Color(0xFF545450)
-                                )
-                                Spacer(Modifier.width(10.dp))
-                                Text(
-                                    statusText,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color(0xFF545450)
-                                )
+                            item(key = ChatListKeys.TOOL_STATUS) {
+                                val statusText = transcript.toolCallActive?.let { tool ->
+                                    formatToolStatus(tool)
+                                } ?: "Thinking..."
+                                val statusA11y = transcript.toolCallActive?.let { tool ->
+                                    formatToolStatusA11y(tool)
+                                }
+                                Row(
+                                    modifier = Modifier
+                                        .padding(vertical = 8.dp)
+                                        .then(
+                                            if (statusA11y != null) Modifier.semantics {
+                                                contentDescription = statusA11y
+                                            } else Modifier
+                                        ),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        strokeWidth = 2.dp,
+                                        color = Color(0xFF545450)
+                                    )
+                                    Spacer(Modifier.width(10.dp))
+                                    Text(
+                                        statusText,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFF545450)
+                                    )
+                                }
                             }
                         }
                         // 47-01 UI-SPEC §6: no-support notice, inline where the
                         // status row would have been, once per turn.
-                        if (uiState.showNoToolSupportNotice) {
-                            NoToolSupportNotice()
+                        if (transcript.showNoToolSupportNotice) {
+                            item(key = ChatListKeys.NO_TOOL_SUPPORT) {
+                                NoToolSupportNotice()
+                            }
                         }
                         // 47-01 UI-SPEC §4: tool error row below the bubble it
                         // belongs to; fallback text streams in the bubble.
-                        uiState.activeToolError?.let { toolError ->
-                            ToolErrorRow(toolId = toolError.toolId, reason = toolError.reason)
+                        transcript.activeToolError?.let { toolError ->
+                            item(key = ChatListKeys.toolError(toolError.toolId)) {
+                                ToolErrorRow(toolId = toolError.toolId, reason = toolError.reason)
+                            }
                         }
                     }
                     // Top fade gradient overlay
@@ -367,23 +429,38 @@ fun ChatScreen(
                                 )
                             )
                     )
+                    // 48-01 (48-UI-SPEC §2): Jump-to-latest pill — the only new
+                    // composable. Renders above the fades, never dimmed.
+                    JumpToLatestPillOverlay(
+                        visible = showPill,
+                        onClick = {
+                            snapToBottomOnNextContent = false
+                            hasNewContentBelow = false
+                            scope.launch {
+                                if (totalItems > 0) listState.animateScrollToItem(totalItems - 1)
+                            }
+                        },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 16.dp, bottom = 8.dp)
+                    )
                 }
             }
 
-            if (uiState.modelLoadError != null) {
+            if (connection.modelLoadError != null) {
                 Snackbar(
                     modifier = Modifier.padding(16.dp),
                     action = { TextButton(onClick = { viewModel.clearModelLoadError() }) { Text("Dismiss") } }
-                ) { Text(uiState.modelLoadError ?: "") }
+                ) { Text(connection.modelLoadError ?: "") }
             }
 
-            if (uiState.error != null) {
+            if (transcript.error != null) {
                 Snackbar(
                     modifier = Modifier.padding(16.dp),
                     action = { TextButton(onClick = { viewModel.clearError() }) { Text("Dismiss") } }
                 ) {
                     Text(
-                        when (val error = uiState.error) {
+                        when (val error = transcript.error) {
                             is ChatError.Network -> error.message
                             is ChatError.Server -> error.message
                             is ChatError.Auth -> error.message
@@ -399,7 +476,7 @@ fun ChatScreen(
             }
 
             // Model unavailable banner
-            if (uiState.modelUnavailable) {
+            if (connection.modelUnavailable) {
                 Snackbar(
                     modifier = Modifier.padding(16.dp),
                     containerColor = MaterialTheme.colorScheme.errorContainer,
@@ -413,7 +490,7 @@ fun ChatScreen(
             }
 
             // Model switch confirmation dialog
-            if (uiState.pendingModelSwitch != null) {
+            if (connection.pendingModelSwitch != null) {
                 WarpedAlertDialog(
                     onDismissRequest = { viewModel.cancelModelSwitch() },
                     title = { Text("New model selected") },
@@ -441,16 +518,88 @@ fun ChatScreen(
         // CHAT-04/05: ModalBottomSheet model picker
         ModelSelectorSheet(
             visible = showModelPicker,
-            selectedModelId = uiState.selectedLocalModelId ?: uiState.selectedRemoteModelId,
-            selectedProvider = if (uiState.selectedLocalModelId != null) ProviderType.LITE_RT_LM else uiState.selectedRemoteProvider,
-            localModels = uiState.localModels,
-            endpoints = uiState.endpoints,
-            endpointModels = uiState.endpointModels,
+            selectedModelId = connection.selectedLocalModelId ?: connection.selectedRemoteModelId,
+            selectedProvider = if (connection.selectedLocalModelId != null) ProviderType.LITE_RT_LM else connection.selectedRemoteProvider,
+            localModels = connection.localModels,
+            endpoints = connection.endpoints,
+            endpointModels = connection.endpointModels,
             onDismiss = { showModelPicker = false },
             onModelSelected = { modelId, providerType, endpointId ->
                 viewModel.launchModelSelection(modelId, providerType, endpointId)
             }
         )
+    }
+}
+
+/**
+ * 48-01: file-level wrapper so the pill's fade resolves to the top-level
+ * AnimatedVisibility (a direct call inside ChatScreen's Column would bind
+ * the ColumnScope overload and fail to compile).
+ */
+@Composable
+private fun JumpToLatestPillOverlay(
+    visible: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(animationSpec = tween(150)),
+        exit = fadeOut(animationSpec = tween(150)),
+        modifier = modifier
+    ) {
+        JumpToLatestPill(onClick = onClick)
+    }
+}
+
+/**
+ * 48-01 (PERF-15, 48-UI-SPEC §2): "Jump to latest" affordance — the ONLY new
+ * composable in this phase. Coral pill (36dp visual) centered in a 48dp touch
+ * target; announces politely at most once per latch set (content unchanged
+ * while visible, so no re-announcement per streaming token).
+ */
+@Composable
+private fun JumpToLatestPill(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+            .clip(RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+            .semantics {
+                contentDescription = "Jump to latest message"
+                liveRegion = LiveRegionMode.Polite
+            }
+    ) {
+        Surface(
+            shape = RoundedCornerShape(50),
+            color = Color(0xFFD97757),
+            contentColor = Color(0xFF1C1C1C),
+            shadowElevation = 6.dp
+        ) {
+            Row(
+                modifier = Modifier
+                    .height(36.dp)
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Filled.KeyboardArrowDown,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Latest",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1
+                )
+            }
+        }
     }
 }
 
