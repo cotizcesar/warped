@@ -976,14 +976,24 @@ class ChatViewModel @Inject constructor(
         updateTranscript { it.copy(error = null) }
     }
 
-    fun deleteMessage(messageId: Long) {
+    /**
+     * 48 (WR-06): takes the row's String id — [ChatMessage.id] defaults to a
+     * UUID, so a just-sent message not yet reloaded from Room keeps a
+     * non-numeric id a Long parameter cannot express. The DB delete still
+     * needs the numeric key, parsed best-effort; the local filter always
+     * matches on the String id so the bubble disappears immediately.
+     */
+    fun deleteMessage(messageId: String) {
         viewModelScope.launch(coroutineExceptionHandler) {
-            chatRepository.deleteMessage(messageId)
+            messageId.toLongOrNull()?.let { chatRepository.deleteMessage(it) }
             updateTranscript { state ->
-                state.copy(messages = state.messages.filter { it.id != messageId.toString() })
+                state.copy(messages = state.messages.filter { it.id != messageId })
             }
         }
     }
+
+    /** Room-sourced call sites holding the numeric key. */
+    fun deleteMessage(messageId: Long) = deleteMessage(messageId.toString())
 
     fun clearModelLoadError() {
         updateConnection { it.copy(modelLoadError = null) }
