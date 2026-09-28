@@ -22,11 +22,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 
 @HiltViewModel
@@ -59,8 +61,7 @@ class ChatViewModel @Inject constructor(
     private var activeHelper: LlmModelHelper? = null
 
     /** Monotonic turn counter backing the [activeHelper] stale-finally guard. */
-    @Volatile
-    private var generationSeq = 0L
+    private val generationSeq = AtomicLong(0L)
 
     private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         timber.log.Timber.e(throwable, "Unhandled coroutine exception")
@@ -193,8 +194,17 @@ class ChatViewModel @Inject constructor(
         val userMessage = ChatMessage(role = Role.USER, content = text.trim(), imageUris = imageDataUrls)
         _uiState.update { it.copy(messages = it.messages + userMessage, inputText = "", isStreaming = true, toolCallActive = null) }
 
-        // 46-01 RUNTIME-13: per-turn identity for the single shared inference Flow.
-        val turnId = ++generationSeq
+        // CR-02: cancel any in-flight turn before starting a new one — otherwise
+        // two collectors interleave tokens into one bubble and activeHelper is
+        // clobbered (Stop then only halts the newest turn's transport).
+        generationJob?.let {
+            try { activeHelper?.stopResponse() } catch (e: Exception) { Timber.e(e, "Chat: prior stopResponse failed") }
+            it.cancel()
+        }
+        generationJob = null
+        activeHelper = null
+        // WR-04: atomic increment — @Volatile ++ is a non-atomic read-modify-write.
+        val turnId = generationSeq.incrementAndGet()
         generationJob = viewModelScope.launch(coroutineExceptionHandler) {
             try {
                 val conversationId = ensureConversation(text, hasMedia = images.isNotEmpty() || audioBytes != null)
@@ -242,7 +252,7 @@ class ChatViewModel @Inject constructor(
                 }
 
                 val helper = when (selectedProvider) {
-                    ProviderType.LITE_RT_LM,
+                    ProviderType.LOCAL,
                     ProviderType.LITE_RT_LM -> providerRouter.resolveLocalHelper(
                         selectedProvider,
                         modelId
@@ -362,6 +372,11 @@ class ChatViewModel @Inject constructor(
                         }
                     }
                 }
+            } catch (e: CancellationException) {
+                // CR-01: Stop means stop — user-initiated cancel is not an error.
+                // Rethrow so structured concurrency observes cancellation; the
+                // finally (stale-seq guard) still runs on the rethrow path.
+                throw e
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
@@ -372,7 +387,7 @@ class ChatViewModel @Inject constructor(
             } finally {
                 // 46-01: clear the serving helper on turn end — but only if no newer
                 // turn has started since (stale-finally guard via turnId/seq).
-                if (turnId == generationSeq) activeHelper = null
+                if (turnId == generationSeq.get()) activeHelper = null
             }
         }
     }
@@ -385,14 +400,17 @@ class ChatViewModel @Inject constructor(
      * with no stale handle (pitfall 2). Safe when idle.
      */
     fun stopGeneration() {
+        // WR-05: snapshot-then-null so a stale Stop never clobbers a newer turn's
+        // transport started after this call was dispatched.
+        val helper = activeHelper
+        activeHelper = null
         try {
-            activeHelper?.stopResponse()
+            helper?.stopResponse()
         } catch (e: Exception) {
             Timber.e(e, "Chat: stopResponse failed")
         }
         generationJob?.cancel()
         generationJob = null
-        activeHelper = null
         _uiState.update { it.copy(
             isStreaming = false,
             streamingContent = "",
@@ -869,7 +887,7 @@ class ChatViewModel @Inject constructor(
 
     private suspend fun isModelAvailable(modelId: String, providerType: ProviderType): Boolean {
         return when (providerType) {
-            ProviderType.LITE_RT_LM, ProviderType.LITE_RT_LM -> {
+            ProviderType.LOCAL, ProviderType.LITE_RT_LM -> {
                 localModelRepository.existsByFilePath(modelId)
             }
             else -> {
