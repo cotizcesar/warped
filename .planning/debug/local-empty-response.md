@@ -73,3 +73,4 @@ updated: 2026-09-28
 - fix: removed the fallback in ChatViewModel.parseThinkBlocks — untagged output stays the visible answer; tagged <think>/<channel|> extraction unchanged
 - verification: ./gradlew :app:compileDebugKotlin --offline passed; device confirmation pending (Phase 48 smoke)
 - files_changed: app/src/main/java/com/warped/ui/chat/ChatViewModel.kt
+- follow_up_2026_09_28: user screenshot showed the answer rendered INSIDE the expanded Thinking panel — a row persisted while the bug was live (reasoning=reply, content=""). e99ca5d adds MIGRATION_13_14 (DB v14) repairing those rows: untagged reasoning moves back to content for content-empty assistant rows; genuine tagged reasoning untouched. SQL simulated-verified, compile green, 14.json exported, unit suite 192/192. Upgrade-install runs the repair; user to confirm on device.
