@@ -61,13 +61,30 @@ class EngineManager @Inject constructor(
         }
 
         Timber.d("EngineManager: initializing LiteRT-LM with backend=${target.backend} path=$modelPath (mmap, no copy)")
-        liteRTLmEngine.init(
-            modelPath = modelPath,
-            backend = target.backend!!,
-            visionBackend = BackendType.CPU,
-            audioBackend = BackendType.CPU
-        )
-        activeEngine = target
+        try {
+            initWith(target)
+            activeEngine = target
+        } catch (e: Exception) {
+            // GPU-constrained models (e.g. gemma-4-12B-it: "requires one of [gpu]")
+            // fail on the probed CPU backend. The device probe can false-negative
+            // (strict OpenCL+EGL AND), so the engine is ground truth: retry once
+            // with the required backend before giving up.
+            val required = parseRequiredBackend(e.message)
+            if (required != null && required != target.backend) {
+                Timber.w(e, "EngineManager: backend constraint mismatch, retrying with $required")
+                try {
+                    val retryTarget = target.copy(backend = required)
+                    initWith(retryTarget)
+                    activeEngine = retryTarget
+                    return
+                } catch (retryEx: Exception) {
+                    throw IllegalStateException(
+                        "This model needs the ${required.name} backend, which failed on this device: ${retryEx.message}"
+                    )
+                }
+            }
+            throw e
+        }
         ioScope.launch {
             runCatching { cacheManager.touchAccess(modelPath) }
                 .onFailure { Timber.w(it, "EngineManager: touchAccess failed") }
@@ -104,6 +121,35 @@ class EngineManager @Inject constructor(
             liteRTLmEngine.close()
         } catch (e: Exception) { Timber.e(e, "EngineManager: scheduleUnload failed") }
         synchronized(this) { activeEngine = null }
+    }
+
+    /** Single init attempt for a resolved target (no retry). */
+    private fun initWith(target: ActiveEngine) {
+        liteRTLmEngine.init(
+            modelPath = target.modelPath,
+            backend = target.backend!!,
+            visionBackend = BackendType.CPU,
+            audioBackend = BackendType.CPU
+        )
+    }
+
+    /**
+     * Parse a native backend-constraint error ("Model requires one of [gpu]" or
+     * "Main backend constraint mismatch ... one of [gpu, cpu]") into the first
+     * supported [BackendType]. Null when the message carries no constraint.
+     * Pure function — unit-testable without the native engine.
+     */
+    fun parseRequiredBackend(message: String?): BackendType? {
+        if (message == null) return null
+        val match = Regex("""requires one of \[(.*?)\]""").find(message) ?: return null
+        for (token in match.groupValues[1].split(",")) {
+            when (token.trim().lowercase()) {
+                "gpu" -> return BackendType.GPU
+                "cpu" -> return BackendType.CPU
+                "npu" -> return BackendType.NPU
+            }
+        }
+        return null
     }
 
     /** Returns true if any engine is currently loaded. */
