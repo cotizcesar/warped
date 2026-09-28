@@ -641,7 +641,8 @@ class ChatViewModel @Inject constructor(
             streamingContent = "",
             streamingReasoning = "",
             toolCallActive = null,
-            activeToolError = null
+            activeToolError = null,
+            showNoToolSupportNotice = false
         ) }
         updateInput { it.copy(isGenerating = false) }
     }
@@ -777,7 +778,10 @@ class ChatViewModel @Inject constructor(
                     messages = emptyList(),
                     streamingContent = "",
                     streamingReasoning = "",
-                    error = null
+                    error = null,
+                    toolCallActive = null,
+                    activeToolError = null,
+                    showNoToolSupportNotice = false
                 )
             }
             updateConnection {
