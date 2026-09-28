@@ -1,38 +1,33 @@
 {
   "contract": "1.0.0",
   "flavor": "core",
-  "milestone": "v2.1 — +, tracked in REQUIREMENTS.md)",
+  "milestone": "v2.1 — Finish v2.0 Leftovers",
   "phases": [
     {
-      "number": "40",
-      "name": "Runtime & Allowlist Foundation",
-      "status": "pending"
+      "number": "45",
+      "name": "Foundation Refresh",
+      "status": "complete"
     },
     {
-      "number": "41",
-      "name": "Thinking Mode + Model Benchmark",
-      "status": "pending"
+      "number": "46",
+      "name": "Runtime Hardening",
+      "status": "complete"
     },
     {
-      "number": "42",
-      "name": "Prompt Lab",
-      "status": "pending"
+      "number": "47",
+      "name": "Real Tool Execution",
+      "status": "complete"
     },
     {
-      "number": "43",
-      "name": "Performance Convergence",
-      "status": "pending"
-    },
-    {
-      "number": "44",
-      "name": "Agent Skills Lite",
-      "status": "pending"
+      "number": "48",
+      "name": "Chat Perf + Startup + Release",
+      "status": "complete"
     }
   ],
   "next": {
-    "command": "/gsd:discuss-phase",
-    "label": "Discuss the first phase",
-    "reason": "Project initialized — plan your first phase"
+    "command": "/gsd:new-milestone",
+    "label": "Start a new milestone",
+    "reason": "All phases complete — start a new milestone"
   },
-  "updated_at": "2026-09-27T02:57:28.501Z"
+  "updated_at": "2026-09-28T04:22:13.302Z"
 }

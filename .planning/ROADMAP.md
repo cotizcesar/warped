@@ -32,58 +32,70 @@ Both researchers agree PERF-14 + PERF-15 are atomic (never split) and that runti
 
 ## Phases
 
-- [ ] **Phase 45: Foundation Refresh** — Full catalog to latest stable + LiteRT-LM 0.13.1 → 0.17.1 with API-surface re-verification
-- [ ] **Phase 46: Runtime Hardening** — Single shared inference Flow (`shareIn`) + true Stop (`Call.cancel()`/`cancelProcess()`)
-- [ ] **Phase 47: Real Tool Execution** — Skills surface recovery + LiteRT-LM `@Tool`s + LM Studio `tools[]` loop + trust boundary
-- [ ] **Phase 48: Chat Perf + Startup + Release** — Atomic sub-state/LazyColumn split, sub-1s cold start, release hardening sweep
+- [x] **Phase 45: Foundation Refresh** — Full catalog to latest stable + LiteRT-LM 0.13.1 → 0.17.1 with API-surface re-verification (completed 2026-09-27)
+- [x] **Phase 46: Runtime Hardening** — Single shared inference Flow (`shareIn`) + true Stop (`Call.cancel()`/`cancelProcess()`) (completed 2026-09-27)
+- [x] **Phase 47: Real Tool Execution** — Skills surface recovery + LiteRT-LM `@Tool`s + LM Studio `tools[]` loop + trust boundary (completed 2026-09-27)
+- [x] **Phase 48: Chat Perf + Startup + Release** — Atomic sub-state/LazyColumn split, sub-1s cold start, release hardening sweep (completed 2026-09-27)
 
 ---
 
 ## Phase Details
 
 ### Phase 45: Foundation Refresh
+
 **Goal**: The entire dependency catalog rides latest stable releases and the app runs on LiteRT-LM 0.17.1 with its new `EngineConfig`/`ConversationConfig` surface, R8 rules, and cache schema re-verified — so every later phase builds on the final APIs, not the old ones
 **Depends on**: Nothing (Phase 44 complete; foundation for Phases 46–48)
 **Requirements**: DEPS-01, DEPS-02, LRT-07, LRT-09
 **Success Criteria** (what must be TRUE):
+
   1. User can load a downloaded `.litertlm` model and chat with streaming on the bumped engine — no `UnsatisfiedLinkError`, no serializer errors, no silent cache-schema drift after the upgrade
   2. Dependency audit returns empty (no SNAPSHOT, no `-alpha` artifacts, RUNTIME-12 anti-pattern list still clean) and the full unit-test suite is green after the refresh
   3. `model_allowlist.json` capability flags reflect only model features actually verified against 0.17.x on Android
   4. Room/Hilt/Navigation breaking changes (if any) are migrated — existing chat history, presets, and endpoints survive the upgrade intact
+
 **Plans**: TBD
 
 ### Phase 46: Runtime Hardening
+
 **Goal**: Streaming is truly cancellable on both backends through one shared inference Flow — Stop means stop
 **Depends on**: Phase 45 (final engine + OkHttp APIs)
 **Requirements**: RUNTIME-13, RUNTIME-14
 **Success Criteria** (what must be TRUE):
+
   1. User taps Stop mid-generation (local or remote) and tokens halt immediately — no trailing tokens keep arriving after Stop
   2. User rotates the device mid-stream and sees no duplicated or dropped tokens in the finished message
   3. User can Stop and immediately send a follow-up message with no hang, wedge, or stale "generating" spinner
+
 **Plans**: TBD
 
 ### Phase 47: Real Tool Execution
+
 **Goal**: Enabled skills actually execute — locally via LiteRT-LM `@Tool`s and remotely via the LM Studio `tools[]` loop — with visible progress, graceful errors, and validated inputs
 **Depends on**: Phase 46 (cancellable single-flight `runInference` the tool loop runs through)
 **Requirements**: SKILLS-07, SKILLS-08, SKILLS-09, SKILLS-10, SKILLS-11, SKILLS-12, LRT-08, HARD-02
 **Success Criteria** (what must be TRUE):
+
   1. User enables the Calculator chip and asks a math question in airplane mode (local model) — the assistant replies with the computed result, not a prompt-injected guess
   2. User asks the same kind of question against an LM Studio remote endpoint — the tool loop runs (tools[] → execute → re-POST → answer) with identical visible behavior
   3. While a tool runs, the user sees a "Using calculator…" status row; on tool failure they see "Calculator failed: …" followed by a plain-text fallback answer — never a hang or empty bubble
   4. Past tool use is visible in the conversation transcript (tool name + summarized result) and survives resume
   5. A model without tool support degrades gracefully — user gets a clear message plus a normal answer, and per-model gating keeps known-bad families (e.g. Qwen3/Gemma template bugs) on prompt-injection fallback until re-tested on-device
-**Plans**: TBD
+
+**Plans**: 3 plans (47-01 tracer surface, 47-02 local @Tools, 47-03 remote loop)
 **UI hint**: yes
 
 ### Phase 48: Chat Perf + Startup + Release
+
 **Goal**: Chat stays smooth at scale, the app cold-starts in under a second, and the release build is hardened end-to-end
 **Depends on**: Phase 47 (tool-turn UI states exist before the list/state split accommodates them)
 **Requirements**: PERF-14, PERF-15, PERF-16, HARD-01
 **Success Criteria** (what must be TRUE):
+
   1. User scrolls a 100+ message conversation with long code blocks during active streaming — no scroll jumps, position stays put unless already at the bottom (with a "Jump to latest" affordance)
   2. User types in the input bar while tokens stream in — keystrokes stay fluid, and streaming tokens never recompose the input bar
   3. Cold start on the Pixel 7 reference device measures under 1 second, recorded in `BENCHMARKS.md` next to the PERF-12 targets
   4. Release build (`assembleRelease`) installs on a real device, tool skills work in it, and logcat shows no secrets, PII, or raw tool arguments
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -99,10 +111,10 @@ MCP bridge, JS/WebView skills, parallel tool calls, multimodal/vision/audio, App
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 45. Foundation Refresh | 0/TBD | Not started | - |
-| 46. Runtime Hardening | 0/TBD | Not started | - |
-| 47. Real Tool Execution | 0/TBD | Not started | - |
-| 48. Chat Perf + Startup + Release | 0/TBD | Not started | - |
+| 45. Foundation Refresh | 2/2 | Complete    | 2026-09-27 |
+| 46. Runtime Hardening | 2/2 | Complete    | 2026-09-27 |
+| 47. Real Tool Execution | 3/3 | Complete    | 2026-09-27 |
+| 48. Chat Perf + Startup + Release | 3/3 | Complete    | 2026-09-27 |
 
 ---
 
