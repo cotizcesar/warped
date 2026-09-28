@@ -64,6 +64,9 @@ fun MessageBubble(
     isStreaming: Boolean = false,
     codeTheme: SyntaxTheme = SyntaxTheme.MONOKAI,
     codeFontScale: Float = 1.0f,
+    isValidatedOnline: Boolean = false,
+    isFetchingWeb: Boolean = false,
+    onRetry: (messageId: String) -> Unit = {},
 ) {
     val isUser = message.role == Role.USER
     // Phase 49 (DEL-01): persisted tool rows render as collapsed transcript
@@ -98,7 +101,13 @@ fun MessageBubble(
         // text, never error text as context. 4dp above the qualified
         // assistant message; grounded answers render no banner.
         if (!isUser && message.modelOnlyNotice != null) {
-            ModelOnlyBanner(notice = message.modelOnlyNotice, totalSources = message.modelOnlySourceCount)
+            ModelOnlyBanner(
+                notice = message.modelOnlyNotice,
+                totalSources = message.modelOnlySourceCount,
+                isValidatedOnline = isValidatedOnline,
+                isFetchingWeb = isFetchingWeb,
+                onRetry = { onRetry(message.id) }
+            )
             Spacer(Modifier.height(4.dp))
         }
         Surface(
@@ -344,7 +353,17 @@ fun MessageBubble(
  * collapse already resolved upstream).
  */
 @Composable
-private fun ModelOnlyBanner(notice: ModelOnlyNotice, totalSources: Int = 1) {
+private fun ModelOnlyBanner(
+    notice: ModelOnlyNotice,
+    totalSources: Int = 1,
+    isValidatedOnline: Boolean = false,
+    isFetchingWeb: Boolean = false,
+    onRetry: () -> Unit = {},
+) {
+    // Phase 54 (RETRY-01): queued OFFLINE row — existing v2.2 copy + the
+    // " En espera." suffix on the same row, plus a trailing-slot Reintentar
+    // TextButton gated on validated-online && idle. FETCH_FAILED branch
+    // below is byte-identical (OFFLINE-only scope).
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
             imageVector = Icons.Filled.Info,
@@ -356,7 +375,7 @@ private fun ModelOnlyBanner(notice: ModelOnlyNotice, totalSources: Int = 1) {
         Text(
             text = when (notice) {
                 ModelOnlyNotice.OFFLINE ->
-                    "Sin conexión. Respuesta solo del modelo, sin contenido de la página."
+                    "Sin conexión. Respuesta solo del modelo, sin contenido de la página. En espera."
                 ModelOnlyNotice.FETCH_FAILED ->
                     if (totalSources > 1) {
                         "No se pudieron leer las páginas. Respuesta solo del modelo — " +
@@ -367,8 +386,25 @@ private fun ModelOnlyBanner(notice: ModelOnlyNotice, totalSources: Int = 1) {
                     }
             },
             fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f, fill = false)
         )
+        if (notice == ModelOnlyNotice.OFFLINE && isValidatedOnline && !isFetchingWeb) {
+            TextButton(
+                onClick = onRetry,
+                modifier = Modifier
+                    .heightIn(min = 44.dp)
+                    .semantics {
+                        contentDescription =
+                            "Reintentar la lectura de las páginas. Disponible al recuperar la conexión."
+                    }
+            ) {
+                Text(
+                    text = "Reintentar",
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
     }
 }
 
