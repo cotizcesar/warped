@@ -436,7 +436,7 @@ class ChatViewModel @Inject constructor(
                 // re-subscription with no duplicate upstream work.
                 helper.runInference(
                     request = request,
-                    enableThinking = state.enableThinking && state.supportsThinking,
+                    enableThinking = _input.value.enableThinking && _input.value.supportsThinking,
                 ).shareIn(this, SharingStarted.Eagerly, replay = 1).collect { token ->
 
                     when (token) {
