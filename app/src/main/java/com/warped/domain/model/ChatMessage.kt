@@ -16,6 +16,9 @@ data class ChatMessage(
     // (EntityMappers maps field-by-field, no migration).
     val groundedSources: List<String> = emptyList(),
     val modelOnlyNotice: ModelOnlyNotice? = null,
+    // Phase 52 (FETCH-02): attempted-URL count behind an all-fail banner so
+    // the copy pluralizes for M > 1. Ephemeral, same as its siblings.
+    val modelOnlySourceCount: Int = 1,
 )
 
 /** Phase 50 (WEB-06): why a grounded turn fell back to the model-only path. */

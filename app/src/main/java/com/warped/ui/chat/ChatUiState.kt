@@ -49,6 +49,37 @@ data class ChatInputState(
     // Phase 50 (WEB-06): true while the grounding fetch is in flight.
     // Owner: send/stop turn code, mirrors isGenerating.
     val isFetchingWeb: Boolean = false,
+    // Phase 52 (FETCH-03): N-de-M fan-out progress. Nullable: present only
+    // while fetching; cleared on completion/failure/Stop (transient, never
+    // persisted, never a transcript message). The chip copy derives from
+    // done/total; per-source ok/omitida states are recorded here, never
+    // as transcript messages.
+    val webFetchProgress: WebFetchProgress? = null,
+)
+
+/**
+ * Phase 52 (FETCH-02/FETCH-03): per-source outcome of a fan-out turn.
+ * Every attempted URL (up to the cap of 5) lands as [OK] or [OMITIDA] —
+ * no silent drops. 6th+ URLs are ignored deterministically and never
+ * enter this state.
+ */
+enum class PerSourceStatus {
+    LOADING,
+    OK,
+    OMITIDA,
+}
+
+@Immutable
+data class SourceFetchState(
+    val url: String,
+    val status: PerSourceStatus = PerSourceStatus.LOADING,
+)
+
+@Immutable
+data class WebFetchProgress(
+    val done: Int,
+    val total: Int,
+    val perSource: List<SourceFetchState> = emptyList(),
 )
 
 @Immutable
@@ -124,6 +155,7 @@ data class ChatUiState(
     val isStreaming: Boolean = false,
     val generationParameters: GenerationParameters = GenerationParameters(),
     val isFetchingWeb: Boolean = false,
+    val webFetchProgress: WebFetchProgress? = null,
     val isLoadingModel: Boolean = false,
     val loadingModelName: String = "",
     val modelLoadError: String? = null,
@@ -169,6 +201,7 @@ fun combineSnapshot(
     endpointModels = connection.endpointModels,
     isStreaming = transcript.isStreaming,
     isFetchingWeb = input.isFetchingWeb,
+    webFetchProgress = input.webFetchProgress,
     generationParameters = connection.generationParameters,
     isLoadingModel = connection.isLoadingModel,
     loadingModelName = connection.loadingModelName,

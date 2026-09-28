@@ -288,6 +288,7 @@ class ChatCancellationTest {
         every { providerRouter.resolveLocalHelper(any(), any()) } returns helper
         val fetcher = mockk<com.warped.data.grounding.WebPageFetcher>()
         every { fetcher.cancel() } just Runs
+        val multiUrlFetcher = mockk<com.warped.data.grounding.MultiUrlFetcher>()
 
         return ChatViewModel(
             chatRepository = chatRepository,
@@ -301,6 +302,7 @@ class ChatCancellationTest {
             memoryChecker = memoryChecker,
             advancedPreferences = advancedPreferences,
             fetcher = fetcher,
+            multiUrlFetcher = multiUrlFetcher,
             context = context,
         )
     }

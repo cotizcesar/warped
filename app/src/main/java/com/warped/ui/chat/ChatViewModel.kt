@@ -8,6 +8,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.warped.data.grounding.GroundingPrompt
 import com.warped.data.grounding.GroundingResult
+import com.warped.data.grounding.MultiUrlFetcher
+import com.warped.data.grounding.MultiUrlResult
 import com.warped.data.grounding.UrlDetector
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.inference.BackendType
@@ -48,6 +50,7 @@ class ChatViewModel @Inject constructor(
     private val memoryChecker: MemoryChecker,
     private val advancedPreferences: AdvancedPreferences,
     private val fetcher: WebPageFetcher,
+    private val multiUrlFetcher: MultiUrlFetcher,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -266,32 +269,81 @@ class ChatViewModel @Inject constructor(
                 val conversationId = ensureConversation(text, hasMedia = images.isNotEmpty() || audioBytes != null)
                 chatRepository.saveMessage(conversationId, userMessage)
 
-                // Phase 50 (WEB-01..WEB-04): grounding fetch hook — detect →
-                // fetch → augment. Runs after save, before helper resolution.
-                // History keeps persisted originals; only the outgoing
-                // request's current message carries the augmented text.
+                // Phase 52 (FETCH-01..FETCH-03): multi-URL grounding fan-out —
+                // detect → fan-out → augment. Same position as the v2.2 hook
+                // (after save, before helper resolution). History keeps
+                // persisted originals; only the outgoing request's current
+                // message carries the augmented text. Providers/helpers stay
+                // untouched (prompt-prefix augmentation only).
                 var requestUserText = userMessage.content
                 var groundedSources: List<String> = emptyList()
                 var modelOnlyNotice: ModelOnlyNotice? = null
+                var modelOnlySourceCount: Int = 1
                 if (webGroundingEnabled) {
-                    val groundedUrl = UrlDetector.firstUrl(userMessage.content)
-                    if (groundedUrl != null) {
-                        updateInput { it.copy(isFetchingWeb = true) }
+                    val groundedUrls = UrlDetector.allUrls(userMessage.content)
+                    if (groundedUrls.isNotEmpty()) {
+                        updateInput {
+                            it.copy(
+                                isFetchingWeb = true,
+                                webFetchProgress = WebFetchProgress(
+                                    done = 0,
+                                    total = groundedUrls.size,
+                                    perSource = groundedUrls.map { url ->
+                                        SourceFetchState(url, PerSourceStatus.LOADING)
+                                    },
+                                ),
+                            )
+                        }
                         try {
-                            when (val result = withContext(Dispatchers.IO) { fetcher.fetch(groundedUrl) }) {
-                                is GroundingResult.Grounded -> {
+                            val contextSize = state.generationParameters.contextSize
+                            when (
+                                val result = multiUrlFetcher.fetchAll(
+                                    urls = groundedUrls,
+                                    contextSize = contextSize,
+                                    onProgress = { done, total ->
+                                        updateInput { s ->
+                                            s.copy(
+                                                webFetchProgress = s.webFetchProgress?.copy(
+                                                    done = done,
+                                                    total = total,
+                                                ),
+                                            )
+                                        }
+                                    },
+                                )
+                            ) {
+                                is MultiUrlResult.Fused -> {
                                     requestUserText = GroundingPrompt.augment(requestUserText, result.block)
-                                    groundedSources = listOf(result.url)
+                                    groundedSources = result.okUrls
+                                    val skipped = result.skippedUrls.toSet()
+                                    updateInput { s ->
+                                        s.copy(
+                                            webFetchProgress = s.webFetchProgress?.copy(
+                                                done = groundedUrls.size,
+                                                perSource = groundedUrls.map { url ->
+                                                    SourceFetchState(
+                                                        url,
+                                                        if (url in skipped) {
+                                                            PerSourceStatus.OMITIDA
+                                                        } else {
+                                                            PerSourceStatus.OK
+                                                        },
+                                                    )
+                                                },
+                                            ),
+                                        )
+                                    }
                                 }
-                                is GroundingResult.ModelOnly -> {
+                                is MultiUrlResult.AllFailed -> {
                                     modelOnlyNotice = when (result.reason) {
                                         GroundingResult.Reason.OFFLINE -> ModelOnlyNotice.OFFLINE
                                         GroundingResult.Reason.FETCH_FAILED -> ModelOnlyNotice.FETCH_FAILED
                                     }
+                                    modelOnlySourceCount = groundedUrls.size
                                 }
                             }
                         } finally {
-                            updateInput { it.copy(isFetchingWeb = false) }
+                            updateInput { it.copy(isFetchingWeb = false, webFetchProgress = null) }
                         }
                     }
                 }
@@ -448,6 +500,7 @@ class ChatViewModel @Inject constructor(
                                     stats = token.stats,
                                     groundedSources = groundedSources,
                                     modelOnlyNotice = modelOnlyNotice,
+                                    modelOnlySourceCount = modelOnlySourceCount,
                                 )
                                 updateTranscript {
                                     it.copy(
@@ -533,7 +586,7 @@ class ChatViewModel @Inject constructor(
             streamingContent = "",
             streamingReasoning = ""
         ) }
-        updateInput { it.copy(isGenerating = false, isFetchingWeb = false) }
+        updateInput { it.copy(isGenerating = false, isFetchingWeb = false, webFetchProgress = null) }
     }
 
     fun selectConversation(conversationId: Long) {
