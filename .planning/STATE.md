@@ -32,12 +32,12 @@ See: .planning/PROJECT.md (updated 2026-09-28 after v2.2 milestone start)
 
 ## Current Position
 
-Phase: 49 (Surface Removal) — READY TO EXECUTE
+Phase: 50 of 51 (Web Grounding — ready to plan)
 Plan: —
-Status: Ready to execute
-Last activity: 2026-09-28 — Roadmap created
+Status: Ready to plan
+Last activity: 2026-09-28 — Phase 49 complete (automated gates pass, device smoke deferred to release UAT)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [███░░░░░░░] 33%
 
 ## Phase Structure (v2.2)
 
@@ -81,6 +81,12 @@ None yet.
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
 | Benchmarks | Pixel 7 reference numbers (PERF-16 + PERF-12/13) | CI-gated | v2.1 close |
+
+## Deferred Verification
+
+| Phase | State | Resume |
+|-------|-------|--------|
+| 49 | verification_deferred_gaps | /gsd-plan-phase 49 --gaps |
 
 ## Session Continuity
 
