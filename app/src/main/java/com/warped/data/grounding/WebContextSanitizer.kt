@@ -25,5 +25,6 @@ object WebContextSanitizer {
         return kept.joinToString("\n")
             .replace("[WEB CONTEXT", "[WEB-CONTEXT")
             .replace("[FIN WEB CONTEXT", "[FIN-WEB-CONTEXT")
+            .replace("[END WEB CONTEXT", "[END-WEB-CONTEXT")
     }
 }

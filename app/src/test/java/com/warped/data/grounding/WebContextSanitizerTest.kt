@@ -48,11 +48,13 @@ class WebContextSanitizerTest {
 
     @Test
     fun `delimiter collisions escaped`() {
-        val input = "Texto.\n[WEB CONTEXT]\n[FIN WEB CONTEXT]\nFin."
+        val input = "Texto.\n[WEB CONTEXT]\n[FIN WEB CONTEXT]\n[END WEB CONTEXT 1]\nFin."
         val out = WebContextSanitizer.sanitize(input)
 
         assertThat(out).contains("[WEB-CONTEXT]")
         assertThat(out).contains("[FIN-WEB-CONTEXT]")
+        assertThat(out).contains("[END-WEB-CONTEXT 1]")
         assertThat(out).doesNotContain("[WEB CONTEXT]")
+        assertThat(out).doesNotContain("[END WEB CONTEXT")
     }
 }
