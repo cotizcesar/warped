@@ -16,6 +16,9 @@ import javax.inject.Singleton
 /** Identifies which local inference engine type. */
 enum class EngineType { LITE_RT_LM }
 
+/** Which backend slot a native constraint error (or init resolution) names. */
+enum class BackendSlot { MAIN, VISION, AUDIO }
+
 /** Tracks which engine (if any) is currently loaded and which model. */
 data class ActiveEngine(
     val type: EngineType,
@@ -71,18 +74,45 @@ class EngineManager @Inject constructor(
             // fail on the probed CPU backend. The device probe can false-negative
             // (strict OpenCL+EGL AND), so the engine is ground truth: retry once
             // with the required backend before giving up.
+            //
+            // Slot-aware retry (2026-09-28): vision-capable .litertlm files carry
+            // per-slot constraints ("Vision backend constraint mismatch ... requires
+            // one of [gpu]"), so flip ONLY the named slot. Retrying the main
+            // backend for a vision-slot error repeats the identical JNI failure.
             val required = parseRequiredBackend(e.message)
-            if (required != null && required != target.backend) {
-                Timber.w(e, "EngineManager: backend constraint mismatch, retrying with $required")
-                try {
-                    val retryTarget = target.copy(backend = required)
-                    initWith(retryTarget)
-                    activeEngine = retryTarget
-                    return
-                } catch (retryEx: Exception) {
-                    throw IllegalStateException(
-                        "This model needs the ${required.name} backend, which failed on this device: ${retryEx.message}"
-                    )
+            if (required != null) {
+                val slot = parseConstraintSlot(e.message) ?: BackendSlot.MAIN
+                val current: BackendType? = when (slot) {
+                    BackendSlot.MAIN -> target.backend
+                    BackendSlot.VISION -> resolveVisionBackend(target)
+                    BackendSlot.AUDIO -> resolveAudioBackend()
+                }
+                // Never retry when the required backend already equals the
+                // current value of the named slot — it would fail identically.
+                if (required != current) {
+                    Timber.w(e, "EngineManager: $slot backend constraint mismatch, retrying with $required")
+                    try {
+                        when (slot) {
+                            BackendSlot.MAIN -> {
+                                val retryTarget = target.copy(backend = required)
+                                initWith(retryTarget)
+                                activeEngine = retryTarget
+                            }
+                            BackendSlot.VISION -> {
+                                initWith(target, visionOverride = required)
+                                activeEngine = target
+                            }
+                            BackendSlot.AUDIO -> {
+                                initWith(target, audioOverride = required)
+                                activeEngine = target
+                            }
+                        }
+                        return
+                    } catch (retryEx: Exception) {
+                        throw IllegalStateException(
+                            "This model needs the ${required.name} backend, which failed on this device: ${retryEx.message}"
+                        )
+                    }
                 }
             }
             throw e
@@ -126,20 +156,64 @@ class EngineManager @Inject constructor(
     }
 
     /** Single init attempt for a resolved target (no retry). */
-    private fun initWith(target: ActiveEngine) {
+    private fun initWith(
+        target: ActiveEngine,
+        visionOverride: BackendType? = null,
+        audioOverride: BackendType? = null
+    ) {
         // Speculative decoding is allowlist opt-in: the GPU flag demands a
         // TF_LITE_MTP_DRAFTER in the model file, and unlisted/unverified models
         // (e.g. gemma-4-12B-it) fail engine creation with it on.
-        val specDecoding = allowlist
+        val entry = allowlist
             .findByModelFile(target.modelPath.substringAfterLast("/"))
-            ?.capabilities?.speculativeDecoding == true
+        val specDecoding = entry?.capabilities?.speculativeDecoding == true
         liteRTLmEngine.init(
             modelPath = target.modelPath,
             backend = target.backend!!,
-            visionBackend = BackendType.CPU,
-            audioBackend = BackendType.CPU,
+            visionBackend = visionOverride ?: resolveVisionBackend(target, entry?.capabilities?.vision),
+            audioBackend = audioOverride ?: resolveAudioBackend(),
             enableSpeculativeDecoding = specDecoding
         )
+    }
+
+    /**
+     * Resolve the vision backend for an init attempt. Vision-capable models
+     * (allowlist `capabilities.vision == true`, e.g. gemma-4-E2B-it) probe the
+     * device vision backend (GPU when EGL is present); all other models keep
+     * the legacy explicit CPU — byte-identical to the old hardcoded behavior.
+     */
+    private fun resolveVisionBackend(
+        target: ActiveEngine,
+        visionCapable: Boolean? = allowlist
+            .findByModelFile(target.modelPath.substringAfterLast("/"))
+            ?.capabilities?.vision
+    ): BackendType =
+        if (visionCapable == true) backendDetector.probeVisionBackend() else BackendType.CPU
+
+    /**
+     * Resolve the audio backend for an init attempt. Probed via
+     * [BackendDetector.probeAudioBackend] (CPU today, most compatible).
+     */
+    private fun resolveAudioBackend(): BackendType =
+        backendDetector.probeAudioBackend()
+
+    /**
+     * Which backend slot a native constraint error names. Inspects the JNI
+     * message prefix: "vision backend" → [VISION], "audio backend" → [AUDIO],
+     * "main backend" → [MAIN]. Any other message carrying a
+     * "requires one of [...]" constraint falls back to [MAIN] (preserves the
+     * pre-existing main-only retry behavior). Null when the message carries
+     * no constraint info. Pure function — unit-testable without the native engine.
+     */
+    fun parseConstraintSlot(message: String?): BackendSlot? {
+        if (message == null) return null
+        if (!message.contains("requires one of", ignoreCase = true)) return null
+        return when {
+            message.contains("vision backend", ignoreCase = true) -> BackendSlot.VISION
+            message.contains("audio backend", ignoreCase = true) -> BackendSlot.AUDIO
+            message.contains("main backend", ignoreCase = true) -> BackendSlot.MAIN
+            else -> BackendSlot.MAIN
+        }
     }
 
     /**
