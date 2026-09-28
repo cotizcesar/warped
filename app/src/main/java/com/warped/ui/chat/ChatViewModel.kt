@@ -299,25 +299,27 @@ class ChatViewModel @Inject constructor(
                     val capabilities = state.localModels.firstOrNull { it.filePath == modelId }?.capabilities
                     if (capabilities == null) {
                         Timber.w("ChatVM: capabilities unknown for $modelId — skipping media gate")
-                    } else if (images.isNotEmpty() && !capabilities.vision) {
-                        updateTranscript {
-                            it.copy(
-                                error = ChatError.Unknown("This model does not support images (no vision capability)."),
-                                isStreaming = false
-                            )
+                    } else {
+                        if (images.isNotEmpty() && !capabilities.vision) {
+                            updateTranscript {
+                                it.copy(
+                                    error = ChatError.Unknown("This model does not support images (no vision capability)."),
+                                    isStreaming = false
+                                )
+                            }
+                            updateInput { it.copy(isGenerating = false) }
+                            return@launch
                         }
-                        updateInput { it.copy(isGenerating = false) }
-                        return@launch
-                    }
-                    if (audioBytes != null && capabilities.audio != true) {
-                        updateTranscript {
-                            it.copy(
-                                error = ChatError.Unknown("This model does not support audio input."),
-                                isStreaming = false
-                            )
+                        if (audioBytes != null && !capabilities.audio) {
+                            updateTranscript {
+                                it.copy(
+                                    error = ChatError.Unknown("This model does not support audio input."),
+                                    isStreaming = false
+                                )
+                            }
+                            updateInput { it.copy(isGenerating = false) }
+                            return@launch
                         }
-                        updateInput { it.copy(isGenerating = false) }
-                        return@launch
                     }
                 }
 
