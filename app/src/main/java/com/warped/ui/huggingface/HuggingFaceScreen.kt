@@ -1,5 +1,6 @@
 package com.warped.ui.huggingface
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,21 +10,28 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,11 +43,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.data.local.download.DownloadState
 import com.warped.data.repository.AllowlistedModel
+import com.warped.ui.components.CapabilityIconBadge
 import com.warped.ui.components.WarpedAlertDialog
 
 /**
@@ -110,6 +123,19 @@ fun HuggingFaceScreen(
     }
 }
 
+/**
+ * Pure helper joining the Spanish catalog-card details (RAM guidance + purpose
+ * blurb). Returns null when both fields are absent/blank — the card then
+ * renders with no expand affordance. Unit-testable on the JVM.
+ */
+fun expandedText(entry: AllowlistedModel): String? {
+    val parts = listOfNotNull(
+        entry.ramNote?.takeIf { it.isNotBlank() },
+        entry.blurb?.takeIf { it.isNotBlank() }
+    )
+    return if (parts.isEmpty()) null else parts.joinToString(separator = "\n")
+}
+
 @Composable
 private fun CatalogModelCard(
     entry: AllowlistedModel,
@@ -126,7 +152,12 @@ private fun CatalogModelCard(
         downloadState.error != "Cancelled"
     val downloaded = downloadState != null && !active &&
         downloadState.error == null && downloadState.progress >= 1f
+    val failed = !active && !downloaded &&
+        downloadState?.error != null && downloadState.error != "Cancelled"
     var showCancelConfirm by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
+    val details = remember(entry) { expandedText(entry) }
+    val expandable = details != null
 
     if (showCancelConfirm) {
         WarpedAlertDialog(
@@ -144,130 +175,212 @@ private fun CatalogModelCard(
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth()
+            .then(
+                if (expandable) {
+                    Modifier.clickable(
+                        role = Role.Button,
+                        onClickLabel = if (expanded) "Contraer detalles" else "Expandir detalles"
+                    ) { expanded = !expanded }
+                } else {
+                    Modifier
+                }
+            ),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
         )
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
+            // Collapsed row 1: title + download-state icon cluster.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Storage,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
+                Text(
+                    text = entry.displayName,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = entry.displayName,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1
-                    )
-                    Text(
-                        text = entry.modelFile,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
-                }
-            }
-            val badges = buildList {
-                if (entry.capabilities.vision) add("vision")
-                if (entry.capabilities.audio) add("audio")
-            }
-            if (badges.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    badges.forEach { cap ->
-                        CatalogCapabilityBadge(capability = cap)
-                    }
-                }
-            }
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = formatFileSize(entry.sizeInBytes),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
-            )
-
-            Spacer(Modifier.height(10.dp))
-
-            when {
-                active -> CatalogDownloadProgress(
-                    state = downloadState!!,
+                Spacer(Modifier.width(8.dp))
+                CatalogDownloadActions(
+                    downloadState = downloadState,
+                    active = active,
+                    downloaded = downloaded,
+                    failed = failed,
+                    onDownload = onDownload,
                     onPause = onPause,
                     onResume = onResume,
                     onCancelClick = { showCancelConfirm = true }
                 )
-                downloaded -> Text(
-                    text = "Downloaded",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary
+            }
+            Spacer(Modifier.height(8.dp))
+            // Collapsed row 2: capability icons + size.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CatalogCapabilityIcons(entry = entry)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text = formatFileSize(entry.sizeInBytes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
                 )
-                else -> {
-                    if (downloadState?.error != null && downloadState.error != "Cancelled") {
-                        Text(
-                            text = downloadState.error,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Spacer(Modifier.height(6.dp))
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    OutlinedButton(
-                        onClick = onDownload,
-                        modifier = Modifier.align(Alignment.End)
-                    ) {
-                        Text("Download")
-                    }
+            }
+            // Active download: compact progress parity (label + bytes/total).
+            if (active) {
+                Spacer(Modifier.height(6.dp))
+                CatalogInlineProgress(state = downloadState!!)
+            }
+            // Retained error text (icon form keeps the message for a11y;
+            // retry = download icon tap).
+            if (failed) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = downloadState!!.error!!,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            // Expanded: Spanish RAM guidance + blurb + retained model file.
+            if (expanded && expandable) {
+                Spacer(Modifier.height(8.dp))
+                if (!entry.ramNote.isNullOrBlank()) {
+                    Text(
+                        text = entry.ramNote,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
+                if (!entry.blurb.isNullOrBlank()) {
+                    Text(
+                        text = entry.blurb,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = entry.modelFile,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
 }
 
+/**
+ * Download-state icon cluster (1:1 with the pre-redesign states): idle
+ * download, downloading mini-progress + pause + cancel, paused resume +
+ * cancel, downloaded status, error retry. All content descriptions in Spanish.
+ */
 @Composable
-private fun CatalogCapabilityBadge(capability: String) {
-    val color = when (capability) {
-        "vision" -> androidx.compose.ui.graphics.Color(0xFF2196F3)
-        "audio" -> androidx.compose.ui.graphics.Color(0xFFFF9800)
-        else -> MaterialTheme.colorScheme.primary
-    }
-    androidx.compose.material3.Surface(
-        shape = MaterialTheme.shapes.extraSmall,
-        color = color.copy(alpha = 0.15f),
-        contentColor = color
-    ) {
-        Text(
-            text = capability,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-            style = MaterialTheme.typography.labelSmall,
-            maxLines = 1
-        )
-    }
-}
-
-@Composable
-private fun CatalogDownloadProgress(
-    state: DownloadState,
+private fun CatalogDownloadActions(
+    downloadState: DownloadState?,
+    active: Boolean,
+    downloaded: Boolean,
+    failed: Boolean,
+    onDownload: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onCancelClick: () -> Unit
 ) {
+    when {
+        active -> {
+            val paused = downloadState?.isPaused == true
+            if (!paused) {
+                CircularProgressIndicator(
+                    progress = { (downloadState?.progress ?: 0f).coerceIn(0f, 1f) },
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                IconButton(onClick = onPause) {
+                    Icon(
+                        imageVector = Icons.Filled.Pause,
+                        contentDescription = "Pausar descarga"
+                    )
+                }
+            } else {
+                IconButton(onClick = onResume) {
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = "Reanudar descarga"
+                    )
+                }
+            }
+            IconButton(onClick = onCancelClick) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = "Cancelar descarga",
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+        downloaded -> Icon(
+            imageVector = Icons.Filled.CheckCircle,
+            contentDescription = "Descargado",
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(12.dp).size(24.dp)
+        )
+        else -> IconButton(onClick = onDownload) {
+            Icon(
+                imageVector = Icons.Filled.Download,
+                contentDescription = "Descargar modelo",
+                tint = if (failed) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.primary
+                }
+            )
+        }
+    }
+}
+
+/**
+ * Capability icons reusing [CapabilityIconBadge] iconography (vision/audio/
+ * thinking only — tools is never shown on catalog cards per Phase 49 DEL-01).
+ */
+@Composable
+private fun CatalogCapabilityIcons(entry: AllowlistedModel) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (entry.capabilities.vision) {
+            CapabilityIconBadge(
+                icon = Icons.Filled.Visibility,
+                contentDescription = "Visión",
+                color = Color(0xFF9C27B0)
+            )
+        }
+        if (entry.capabilities.audio) {
+            CapabilityIconBadge(
+                icon = Icons.Filled.Audiotrack,
+                contentDescription = "Audio",
+                color = Color(0xFF4CAF50)
+            )
+        }
+        if (entry.capabilities.supportsThinking) {
+            CapabilityIconBadge(
+                icon = Icons.Filled.Psychology,
+                contentDescription = "Razonamiento",
+                color = Color(0xFFFF9800)
+            )
+        }
+    }
+}
+
+@Composable
+private fun CatalogInlineProgress(state: DownloadState) {
     val progressInt = (state.progress * 100).toInt().coerceIn(0, 100)
     Column {
-        LinearProgressIndicator(
-            progress = { state.progress.coerceIn(0f, 1f) },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(Modifier.height(6.dp))
         Text(
-            text = "${if (state.isPaused) "Paused" else "Downloading"}: ${state.fileName.substringAfterLast('/')} ($progressInt%)",
-            style = MaterialTheme.typography.bodyMedium
+            text = "${if (state.isPaused) "En pausa" else "Descargando"}: " +
+                "${state.fileName.substringAfterLast('/')} ($progressInt%)",
+            style = MaterialTheme.typography.bodySmall
         )
         Text(
             text = "${formatFileSize(state.downloadedBytes)} / ${formatFileSize(state.totalBytes)}" +
@@ -275,20 +388,8 @@ private fun CatalogDownloadProgress(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(Modifier.height(6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (state.isPaused) {
-                TextButton(onClick = onResume) { Text("Resume") }
-            } else if (state.isDownloading) {
-                TextButton(onClick = onPause) { Text("Pause") }
-            }
-            TextButton(
-                onClick = onCancelClick,
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-            ) { Text("Cancel") }
-        }
-        if (state.error != null) {
-            Spacer(Modifier.height(6.dp))
+        if (state.error != null && state.error != "Cancelled") {
+            Spacer(Modifier.height(4.dp))
             Text(
                 text = state.error,
                 color = MaterialTheme.colorScheme.error,
