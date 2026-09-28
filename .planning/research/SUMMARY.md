@@ -1,163 +1,161 @@
 # Project Research Summary
 
-**Project:** Warped v2.2 Simplificación + Web Grounding
-**Domain:** Android local-LLM chat app (Kotlin + Compose + LiteRT-LM local + LM Studio remote)
+**Project:** Warped — v2.3 milestone (Web Grounding v2)
+**Domain:** On-device Android LLM chat with multi-URL web grounding
 **Researched:** 2026-09-28
 **Confidence:** HIGH
 
 ## Executive Summary
 
-Warped v2.2 is a simplification-plus-one-feature milestone, not a greenfield build. The app already ships local inference (LiteRT-LM), remote chat (LM Studio), model downloads (WorkManager), and chat history (Room). The milestone deletes three shipped-but-valueless surfaces — Skills tool-calling (Calculator/CurrentTime/JsonFormatter + both tool loops), the Hugging Face access-token plumbing, and HF model search (replaced by a static allowlist) — fixes a half-broken syntax-theme selector (only Monokai applies), and adds heuristic web grounding: deterministic URL-in-message detection → bounded OkHttp page fetch → HTML→text extraction → injection as a delimited `[WEB CONTEXT]` block → single inference call, with offline/failure fallback to a model-only answer plus a visible notice.
+Warped v2.2 already ships single-URL web grounding: a bounded OkHttp fetch, heuristic HTML→text extraction, `[WEB CONTEXT]` prompt-prefix augmentation, hijack sanitization, offline fallback, and a global default-ON toggle. v2.3 extends that proven pipeline to multi-URL fetch (2–5 URLs per message, fused numbered context), in-chat source previews, a per-chat toggle override, and offline retry — without touching the inference providers, which stay blind to grounding (prompt string gets longer, interfaces unchanged).
 
-The unanimous research recommendation is **zero new dependencies**: grounding is prompt-engineering plus ~100 lines of fetch plumbing over the already-pinned OkHttp 4.12.0 client, a pure-Kotlin heuristic policy, and a thin `ConnectivityManager` gate. `LlmModelHelper` — the 5-method domain keystone both backends speak through — stays byte-identical; grounding is a single pre-inference hook in `ChatViewModel.sendMessage`, so local and remote backends inherit it for free. The one open conflict across research files (FEATURES recommends adding Jsoup for extraction; STACK/ARCHITECTURE mandate zero-new-deps hand-rolled stripping) is resolved here in favor of **hand-rolled HTML→text stripping**: the milestone's explicit constraint is zero new catalog entries, the audit script (`scripts/audit-dependencies.sh`) and R8 posture punish additions, and heuristic grounding needs ~4–8 KB of clean text, not a DOM.
+The recommended approach is to build the new `GroundingOrchestrator` (bounded parallel fan-out + context fusion + global token budget) as the foundation first, with the Jsoup extraction swap folded into that same phase — because budget numbers and the adversarial baseline both depend on extraction density. Source previews and the per-chat toggle come second (they share one Room migration v15 and consume the orchestrator's `List<GroundedSource>` output shape), and offline retry comes last (it orchestrates all three prior pieces and must respect fetch deadlines, cache identity, and toggle resolution). The only new dependency v2.3 needs is Jsoup 1.23.2 (plus desugar NIO build config); everything else reuses the existing OkHttp / Room / DataStore / WorkManager / Compose stack.
 
-The dominant risks are deletion hygiene (dangling skill/HF references across domain/data/UI/DI/test layers, stale R8 keeps that either preserve dead reflection surface or — worse — crash LiteRT-LM in release-only builds if SDK keeps are over-deleted, and legacy `Role.TOOL` transcript rows from v2.1 that must keep rendering after their writers die) and grounding security (indirect prompt injection via fetched pages, plus SSRF-adjacent private-IP fetch and unbounded page sizes against on-device memory). Mitigation is structural: removals-first ordering with grep-gate exit criteria, release-variant smoke tests, trust-boundary delimiters + extraction + least-privilege as day-one requirements (never "iterate later"), and fetch caps (byte cap, redirect cap, timeouts, `Call.cancel()` wired to Stop) designed alongside the fetch client, not after it.
+The key risks are context-budget blowout on small local-model windows (fix: global grounding budget divided across pages, model-window-aware, with a worst-case assertion test), injection surface scaling ×N (fix: single `sanitizePage` choke point + multi-page adversarial suite incl. collusion cases as a merge gate), and retry-mechanism mismatch (fix: message-scoped foreground retry first; WorkManager only as explicit opt-in with strict dedup — never periodic, never re-running inference).
 
 ## Key Findings
 
 ### Recommended Stack
 
-Zero-new-dependency milestone: every v2.2 need is met by the pinned catalog plus platform APIs (full detail in `STACK.md`).
+Only one new dependency is needed. Everything else is already in the project and sufficient (full detail in `STACK.md`).
 
 **Core technologies:**
-- Kotlin 2.3.20 (pinned) — all new v2.2 code is plain Kotlin + coroutines; no language change
-- OkHttp 4.12.0 (existing) — page fetch via raw `newCall()` GET on a small bounded client; model downloads/REST unchanged
-- kotlinx-coroutines 1.11.0 (existing) — `Dispatchers.IO` fetch with timeout/cancel, composing with the v2.1 single-flight `Call` pattern
-- Android `ConnectivityManager` + `NET_CAPABILITY_VALIDATED` (platform, minSdk 28, permission already declared) — offline pre-check for model-only fallback
-- LiteRT-LM 0.17.1 (HOLD, do not bump) — grounding is system-prompt injection, not engine work; no API or version change
-- Highlights 1.1.0 + DataStore Preferences 1.2.1 + Hilt 2.60.1 (all existing, unchanged) — theme fix is wiring, not engine; prefs change is deletion-only; DI change is module deletion plus one tiny new module
-- R8 full mode + `scripts/audit-dependencies.sh` — gates: shrink keeps after deletions, audit stays green with zero new catalog entries
+- Jsoup `org.jsoup:jsoup` 1.23.2: HTML→text extraction (parse-only via `Jsoup.parse(htmlString)`) — replaces the hand-rolled regex core of `HtmlToTextExtractor`; WHATWG-spec parser, ~430 KB pre-R8, zero runtime deps — this is the single new dependency
+- Desugar JDK libs NIO `com.android.tools:desugar_jdk_libs_nio` 2.1.5: mandatory build config for Jsoup on Android (`isCoreLibraryDesugaringEnabled = true`; project is on AGP 9.3.0 so compatible)
+- Kotlinx Coroutines (existing 1.11.0): multi-URL parallel fan-out (`supervisorScope` + `async`/`awaitAll` + `Semaphore(3)`)
+- OkHttp (existing 4.12.0): per-URL bounded fetch transport — existing `WebPageFetcher` policy reused unchanged per URL; Jsoup is parse-only, never `Jsoup.connect()`
+- Room (existing 2.8.5) + DataStore Preferences (existing 1.2.1): per-chat tri-state override column + unchanged global default-ON
+- WorkManager (existing 2.12.0) + Compose Material3 `ModalBottomSheet`: retry transport (conditional, see reconciliation below) + sources preview UI
 
-**Explicitly rejected:** `okhttp-sse` artifact (banned by v2.1 precedent), Jsoup/any HTML parser (new-dep cost for a heuristic), search-API SDKs (reintroduces the secrets surface being deleted), Cronet, platform `DownloadManager` for page fetch, Proto DataStore, version bumps of any kind.
+**Stack rule that must survive:** fetching stays a security boundary — Jsoup never fetches, the stripped-OkHttp-client policy (no AuthInterceptor, 64 KB cap, manual redirects, timeouts) applies to every page including retries and cache-miss refetches.
 
 ### Expected Features
 
+(Full landscape, dependency graph, and competitor analysis in `FEATURES.md`.)
+
 **Must have (table stakes):**
-- URL-in-message auto-fetch + single fetch→inject→answer round (1–3 URLs, extract, char-budget truncate) — the core feature
-- Offline + fetch-failure fallback with visible notice — offline-first constraint makes this launch-blocking, not polish
-- Numbered source list under grounded answers (model cites numbers only, app resolves URLs) — models hallucinate URLs from memory; never let them generate links
-- Trust-boundary prompt rules (delimiters + data-not-instructions + recency stamp) — cheapest lines in the prompt builder, prevents the worst failure class
-- "Leyendo página…" fetch status + timeout — reuses the status-row composable spared from skills deletion
-- Grounding on/off toggle (DataStore boolean, default ON) — opt-out for metered-data/purist users
-- Skills removal (chips, prefs, repo, gating, both tool loops) — milestone goal #1
-- HF token removal (field, headers, settings, gated filtering) — milestone goal #2
-- HF search removal (allowlist-only catalog, direct download kept) — milestone goal #3
-- Syntax-theme selector fix (all 4 presets apply, light/dark) — root cause already found: `SyntaxHighlighterImpl.kt:44` hardcodes `.theme(SyntaxThemes.monokai())`
+- Multi-URL fetch (2–5 URLs/message, parallel, fused numbered `[WEB CONTEXT 1..N]` blocks) — the core milestone promise; users paste/compare multiple links
+- Numbered Fuentes list for N sources + progress chip (`Leyendo 2 de 4…`, per-source ok/skipped) — silent drops destroy trust
+- Partial grounding (one dead link never poisons the turn; banner only when ALL fail) — correctness requirement of multi-fetch
+- `GroundingResult` list reshape + `UrlDetector` list + numbered `GroundingPrompt` — the keystone refactor enabling everything
+- Per-chat web toggle (tri-state `null` = inherit global) — headline differentiator, cheap once migration v15 exists
+- Sources preview bottom sheet over persisted extracts — headline differentiator; trust receipts without leaving chat
+- Message-scoped offline retry (queued state + "Reintentar" on reconnect, OFFLINE-only) — offline-resilience promise
 
-**Should have (competitive):**
-- Zero-key, zero-dependency grounding — the differentiator: Perplexity/Copilot/Gemini grounding all require cloud accounts; Warped's works with nothing to configure, on any model including small local ones that can't do function-calling
-- Heuristic trigger via system prompt (no tool-calling required) — a ~10-line prompt addition; model consumes `<web-content>` and asks the user for a link when it needs freshness instead of hallucinating
-- Grounded vs. ungrounded parts visibly distinguished (`[1]` markers on backed claims only — precision beats coverage)
-- Fetch-budget transparency ("página truncada a N caracteres" note when truncation fires)
+**Should have (competitive / v2.3.x on trigger):**
+- Per-message "Sin web" composer override — one-off model-only escape hatch, cheap once per-chat toggle exists
+- Preview "Abrir en navegador" (Custom Tab) — trigger: users want the full page after reading the extract
+- Fused-context budget tuning per model context size — trigger: overflow reports on small local models
 
-**Defer (v2.x / v3+):**
-- P2: model-asks-for-link wording tuning, source titles/domains, per-message retry-without-web, per-conversation fetch cache
-- P3/future: model-suggested URL fetch (hallucination risk on small models), JS-rendered page fallback (WebView cost), keyless search-index endpoint, post-hoc citation entailment check (2× on-device cost)
-- Explicit anti-features: search-API integration (breaks the zero-key differentiator), multi-round agentic browse loops, persisting full fetched text in Room, prompt-injection scanner dependency
+**Defer (v2.4+ / explicit anti-features):**
+- WorkManager persistent grounding queue — message-scoped retry covers chat UX; persistent queue is a second feature disguised as retry
+- Model-output citation pills (`[1]` tappable in response text) — 4-constraint compound problem (rendering, copy, portability, grammar); small local models hallucinate markers
+- JavaScript-rendered (WebView) extraction — main-thread, memory-heavy, JS-execution escalation; mark JS-shell pages skipped
+- Unlimited URL count — hard cap 5 (context window, radio/battery, injection surface all demand it)
+- Auto-grounding URLs inside model responses — recursive-fetch risk; ground user-pasted URLs only
 
 ### Architecture Approach
 
-Removals first while `LlmModelHelper` stays frozen, then one provider-agnostic grounding hook, with the theme fix as an independent parallel track (full delta map in `ARCHITECTURE.md`).
+(Full system diagram, build order, and boundary contracts in `ARCHITECTURE.md`. All structural claims verified against the live codebase — HIGH confidence.)
+
+v1's invariants survive: providers unchanged (prompt-prefix augmentation only), history keeps originals (fused blocks never persist into `MessageEntity.content`), `activeCall` cancel discipline extends to N calls, AuthInterceptor stripping applies to every fetch path. The new logic lives in `data/grounding/` (same package, two new files — no new module), with fan-out encapsulated in a JVM-testable `GroundingOrchestrator`, never inline in the ViewModel.
 
 **Major components:**
-1. `LlmModelHelper` (domain/llm) — UNCHANGED keystone; every feature speaks through its `initialize`/`runInference`/`stopResponse` contract
-2. NEW `WebFetcher` (data/grounding) + `WebGroundingPolicy` (domain/grounding, pure/JVM-testable) + `ConnectivityGate` (data, thin platform wrapper) + `GroundingModule` (di) — fetch policy and mechanism behind injectable seams; ViewModel never touches OkHttp directly
-3. `ChatViewModel.sendMessage` — MODIFIED with exactly one new suspend step (connectivity → policy → fetch → prepend SYSTEM `[WEB CONTEXT]` message) before the unchanged `runInference` call; transient `isFetchingWeb` state added, all skill/tool state removed
-4. DELETE surfaces — `data/skills/` + `domain/skills/*` + `di/SkillsModule.kt`, `LmStudioToolLoop.kt` + remote `tools[]` path, `ui/huggingface/` + `HuggingFaceApi/Repository/AuthInterceptor/Module`, HF token sections in Settings/`ApiKeyStore`/HelpScreen/nav — package-level deletes with grep-gate exit criteria, never visibility-hiding
-5. `SyntaxHighlighterImpl` — FIX: thread the selected `SyntaxTheme` through `highlight(code, language, theme)` and map domain `darkVariant/lightVariant` colors via the existing `TypeMapper` instead of hardcoded Monokai; `AdvancedPreferences.syntaxTheme` key and migration stay byte-identical
+1. `GroundingOrchestrator` (NEW, `data/grounding/`) — parallel fan-out + fusion + budget; owns a `CallRegistry` with `cancelAll()`; exposes `ground()` + `cancel()`; the ViewModel hook becomes ~10 lines
+2. `GroundedSource` value type + `GroundingResult.Grounded(sources: List<…>)` reshape (NEW/MODIFIED) — the keystone change; everything downstream (ViewModel injection, Fuentes UI, banner logic, preview, retry) keys off this type
+3. `UrlDetector.extractUrls(limit=5)` + `GroundingPrompt.buildFusedBlock()` (MODIFIED, additive) — ordered distinct list; uniform fused prompt shape for 1..N URLs so formats never drift
+4. Preview + toggle persistence (MODIFIED schema, single `MIGRATION_14_15`) — nullable `web_grounding_mode` column (NULL = inherit, zero backfill) + `grounded_sources` metadata/excerpt store; preview sheet reads excerpts, full text behind a bounded in-memory LRU
+5. Retry path (NEW, last) — immediate "Reintentar" button (orchestrator direct call) + deferred connectivity-gated refetch converging on the same `ground()` entry point
 
-**Key data-flow decisions:** grounding hook lives in the ViewModel (NOT inside the two helpers — avoids duplicating fetch logic per backend); fetched content enters as a marked SYSTEM-context message (never raw-concatenated, never in the real system prompt); `Role.TOOL` enum value is kept for history compat while all writers die (no Room migration); fetch runs inside `generationJob` so Stop cancels it.
+**Schema fork decided here:** combine the toggle column + source store into ONE migration v15 (avoid two migrations in one milestone); preview sheet state lives in Compose `remember{}`, not the ViewModel (48-01 single-owner discipline).
 
 ### Critical Pitfalls
 
-Top risks from `PITFALLS.md` (7 critical documented; 5 condensed here):
+(Full 7-pitfall catalog with warning signs, debt table, and "looks done but isn't" checklist in `PITFALLS.md`. Do not regress the v2.2 injection/SSRF/fetch-cap defenses.)
 
-1. **Dangling skill references after deletion (compile + DI breaks)** — surface spans 5+ layers plus the `runInference` signature shared with thinking mode. Avoid: grep inventory first (`Skill|@Tool|ToolSet|toggleSkill|applySkills`), delete UI→VM→repo→domain→signatures→DTOs→tests in dependency order, keep `enableThinking` param untouched, decide the fate of `Summarize` (persona, not function) up front.
-2. **Stale R8 keeps / accidental SDK-keep deletion** — leaving warped-owned skill keeps preserves dead reflection surface; deleting LiteRT-LM JNI keeps crashes release-only builds. Avoid: split the edit (keep `litertlm.**`/`MessageCallback`/`ToolSet` SDK rules, drop only `com.warped.*skills*` lines) and promote the release smoke test (launch → load model → one inference turn on a minified build) to a removal-phase exit criterion.
-3. **Legacy `Role.TOOL` rows + HF debris** — old chats crash on non-exhaustive `when(role)` or silently rewrite history; HF token lingers in encrypted prefs; dead routes/ViewModels compile silently. Avoid: keep the enum value, render legacy TOOL rows as collapsed plain text (no migration); ship a one-time encrypted-prefs token wipe; assert every allowlist URL is public with no `Authorization` header on the download path; keep the `WarpedApplication` log scrubber (still covers live `api_key`).
-4. **Prompt injection via fetched content + SSRF/unbounded fetch** — attacker pages treated as instructions (observed in the wild per Unit 42); crafted links probe LAN/metadata IPs; multi-MB pages OOM on-device inference. Avoid (all day-one, never "iterate later"): extend the v2.1 HARD-02 trust boundary (delimiters + provenance header + "data, never instructions"), HTML→text extraction (no raw HTML, no fetched text in system role), least-privilege grounded turns, adversarial test page ("ignore previous instructions" must not hijack); URL policy blocking private/reserved ranges per redirect hop + HTTPS-only, byte cap (256–512 KB), redirect cap (3–5), total timeout (~8–15 s), `Call.cancel()` wired to Stop, token-budget check before prompt build.
-5. **Theme fix treats symptom, not seam** — DataStore key drift vs. stale mapping vs. recomposition-key bug all present as "Monokai always wins," and fixing the wrong layer reopens the report. Avoid: diagnose seam-by-seam end to end before coding (write One Dark → read DataStore → check VM flow → check recomposition), parameterized round-trip test over all 4 presets, verify both streaming (flat) and completed (themed) render paths, no `else → MONOKAI` fallthrough masking the next mapping bug.
+1. **Parallel fetch storm (tail latency)** — 5 naive `async` fetches make every turn as slow as the slowest page. Avoid: `supervisorScope` (never bare `coroutineScope` + `awaitAll()`), per-fetch timeout + overall deadline with drop policy, one shared OkHttp client, per-source progress UI.
+2. **Context-budget blowout** — 5 pages × v2.2 per-page caps overflow 4–8K local-model windows. Avoid: replace per-page constants with a global grounding budget divided across fetched pages (`perPage = budget / pagesFetched`), model-window-aware, truncation markers, worst-case assertion test. Never ship `MAX_URLS` raised with caps untouched.
+3. **Stop doesn't stop N fetches** — fan-out outside the cancellable `generationJob` leaks fetches past Stop into the next turn's context. Avoid: fan-out as a child of the generation job, shared `Call` handles, generation-epoch check before prompt build, mid-fetch Stop regression test as exit criterion.
+4. **Preview storage bloat** — full extracted text per source in Room (~20 KB/grounded turn) bloats the DB and janks recomposition. Avoid: Room holds metadata + ~500-char excerpt only; full text in a bounded in-memory LRU (keyed by URL+hash) with re-fetch-on-miss; stable IDs (not strings) through Compose state.
+5. **Toggle precedence ambiguity** — three layers (per-message > per-chat > global) with no single resolver produces wrong-state bugs and NULL-legacy crashes. Avoid: ONE pure unit-tested `effectiveGrounding()` function resolved at exactly one call site; nullable per-chat column (NULL = inherit, never backfill); 12-case matrix + legacy-upgrade tests as entry criteria for toggle UI.
+6. **Retry-mechanism mismatch** — WorkManager periodic (15-min minimum) is wrong for chat-timescale retry; risks worker spam, stale-turn injection, retrying inference instead of fetch. Avoid: message-scoped foreground retry on connectivity-gain events first; any WorkManager use gets `REPLACE` + unique name per (conversation, message) + attempt cap + URL-only input data; retry fetch only, user re-sends.
+7. **Injection surface × N** — the new merge path can bypass per-page sanitization; colluding pages can run quorum attacks single-page tests never exercise. Avoid: choke-point `sanitizePage` (merge concatenates sanitized spans only), multi-page adversarial suite (1-of-5 malicious, 3-of-5 colluding, delimiter-mimic, malicious-in-truncated-tail) as merge gate, per-source provenance delimiters, extractor change = security-gated change, plain-text-only preview rendering.
 
 ## Implications for Roadmap
 
-Based on research, suggested phase structure (removals before additions — every addition references the post-removal shape):
+Based on research, suggested phase structure:
 
-### Phase 1: Surface Removal (skills + remote tool loop + HF token/search)
-**Rationale:** Removal hygiene touches `runInference`, the system-prompt builder, prefs, and R8 — everything later phases build on. Must complete before grounding starts.
-**Delivers:** Deleted `data/skills/`, `domain/skills/*`, `SkillsModule`, `LmStudioToolLoop` + remote `tools[]` path, HF search UI/API/auth/settings/help/nav surface, one-time HF token prefs wipe; narrowed R8 keeps; legacy TOOL rows render as collapsed text; release smoke green.
-**Addresses:** Skills removal, HF token removal, HF search removal (all P1 table stakes).
-**Avoids:** Pitfalls 1–4 (dangling refs, R8 keeps, TOOL legacy rows, HF debris).
-**Gates (copy-pasteable):** zero hits for the skill grep (`SkillIds|SkillRepository|SkillPreferences|ToolGating|ToolExecutor|automaticToolCalling|SkillChipsRow|toolCallActive|showNoToolSupportNotice`), the loop grep (`LmStudioToolLoop|MAX_TOOL_ROUNDS|chatCompletionsWithTools|OpenAiTool`), and the HF grep (`HuggingFace|huggingface|hfToken|hasHfToken|HuggingFaceToken`) in `app/src/main`; `:app:assembleDebug` + unit tests + minified release smoke all green.
+### Phase 1: Multi-URL fetch + fusion + budget (+ Jsoup swap)
+**Rationale:** The fetch policy is the foundation everything else consumes — preview content, retry payloads, and toggle-gated fetching all key off the `List<GroundedSource>` shape. Budget numbers and the adversarial baseline both depend on extraction density, so the extraction-quality decision must land before or inside this phase, not after.
+**Delivers:** `UrlDetector.extractUrls` → `WebPageFetcher.fetchOne` + call registry → `GroundingOrchestrator.ground` → `GroundingPrompt.buildFusedBlock` → rewired `ChatViewModel` hook; Jsoup replacing the regex extractor core (keeping the 4000-char truncation contract + `WebContextSanitizer` untouched); 2–5 URL turns grounding with fused context; counted chip copy; Stop cancels all.
+**Addresses:** Multi-URL fetch, keystone `GroundingResult` reshape, partial grounding + all-fail banner fix, progress chip, fused citation hints.
+**Avoids:** Pitfalls 1 (fetch storm), 2 (budget blowout), 3 (Stop leak), 7 (injection × N — choke-point + adversarial gate are exit criteria).
+**Uses:** Jsoup 1.23.2 + desugar NIO (only new deps); coroutines `supervisorScope` fan-out; existing fetch policy per URL.
 
-### Phase 2: Web Grounding Core (policy + fetcher + hook + fallback UX)
-**Rationale:** Built atop the post-removal shape (exactly one context-message convention, no TOOL-row confusion, status-row composable spared from deletion). Provider-agnostic by construction — one hook serves both backends.
-**Delivers:** `WebGroundingPolicy` (pure heuristic: URL extract ≤3, freshness keywords, offline veto) + `WebFetcher` (bounded OkHttp client, extraction, caps) + `ConnectivityGate` + `GroundingModule`; `ChatViewModel` pre-inference hook with `isFetchingWeb` state; system-prompt grounding rules; numbered source list UI; offline/failure fallback with visible notice; grounding toggle in Settings.
-**Uses:** OkHttp 4.12.0 raw `Call`, coroutines `Dispatchers.IO`, `ConnectivityManager` pre-check + try/catch defense-in-depth, hand-rolled HTML→text + char cap.
-**Implements:** `domain/grounding/` + `data/grounding/` components, trust-boundary marking pattern, pre-inference hook pattern.
-**Avoids:** Anti-patterns 1–2 (grounding inside helpers, raw OkHttp in ViewModel); status-row reuse conflict resolved by Phase 1 sparing the composable.
+### Phase 2: Sources preview + per-chat toggle
+**Rationale:** Both features consume Phase 1's output shape and both need schema work — combine into a single `MIGRATION_14_15` (one nullable toggle column + one source metadata/excerpt store) to avoid two migrations in one milestone. Storage shape and the precedence resolver must exist before any UI is built, or the UI bakes in the wrong data source.
+**Delivers:** `GroundedSource` domain type → `ChatMessage.groundedSources` list migration → tappable Fuentes rows → `SourcePreviewSheet` (excerpt-first, LRU full text, plain-text-only rendering) → tri-state toggle column + `effectiveGrounding()` resolver + chat-surface toggle affordance showing effective state + source layer.
+**Addresses:** Numbered Fuentes list for N, sources preview bottom sheet + persistence, per-chat toggle, per-message override groundwork (same send-path flag).
+**Avoids:** Pitfalls 4 (preview storage — schema review: no unbounded text column; LRU bounds test) and 5 (precedence — 12-case matrix + legacy-NULL upgrade tests are entry criteria for toggle UI).
+**Implements:** `SourcePreviewSheet`, `GroundedSourceDao` (if persisting), `Conversation.webGroundingMode`, repository get/set, `MIGRATION_14_15`.
 
-### Phase 3: Grounding Trust Boundary Hardening (security review + adversarial tests)
-**Rationale:** Fetch policy + injection boundary are one security review, not two phases (per PITFALLS mapping) — but kept as an explicit phase so the adversarial and caps tests are exit criteria, not afterthoughts. May fold into Phase 2 if the same plan carries the gates; never skipped.
-**Delivers:** Private-IP/redirect-hop enforcement, byte/timeout caps with `[truncated]` marking, randomized per-request delimiters, HARD-02 extension documented, adversarial page test, 5 MB-page / redirect-loop / private-IP / airplane-mode test matrix, provenance (grounding URLs) shown per answer, Stop-cancels-fetch verified.
-**Avoids:** Pitfalls 5–6 (injection, SSRF/unbounded fetch).
-
-### Phase 4: Syntax-Theme Fix
-**Rationale:** Fully independent of Phases 1–3 (highlighting layer only) — schedulable in parallel any time — but ordered last so verification runs against final call sites (e.g. the hardcoded `SyntaxTheme.MONOKAI` in `HuggingFaceScreen.kt:309` dies in Phase 1).
-**Delivers:** Theme threaded into `SyntaxHighlighterImpl` via domain-color mapping; stray MONOKAI hardcodes removed; all-4-preset DataStore round-trip regression test; both streaming and completed render paths verified.
-**Avoids:** Pitfall 7 (symptom-level fix).
+### Phase 3: Offline retry (message-scoped first)
+**Rationale:** Retry orchestrates all three prior pieces and must respect fetch deadlines, cache identity, and toggle resolution — so it builds last. The FEATURES + PITFALLS consensus (over the STACK default) is message-scoped foreground retry first, WorkManager only as explicit opt-in.
+**Delivers:** OFFLINE-vs-FETCH_FAILED-gated pending-retry record per (message, URL) → connectivity-gain re-fetch through the same `ground()` entry point → banner "Reintentar" immediate path + deferred path with dedup (superseded turns cancel) → retry populates the same persisted source rows the preview sheet reads.
+**Addresses:** Message-scoped offline retry, retry-fills-preview enhancement, closed-conversation drop semantics.
+**Avoids:** Pitfall 6 (dedup test, no-inference test, closed-conversation drop test, SSRF re-check on every refetch).
 
 ### Phase Ordering Rationale
 
-- **Removals first (Phase 1 → 2 → 3):** grounding writes SYSTEM context rows into a transcript that must have exactly one context-message convention; building it atop live tool code risks colliding with TOOL-row handling and doubles the test matrix. Grep gates make Phase 1's exit binary.
-- **Security as a gated phase (Phase 3), not a checklist item:** delimiter + extraction + caps are day-one code, but the adversarial test matrix is the only proof they work — a phase with entry/exit criteria forces it.
-- **Theme last but parallelizable (Phase 4):** zero file overlap with grounding; the only ordering constraint is running verification after HF-screen deletion. If bandwidth allows, execute alongside Phase 1.
-- **Grouping by blast radius:** each phase owns a disjoint layer set (removal: all layers but deletion-only; grounding: new packages + one VM hook; hardening: tests + policy tightening; theme: highlighting layer) so intermediate states stay reviewable even though mid-removal trees don't compile — phases are atomic commits.
+- **Dependencies force the order:** Phase 1's `Grounded(sources: List)` reshape is the keystone — Phases 2 and 3 both key off that type. Phase 3 needs Phase 2's store (where retry results land) and Phase 2's resolver (retry must respect the effective toggle).
+- **Schema economy:** Phase 2 bundles both Room changes into one migration v15 (toggle column + source store) — the FEATURES dependency graph and ARCHITECTURE migration precedent agree.
+- **Security gating:** the adversarial suite + budget assertion are Phase 1 exit gates, because Phase 2's preview persistence and Phase 3's refetch paths would otherwise inherit an untested baseline; any later extractor change must re-pass the same gate.
+- **Contested decision resolved:** STACK.md defaults to a WorkManager retry queue; FEATURES.md and PITFALLS.md both argue message-scoped foreground retry first (WorkManager's 15-min granularity and worker-spam risk are wrong for chat). Recommendation: follow FEATURES+PITFALLS (message-scoped first, WorkManager only as explicit user-scheduled retry with `REPLACE` + unique names + attempt cap). The Phase 3 planner should treat this as settled unless new evidence appears.
 
 ### Research Flags
 
-Phases likely needing deeper research during planning:
-- **Phase 2:** HTML→text extraction quality bar — hand-rolled stripping is unproven against real target pages (docs, news). If transcripts show garbage context, revisit Jsoup via a proper `/gsd-plan-phase --research-phase` decision with audit-script justification. Also: exact `<web-content>` budget (4k chars/page × 3) against the smallest allowlisted model's context window.
-- **Phase 3:** delimiter-mimic robustness on small local models (drift attacks ~89% even with delimiters per single-source community testing) — plan may need a model-specific adversarial pass, not just one fixture page.
+Phases likely needing deeper research during planning (`--research-phase` recommended):
+- **Phase 1:** YES — extraction-quality tuning (Jsoup main-content selectors `article`/`main`/`[role=main]` vs full-body, title+description fallback for JS-shell pages, fused ~8K cap vs per-model-window sizing) needs device validation; exact global token-budget numbers per allowlisted model window are LOW-confidence estimates. Also verify Compose BOM / desugar versions against Google Maven at plan time (STACK flags MEDIUM on BOM pinning).
+- **Phase 3:** LIGHT — verify current WorkManager constraint/backoff/unique-work APIs against developer.android.com at plan time (PITFALLS cites training knowledge); connectivity-Flow extension of `ConnectivityGate` needs a plan-time API check.
 
 Phases with standard patterns (skip research-phase):
-- **Phase 1:** deletion + R8 + prefs-wipe are fully inventoried procedures with grep gates; no unknown APIs.
-- **Phase 4:** root cause already located (`SyntaxHighlighterImpl.kt:44`); fix is a parameter-threading refactor with an established test pattern.
+- **Phase 2:** Room manual migration (v14 precedent in `Migrations.kt`), tri-state override resolution, `ModalBottomSheet` preview — all established codebase/platform patterns with HIGH-confidence guidance. Proceed directly to planning.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Pinned versions verified against `libs.versions.toml`, `NetworkModule.kt`, `AndroidManifest.xml`; zero-new-deps is a project constraint, not an inference. |
-| Features | HIGH | Fetch→inject→answer pipeline, citation UX, and fallback patterns verified against multiple 2026 production sources + official OpenAI/xAI/Gemini docs; competitor matrix grounded in named repos. |
-| Architecture | HIGH | Verified against live codebase file-by-file (exact lines cited for helpers, ViewModel, prefs, theme impl, interceptor); theme root cause located to a single line. |
-| Pitfalls | HIGH–MEDIUM | Project-specific claims verified against repo + v2.0/v2.1 audits (HIGH); web-grounding defenses sourced from OWASP/Microsoft/Unit 42 (MEDIUM); delimiter-effectiveness stat is single-source community testing (LOW — flagged above). |
+| Stack | HIGH | Jsoup 1.23.2 + desugar 2.1.5 verified via jsoup.org, mvnrepository, Context7; project gap (no desugaring enabled) verified in `app/build.gradle.kts`. Only BOM pinning is MEDIUM (verify against Google Maven). |
+| Features | HIGH / MEDIUM | HIGH on codebase-verified items (existing `data/grounding/`, DataStore toggle, Room schema, ViewModel hook); MEDIUM on competitor behavior (Perplexity/ChatGPT patterns via 2026 teardowns). |
+| Architecture | HIGH | Every structural claim verified against live code (`data/grounding/`, `ChatViewModel` hook/cancel lines, Room entities, workers). Sizing recommendations (fused cap, parallelism 3, TTL) are MEDIUM — need device validation. |
+| Pitfalls | HIGH / MEDIUM | HIGH on repo-verified pipeline shape and inherited v2.2 defenses; MEDIUM on OkHttp/coroutine/WorkManager standard practices; LOW on exact budget numbers and LRU tuning (flagged for phase validation). |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Jsoup vs. hand-rolled extraction (STACK ↔ FEATURES conflict):** resolved here for zero-new-deps, but extraction quality is the load-bearing assumption — handle during Phase 2 planning by defining a minimum quality bar (e.g. fixture pages for docs/news/blog must yield readable article text) and a Jsoup-escalation trigger.
-- **`Role` converter semantics (name vs. ordinal):** PITFALLS flags ordinal-stored enums as silent-corruption risk, but no research file confirmed the actual converter — Phase 1 planning must check the Room `@TypeConverter` for `Role` before touching the enum; if ordinal, the keep-enum-value recommendation becomes mandatory, not advisory.
-- **`Summarize` persona fate:** flagged in PITFALLS/STATE as neither function nor plain prompt — Phase 1 planning must explicitly decide survive-or-die, or it becomes the most likely dangling-reference source.
-- **Fetch-budget numbers (byte cap, char cap, timeouts):** ranges proposed (256–512 KB, 4k chars/page, 8–15 s) but not validated against the smallest allowlisted model's context window or mid-range device RAM — Phase 2 planning should pin exact numbers with a budget calculation.
-- **Regenerate-path existence:** FEATURES notes per-message "retry without web" is P2 *if* a regenerate path exists — unconfirmed; verify during Phase 2 planning, do not promise the action in v2.2 scope.
+- **Global token-budget numbers per model window (LOW):** exact fused-cap values are estimates. Handle in Phase 1 planning: read allowlisted model metadata, clamp fused output to a fraction of `contextSize`, log worst-case prefix length (Timber, debug), add the 5×max-size budget assertion test.
+- **Preview LRU size/TTL tuning (LOW):** 10 entries / 200 KB / 5 MB / 7 days are starting points. Handle in Phase 2 planning with an eviction test and low-RAM device check.
+- **Extraction-density effect on budget/adversarial baseline (open research question):** if Jsoup output density differs materially from the heuristic, re-tune the Phase 1 budget and re-run the full adversarial suite before merging — treat extractor change as security-gated.
+- **Version pins to verify at plan time:** Compose BOM 2026.06.01, desugar 2.1.5, WorkManager/hilt-work pair — re-check against Google Maven / AGP compatibility table before freezing.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Live Warped codebase: `gradle/libs.versions.toml`, `di/NetworkModule.kt`, `AndroidManifest.xml`, `domain/llm/LlmModelHelper.kt`, `data/local/inference/LiteRtLlmHelper.kt`, `data/remote/provider/LmStudioHelper.kt` + `LmStudioToolLoop.kt`, `data/skills/ToolGating.kt`, `ui/chat/ChatViewModel.kt`, `data/local/preferences/AdvancedPreferences.kt`, `domain/model/SyntaxTheme.kt`, `data/highlighting/SyntaxHighlighterImpl.kt:44`, `data/remote/network/HuggingFaceAuthInterceptor.kt`, `app/proguard-rules.pro`, `WarpedApplication.kt` log scrubber
-- Project audits: `.planning/v2.0-MILESTONE-AUDIT.md`, `.planning/v2.1-MILESTONE-AUDIT.md`, `.planning/STATE.md`, `scripts/audit-dependencies.sh`
-- Official docs: Gemini URL-context (`ai.google.dev`), OpenAI citation formatting (`developers.openai.com`), xAI citations (`docs.x.ai`)
+- Live Warped codebase: `data/grounding/{UrlDetector,WebPageFetcher,GroundingPrompt,GroundingResult,HtmlToTextExtractor,WebContextSanitizer}.kt`; `ui/chat/ChatViewModel.kt` (turn hook, cancel discipline); `ui/chat/{ChatUiState,ChatScreen}` + `components/MessageBubble.kt`; `domain/model/{ChatMessage,Conversation}`; `data/local/db/{AppDatabase,Migrations}`; `AdvancedPreferences.webGroundingEnabled`; `ModelDownloadWorker`/`ModelBenchmarkWorker` (WorkManager precedent); `app/build.gradle.kts` (desugaring gap)
+- https://jsoup.org/download + https://jsoup.org/news/release-1.23.1 + https://jsoup.org/news/release-1.22.2 — current release 1.23.2, zero runtime deps, Android desugaring requirement, R8/re2j rule
+- Context7 `/jhy/jsoup` (342 snippets) + mvnrepository `org.jsoup:jsoup` versions + google/desugar_jdk_libs CHANGELOG (2.1.5)
 
 ### Secondary (MEDIUM confidence)
-- Production grounding pipelines: link.sc real-time web search for LLMs (2026-07); tianpan.co live web grounding pipeline (2026-04)
-- Citation/attribution UX: ai-tldr.dev, MUI-X, shapeof.ai, multigrid.ai (2026-08), kds.koder.dev (EU AI Act framing)
-- Threat models: OWASP LLM Prompt Injection Prevention Cheat Sheet; Microsoft Zero-Trust AI prompt-injection catalog; Palo Alto Unit 42 indirect prompt injection in the wild (2026)
-- Prior-art repos: off-grid-mobile-ai (`read_url` tool), browser-llm (Readability extraction), airgap + OfflineOS (on-device RAG + offline posture), Ratatoskr + Groundhog (injection threat reports)
-- Platform docs: Android Room migration/testing guides (enum-ordinal fragility)
+- Android Developers offline-first guide + WorkManager BackoffPolicy docs (`NetworkType.CONNECTED`, `EXPONENTIAL` default, 15-min periodic minimum)
+- Setproduct "Designing AI chat interfaces" (2026) — citations-as-receipts, message-state checklist
+- Flaig "How Leading AI Apps Implement Inline Citations" (2026-04) — 4-constraint compound problem, Markdown-collision warning
+- LibreChat PR #7032 (Perplexity sources menu precedent); AnythingLLM #2827 (source-metadata-alongside-message precedent)
+- OkHttp Dispatcher/pool/timeout behavior (square.github.io/okhttp); Kotlin `supervisorScope` semantics (kotlinlang.org); OWASP LLM prompt-injection cheat sheet
+- `.planning/research/PITFALLS.md` (v2.2) Pitfalls 5–6 — inherited injection/SSRF baseline still in force
 
-### Tertiary (LOW confidence)
-- DEV community delimiter-defense test across 13 LLMs (~95% delimiter+declaration vs ~60% baseline) — single source, needs validation on Warped's small local models (see Phase 3 flag)
+### Tertiary (LOW confidence, needs phase validation)
+- Exact global token budgets per allowlisted model window; preview LRU size/TTL tuning; whether the extraction upgrade shifts the adversarial baseline (gated, not assumed)
 
 ---
 *Research completed: 2026-09-28*

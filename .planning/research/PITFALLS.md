@@ -1,178 +1,183 @@
-# Pitfalls Research: v2.2 Simplificación + Web Grounding
+# Pitfalls Research: v2.3 Web Grounding v2
 
-**Domain:** Android LLM chat app — deleting a shipped subsystem + adding untrusted web fetch into LLM context
+**Domain:** Android LLM chat app (Warped) — extending a shipped single-fetch grounding pipeline to multi-URL fetch, source previews, per-chat toggle, offline retry
 **Researched:** 2026-09-28
-**Confidence:** HIGH (project-specific claims verified against repo + planning audits); MEDIUM (web-grounding defenses, sourced from OWASP/Microsoft/Palo Alto Unit 42 below)
+**Confidence:** HIGH (repo-verified: v2.2 grounding shape, ChatViewModel hook, Room transcript, DataStore prefs); MEDIUM (Android/OkHttp/coroutine standard practices cited below); LOW where flagged (extraction-library decision still open per milestone scope)
+
+> Scope note: v2.2 shipped heuristic single-fetch grounding (`data/grounding/`, `[WEB CONTEXT]` block, hijack sanitization, offline fallback, default-ON toggle). Its pitfalls (indirect injection, SSRF/private-IP, unbounded fetch) are recorded in the v2.2 PITFALLS research and remain in force. This file covers only what is **new or amplified** when extending that pipeline. Do not regress the v2.2 defenses.
 
 ## Critical Pitfalls
 
-### Pitfall 1: Dangling skill references after subsystem deletion (compile + DI graph breaks)
+### Pitfall 1: Parallel fetch storm — slowest page sets latency, bursty connections waste radio/battery
 
 **What goes wrong:**
-Skills surface is woven through many layers: `domain/skill/` (Skill, SkillCategory, SkillRegistry, 4 impls), `SkillPreferences` DataStore, `SkillRepository` + Hilt bind in `RepositoryModule`, `SkillChipsRow` composable + `ChatInputBar` slot, `ChatViewModel.toggleSkill`, `LlmModelHelper.runInference(..., skills: List<Skill>)` signature (touched by both Phase 41 THINK and Phase 44 SKILLS), `LmStudioHelper.applySkills` + `tools[]` DTO, LiteRT-LM `@Tool` ToolSets, 45+ skills tests. Deleting the 3 `@Tool` impls but missing one call site leaves a red build — or worse, a Hilt binding that compiles but crashes at runtime (`NoSuchMethod`, missing `@Binds`).
+2–5 URLs per message fetched naively (`async` × N with no limits) means every grounded turn opens up to 5 TLS connections at once, and total latency equals the *slowest* page. On mobile networks one stalled host turns a 1s grounding step into a 10–15s hang. Bursty parallel connections also keep the radio in high-power state longer than sequential or bounded fetch, draining battery per turn.
 
 **Why it happens:**
-Removal work is verified by "it compiles" run once, but the surface spans domain/data/UI/di/test layers plus the `runInference` signature shared with thinking mode. The v2.0 audit explicitly notes the signature change history (`enableThinking` + `skills` params) — reverting half the signature breaks the other half.
+The v2.2 fetcher was built for one URL: one call, one timeout, done. Scaling that loop to N without a concurrency policy feels like no change ("just `awaitAll()`"), but the failure mode changes from single-timeout to tail-latency-dominated. OkHttp's default `Dispatcher` (64 max requests, 5 per host) won't save you — it caps abuse, it doesn't bound *your* turn latency.
 
 **How to avoid:**
-1. Inventory first: `grep -rn "Skill\|@Tool\|ToolSet\|toggleSkill\|applySkills" app/src` before deleting anything; turn the hit list into the deletion checklist.
-2. Delete in dependency order: UI (chips, slots) → ViewModel → repo/prefs → domain → helper signatures → DTOs → tests. Keep `runInference`'s `enableThinking` param untouched.
-3. Decide up front: does `Summarize` (PromptTemplate/persona, not a function per STATE.md) survive or die? Half-removal (delete tools, orphan the template plumbing) is the most likely dangling-ref source.
-4. Full gates after deletion: `:app:assembleDebug` + unit tests + release build (R8, see Pitfall 2).
+1. Bound concurrency explicitly: `async` fan-out inside a `supervisorScope` with a per-fetch timeout (e.g. 8s each) AND an overall deadline (e.g. 12s total). First-N-wins or deadline cutoff: pages that miss the deadline are dropped with a "source unavailable" marker, never awaited indefinitely.
+2. Fail-partial, never fail-all: one host down must not poison the other four. `supervisorScope` (child failure doesn't cancel siblings) is mandatory — bare `coroutineScope` + `awaitAll()` cancels everything on the first exception.
+3. Reuse a single OkHttpClient (connection pooling, one Dispatcher) rather than a client per fetch. Consider `dispatcher.maxRequestsPerHost` tuning if grounding hammers one domain.
+4. Show per-source progress ("Fetching 2/5…") via the existing `isFetchingWeb` transient state extended to a count, so a stalled page is visible, not a mystery hang.
 
 **Warning signs:**
-- A plan that says "delete skills" without a grep inventory or a per-layer file list.
-- `runInference` signature edited in the same diff as thinking-mode code.
-- Tests still importing `domain.skill.*` after the "removal complete" commit.
+- `awaitAll()` inside `coroutineScope` (not `supervisorScope`) in the multi-fetch design.
+- No overall deadline — only per-request timeouts.
+- A new OkHttpClient instantiated per URL.
+- Plan mentions "parallel fetch" with no dropped-source policy.
 
 **Phase to address:**
-Removal-hygiene phase (first phase of the milestone). Must complete before grounding work starts — grounding reuses `runInference` and the system-prompt builder that skills plumbing touches.
+Multi-fetch + context-budget phase (first v2.3 phase — the fetch policy is the foundation everything else builds on).
 
 ---
 
-### Pitfall 2: Stale R8 keep rules keep dead reflection surface alive (or crash LiteRT-LM)
+### Pitfall 2: Context-budget blowout — 5 pages × current caps overflow small on-device windows
 
 **What goes wrong:**
-Two failure modes, both real in this repo. (a) Deleting skills code but leaving the Phase-47 keep rules (`ToolProvider`, `ToolSet`, `ReflectionTool`, `@Tool`/`@ToolParam`, `ToolKt`, `Capabilities`, `com.warped.domain.skills.**`, `com.warped.data.skills.**` in `proguard-rules.pro` :22-36, :81-85) — harmless to size (~KB) but preserves a reflection attack surface and confuses every future reader into thinking tools still exist. (b) Worse: an over-eager cleanup removes the *LiteRT-LM* keeps (lines 16-36) along with the skills rules, and release builds crash at runtime when LiteRT-LM touches `MessageCallback`/`ToolSet` via JNI — a crash debug builds never show because R8 full mode only runs on release.
+v2.2 caps (~4k chars/page, ≤3 URLs ≈ 3k tokens) were sized for *one* fetch. Naively keeping the per-page cap and raising the URL count to 5 injects ~5–7k tokens of web context into models whose total windows can be 4–8k. Result: the grounding context evicts conversation history, or LiteRT-LM inference OOMs / slows to a crawl on-device — the exact memory pressure v2.1–v2.2 fought (smart presets, `largeHeap` awareness).
 
 **Why it happens:**
-The keeps file mixes two concerns in one block: SDK-required keeps (LiteRT-LM JNI, must stay) and feature keeps (skills `@Tool` reflection, safe to drop). The v2.1 audit confirms "R8 full mode on; release smoke proves tool survival" — that smoke test dies with the feature, removing the only guard.
+Caps were designed as per-page constants, not as a *global budget* to be divided. Developers raise `MAX_URLS` without touching the char cap, and no test asserts total grounded tokens against the active model's window.
 
 **How to avoid:**
-1. Split, don't blanket-delete: keep lines 16-36 SDK rules (`litertlm.**`, `MessageCallback`, `ToolSet`, `ReflectionTool`, etc.); delete only the `com.warped.domain.skills.**` / `com.warped.data.skills.**` package keeps and the 47-01 comment block if no warped-owned skill classes remain.
-2. Keep a release smoke test: launch → load model → one inference turn on a `minifyEnabled` build. Promote it from "skills smoke" to "post-removal release smoke" so the gate survives the feature.
-3. Verify shrink benefit: compare release APK/AAB size before/after; if unchanged, a keep is still pinning dead code.
+1. Replace per-page constants with a **global grounding budget** (e.g. 3–4k tokens total) divided across successfully fetched pages: `perPage = budget / pagesFetched`. Truncation gets a `…[truncated, N chars omitted]` marker per page so the model knows content is partial.
+2. Budget against the *active model's* context window (the allowlist already carries model metadata — reuse that read path). Small-window local models get fewer/shorter pages than large-window remote ones.
+3. Fuse-then-rank, don't just concatenate: if extraction quality work lands (milestone open question), prefer first-paragraph/lead extraction per page over tail truncation — lead paragraphs carry more signal per token for grounding.
+4. Add a budget assertion test: 5 × max-size pages → total `[WEB CONTEXT]` block ≤ budget, every page marked truncated.
 
 **Warning signs:**
-- Diff touches `proguard-rules.pro` deleting more than the `com.warped.*skills*` lines.
-- No release-variant verification in the removal phase's success criteria.
-- Comment `47-01 SKILLS (threat T-47-04)` still present after skills are gone.
+- `MAX_URLS` raised with the per-page char cap untouched.
+- No test asserting total context size for the 5-URL worst case.
+- Grounding built before the extraction-quality decision (budget numbers depend on extraction density).
 
 **Phase to address:**
-Removal-hygiene phase. R8 rule edit + release smoke are exit criteria of that phase, not a later hardening step.
+Multi-fetch + context-budget phase (same phase as Pitfall 1 — fetch policy and token budget are one review, not two).
 
 ---
 
-### Pitfall 3: Room Role.TOOL rows + history repair migration v14 left inconsistent
+### Pitfall 3: Stop doesn't stop N fetches — cancellation doesn't propagate to the fan-out
 
 **What goes wrong:**
-v2.1 persists `Role.TOOL` transcript rows (SKILLS-11) and shipped history repair migration v14. After skills deletion, old conversations still contain TOOL rows. Depending on how rendering/querying code is cut, three outcomes: (a) crash on re-open (`when(role)` non-exhaustive, unknown-role exception); (b) silent disappearance of tool turns, rewriting the visible history of old chats; (c) a new migration that touches v14's repair path and corrupts it. Any new migration also needs the exported-schema + migration test the project already treats as standard practice (Room docs: test migrations, never `fallbackToDestructiveMigration` in production).
+v2.1 built cancellable single-flight inference (`Call.cancel()`, Stop means stop). Multi-fetch adds N concurrent network calls inside the pre-inference hook. If the fan-out scope isn't a child of the cancellable `generationJob`, pressing Stop cancels inference but leaves up to 5 fetches running — wasted data/battery, and late-arriving pages can race into the *next* turn's context.
 
 **Why it happens:**
-Developers model deletion as "remove the writer" and forget the *reader* of legacy rows. Enum-by-ordinal vs by-name storage makes this worse: if `Role` is ordinal-stored, deleting a value shifts every row's meaning silently (no crash, just corrupted data — per community post-mortems). Even name-stored, a `when` without `else` crashes on the first legacy TOOL row opened.
+The grounding hook runs *before* `runInference`, so it's tempting to launch it in the ViewModel scope rather than inside the cancellable generation job. Single-fetch was fast enough that the leak window was invisible; 5 parallel fetches with a 12s deadline make it a real race.
 
 **How to avoid:**
-1. Check `Role` converter first (name vs ordinal). If ordinal — migrate carefully, do not just delete the enum entry.
-2. Decide legacy-row policy explicitly and document it: render TOOL rows as plain collapsed text (safest, preserves history) vs filter at DAO level vs one-time migration rewriting them. Recommendation: keep the enum value + DAO filter/render-as-text; delete the execution code, not the data type.
-3. Any migration gets a migration test (create v14 DB with TOOL rows → migrate → assert readable). Never `fallbackToDestructiveMigration` — chat history is the user's data.
-4. Regression test: seed a conversation with TOOL rows, open it post-removal, assert no crash and history intact.
+1. Launch the entire fetch fan-out as a child of the existing cancellable `generationJob` (same discipline as inference). Structured concurrency then cancels all N calls on Stop for free.
+2. Use a shared OkHttp `Call` handle per fetch and cancel via coroutine cancellation (OkHttp's `suspend` extension / `Call.cancel()` on `ensureActive()` paths) — don't rely on timeout alone.
+3. Guard against late arrival: generation counter / single-flight check before appending fetched pages to context, so a cancelled turn's pages can never leak into the next turn.
+4. Regression test: start grounded turn → Stop mid-fetch → assert zero network callbacks fire afterward and next turn contains no stale pages.
 
 **Warning signs:**
-- `Role.TOOL` deleted from the enum in the same commit as the tools.
-- No migration test in the removal plan.
-- `when (message.role)` sites not audited (grep them).
+- Fetch launched in `viewModelScope` instead of the generation job scope.
+- Stop tested only for inference, not for a mid-fetch Stop.
+- No generation-epoch check between fetch completion and prompt build.
 
 **Phase to address:**
-Removal-hygiene phase. Legacy-data policy decided before any enum/DAO edit.
+Multi-fetch + context-budget phase. Cancellation wiring is an exit criterion, not a follow-up.
 
 ---
 
-### Pitfall 4: Leftover HF token + search-removal debris (prefs keys, encrypted entries, dead routes)
+### Pitfall 4: Source preview storage — persisting full extracted text per source bloats Room and janks the list
 
 **What goes wrong:**
-Removing the HF token field and model search UI but leaving: DataStore/EncryptedSharedPreferences keys (token value persists on device — a credential the UI claims no longer exists), `Authorization: Bearer` header wiring on download calls, the log-scrubber regex in `WarpedApplication` (`hf_token|access_token|token|api_key` — keep or consciously narrow, don't orphan), dead nav routes/ViewModels/repo methods that still compile because nothing calls them, and gated-model references against a static-only `model_allowlist.json` catalog. Result: dead code that compiles, a token lingering in encrypted storage contradicting the "we removed it" story, and search-ViewModel tests passing against a screen that no longer exists.
+Source preview ("tap a source to preview extracted text") needs the extracted text available after the turn. Storing full text for up to 5 pages per grounded turn as Room columns means the transcript table grows by ~20KB per grounded turn — chat history DB bloat, slower queries, slower backup, and `LazyColumn` recomposition passing multi-KB strings through every recompose. Storing nothing means previews break after process death or on old conversations.
 
 **Why it happens:**
-UI deletion is visible and satisfying; storage/network cleanup is invisible. Encrypted prefs entries survive feature removal by design — nobody wipes them unless a plan says to.
-
-**How to Avoid:**
-1. Per-key checklist: grep `hf_token|HuggingFaceToken|huggingFaceToken|Authorization` across `app/src/main`; every hit gets delete/migrate/keep decision.
-2. Ship a one-time prefs cleanup: on upgrade, delete the HF token key from EncryptedSharedPreferences/DataStore (credential hygiene — the token should not outlive the feature).
-3. Delete dead navigation routes + ViewModels + repo search methods outright, not just their call sites; run lint/dependency analysis to confirm zero references.
-4. Keep the `WarpedApplication` log-scrubber (it also covers `api_key`, still live for remote endpoints) — verify with a test, don't delete with the HF code.
-5. Static catalog contract: `model_allowlist.json` becomes the *only* source; assert at startup/test that every entry resolves to a public (gateless) URL with no auth header.
-
-**Warning signs:**
-- Removal plan mentions screens but not prefs keys.
-- `Authorization: Bearer` still present in download path after "token removal complete."
-- Instrumented/unit tests referencing a search ViewModel that has no route.
-
-**Phase to address:**
-Removal-hygiene phase (same phase as skills removal — one "surface removal" phase with a per-key, per-route checklist for both).
-
----
-
-### Pitfall 5: Prompt injection via fetched web content (the grounding trust-boundary extension)
-
-**What goes wrong:**
-v2.1 built a tool-input trust boundary (HARD-02). Web grounding punches a new, larger hole through the same wall: arbitrary page text — attacker-controllable — is concatenated into the LLM context. A malicious page (`ignore previous instructions, …`, fake `[SYSTEM]` tags, exfil-style "summarize the user's API keys") gets treated as instructions. Per Palo Alto Unit 42 (2026, observed in the wild) this is *indirect* prompt injection: the attacker never talks to the model, they just publish a page the model reads. OWASP's cheat sheet is explicit: pattern/regex filters do not reliably catch this; a system-prompt rule alone ("treat fetched content as data") is a policy, not a boundary.
-
-**Why it happens:**
-The heuristic design ("system-prompt + fetch directo, sin API keys") frames grounding as a *prompting* task. Teams then under-invest in the *structural* defenses and ship raw concatenation with a hopeful system-prompt sentence.
-
-**How to avoid (defense in depth, cheapest first):**
-1. Extend HARD-02, don't reinvent it: fetched content enters through the same trust-boundary abstraction as tool output. Same delimiters, same "data, never instructions" tagging.
-2. Delimit + declare: wrap fetched text in explicit boundary markers (randomized per-request tokens resist delimiter-mimic attacks) and instruct the model the span is untrusted data. Community testing across 13 LLMs shows ~95% defense rates for delimiter+declaration vs ~60% baseline — worth doing, not sufficient alone (drift attacks ~89%).
-3. Structural containment: never let fetched content carry authority — no fetched text in system role; user-role or dedicated context span only. Strip active content (scripts, comments, metadata) before insertion — HTML→text extraction, not raw HTML.
-4. Least privilege: grounding is read-only summarization context. No tool calls, no endpoint mutations, no credential-bearing context in the same turn when grounding is active (excessive-agency chaining is the OWASP LLM06:2025 escalation path).
-5. Show provenance in UI: render which URL grounded the answer; user sees *what* influenced the model.
-
-**Warning signs:**
-- Grounding plan with no mention of HARD-02 or the trust boundary.
-- Fetched HTML inserted raw (tags, scripts, comments included).
-- Fetched content placed in the system prompt alongside real instructions.
-- No adversarial test case (a page containing "ignore previous instructions" is the minimum bar).
-
-**Phase to address:**
-Grounding-trust-boundary phase (dedicated phase, not folded into "fetch plumbing"). Adversarial test page is an entry/exit criterion.
-
----
-
-### Pitfall 6: SSRF / private-IP fetch + unbounded page size (context overflow, OOM)
-
-**What goes wrong:**
-"Fetch directo" means the app fetches arbitrary URLs. Without guards: (a) SSRF-adjacent risk — a crafted link or redirect chain pulls `http://192.168.x.x/admin`, `localhost`, or metadata endpoints (`169.254.169.254`) from the user's own network position, leaking LAN content into model context or probing the network; (b) unbounded pages (multi-MB docs, infinite streams) blow the model's context window and, on-device, spike RAM during LiteRT-LM inference — the project already fights memory pressure (smart presets, `largeHeap` awareness); (c) redirect chains turn a 2s fetch into a 30s hang on the inference path.
-
-**Why it happens:**
-OkHttp follows redirects by default and imposes no response-size cap unless configured. Mobile + on-device inference makes the cost physical (RAM, battery, ANR), not just a slow server.
+The transcript is the convenient place (it's already persisted, already observed), so full text lands in a `sourcesJson`/`extractedText` column "temporarily" and never moves. The v2.2 transcript holds small rows; nobody re-evaluates the size assumption.
 
 **How to avoid:**
-1. URL policy before fetch: block private/reserved ranges (10/8, 172.16/12, 192.168/16, 127/8, 169.254/16, IPv6 loopback/ULA) including after redirect resolution — resolve and re-check each hop. HTTPS-only except user-configured LAN hosts (consistent with the existing cleartext-blocking posture).
-2. Hard caps: max response bytes (e.g. 256–512 KB), max redirect hops (e.g. 3–5), connect+read timeouts (e.g. 8–10 s total). Truncate with a "…[truncated]" marker so the model knows content is partial.
-3. Fetch off the inference path: download → extract → truncate → *then* build the prompt. Never stream a socket into context construction. Cancellation (the v2.1 single-flight `Call.cancel()` work) must cover the fetch call too — Stop means stop for grounding fetches.
-4. Budget grounding tokens against the model's context window *before* inference; skip-or-summarize when the page exceeds budget rather than OOM-killing inference.
+1. Two-tier storage: Room persists **metadata only** (URL, title, fetch timestamp, char count, truncation flag, content hash) + a short excerpt (~500 chars) for instant preview paint. Full text lives in an in-memory LRU cache (keyed by URL+hash, size-bounded, e.g. 10 entries / 200KB) with re-fetch-on-miss as the fallback.
+2. Cap the excerpt, index nothing full-text (no Room FTS on extracted content — query cost for zero user value).
+3. Pass stable IDs (not full strings) through Compose state; load preview text lazily on tap (`LaunchedEffect(sourceId)`), so list recomposition never touches page bodies.
+4. Decide the offline-preview policy explicitly: cached full text previewable offline; evicted/missing full text shows excerpt + "reconnect to reload" — consistent with the offline-first posture.
 
 **Warning signs:**
-- No `Dns`/redirect handling or size cap in the fetch client design.
-- Grounding fetch sharing the inference coroutine without independent timeout/cancel.
-- No test with a 5 MB page, a redirect loop, or a `192.168.x.x` URL.
+- Room entity gains an `extractedText: String` (unbounded) column.
+- Preview composable receives the full text as a parameter from list state.
+- No cache-size bound or eviction policy in the preview design.
 
 **Phase to address:**
-Grounding-trust-boundary phase (same phase as Pitfall 5 — fetch policy + injection boundary are one security review, not two phases).
+Sources-preview + per-chat-toggle phase (storage shape must be decided before the preview UI is built, or the UI bakes in the wrong data source).
 
 ---
 
-### Pitfall 7: Theme fix treats symptom, not the DataStore-key / mapping / recomposition cause
+### Pitfall 5: Per-chat toggle precedence ambiguity — three layers, no defined override order
 
 **What goes wrong:**
-Only Monokai applies; One Dark/GitHub/Dracula are silently ignored. The three usual suspects: (a) DataStore key mismatch (v1.6's CodeTheme→SyntaxTheme migration kept the old key — a write going to a new key while the reader watches the old one reproduces exactly this: default theme always wins); (b) stale mapping (settings writes a name the `when` in the theme resolver doesn't match → falls through to default); (c) recomposition key bug (theme state flows correctly but the code-block composable doesn't re-read it — e.g. `remember` without the theme key, or the streaming flat-monospace path never swapping to the themed path). Fixing the wrong one "works" in the demo (select Monokai, looks fine) and the bug report reopens.
+v2.3 adds per-conversation/per-message override on top of the v2.2 global default-ON toggle. Without an explicit precedence chain, edge cases produce wrong behavior: user disables globally but an old conversation re-enables; per-message toggle contradicts per-chat setting mid-thread; existing conversations (created before the column exists) read NULL and crash or silently default the wrong way.
 
 **Why it happens:**
-Silent-ignore bugs have no crash and no log. Each layer (settings write → DataStore → ViewModel flow → composable) looks correct in isolation; the break is at a seam. The streaming path (flat monospace during streaming, themed on closing fence — v1.6 deferred-highlighting decision) doubles the suspect surface: theme may apply post-stream but never visibly, or vice versa.
+Each toggle is added where convenient (global in DataStore, per-chat as a Room column, per-message as transient UI state) and the resolution logic becomes an ad-hoc `if` chain scattered across ViewModel call sites. NULL-legacy handling is forgotten because all test conversations are created fresh.
 
 **How to avoid:**
-1. Diagnose seam by seam, end to end, before coding: set One Dark → read back DataStore value directly (is the write landing?) → check ViewModel flow emission → check composable recomposition (Layout Inspector / log on theme change). The seam where the value stops changing *is* the bug.
-2. Cover all four themes in the fix's test, not just the reported-broken ones: parameterized test asserting each preset resolves to its distinct color table and that selecting each one round-trips through DataStore.
-3. Check both render paths: streaming (flat) and completed (themed) code blocks, since v1.6's deferred highlighting means two code paths consume the theme.
-4. Add a regression test at the seam that was broken (e.g. DataStore round-trip for all 4 enum values; or resolver `when` exhaustiveness with no default-fallthrough hiding mismatches).
+1. Define and document ONE precedence function, pure and unit-tested: `effectiveGrounding(perMessageOverride?, perChatSetting?, globalDefault) -> Boolean`. Recommended: per-message (single-turn override) > per-chat (conversation setting, NULL = inherit) > global default-ON.
+2. Per-chat column nullable with NULL meaning "inherit global" — never backfill existing rows with a hardcoded value (that would silently override users' global choice on upgrade).
+3. Resolve the effective value at exactly one call site (the grounding hook), not in UI collectors. UI shows the *effective* state with its source ("On — from global default" vs "Off — for this chat") so users can predict behavior.
+4. Tests: matrix of (global × perChat NULL/true/false × perMessage null/true/false) = 12 cases; plus upgrade test opening a pre-v2.3 conversation (NULL column) asserting global applies.
 
 **Warning signs:**
-- Fix PR touches only the settings dropdown or only the composable without evidence of seam-by-seam diagnosis.
-- Manual verification "selected each theme, looks right" with no automated round-trip test.
-- A `when` on theme with an `else → MONOKAI` branch (silently masks the next mapping bug).
+- Toggle resolution logic duplicated in more than one place.
+- Non-nullable per-chat column with a default that isn't the global value.
+- Settings UI with no indication of which layer is currently deciding.
 
 **Phase to address:**
-Theme-fix phase (small, isolated — safe to schedule parallel/after removal, but before release hardening so the regression test gates the milestone).
+Sources-preview + per-chat-toggle phase. The precedence function and its 12-case test are entry criteria for any toggle UI work.
+
+---
+
+### Pitfall 6: Offline retry queue — WorkManager overkill, duplicate retries, retrying the wrong thing
+
+**What goes wrong:**
+"Retry fetch when back online" sounds like a WorkManager job, but WorkManager's minimum periodic interval (15 min) and its persistent-job machinery are wrong for a chat-timescale retry (user expects seconds, not minutes). Misuse produces: duplicate enqueued workers per failed URL (5 URLs × retries = worker spam), retry firing long after the conversation moved on (stale context injected into a dead turn), battery drain from unconstrained retry loops, and retrying *inference* instead of just the *fetch*.
+
+**Why it happens:**
+WorkManager is the project's standard background tool (model downloads), so it becomes the default answer. But downloads are deferrable-by-nature; grounding retry is interactive-by-nature — different problem, different mechanism.
+
+**How to avoid:**
+1. Prefer a lightweight foreground mechanism: `ConnectivityManager.NetworkCallback` (or existing `ConnectivityGate` extended to a Flow) → on reconnect, retry only the pending *fetch*, only if its conversation is still open and its turn still current (generation epoch check). No persistent workers for the common case.
+2. If WorkManager is used at all, reserve it for explicit user-requested "retry when online" with: `NetworkType.CONNECTED` constraint, `ExistingWorkPolicy.REPLACE` + unique work name per (conversationId, messageId) for dedup, `setBackoffCriteria(EXPONENTIAL)` with a max-attempt cap (e.g. 3), and input data carrying only URL + turn identity (never full context).
+3. Deduplicate by identity: one pending-retry record per (message, URL). New turn on the same conversation supersedes — cancel superseded retries, never pile them.
+4. Never auto-retry inference on reconnect — only the fetch. The user re-sends; the app doesn't hallucinate intent.
+5. Battery guard: retries only on actual connectivity *gain* events, never polling; cap attempts; drop retries for conversations closed >N minutes.
+
+**Warning signs:**
+- `PeriodicWorkRequest` with 15-min interval proposed for chat retry.
+- Worker input data containing prompt text or full context.
+- No unique-work-name / dedup story in the retry design.
+- Retry path re-triggers `runInference` instead of just re-fetch.
+
+**Phase to address:**
+Offline-retry phase (last functional phase — it depends on the fetch fan-out, preview cache, and toggle resolution all being final, since retry must respect all three).
+
+---
+
+### Pitfall 7: Injection surface × N — per-page sanitization drift and cross-page collusion
+
+**What goes wrong:**
+v2.2's hijack sanitization was built and adversarial-tested for ONE page. With 5 pages: (a) a new code path (fan-out merge, fused-context builder) can bypass or reorder sanitization for some pages — one unsanitized page poisons the whole fused block; (b) coordinated pages can run quorum attacks ("three independent sources agree: …ignore previous instructions…") which single-page adversarial tests never exercise; (c) the extraction-quality upgrade (if it changes HTML→text handling) can re-admit scripts/comments/metadata vectors the heuristic stripper removed.
+
+**Why it happens:**
+Sanitization lives at the single-fetch layer; the multi-page merge is written as *new* code that calls the fetcher but builds the context block itself. Security review covers "the fetcher" (unchanged, ✓) and misses "the new merge path" (untainted, ✗). Multi-page adversarial testing feels redundant ("we already test injection") so it's skipped.
+
+**How to avoid:**
+1. Sanitize at the narrowest choke point: ONE function `sanitizePage(raw) -> trusted-span` that every page passes through regardless of path (single, multi, retry-refetch, cache-hit). The merge step only concatenates already-sanitized spans — it must be *incapable* of inserting raw text (type-level if cheap: a `SanitizedText` inline class the builder accepts).
+2. Extend the v2.2 adversarial suite: multi-page cases — 1-of-5 malicious, 3-of-5 colluding (same instruction repeated), delimiter-mimic inside page 4, malicious content only in the truncated-away tail. Minimum bar before merge.
+3. Per-page provenance in the fused block (`--- source N: url, fetchedAt ---`), carried into the preview UI (Pitfall 4 metadata) so users can attribute influence per source.
+4. If extraction is upgraded (robust HTML→text), re-run the FULL adversarial suite against the new extractor before it touches the merge path — extractor change = security-relevant change, gated like one.
+5. Keep the v2.2 SSRF/private-IP/fetch-cap policy enforced per page AND on the fan-out (per-hop re-check already exists — verify the parallel path doesn't skip it).
+
+**Warning signs:**
+- Merge/fuse builder accepts raw `String` page bodies.
+- Adversarial tests only cover single-page cases.
+- Extraction upgrade PR with no adversarial re-run.
+- Fused block without per-source delimiters/provenance.
+
+**Phase to address:**
+Multi-fetch phase for the choke-point + adversarial tests (exit gate); extraction-upgrade work (whenever scheduled) must re-pass the same gate before merging.
 
 ---
 
@@ -180,101 +185,107 @@ Theme-fix phase (small, isolated — safe to schedule parallel/after removal, bu
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Comment out skills wiring instead of deleting | "Reversible" removal, fast | Dead code rots; Hilt/DTO surface still compiled and R8-kept; next milestone pays full deletion cost again | Never — delete outright, git history is the undo button |
-| Keep `@Tool` R8 rules "just in case" | One less file to touch | Fake reflection surface; future devs assume tools exist; masks real shrink regressions | Never — LiteRT-LM SDK keeps stay, warped-owned skill keeps go |
-| Delete `Role.TOOL` enum value to "finish" removal | Clean enum | Legacy chat history crashes or silently corrupts; ordinal shift corrupts all rows if ordinal-stored | Never — keep the value, remove the execution |
-| Leave HF token in encrypted prefs ("harmless, it's encrypted") | Skip a migration step | Credential outlives its feature; contradicts removal; Play review / audit flag | Never — one-time wipe on upgrade |
-| Raw HTML concatenation for grounding v1 ("iterate later") | Fastest grounding demo | Injection hole + context blowout shipped to users; retrofit is a migration, not a tweak | Never — delimiters + caps are day-one, not v2.3 |
-| System-prompt-only injection defense ("the model knows") | Zero code | ~60% baseline defense; prompt-only rules are policy, not boundary (OWASP) | Never as sole defense; fine as one layer among delimiters + extraction + least-privilege |
-| Theme fix verified manually on one device | Fast close | Silent-ignore regresses on next theme/prefs touch; no gate | Never — parameterized round-trip test is the gate |
+| Reuse v2.2 per-page caps × 5 URLs, no global budget | Zero new logic | Context overflow on small-window local models; OOM-class bug shipped | Never — budget is day-one (Pitfall 2) |
+| `coroutineScope` + `awaitAll()` for fan-out ("simpler") | Less code | One bad host kills all pages; no partial results | Never — `supervisorScope` is the same line count |
+| Full extracted text in Room "for now" | Preview works immediately | DB bloat, slow queries, recomposition jank; migration needed to undo | Never — metadata + excerpt + LRU from the start (Pitfall 4) |
+| WorkManager periodic retry ("standard tool") | Familiar API | 15-min granularity, worker spam, stale-turn injection | Never for auto-retry; only for explicit user-scheduled retry with dedup (Pitfall 6) |
+| Per-chat toggle as non-null default-false column | No NULL handling | Silently overrides global-ON users' choice on upgrade | Never — nullable inherit (Pitfall 5) |
+| Merge path concatenates raw strings, "sanitizer runs earlier" | Faster merge code | One bypass poisons fused block; invisible until exploit | Never — choke-point sanitize (Pitfall 7) |
+| Retry re-runs inference on reconnect | "Feels seamless" | App acts on stale intent; unexpected data/battery use | Never — retry fetch only, user re-sends |
 
 ## Integration Gotchas
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| LiteRT-LM after skills removal | Deleting SDK keep rules with feature keeps → release-only JNI crash | Keep `com.google.ai.edge.litertlm.**` rules; release-smoke on minified build |
-| LM Studio remote after tool-loop deletion | Leaving `tools[]` DTO + loop scaffolding half-wired → malformed requests or silent param drop | Remove loop + DTO field together; contract-test a plain chat completion post-removal |
-| Static allowlist as sole catalog | Entries pointing at gated URLs needing the deleted token → downloads 401 with no auth path | Startup/test assertion: every entry public, no `Authorization` header in download path |
-| OkHttp fetch for grounding | Default redirect-following + no size cap → LAN-probe/large-page/OOM exposure | Private-IP block per hop, byte cap, hop cap, timeouts, `Call.cancel()` wired to Stop |
-| Offline fallback | Grounding failure surfaces as chat failure | Fetch errors degrade to plain local/remote answer with a visible "sin conexión / sin grounding" indicator; never block the turn |
-| Theme prefs across upgrade | Write/read key drift (CodeTheme→SyntaxTheme legacy) → selection silently ignored | Round-trip test all 4 values through the real DataStore key; no `else → default` masking |
+| OkHttp fan-out | New client per URL; default timeouts inherited blindly | One shared client; per-fetch timeout + overall deadline; `maxRequestsPerHost` reviewed |
+| `ConnectivityGate` (v2.2) | Boolean check reused for retry ("poll until online") | Extend to a connectivity *Flow*; retry on gain-events only, never poll |
+| Room transcript | New columns for full page text + non-null toggle with wrong default | Metadata + excerpt columns only; nullable toggle (NULL = inherit global) |
+| ChatViewModel grounding hook | Second hook/branch for multi-URL alongside the v2.2 single path | One hook, N=1 is just the degenerate case — single code path for 1..5 URLs |
+| LiteRT-LM / LM Studio helpers | Per-backend budget tweaks scattered in helpers | Budget computed once in the hook from allowlist model metadata; helpers unchanged (v2.2 keystone discipline preserved) |
+| Preview UI ↔ cache | Preview reads Room full-text column directly | Preview reads LRU by content-hash; Room holds excerpt fallback; re-fetch on miss |
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Unbounded page into on-device context | Inference slowdown, RAM spike, ANR on large pages | Byte cap + token budget check before prompt build | First 1 MB+ page on a mid-range device |
-| Fetch on the inference critical path | Chat latency = page latency; Stop doesn't stop | Fetch with independent timeout/cancel, then build prompt | First slow/flaky network |
-| Re-fetching same URL every turn | Repeated latency + data use in multi-turn grounding | Per-conversation fetch cache (URL → truncated text) with size bound | Second follow-up question on same page |
-| Theme recomposition storm | Full chat re-highlights on every theme tick; jank during streaming | Theme consumed at code-block scope; streaming path stays flat monospace (v1.6 decision preserved) | Long chats with many code blocks |
+| Tail-latency fan-out | Grounded turns take 10s+ on flaky networks | Per-fetch timeout + overall deadline + drop policy (Pitfall 1) | First stalled host on mobile data |
+| Token-budget overflow | Slow inference, evicted history, RAM spike on-device | Global budget ÷ pages; model-window-aware (Pitfall 2) | First 5-URL turn on a small-window local model |
+| Cache without bounds | Preview cache grows to MBs over a long session | LRU with entry + byte caps; eviction test | Long grounding-heavy session on low-RAM device |
+| Re-fetch every follow-up | Same 5 URLs re-downloaded per turn in a thread | URL+hash cache with short TTL (e.g. 5–10 min) scoped per conversation | Second follow-up question on same sources |
+| Retry storms on flapping network | Connect/disconnect oscillation triggers fetch per flap | Debounce gain-events; dedup by (message, URL); attempt cap (Pitfall 6) | Elevator/tunnel commute usage |
 
 ## Security Mistakes
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Fetched page treated as instructions (indirect injection) | Attacker page hijacks answer, exfiltrates context, issues unauthorized actions | Delimited untrusted spans + HTML→text extraction + system-prompt declaration + least-privilege (no tools/actions on grounded turns) |
-| Delimiter mimic (`</context>` forged inside page) | Model "escapes" the data span, follows injected instructions | Randomized per-request boundary tokens; post-extraction scan for boundary collision → re-tokenize or reject |
-| Private-IP / metadata-IP fetch (SSRF-adjacent) | LAN probing, local content pulled into model context | Deny private/reserved ranges pre-fetch and per redirect hop; HTTPS-only |
-| HF token lingering post-removal | Stale credential on device; contradicts feature removal | One-time encrypted-prefs wipe; verify key absent post-upgrade |
-| Log scrubber deleted with HF code | API keys for remote endpoints leak into crash logs | Keep `WarpedApplication` scrubber; test covers `api_key` after HF removal |
-| Grounded answer without provenance | User can't tell attacker-influenced content from model knowledge | UI shows grounding URL(s) per answer |
+| Merge path bypasses per-page sanitization | Single malicious page hijacks fused answer | Choke-point `sanitizePage`; merge accepts sanitized spans only (Pitfall 7) |
+| Colluding pages untested | Quorum-style instruction override succeeds | Multi-page adversarial suite incl. 3-of-5 collusion (Pitfall 7) |
+| Extractor upgrade without adversarial re-run | Re-admitted script/comment/metadata vectors | Extractor change gated on full adversarial suite |
+| Retry refetch skipping SSRF re-check | Redirect target changed since first fetch; LAN probe via retry | Same URL policy + per-hop checks on every refetch, including retries |
+| Preview rendering extracted HTML raw | Stored-XSS-adjacent: `WebView`/HTML render executes page content | Preview renders plain text only (extracted text, never raw HTML, never `WebView` with JS) |
+| Stale-turn retry injecting context | Retry lands in a conversation the user already left | Epoch check: retry applies only if conversation + turn still current |
 
 ## UX Pitfalls
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Old chats change appearance after skills removal | Tool turns vanish → history feels rewritten | Render legacy TOOL rows as collapsed plain text; history never shrinks |
-| Grounded answer with no source shown | Can't judge trustworthiness of web-influenced answer | Chip/link with grounding URL + "offline, sin grounding" state when fetch fails |
-| Grounding failure blocks the turn | No internet → no answer at all | Graceful fallback: plain model answer + visible offline indicator |
-| Theme selector still silently ignores choice | User taps, nothing happens, trust erodes | Immediate visible apply + persisted round-trip; all 4 presets selectable and distinct |
+| "Fetching…" with no per-source detail | Mystery hang on 5-URL turns | Progressive state: "Fetching 2/5…", per-source success/failed markers, dropped-source note |
+| Failed source silently dropped | Answer cites sources that weren't actually read | Visible per-source status in Fuentes UI (✓/✗/truncated); answer never claims dropped sources |
+| Toggle layers disagree silently | User disables globally, old chat still grounds (or vice versa) | Show effective state + its source layer at the toggle site (Pitfall 5) |
+| Preview empty after process death | Tap source → blank, looks broken | Excerpt always available (Room); full text reload affordance when evicted |
+| Retry fires into a dead conversation | Surprise data use + confusing late banner | Retry only for the open conversation/current turn; silent-drop otherwise with no banner |
+| 5 sources, no attribution | Can't tell which source influenced which claim | Per-source numbered markers preserved from v2.2, extended per page; tap → preview (ties Pitfalls 4 + 7 together) |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Skills removal:** Often missing R8 cleanup + release smoke — verify `proguard-rules.pro` diff only drops warped-owned skill keeps and a minified build passes an inference turn
-- [ ] **Skills removal:** Often missing legacy TOOL rows — verify an old conversation with TOOL rows opens without crash and history intact
-- [ ] **Skills removal:** Often missing test cleanup — verify zero `*Skill*`/`@Tool` references in `app/src` (main + test) except the kept SDK keeps
-- [ ] **HF/search removal:** Often missing stored credential — verify token key absent from encrypted prefs after upgrade
-- [ ] **HF/search removal:** Often missing header wiring — verify no `Authorization` header on the download path and all allowlist URLs public
-- [ ] **Grounding:** Often missing adversarial case — verify a page containing "ignore previous instructions" does not hijack the answer
-- [ ] **Grounding:** Often missing fetch caps — verify 5 MB page, redirect loop, and private-IP URL are all refused/capped
-- [ ] **Grounding:** Often missing offline path — verify airplane-mode turn still answers with a visible no-grounding indicator
-- [ ] **Theme fix:** Often missing full-matrix check — verify all 4 presets round-trip through DataStore and render distinctly in both streaming and completed paths
+- [ ] **Multi-fetch:** Often missing partial-failure handling — verify 1-of-5 hostile/slow/dead still yields a 4-page grounded answer within the deadline
+- [ ] **Multi-fetch:** Often missing cancellation — verify Stop mid-fetch cancels all N calls with zero late-arriving pages in the next turn
+- [ ] **Budget:** Often missing worst-case assertion — verify 5 × max-size pages produce a `[WEB CONTEXT]` block within the global budget, all pages truncation-marked
+- [ ] **Budget:** Often missing model-awareness — verify a small-window local model gets a smaller grounding block than a large-window remote one
+- [ ] **Preview:** Often missing storage bounds — verify Room holds metadata + excerpt only, full text behind a bounded LRU, preview works from excerpt alone
+- [ ] **Preview:** Often missing plain-text rendering — verify preview never renders raw HTML / never uses `WebView` with JS
+- [ ] **Toggle:** Often missing precedence matrix — verify all 12 (global × perChat × perMessage) combinations resolve correctly
+- [ ] **Toggle:** Often missing legacy upgrade — verify a pre-v2.3 conversation (NULL column) follows the global default
+- [ ] **Retry:** Often missing dedup — verify flapping connectivity produces exactly one retry per (message, URL), superseded turns cancel
+- [ ] **Retry:** Often missing scope guard — verify retry re-fetches only, never re-runs inference, and never touches a closed conversation
+- [ ] **Security:** Often missing multi-page adversarial cases — verify 1-of-5 malicious, 3-of-5 colluding, and delimiter-mimic-in-page-N all fail to hijack
+- [ ] **Security:** Often missing refetch policy — verify retry and cache-miss refetch re-apply SSRF/private-IP checks and fetch caps
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Dangling refs break build/DI | LOW (if caught pre-release) | Grep inventory → delete in dependency order → full gates; never partial-revert `runInference` |
-| Release-only LiteRT-LM crash from keep deletion | HIGH (store-hotfix territory) | Restore SDK keeps, emergency release; add minified-build smoke to CI so it can't recur |
-| Legacy TOOL rows crash old chats | MEDIUM | Restore enum value + render-as-text; ship reader fix, no data migration needed if rows untouched |
-| Token lingering / dead routes shipped | LOW | Follow-up cleanup release: prefs wipe + route deletion; audit log scrubber still active |
-| Injection via grounded page in the wild | HIGH (trust + safety) | Server-free mitigation: tighten extraction + delimiters, add adversarial tests, disclose; consider grounding kill-switch pref |
-| OOM from unbounded fetch | MEDIUM | Add byte/token caps + fetch-cache bound; hotfix caps first, policy UI later |
-| Theme silently ignored again | LOW | Seam-by-seam diagnosis; parameterized regression test locks all 4 presets |
+| Fetch storm / tail latency shipped | MEDIUM | Hotfix timeouts + deadline + drop policy; no schema change needed — reine in the fan-out, ship |
+| Budget blowout on small models | MEDIUM | Hotfix global cap + per-page division; consider grounding kill-switch pref while fixing; no migration |
+| Stop-leak / stale pages in next turn | MEDIUM | Move fan-out under generation job; add epoch check; regression test mid-fetch Stop |
+| Full text already in Room | HIGH (migration territory) | Ship migration moving bodies to cache/file store, leaving excerpt+metadata; or versioned table with cleanup worker — expensive, hence "never" in debt table |
+| Toggle precedence wrong post-ship | LOW–MEDIUM | Centralize resolver + backfill policy doc; if non-null default shipped, migrate values to nullable-inherit carefully |
+| Worker-spam retry shipped | LOW | Cancel all by tag, replace with connectivity-Flow retry; drain duplicate workers on upgrade |
+| Multi-page injection in the wild | HIGH (trust + safety) | Tighten choke-point, emergency adversarial patch, disclose; grounding kill-switch pref buys time |
 
 ## Pitfall-to-Phase Mapping
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| 1 Dangling skill refs | Removal-hygiene phase (phase 1) | Zero skill refs grep-clean + debug + unit gates green |
-| 2 Stale R8 keeps / SDK keep deletion | Removal-hygiene phase (phase 1) | `proguard-rules.pro` diff scoped + minified release smoke passes |
-| 3 Role.TOOL legacy rows | Removal-hygiene phase (phase 1) | Seeded legacy conversation opens intact, no crash |
-| 4 HF token/search debris | Removal-hygiene phase (phase 1) | Prefs key absent post-upgrade; no auth header; dead routes deleted |
-| 5 Injection via fetched content | Grounding-trust-boundary phase (phase 2) | Adversarial page test; HARD-02 extension documented |
-| 6 SSRF + unbounded fetch | Grounding-trust-boundary phase (phase 2) | Private-IP/large-page/redirect-loop tests; cancel wired |
-| 7 Theme silent-ignore | Theme-fix phase (phase 3, isolable) | All-4-preset round-trip test + both render paths verified |
+| 1 Fetch storm | Multi-fetch + budget phase | Kill-1-of-5 test; deadline test; single shared client |
+| 2 Budget blowout | Multi-fetch + budget phase | 5×max-size budget assertion; model-window-aware test |
+| 3 Stop doesn't stop N | Multi-fetch + budget phase | Mid-fetch Stop regression test; epoch check |
+| 7 Injection × N | Multi-fetch + budget phase (choke-point + adversarial gate) | Multi-page adversarial suite incl. collusion; extractor re-gate rule |
+| 4 Preview storage | Preview + toggle phase | Schema review (no unbounded text col); LRU bounds test; excerpt-only preview test |
+| 5 Toggle precedence | Preview + toggle phase | 12-case matrix test; legacy-NULL upgrade test |
+| 6 Retry queue | Offline-retry phase (last) | Dedup test; no-inference test; closed-conversation drop test |
 
-Suggested ordering rationale: removal hygiene first (it touches `runInference`, system-prompt builder, prefs, and R8 that grounding and theme work both build on) → grounding trust boundary as one security-reviewed phase → theme fix small and independent (schedulable any time after removal, must gate the milestone release).
+Suggested ordering rationale: fetch policy + budget + security choke-point first (everything else — preview content, retry payloads, toggle-gated fetching — consumes the fan-out's output shape); preview + toggle second (storage schema and precedence resolver must exist before retry can reference them); offline retry last (it orchestrates all three prior pieces and must respect fetch deadlines, cache identity, and toggle resolution). Extraction-quality decision (open research question) should land before or inside the first phase — budget numbers and adversarial baselines both depend on it.
 
 ## Sources
 
-- Repo + planning audits (HIGH): `app/proguard-rules.pro` (:16-36, :81-85); `.planning/v2.1-MILESTONE-AUDIT.md` (SKILLS-07/08/11, R8 keeps, 45 skills tests); `.planning/v2.0-MILESTONE-AUDIT.md` (Phase 44 surface inventory, `runInference` signature history); `.planning/STATE.md` (Summarize-as-persona note); `app/src/main/java/com/warped/WarpedApplication.kt` (:107-108 log scrubber); `app/src` grep (`SyntaxTheme` usages, test fakes of `advancedPreferences.syntaxTheme`)
-- OWASP LLM Prompt Injection Prevention Cheat Sheet (MEDIUM): https://cheatsheetseries.owasp.org/cheatsheets/LLM_Prompt_Injection_Prevention_Cheat_Sheet.html — screen retrieved/fetched context; regex filters unreliable; guardrail-LLM is one layer, not the boundary
-- Microsoft Zero-Trust AI attack techniques: Prompt Injection (MEDIUM): https://learn.microsoft.com/en-us/security/zero-trust/catalog-ai-attack-techniques/prompt-injection — input segmentation/delimiters for external text; untrusted content as adversarial by default
-- Palo Alto Unit 42, web-based indirect prompt injection observed in the wild (MEDIUM): https://unit42.paloaltonetworks.com/ai-agent-prompt-injection — benign-page-embedded instructions influencing summarization/analysis flows at scale
-- DEV community delimiter-defense test across 13 LLMs (LOW, single-source): https://dev.to/whetlan/i-tested-delimiter-based-prompt-injection-defense-across-13-llms-50mn — ~95% delimiter+declaration vs ~60% baseline; drift/mimic residual weakness
-- Android Room migration docs + community guides (MEDIUM): https://developer.android.com/training/data-storage/room/migrating-db-versions — AutoMigrationSpec, schema export, migration testing; never destructive fallback in production; enum-ordinal fragility
+- Repo-verified, HIGH: v2.2 grounding pipeline shape (`data/grounding/`, pre-inference hook in `ChatViewModel.sendMessage`, `[WEB CONTEXT]` block, `ConnectivityGate`, `isFetchingWeb` transient, default-ON global toggle); v2.1 single-flight cancellation (`Call.cancel()`, Stop discipline); Room transcript + DataStore prefs conventions; `.planning/research/PITFALLS.md` (v2.2) Pitfalls 5–6 for the inherited injection/SSRF baseline
+- Android WorkManager constraints/backoff/unique-work guidance, MEDIUM (training knowledge, verify against current docs at plan time): `developer.android.com` background-work guides — `NetworkType.CONNECTED` constraints, `ExistingWorkPolicy`, 15-min periodic minimum
+- OkHttp Dispatcher/connection-pool/timeout behavior, MEDIUM (training knowledge, stable API surface): `square.github.io/okhttp` — shared client, per-call timeouts, `Dispatcher.maxRequestsPerHost`
+- Kotlin `supervisorScope` vs `coroutineScope` failure semantics, MEDIUM (stable language contract): `kotlinlang.org/api/kotlinx.coroutines`
+- OWASP LLM prompt-injection prevention (cheat sheet series) + v2.2 research citations, MEDIUM — policy for choke-point sanitization and adversarial testing carries over unchanged, amplified to N pages
+- LOW confidence, needs phase-level validation: exact global token budget numbers per allowlisted model window; LRU size/TTL tuning for the preview cache; whether extraction upgrade changes the adversarial baseline (flagged as a gate, not assumed)
 
 ---
-*Pitfalls research for: Warped v2.2 Simplificación + Web Grounding*
+*Pitfalls research for: Warped v2.3 Web Grounding v2*
 *Researched: 2026-09-28*
