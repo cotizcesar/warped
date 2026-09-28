@@ -6,6 +6,7 @@ import com.warped.data.remote.dto.OpenAiMessage
 import com.warped.data.remote.network.asSseFlow
 import com.warped.data.skills.toProviderText
 import com.warped.domain.model.ChatRequest
+import com.warped.domain.model.Role
 import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.ModelInfo
 import com.warped.domain.model.ProviderType

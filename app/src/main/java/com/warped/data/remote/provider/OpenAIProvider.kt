@@ -2,7 +2,8 @@ package com.warped.data.remote.provider
 
 import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.remote.api.OpenAiApi
-import com.warped.data.remote.dto.OpenAiChatRequestimport com.warped.data.remote.dto.OpenAiCompletionsRequest
+import com.warped.data.remote.dto.OpenAiChatRequest
+import com.warped.data.remote.dto.OpenAiCompletionsRequest
 import com.warped.data.remote.dto.OpenAiEmbeddingsRequest
 import com.warped.data.remote.dto.OpenAiMessage
 import com.warped.data.remote.dto.OpenAiNonStreamingResponse
