@@ -2,8 +2,7 @@ package com.warped.data.remote.provider
 
 import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.remote.api.OpenAiApi
-import com.warped.data.remote.dto.OpenAiChatRequest
-import com.warped.data.remote.dto.OpenAiCompletionsRequest
+import com.warped.data.remote.dto.OpenAiChatRequestimport com.warped.data.remote.dto.OpenAiCompletionsRequest
 import com.warped.data.remote.dto.OpenAiEmbeddingsRequest
 import com.warped.data.remote.dto.OpenAiMessage
 import com.warped.data.remote.dto.OpenAiNonStreamingResponse
@@ -12,6 +11,7 @@ import com.warped.data.remote.dto.OpenAiStreamChunk
 import com.warped.data.remote.network.asCompletionsSseFlow
 import com.warped.data.remote.network.asResponsesSseFlow
 import com.warped.data.remote.network.asSseFlow
+import com.warped.data.skills.toProviderText
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.Role
 import com.warped.domain.model.ConnectionStatus
@@ -71,8 +71,17 @@ class OpenAIProvider(
         val messages = request.messages
             .filter { it.role != Role.SYSTEM && it.content.isNotBlank() }
             .map {
-                val content = if (it.role == Role.USER) inputSanitizer.sanitize(it.content) else it.content
-                OpenAiMessage(role = it.role.name.lowercase(), content = content)
+                // CR-01: TOOL rows replay as plain user text — the raw
+                // "<toolId>\n<summary>" encoding must never hit the wire,
+                // and an unpaired role:"tool" (no tool_calls echo) is
+                // rejected by strict OpenAI-compatible servers.
+                if (it.role == Role.TOOL) {
+                    val (role, text) = it.toProviderText()
+                    OpenAiMessage(role = role, content = text)
+                } else {
+                    val content = if (it.role == Role.USER) inputSanitizer.sanitize(it.content) else it.content
+                    OpenAiMessage(role = it.role.name.lowercase(), content = content)
+                }
             }
         val body = OpenAiChatRequest(
             model = modelId,

@@ -13,6 +13,7 @@ import com.warped.data.remote.dto.OllamaShowRequest
 import com.warped.data.remote.network.asOllamaFlow
 import com.warped.data.remote.network.asOllamaGenerateFlow
 import com.warped.data.remote.network.asOllamaPullFlow
+import com.warped.data.skills.toProviderText
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.ModelInfo
@@ -57,8 +58,15 @@ class OllamaProvider(
         val messages = request.messages
             .filter { it.content.isNotBlank() }
             .map {
-                val content = if (it.role == Role.USER) inputSanitizer.sanitize(it.content) else it.content
-                OllamaMessage(role = it.role.name.lowercase(), content = content)
+                // CR-01: TOOL rows replay as plain user text — the raw
+                // "<toolId>\n<summary>" encoding must never hit the wire.
+                if (it.role == Role.TOOL) {
+                    val (role, text) = it.toProviderText()
+                    OllamaMessage(role = role, content = text)
+                } else {
+                    val content = if (it.role == Role.USER) inputSanitizer.sanitize(it.content) else it.content
+                    OllamaMessage(role = it.role.name.lowercase(), content = content)
+                }
             }
         val body = OllamaChatRequest(
             model = modelId,

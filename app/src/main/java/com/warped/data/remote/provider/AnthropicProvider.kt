@@ -6,6 +6,7 @@ import com.warped.data.remote.dto.AnthropicChatRequest
 import com.warped.data.remote.dto.AnthropicMessage
 import com.warped.data.remote.dto.AnthropicSseEvent
 import com.warped.data.remote.dto.AnthropicThinking
+import com.warped.data.skills.toProviderText
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.ModelInfo
@@ -63,8 +64,15 @@ class AnthropicProvider(
         val chatMessages = request.messages
             .filter { it.role.name != "SYSTEM" && it.content.isNotBlank() }
             .map {
-                val content = if (it.role == Role.USER) inputSanitizer.sanitize(it.content) else it.content
-                AnthropicMessage(role = it.role.name.lowercase(), content = content)
+                // CR-01: Anthropic has no tool role (only user/assistant are
+                // valid) — TOOL rows replay as user-adjacent text.
+                if (it.role == Role.TOOL) {
+                    val (role, text) = it.toProviderText()
+                    AnthropicMessage(role = role, content = text)
+                } else {
+                    val content = if (it.role == Role.USER) inputSanitizer.sanitize(it.content) else it.content
+                    AnthropicMessage(role = it.role.name.lowercase(), content = content)
+                }
             }
 
         val body = AnthropicChatRequest(

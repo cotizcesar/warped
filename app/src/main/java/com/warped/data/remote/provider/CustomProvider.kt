@@ -4,6 +4,7 @@ import com.warped.data.remote.api.CustomApi
 import com.warped.data.remote.dto.OpenAiChatRequest
 import com.warped.data.remote.dto.OpenAiMessage
 import com.warped.data.remote.network.asSseFlow
+import com.warped.data.skills.toProviderText
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.ModelInfo
@@ -57,7 +58,13 @@ class CustomProvider(
         val messages = request.messages
             .filter { it.content.isNotBlank() }
             .map {
-                OpenAiMessage(role = it.role.name.lowercase(), content = it.content)
+                // CR-01: TOOL rows replay as plain user text (see OpenAIProvider).
+                if (it.role == Role.TOOL) {
+                    val (role, text) = it.toProviderText()
+                    OpenAiMessage(role = role, content = text)
+                } else {
+                    OpenAiMessage(role = it.role.name.lowercase(), content = it.content)
+                }
             }
         val body = OpenAiChatRequest(
             model = modelId,
