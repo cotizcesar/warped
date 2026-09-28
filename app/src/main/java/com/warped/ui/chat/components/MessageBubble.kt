@@ -284,17 +284,37 @@ fun MessageBubble(
                 onOpenBrowser = { url ->
                     // T-53-09/T-53-10: ACTION_VIEW carries the
                     // fetcher-resolved url only — never raw pasted text,
-                    // never extracted text. T-53-11: bare emulators without
-                    // a browser must not crash chat.
-                    try {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                        previewSource = null
-                    } catch (_: ActivityNotFoundException) {
+                    // never extracted text. WR-01: stored resolved_url is
+                    // untrusted TEXT — allowlist http/https like the
+                    // fetcher redirect gate (WebPageFetcher scheme check).
+                    // T-53-11: bare emulators without a browser must not
+                    // crash chat (ActivityNotFoundException); OEM
+                    // exported-activity enforcement can throw
+                    // SecurityException from the same tap handler.
+                    val uri = Uri.parse(url)
+                    if (uri.scheme != "http" && uri.scheme != "https") {
                         Toast.makeText(
                             context,
-                            "No se encontró un navegador para abrir el enlace.",
+                            "Enlace no válido.",
                             Toast.LENGTH_SHORT,
                         ).show()
+                    } else {
+                        try {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                            previewSource = null
+                        } catch (_: ActivityNotFoundException) {
+                            Toast.makeText(
+                                context,
+                                "No se encontró un navegador para abrir el enlace.",
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        } catch (_: SecurityException) {
+                            Toast.makeText(
+                                context,
+                                "No se encontró un navegador para abrir el enlace.",
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
                     }
                 }
             )
