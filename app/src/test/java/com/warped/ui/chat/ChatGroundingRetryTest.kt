@@ -399,6 +399,92 @@ class ChatGroundingRetryTest {
         coVerify(exactly = 2) { multiUrlFetcher.fetchAll(any(), any(), any()) }
     }
 
+    // ------------------------------------------------------------------
+    // WR-01/WR-02 regression: back-to-back taps (no dispatch between
+    // them) start exactly one retry; Stop is reachable mid-retry via
+    // isGenerating and state resets on completion.
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `back-to-back retry taps start a single fetch with Stop surfaced`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
+        val vm = buildViewModel(modelFile.absolutePath)
+        runCurrent()
+        coEvery { multiUrlFetcher.fetchAll(any(), any(), any()) } returns
+            MultiUrlResult.AllFailed(GroundingResult.Reason.OFFLINE)
+
+        vm.sendMessage("mira https://a.example/uno")
+        advanceUntilIdle()
+        val queued = assistantOf(vm)
+
+        val gate = CompletableDeferred<MultiUrlResult>()
+        coEvery { multiUrlFetcher.fetchAll(any(), any(), any()) } coAnswers { gate.await() }
+        every { fetcher.hasValidatedInternet() } returns true
+
+        // No dispatch between taps: the second tap must observe the active
+        // retryJob synchronously (WR-02) — isFetchingWeb is still false here.
+        vm.retryGrounding(queued.id)
+        vm.retryGrounding(queued.id)
+        runCurrent()
+        assertThat(vm.inputState.value.isFetchingWeb).isTrue()
+        assertThat(vm.inputState.value.isGenerating).isTrue()
+
+        gate.complete(fusedResult())
+        advanceUntilIdle()
+
+        // 1 × send-time fetch + 1 × single retry fetch.
+        coVerify(exactly = 2) { multiUrlFetcher.fetchAll(any(), any(), any()) }
+        assertThat(assistantOf(vm).modelOnlyNotice).isNull()
+        assertThat(assistantOf(vm).groundedSources).containsExactly("https://a.example/uno")
+        assertThat(vm.inputState.value.isFetchingWeb).isFalse()
+        assertThat(vm.inputState.value.isGenerating).isFalse()
+        assertThat(vm.inputState.value.webFetchProgress).isNull()
+    }
+
+    // ------------------------------------------------------------------
+    // WR-03 regression: retry during active inference streaming is refused.
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `retryGrounding during active streaming is refused`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
+        val vm = buildViewModel(modelFile.absolutePath)
+        runCurrent()
+        coEvery { multiUrlFetcher.fetchAll(any(), any(), any()) } returns
+            MultiUrlResult.AllFailed(GroundingResult.Reason.OFFLINE)
+
+        vm.sendMessage("mira https://a.example/uno")
+        advanceUntilIdle()
+        val queued = assistantOf(vm)
+        assertThat(queued.modelOnlyNotice).isEqualTo(ModelOnlyNotice.OFFLINE)
+
+        // Second send stalls mid-streaming behind a gate.
+        coEvery { multiUrlFetcher.fetchAll(any(), any(), any()) } returns fusedResult()
+        val gate = CompletableDeferred<Unit>()
+        every { inferenceHelper.runInference(any(), any()) } returns flow {
+            gate.await()
+            emit(StreamToken.Delta("hola"))
+            emit(StreamToken.Done())
+        }
+        vm.sendMessage("otra https://b.example/x")
+        runCurrent()
+        assertThat(vm.inputState.value.isGenerating).isTrue()
+        assertThat(vm.transcriptState.value.isStreaming).isTrue()
+
+        every { fetcher.hasValidatedInternet() } returns true
+        vm.retryGrounding(queued.id)
+        runCurrent()
+
+        // 1 × first-send fetch + 1 × second-send fan-out; no retry fetch.
+        coVerify(exactly = 2) { multiUrlFetcher.fetchAll(any(), any(), any()) }
+        assertThat(assistantOf(vm).modelOnlyNotice).isEqualTo(ModelOnlyNotice.OFFLINE)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+    }
+
     @Test
     fun `retry with stale connectivity returns without fetching`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
