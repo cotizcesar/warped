@@ -107,6 +107,10 @@ class ChatRepositoryImpl @Inject constructor(
         val rowId = messageDao.insert(message.toEntity(conversationId))
         if (sources.isNotEmpty()) {
             try {
+                // WR-03: delete-then-insert per message — REPLACE is a no-op
+                // on autoGenerate ids, so a re-save would otherwise stack
+                // duplicate (message_id, source_index) rows.
+                groundedSourceDao.deleteByMessage(rowId)
                 groundedSourceDao.insertAll(
                     sources.mapIndexed { index, source -> source.toEntity(rowId, index) },
                 )
