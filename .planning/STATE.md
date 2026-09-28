@@ -1,52 +1,54 @@
 ---
 gsd_state_version: "1.0"
-milestone: v2.3
-milestone_name: Web Grounding v2
-current_phase: 54
-current_phase_name: Offline Retry
-status: complete
-stopped_at: v2.3 milestone complete (audit gaps_found accepted, ready to archive)
-last_updated: "2026-09-28T18:20:00Z"
+milestone: v2.4
+milestone_name: Agentic Web
+current_phase: 55
+current_phase_name: Tavily Search Foundation
+status: planning
+stopped_at: v2.4 roadmap created (Phases 55–58)
+last_updated: "2026-09-28T21:40:00Z"
 last_activity: 2026-09-28
-last_activity_desc: v2.3 milestone complete — all 3 phases verified and transitioned
+last_activity_desc: v2.4 roadmap created — Tavily + agentic local/remote + OG thumbnails
 state_head: 0c6b68ca25a30b2ca4556301767a2fa1e8ddb943
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
-  percent: 100
+  total_phases: 4
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State: Warped
 
 **Last updated:** 2026-09-28
-**Last activity:** 2026-09-28 — v2.3 milestone complete (Phases 52–54, 12/12 verified, audit gaps accepted)
+**Last activity:** 2026-09-28 — v2.4 roadmap created (Phases 55–58, 10 requirements mapped)
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-09-28 after v2.3 milestone close)
 
 **Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** v2.3 shipped — next milestone via `/gsd-new-milestone`
+**Current focus:** v2.4 Agentic Web — Phase 55 Tavily Search Foundation (ready to plan)
 
 ## Current Position
 
-Milestone: v2.3 Web Grounding v2 — COMPLETE ✅
-Status: Archived, ready for next milestone
-Last activity: 2026-09-28 — audit (gaps_found, accepted) → complete → cleanup
+Phase: 55 of 58 (Tavily Search Foundation)
+Plan: —
+Status: Ready to plan
+Last activity: 2026-09-28 — Roadmap created
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
-## Phase Structure (v2.3 — SHIPPED)
+## Phase Structure (v2.4 — PLANNED)
 
 | Phase | Name | Requirements | Status | Depends On |
 |-------|------|--------------|--------|------------|
-| 52 | Multi-URL Fetch Foundation | FETCH-01..03, EXTRACT-01..02 (5) | Complete (5/5 verified) | Phase 51 |
-| 53 | Sources Preview + Per-Chat Toggle | SRC-01..03, TOGGLE-01..03 (6) | Complete (6/6 verified) | Phase 52 |
-| 54 | Offline Retry | RETRY-01 (1) | Complete (3/3 verified) | Phase 53 |
+| 55 | Tavily Search Foundation | TAV-01..03 (3) | Not started | Phase 54 |
+| 56 | Local Agentic Loop | AGENT-01, AGENT-02, AGENT-04 (3) | Not started | Phase 55 |
+| 57 | Remote Agentic Loop | AGENT-03 (1) | Not started | Phase 56 |
+| 58 | OpenGraph Thumbnails | OG-01..03 (3) | Not started | Phase 57 |
 
-**Total v2.3:** 3 phases, 8 plans, 12 requirements verified (12/12 ✓). 289/289 unit green. SECURED all phases.
+**Total v2.4:** 4 phases, 10 requirements mapped (10/10 ✓). Coarse granularity.
 
 ## Performance Metrics
 

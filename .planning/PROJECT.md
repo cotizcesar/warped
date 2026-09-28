@@ -78,7 +78,15 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 **Known deferred:** 3 release-UAT device smokes (MIG-01 on-device MigrationTest, WEB-07 grounding visuals both themes, WEB-08 offline→retry live E2E). UI polish trio + budget on-device validation (TUNE-01/02 triggers). Pre-existing carry-overs: Pixel 7 reference numbers, v2.2 smokes, orphaned Keystore entry.
 
-## Current Milestone: (next — run `/gsd-new-milestone`)
+## Current Milestone: v2.4 Agentic Web
+
+**Goal:** The model itself searches (Tavily) and fetches the web via tool calling — local (LiteRT-LM function calling) and remote (OpenAI-compatible tools[]) — with OpenGraph thumbnail cards per source.
+
+**Target features:**
+- Tavily search backend (user API key in Keystore, search→ground fusion through the existing pipeline)
+- Local agentic loop (web_search/web_fetch ToolSets, step cap, channel hygiene, trust boundary)
+- Remote agentic loop (native tools[] with capability gating)
+- OpenGraph thumbnails (Coil cards + sheet header, Room v16)
 
 ## Requirements
 
