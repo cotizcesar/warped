@@ -177,7 +177,14 @@ class LmStudioToolLoop(
             val outcome = doRound(messages, tools, turnText, onCallCreated)
             if (outcome.failed) return
             // Plain content finish (including malformed-call fallback).
-            if (outcome.toolCalls.isEmpty()) break
+            // WR-06: the malformed flag is read here so malformed-call
+            // turns stay distinguishable from plain-content turns.
+            if (outcome.toolCalls.isEmpty()) {
+                if (outcome.malformed) {
+                    Timber.w("LmStudioToolLoop: malformed tool call — content fallback")
+                }
+                break
+            }
             // tool_calls finish: enforce the cap with >= semantics —
             // a 6th tool round must never fire.
             if (toolRounds >= MAX_TOOL_ROUNDS) {
