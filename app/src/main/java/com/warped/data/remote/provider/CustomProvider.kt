@@ -4,13 +4,13 @@ import com.warped.data.remote.api.CustomApi
 import com.warped.data.remote.dto.OpenAiChatRequest
 import com.warped.data.remote.dto.OpenAiMessage
 import com.warped.data.remote.network.asSseFlow
-import com.warped.data.skills.toProviderText
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.Role
 import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.ModelInfo
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.StreamToken
+import com.warped.domain.model.toProviderText
 import com.warped.domain.provider.LlmProvider
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -59,7 +59,7 @@ class CustomProvider(
         val messages = request.messages
             .filter { it.content.isNotBlank() }
             .map {
-                // CR-01: TOOL rows replay as plain user text (see OpenAIProvider).
+                // Phase 49 (DEL-01): TOOL rows replay as plain user text (see OpenAIProvider).
                 if (it.role == Role.TOOL) {
                     val (role, text) = it.toProviderText()
                     OpenAiMessage(role = role, content = text)

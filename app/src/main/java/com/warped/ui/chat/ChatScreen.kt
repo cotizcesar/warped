@@ -56,10 +56,6 @@ import kotlinx.coroutines.launch
 import com.warped.ui.chat.components.ChatInputBar
 import com.warped.ui.chat.components.MessageBubble
 import com.warped.ui.chat.components.ModelSelectorSheet
-import com.warped.ui.chat.components.NoToolSupportNotice
-import com.warped.ui.chat.components.ToolErrorRow
-import com.warped.ui.chat.components.formatToolStatus
-import com.warped.ui.chat.components.formatToolStatusA11y
 import com.warped.ui.components.WarpedAlertDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -199,18 +195,12 @@ fun ChatScreen(
     // per-token animateScrollTo defect); otherwise the hasNewContentBelow
     // latch sets and the pill takes over.
     val showStreamingBubble = transcript.streamingContent.isNotEmpty() || transcript.streamingReasoning.isNotEmpty()
-    val showToolStatus = transcript.isStreaming && !showStreamingBubble
-    val trailingCount = (if (showStreamingBubble || showToolStatus) 1 else 0) +
-        (if (transcript.showNoToolSupportNotice) 1 else 0) +
-        (if (transcript.activeToolError != null) 1 else 0)
+    val trailingCount = if (showStreamingBubble) 1 else 0
     val totalItems = transcript.messages.size + trailingCount
     LaunchedEffect(
         transcript.messages.size,
         transcript.streamingContent.length,
         transcript.streamingReasoning.length,
-        transcript.toolCallActive,
-        transcript.activeToolError,
-        transcript.showNoToolSupportNotice,
     ) {
         if (totalItems == 0) return@LaunchedEffect
         if (snapToBottomOnNextContent || isAtBottom) {
@@ -229,9 +219,6 @@ fun ChatScreen(
     val isEmpty = transcript.messages.isEmpty()
         && transcript.streamingContent.isEmpty()
         && transcript.streamingReasoning.isEmpty()
-        && transcript.toolCallActive == null
-        && transcript.activeToolError == null
-        && !transcript.showNoToolSupportNotice
     val showPill = !isEmpty && !isAtBottom && hasNewContentBelow
 
     Scaffold(
@@ -264,11 +251,6 @@ fun ChatScreen(
                 modelHasAudio = connection.localModels.firstOrNull { it.filePath == connection.selectedLocalModelId }?.capabilities?.audio == true,
                 onAudioRecorded = { bytes -> audioBytes = bytes },
                 onAudioRecordingChanged = { isRecording = it },
-                // 47-01 UI-SPEC §2: skill chips hoisted state.
-                skillEnabled = input.skillEnabled,
-                onToggleSkill = { id ->
-                    viewModel.setSkillEnabled(id, !(input.skillEnabled[id] ?: true))
-                },
             )
         }
     ) { padding ->
@@ -354,53 +336,6 @@ fun ChatScreen(
                                     codeTheme = connection.codeTheme,
                                     codeFontScale = connection.codeFontScale
                                 )
-                            }
-                        } else if (showToolStatus) {
-                            // 47-01 UI-SPEC §3: exact "Using {display}…" copy via
-                            // the shared toolDisplayName() mapping (never paraphrased).
-                            item(key = ChatListKeys.TOOL_STATUS) {
-                                val statusText = transcript.toolCallActive?.let { tool ->
-                                    formatToolStatus(tool)
-                                } ?: "Thinking..."
-                                val statusA11y = transcript.toolCallActive?.let { tool ->
-                                    formatToolStatusA11y(tool)
-                                }
-                                Row(
-                                    modifier = Modifier
-                                        .padding(vertical = 8.dp)
-                                        .then(
-                                            if (statusA11y != null) Modifier.semantics {
-                                                contentDescription = statusA11y
-                                            } else Modifier
-                                        ),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(14.dp),
-                                        strokeWidth = 2.dp,
-                                        color = Color(0xFF545450)
-                                    )
-                                    Spacer(Modifier.width(10.dp))
-                                    Text(
-                                        statusText,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Color(0xFF545450)
-                                    )
-                                }
-                            }
-                        }
-                        // 47-01 UI-SPEC §6: no-support notice, inline where the
-                        // status row would have been, once per turn.
-                        if (transcript.showNoToolSupportNotice) {
-                            item(key = ChatListKeys.NO_TOOL_SUPPORT) {
-                                NoToolSupportNotice()
-                            }
-                        }
-                        // 47-01 UI-SPEC §4: tool error row below the bubble it
-                        // belongs to; fallback text streams in the bubble.
-                        transcript.activeToolError?.let { toolError ->
-                            item(key = ChatListKeys.toolError(toolError.toolId)) {
-                                ToolErrorRow(toolId = toolError.toolId, reason = toolError.reason)
                             }
                         }
                     }

@@ -16,21 +16,7 @@ data class AnthropicChatRequest(
     val temperature: Float? = null,
     @SerialName("top_p") val topP: Float? = null,
     @SerialName("top_k") val topK: Int? = null,
-    val tools: List<AnthropicTool>? = null,
-    @SerialName("tool_choice") val toolChoice: AnthropicToolChoice? = null,
     val thinking: AnthropicThinking? = null
-)
-
-@Serializable
-data class AnthropicTool(
-    val name: String,
-    val description: String? = null,
-    @SerialName("input_schema") val inputSchema: JsonElement? = null
-)
-
-@Serializable
-data class AnthropicToolChoice(
-    val type: String
 )
 
 @Serializable

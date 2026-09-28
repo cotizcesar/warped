@@ -13,6 +13,7 @@ import com.warped.domain.model.ModelInfo
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.Role
 import com.warped.domain.model.StreamToken
+import com.warped.domain.model.toolDisplayNameCapitalized
 import com.warped.domain.provider.LlmProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -95,11 +96,6 @@ class LMStudioProvider(
      *   socket: a bare collector-cancel also tears down the Call, because
      *   `readUtf8Line()` is blocking and would otherwise ignore cancellation and
      *   leak the connection until the server sends again.
-     *
-     * 46-01 Phase 47 hook contract (hooks only, no loop): every tool-round
-     * boundary in the future tool loop must call
-     * `currentCoroutineContext().ensureActive()` and enforce the round cap with
-     * `>=` semantics (`check(round >= MAX_TOOL_ROUNDS)`). Full loop is Phase 47.
      */
     @Volatile
     private var currentCall: Call? = null
@@ -128,7 +124,7 @@ class LMStudioProvider(
             .filter { it.role != Role.SYSTEM }
             .filter { it.content.isNotBlank() }
             .map {
-                // 47-03: resumed role:tool rows (persisted as
+                // Phase 49 (DEL-01): resumed role:tool rows (persisted as
                 // "<toolId>\n<summary>") replay as plain-text summaries on
                 // the native path, which has no role:tool concept. Plain
                 // chat (no TOOL rows) is byte-identical to before.
@@ -138,7 +134,7 @@ class LMStudioProvider(
                         val idx = it.content.indexOf('\n')
                         val toolId = if (idx < 0) it.content else it.content.substring(0, idx)
                         val summary = if (idx < 0) "" else it.content.substring(idx + 1)
-                        "Used ${com.warped.domain.skills.toolDisplayNameCapitalized(toolId)}: $summary"
+                        "Used ${toolDisplayNameCapitalized(toolId)}: $summary"
                     }
                     else -> it.content
                 }
@@ -227,9 +223,6 @@ class LMStudioProvider(
                                                 send(StreamToken.Delta("$out"))
                                                 hasTokens = true
                                             } else {
-                                                // 46-01 Phase 47 hook site: tool_call.* events are
-                                                // round boundaries of the future tool loop —
-                                                // ensureActive() + >= round-cap check land here.
                                                 handleSseEvent(eventType, event).forEach {
                                                     send(it)
                                                     if (it is StreamToken.Delta) hasTokens = true
@@ -297,30 +290,6 @@ class LMStudioProvider(
         awaitClose { currentCall = null }
     }.flowOn(Dispatchers.IO)
 
-    /**
-     * 47-03 (D-04/D-07): OpenAI-compatible tool-loop entry — PARALLEL path.
-     *
-     * Speaks `POST {base}/v1/chat/completions` with `tools[]` via
-     * [LmStudioToolLoop] (index-keyed SSE accumulator, local execution,
-     * `role:tool` re-POST, 5-round cap, malformed fallback). The native
-     * `/api/v1/chat` [chat] path above is untouched for plain chat.
-     */
-    fun chatCompletionsWithTools(
-        request: ChatRequest,
-        tools: List<com.warped.data.remote.dto.OpenAiTool>,
-        executor: com.warped.domain.skills.ToolExecutor,
-        onCallCreated: (Call) -> Unit = {},
-    ): Flow<StreamToken> {
-        val loop = LmStudioToolLoop(
-            client = client,
-            baseUrl = baseUrl,
-            modelId = modelId,
-            executor = executor,
-            inputSanitizer = inputSanitizer,
-        )
-        return loop.run(request, tools, onCallCreated)
-    }
-
     private fun handleSseEvent(eventType: String, event: LmStudioSseEvent): List<StreamToken> {
         val tokens = mutableListOf<StreamToken>()
         when {
@@ -340,20 +309,9 @@ class LMStudioProvider(
                 event.content?.let { if (it.isNotEmpty()) tokens.add(StreamToken.Delta(it)) }
             }
             eventType == "message.end" -> { /* marker */ }
-            // tool_call
-            eventType == "tool_call.start" -> {
-                event.tool?.let { tokens.add(StreamToken.Delta("[tool:$it]")) }
-            }
-            eventType == "tool_call.arguments" -> {
-                event.arguments?.let { args ->
-                    tokens.add(StreamToken.Delta("(${json.encodeToString(JsonObject.serializer(), args)})"))
-                }
-            }
-            // tool_call.success handled inline (output field is a string, not a list)
-            eventType == "tool_call.failure" -> {
-                val r = event.reason ?: "unknown error"
-                tokens.add(StreamToken.Delta("$r"))
-            }
+            // Phase 49 (DEL-01): no tools are ever sent, so the server
+            // emits no tool_call.* events. tool_call.success output still
+            // renders as plain text below; control markers are dropped.
             // model load / prompt processing — silent (user sees spinner in UI)
             eventType == "model_load.progress" -> { /* silent */ }
             eventType == "model_load.end" -> { /* silent */ }

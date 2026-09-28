@@ -20,22 +20,6 @@ data class LmStudioChatRequest(
     val reasoning: String? = null,
     @EncodeDefault(EncodeDefault.Mode.ALWAYS) val store: Boolean = false,
     val integrations: List<LmStudioIntegration> = emptyList(),
-    // 44-02: OpenAI-compatible tools[] field. Empty by default; LmStudioHelper
-    // maps each Tool-category Skill into an entry when skills are active.
-    val tools: List<LmStudioTool> = emptyList(),
-)
-
-@Serializable
-data class LmStudioTool(
-    val type: String = "function",
-    val function: LmStudioToolFunction,
-)
-
-@Serializable
-data class LmStudioToolFunction(
-    val name: String,
-    val description: String,
-    val parameters: kotlinx.serialization.json.JsonObject = kotlinx.serialization.json.buildJsonObject {},
 )
 
 @Serializable

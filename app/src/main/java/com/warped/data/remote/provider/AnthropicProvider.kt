@@ -6,13 +6,13 @@ import com.warped.data.remote.dto.AnthropicChatRequest
 import com.warped.data.remote.dto.AnthropicMessage
 import com.warped.data.remote.dto.AnthropicSseEvent
 import com.warped.data.remote.dto.AnthropicThinking
-import com.warped.data.skills.toProviderText
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.ModelInfo
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.Role
 import com.warped.domain.model.StreamToken
+import com.warped.domain.model.toProviderText
 import com.warped.domain.provider.LlmProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -64,8 +64,9 @@ class AnthropicProvider(
         val chatMessages = request.messages
             .filter { it.role.name != "SYSTEM" && it.content.isNotBlank() }
             .map {
-                // CR-01: Anthropic has no tool role (only user/assistant are
-                // valid) — TOOL rows replay as user-adjacent text.
+                // Phase 49 (DEL-01): Anthropic has no tool role (only
+                // user/assistant are valid) — TOOL rows replay as
+                // user-adjacent text.
                 if (it.role == Role.TOOL) {
                     val (role, text) = it.toProviderText()
                     AnthropicMessage(role = role, content = text)
@@ -135,7 +136,6 @@ class AnthropicProvider(
             val source = body.source()
             var currentEvent: String? = null
             var thinkingOpen = false
-            var toolOpen = false
             try {
                 while (!source.exhausted()) {
                     val line = source.readUtf8Line() ?: break
@@ -146,15 +146,7 @@ class AnthropicProvider(
                             try {
                                 val event = json.decodeFromString<AnthropicSseEvent>(data)
                                 when (event.type) {
-                                    "content_block_start" -> {
-                                        event.contentBlock?.let { block ->
-                                            if (block.type == "tool_use") {
-                                                toolOpen = true
-                                                val toolName = block.name ?: "unknown"
-                                                emit(StreamToken.Delta("[tool:$toolName]("))
-                                            }
-                                        }
-                                    }
+                                    "content_block_start" -> { /* marker */ }
                                     "content_block_delta" -> {
                                         if (event.delta?.thinking != null) {
                                             if (!thinkingOpen) {
@@ -162,8 +154,6 @@ class AnthropicProvider(
                                                 thinkingOpen = true
                                             }
                                             emit(StreamToken.Delta(event.delta.thinking))
-                                        } else if (event.delta?.partialJson != null && toolOpen) {
-                                            emit(StreamToken.Delta(event.delta.partialJson))
                                         } else if (event.delta?.text != null) {
                                             if (thinkingOpen) {
                                                 emit(StreamToken.Delta("</think>"))
@@ -172,16 +162,10 @@ class AnthropicProvider(
                                             emit(StreamToken.Delta(event.delta.text))
                                         }
                                     }
-                                    "content_block_stop" -> {
-                                        if (toolOpen) {
-                                            emit(StreamToken.Delta(")"))
-                                            toolOpen = false
-                                        }
-                                    }
+                                    "content_block_stop" -> { /* marker */ }
                                     "message_delta" -> { }
                                     "message_stop" -> {
                                         if (thinkingOpen) emit(StreamToken.Delta("</think>"))
-                                        if (toolOpen) emit(StreamToken.Delta(")"))
                                         emit(StreamToken.Done())
                                         return@flow
                                     }
@@ -197,7 +181,6 @@ class AnthropicProvider(
                     }
                 }
                 if (thinkingOpen) emit(StreamToken.Delta("</think>"))
-                if (toolOpen) emit(StreamToken.Delta(")"))
                 if (source.exhausted()) {
                     emit(StreamToken.Done())
                 }

@@ -29,19 +29,6 @@ object PromptTemplateConfigs {
     @Provides
     @IntoSet
     @Named(QUALIFIER)
-    fun provideSummarizeTemplate(): PromptTemplate = PromptTemplate(
-        id = "summarize",
-        name = "Summarize",
-        description = "Summarize text in 3-5 sentences",
-        systemPrompt = "You are a summarization specialist. Produce a clear, faithful summary in 3-5 sentences that captures the essential information of the user's text.",
-        userPromptTemplate = { vars ->
-            "Summarize the following text:\n\n${vars["input"]}"
-        },
-    )
-
-    @Provides
-    @IntoSet
-    @Named(QUALIFIER)
     fun provideExtractKeyPointsTemplate(): PromptTemplate = PromptTemplate(
         id = "extractKeyPoints",
         name = "Key points",

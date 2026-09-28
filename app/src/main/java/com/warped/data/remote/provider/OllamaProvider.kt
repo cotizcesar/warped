@@ -13,13 +13,13 @@ import com.warped.data.remote.dto.OllamaShowRequest
 import com.warped.data.remote.network.asOllamaFlow
 import com.warped.data.remote.network.asOllamaGenerateFlow
 import com.warped.data.remote.network.asOllamaPullFlow
-import com.warped.data.skills.toProviderText
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.ModelInfo
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.Role
 import com.warped.domain.model.StreamToken
+import com.warped.domain.model.toProviderText
 import com.warped.domain.provider.LlmProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -58,8 +58,8 @@ class OllamaProvider(
         val messages = request.messages
             .filter { it.content.isNotBlank() }
             .map {
-                // CR-01: TOOL rows replay as plain user text — the raw
-                // "<toolId>\n<summary>" encoding must never hit the wire.
+                // Phase 49 (DEL-01): TOOL rows replay as plain user text —
+                // the raw "<toolId>\n<summary>" encoding must never hit the wire.
                 if (it.role == Role.TOOL) {
                     val (role, text) = it.toProviderText()
                     OllamaMessage(role = role, content = text)

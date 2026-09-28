@@ -50,10 +50,6 @@ fun ChatInputBar(
     modelHasAudio: Boolean = false,
     onAudioRecorded: ((ByteArray) -> Unit)? = null,
     onAudioRecordingChanged: ((Boolean) -> Unit)? = null,
-    // 47-01 UI-SPEC §2: skill toggles hoisted as Map<String, Boolean>
-    // (reasoningEnabled pattern). Row 0, above the OutlinedTextField.
-    skillEnabled: Map<String, Boolean> = emptyMap(),
-    onToggleSkill: (String) -> Unit = {},
 ) {
     Surface(
         color = Color(0xFF2B2B29),
@@ -103,18 +99,6 @@ fun ChatInputBar(
                         }
                     }
                 }
-            }
-
-            // 47-01 Row 0: skill chips above the input. Hidden when no model
-            // selected (canSend == false); no-op while generating.
-            if (canSend) {
-                SkillChipsRow(
-                    skillEnabled = skillEnabled,
-                    onToggleSkill = onToggleSkill,
-                    chipsEnabled = !isGenerating,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(8.dp))
             }
 
             // Row 1: Input only

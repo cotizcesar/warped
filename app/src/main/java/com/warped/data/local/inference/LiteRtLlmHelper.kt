@@ -55,9 +55,6 @@ class LiteRtLlmHelper @Inject constructor(
         initializedModelPath = modelPath
         // Ensure the conversation is in a clean state for the first chat() call.
         liteRTLmProvider.resetConversation()
-        // WR-01: model identity changed → the wedge verdict belongs to the
-        // previous (model, engine) pair; re-arm engine tools for the new model.
-        liteRTLmProvider.clearToolsDegraded()
     }
 
     override fun runInference(

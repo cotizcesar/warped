@@ -17,22 +17,7 @@ data class OpenAiChatRequest(
     val seed: Int? = null,
     @SerialName("presence_penalty") val presencePenalty: Float? = null,
     @SerialName("frequency_penalty") val frequencyPenalty: Float? = null,
-    val tools: List<OpenAiTool>? = null,
-    @SerialName("tool_choice") val toolChoice: String? = null,
     @SerialName("response_format") val responseFormat: OpenAiResponseFormat? = null
-)
-
-@Serializable
-data class OpenAiTool(
-    val type: String = "function",
-    val function: OpenAiFunctionDef
-)
-
-@Serializable
-data class OpenAiFunctionDef(
-    val name: String,
-    val description: String? = null,
-    val parameters: kotlinx.serialization.json.JsonObject? = null
 )
 
 @Serializable
@@ -51,22 +36,11 @@ data class OpenAiJsonSchema(
 @Serializable
 data class OpenAiMessage(
     /**
-     * WR-07: nullable so a pure tool round re-POSTs `content:null`
-     * alongside `tool_calls` (the OpenAI spec shape) instead of forcing
-     * `"content":""`, which strict OpenAI-compatible servers reject.
-     * Existing `OpenAiMessage(role, content)` call sites are unaffected.
+     * Phase 49 (DEL-01): single-turn only. Legacy `role=tool` rows never hit
+     * the wire as `role:"tool"` — providers replay them as plain user text.
      */
     val role: String,
-    val content: String? = null,
-    /**
-     * 47-03 (D-04, RESEARCH Pattern 3): completions tool-loop fields.
-     * Both nullable + defaulted so existing positional/named call sites
-     * (`OpenAiMessage(role, content)`) and `encodeDefaults` behavior are
-     * unaffected. `toolCallId` addresses the `role:tool` re-POST;
-     * `toolCalls` carries the assistant tool-call echo.
-     */
-    @SerialName("tool_call_id") val toolCallId: String? = null,
-    @SerialName("tool_calls") val toolCalls: List<OpenAiNonStreamingToolCall>? = null
+    val content: String? = null
 )
 
 @Serializable
@@ -193,18 +167,5 @@ data class OpenAiNonStreamingChoice(
 @Serializable
 data class OpenAiNonStreamingMessage(
     val content: String? = null,
-    @SerialName("reasoning_content") val reasoningContent: String? = null,
-    @SerialName("tool_calls") val toolCalls: List<OpenAiNonStreamingToolCall>? = null
-)
-
-@Serializable
-data class OpenAiNonStreamingToolCall(
-    val id: String? = null,
-    val function: OpenAiNonStreamingFunction? = null
-)
-
-@Serializable
-data class OpenAiNonStreamingFunction(
-    val name: String? = null,
-    val arguments: String? = null
+    @SerialName("reasoning_content") val reasoningContent: String? = null
 )

@@ -18,10 +18,9 @@ import com.warped.domain.model.SyntaxTheme
  * Ownership (each field has exactly one writer group):
  * - [ChatTranscriptState]: streaming Delta collector (streamingContent/
  *   streamingReasoning), send/Done/Error/stop/new-conversation turn boundaries
- *   (messages/isStreaming/clears), tool paths (toolCallActive/activeToolError/
- *   showNoToolSupportNotice), error paths (error).
- * - [ChatInputState]: updateInput + send-clear (inputText), skillRepository
- *   collector (skillEnabled), toggleReasoning (reasoningEnabled),
+ *   (messages/isStreaming/clears), error paths (error).
+ * - [ChatInputState]: updateInput + send-clear (inputText),
+ *   toggleReasoning (reasoningEnabled),
  *   AdvancedPreferences collector (enableThinking), selection collectors
  *   (supportsThinking), turn code mirrors isStreaming (isGenerating).
  * - [ChatConnectionState]: selection/endpoint/prefs collectors and model
@@ -37,16 +36,12 @@ data class ChatTranscriptState(
     val isStreaming: Boolean = false,
     val streamingContent: String = "",
     val streamingReasoning: String = "",
-    val toolCallActive: String? = null,
-    val activeToolError: ActiveToolError? = null,
-    val showNoToolSupportNotice: Boolean = false,
     val error: ChatError? = null,
 )
 
 @Immutable
 data class ChatInputState(
     val inputText: String = "",
-    val skillEnabled: Map<String, Boolean> = emptyMap(),
     val reasoningEnabled: Boolean = true,
     val enableThinking: Boolean = false,
     val supportsThinking: Boolean = false,
@@ -92,9 +87,6 @@ data class ChatConnectionState(
  */
 object ChatListKeys {
     const val STREAMING = "streaming"
-    const val TOOL_STATUS = "tool-status"
-    const val NO_TOOL_SUPPORT = "no-tool-support"
-    fun toolError(toolId: String): String = "tool-error-$toolId"
 }
 
 /**
@@ -144,13 +136,6 @@ data class ChatUiState(
     val pendingModelSwitch: ModelSwitchRequest? = null,
     val conversationModelId: String? = null,
     val conversationProviderType: ProviderType? = null,
-    val toolCallActive: String? = null,  // tool name while tool is executing (e.g. "web_search")
-    // 47-01 Skills surface (UI-SPEC §§2-6): per-skill toggles (all-on
-    // defaults filled by the ViewModel), transient tool error, and the
-    // no-tool-support notice flag. Set by Plans 02/03; rendered here.
-    val skillEnabled: Map<String, Boolean> = emptyMap(),
-    val activeToolError: ActiveToolError? = null,
-    val showNoToolSupportNotice: Boolean = false,
 )
 
 /** 48-01: the single derivation point monolith-shim ← sub-states. */
@@ -196,13 +181,7 @@ fun combineSnapshot(
     pendingModelSwitch = connection.pendingModelSwitch,
     conversationModelId = connection.conversationModelId,
     conversationProviderType = connection.conversationProviderType,
-    toolCallActive = transcript.toolCallActive,
-    skillEnabled = input.skillEnabled,
-    activeToolError = transcript.activeToolError,
-    showNoToolSupportNotice = transcript.showNoToolSupportNotice,
 )
-
-data class ActiveToolError(val toolId: String, val reason: String)
 
 enum class TrafficLightState {
     GREEN, YELLOW, RED, GRAY

@@ -12,13 +12,13 @@ import com.warped.data.remote.dto.OpenAiStreamChunk
 import com.warped.data.remote.network.asCompletionsSseFlow
 import com.warped.data.remote.network.asResponsesSseFlow
 import com.warped.data.remote.network.asSseFlow
-import com.warped.data.skills.toProviderText
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.Role
 import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.ModelInfo
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.StreamToken
+import com.warped.domain.model.toProviderText
 import com.warped.domain.provider.LlmProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -72,9 +72,9 @@ class OpenAIProvider(
         val messages = request.messages
             .filter { it.role != Role.SYSTEM && it.content.isNotBlank() }
             .map {
-                // CR-01: TOOL rows replay as plain user text — the raw
-                // "<toolId>\n<summary>" encoding must never hit the wire,
-                // and an unpaired role:"tool" (no tool_calls echo) is
+                // Phase 49 (DEL-01): TOOL rows replay as plain user text —
+                // the raw "<toolId>\n<summary>" encoding must never hit the
+                // wire, and an unpaired role:"tool" (no tool_calls echo) is
                 // rejected by strict OpenAI-compatible servers.
                 if (it.role == Role.TOOL) {
                     val (role, text) = it.toProviderText()
@@ -129,10 +129,6 @@ class OpenAIProvider(
                                 emit(StreamToken.Delta(content))
                                 hasTokens = true
                             }
-                            delta?.toolCalls?.forEach { tc ->
-                                tc.function?.name?.let { emit(StreamToken.Delta("[tool:$it]")); hasTokens = true }
-                                tc.function?.arguments?.let { emit(StreamToken.Delta("($it)")); hasTokens = true }
-                            }
                         } catch (e: Exception) { Timber.e(e, "OpenAI: SSE first-line delta parse failed") }
                     }
                     try {
@@ -164,16 +160,6 @@ class OpenAIProvider(
                                             emit(StreamToken.Delta(content))
                                             hasTokens = true
                                         }
-                                        delta?.toolCalls?.forEach { tc ->
-                                            tc.function?.name?.let { name ->
-                                                emit(StreamToken.Delta("[tool:$name]"))
-                                                hasTokens = true
-                                            }
-                                            tc.function?.arguments?.let { args ->
-                                                emit(StreamToken.Delta("($args)"))
-                                                hasTokens = true
-                                            }
-                                        }
                                     } catch (e: Exception) { Timber.e(e, "OpenAI: SSE delta parse failed") }
                                 }
                                 line.isEmpty() -> currentEvent = ""
@@ -194,16 +180,6 @@ class OpenAIProvider(
                         msg?.content?.let {
                             emit(StreamToken.Delta(it))
                             hasTokens = true
-                        }
-                        msg?.toolCalls?.forEach { tc ->
-                            tc.function?.name?.let { name ->
-                                emit(StreamToken.Delta("[tool:$name]"))
-                                hasTokens = true
-                            }
-                            tc.function?.arguments?.let { args ->
-                                emit(StreamToken.Delta("($args)"))
-                                hasTokens = true
-                            }
                         }
                     } catch (e: Exception) { Timber.e(e, "OpenAI: non-streaming JSON parse failed") }
                 }

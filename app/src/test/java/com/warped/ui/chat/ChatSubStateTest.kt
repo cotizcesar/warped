@@ -4,11 +4,9 @@ import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import com.google.common.truth.Truth.assertThat
 import com.warped.data.local.inference.EngineManager
-import com.warped.data.local.inference.LiteRTLmProvider
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.preferences.AdvancedPreferences
 import com.warped.data.remote.provider.ProviderRouter
-import com.warped.data.repository.ModelAllowlistRepository
 import com.warped.domain.llm.LlmModelHelper
 import com.warped.domain.model.LocalSelection
 import com.warped.domain.model.ParameterStore
@@ -20,7 +18,6 @@ import com.warped.domain.model.SyntaxTheme
 import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.LocalModelRepository
-import com.warped.domain.skills.SkillIds
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.just
@@ -80,9 +77,6 @@ class ChatSubStateTest {
         val engineManager = mockk<EngineManager>()
         val memoryChecker = mockk<MemoryChecker>()
         val advancedPreferences = mockk<AdvancedPreferences>()
-        val skillRepository = mockk<com.warped.domain.skills.SkillRepository>()
-        val modelAllowlistRepository = mockk<ModelAllowlistRepository>()
-        val liteRTLmProvider = mockk<LiteRTLmProvider>()
         val context = mockk<Context>()
 
         every { chatRepository.observeConversations() } returns MutableStateFlow(emptyList())
@@ -98,10 +92,6 @@ class ChatSubStateTest {
         every { advancedPreferences.syntaxTheme } returns flowOf(SyntaxTheme.MONOKAI)
         every { advancedPreferences.codeFontScale } returns flowOf(1.0f)
         every { advancedPreferences.thinkingEnabled } returns flowOf(false)
-        every { skillRepository.enabledMap } returns
-            MutableStateFlow(SkillIds.TOOL_IDS.associateWith { true })
-        every { modelAllowlistRepository.findByModelFile(any()) } returns null
-        every { liteRTLmProvider.resetConversation() } just Runs
         every { providerRouter.resolveLocalHelper(any(), any()) } returns helper
 
         return ChatViewModel(
@@ -115,9 +105,6 @@ class ChatSubStateTest {
             engineManager = engineManager,
             memoryChecker = memoryChecker,
             advancedPreferences = advancedPreferences,
-            skillRepository = skillRepository,
-            modelAllowlistRepository = modelAllowlistRepository,
-            liteRTLmProvider = liteRTLmProvider,
             context = context,
         )
     }
@@ -159,6 +146,8 @@ class ChatSubStateTest {
         coEvery { helper.initialize(any()) } returns Unit
         coEvery { helper.stopResponse() } returns Unit
         every { helper.runInference(any(), any()) } returns flow {
+            // Phase 49 (DEL-01): legacy ToolStatus tokens carry no text and
+            // are ignored by the single-turn ViewModel.
             emit(StreamToken.ToolStatus("calculator"))
             gate.await() // hold the turn open mid-stream
             emit(StreamToken.ToolStatus(null))
@@ -170,11 +159,11 @@ class ChatSubStateTest {
         runCurrent()
 
         vm.sendMessage("2*10")
-        // Pump until the mid-stream token emission lands on the transcript flow.
+        // Pump until the mid-stream streaming flag lands on the transcript flow.
         var sawStreaming = false
         repeat(100) {
             runCurrent()
-            if (vm.transcriptState.value.toolCallActive == "calculator") {
+            if (vm.transcriptState.value.isStreaming) {
                 sawStreaming = true
                 return@repeat
             }
@@ -198,7 +187,6 @@ class ChatSubStateTest {
 
         // Terminal: answer persisted, stream closed, draft still empty.
         val terminal = vm.transcriptState.value
-        assertThat(terminal.toolCallActive).isNull()
         assertThat(terminal.isStreaming).isFalse()
         assertThat(
             terminal.messages.any { it.role == Role.ASSISTANT && it.content == "twenty" },

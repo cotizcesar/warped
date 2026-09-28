@@ -74,12 +74,5 @@ class ChatKeyStabilityTest {
     @Test
     fun `synthetic trailing keys are content-independent constants`() {
         assertThat(ChatListKeys.STREAMING).isEqualTo("streaming")
-        assertThat(ChatListKeys.TOOL_STATUS).isEqualTo("tool-status")
-        assertThat(ChatListKeys.NO_TOOL_SUPPORT).isEqualTo("no-tool-support")
-        assertThat(ChatListKeys.toolError("calculator")).isEqualTo("tool-error-calculator")
-
-        // Error keys are per-tool (stable across re-emissions), never content hashes.
-        assertThat(ChatListKeys.toolError("calculator")).isNotEqualTo(ChatListKeys.toolError("json_formatter"))
-        assertThat(ChatListKeys.toolError("calculator")).isEqualTo(ChatListKeys.toolError("calculator"))
     }
 }

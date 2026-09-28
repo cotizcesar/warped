@@ -24,7 +24,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import com.warped.ui.components.WarpedAlertDialog
 import androidx.compose.runtime.*
@@ -41,11 +40,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.warped.domain.model.ChatMessage
 import com.warped.domain.model.Role
 import com.warped.domain.model.SyntaxTheme
+import com.warped.domain.model.parseToolRow
+import com.warped.domain.model.toolDisplayName
+import com.warped.domain.model.toolDisplayNameCapitalized
 import kotlinx.coroutines.launch
 
 @Composable
@@ -56,9 +57,9 @@ fun MessageBubble(
     codeFontScale: Float = 1.0f,
 ) {
     val isUser = message.role == Role.USER
-    // 47-01 UI-SPEC §5: persisted tool rows render as collapsed transcript
-    // rows mirroring the Thinking panel — outside any bubble. TOOL rows must
-    // never crash history load (SKILLS-11 foundation).
+    // Phase 49 (DEL-01): persisted tool rows render as collapsed transcript
+    // rows mirroring the Thinking panel — outside any bubble. Read-only;
+    // no new tool calls can be produced.
     if (message.role == Role.TOOL) {
         ToolResultRow(content = message.content)
         return
@@ -202,9 +203,10 @@ fun MessageBubble(
 }
 
 /**
- * 47-01 UI-SPEC §5: collapsed transcript row for a completed tool call
+ * Phase 49 (DEL-01): collapsed transcript row for a completed tool call
  * (role:tool), mirroring the Thinking panel above byte-for-byte in styling.
- * Collapsed by default; expanded shows the summarized result (~200 chars).
+ * Collapsed by default; expanded shows the truncated result (~200 chars).
+ * Malformed payloads render as plain muted text without crashing history load.
  */
 @Composable
 fun ToolResultRow(
@@ -212,7 +214,7 @@ fun ToolResultRow(
     codeTheme: SyntaxTheme = SyntaxTheme.MONOKAI,
     codeFontScale: Float = 1.0f,
 ) {
-    val (toolId, summary) = remember(content) { parseToolResultContent(content) }
+    val (toolId, summary) = remember(content) { parseToolRow(content) }
     var expanded by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -246,7 +248,7 @@ fun ToolResultRow(
             ) {
                 SelectionContainer {
                     MarkdownText(
-                        text = summarizeToolResult(summary),
+                        text = truncateToolSummary(summary),
                         baseColor = Color(0xFF545450),
                         modifier = Modifier.padding(vertical = 4.dp),
                         fontStyle = FontStyle.Italic,
@@ -268,48 +270,23 @@ private fun Modifier.semanticsForToolResult(toolId: String, expanded: Boolean): 
     )
 
 /**
- * 47-01 UI-SPEC §4: inline tool error row — ErrorOutline icon + 0xFFEF4444
- * `"{Display} failed: {reason}"`, maxLines 2 ellipsis. The fallback answer
- * renders as normal assistant text in the sibling bubble (Plans 02/03).
+ * Phase 49 (DEL-01): read-only legacy transcript header. The `"Used {Display}"`
+ * header renders, never stored, so history reload shows the collapsed rows.
  */
-@Composable
-fun ToolErrorRow(toolId: String, reason: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .semantics { contentDescription = formatToolErrorA11y(reason) },
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = Icons.Filled.ErrorOutline,
-            contentDescription = null,
-            tint = Color(0xFFEF4444),
-            modifier = Modifier.size(16.dp)
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = formatToolError(toolId, reason),
-            style = MaterialTheme.typography.bodySmall,
-            color = Color(0xFFEF4444),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
+private const val TOOL_TRANSCRIPT_TEMPLATE = "Used {Display}"
+private const val TOOL_TRANSCRIPT_A11Y_TEMPLATE = "Tool result from {display}, {state}, tap to toggle"
 
-/**
- * 47-01 UI-SPEC §6: muted inline notice when the model lacks tool support.
- * Informational only — no icon, no error color, no dismissal.
- */
-@Composable
-fun NoToolSupportNotice() {
-    Text(
-        text = NO_TOOL_SUPPORT_NOTICE,
-        style = MaterialTheme.typography.bodySmall,
-        color = Color(0xFF545450),
-        fontStyle = FontStyle.Italic
-    )
-}
+private fun formatToolTranscriptHeader(toolId: String): String =
+    TOOL_TRANSCRIPT_TEMPLATE.replace("{Display}", toolDisplayNameCapitalized(toolId))
+
+private fun formatToolTranscriptA11y(toolId: String, expanded: Boolean): String =
+    TOOL_TRANSCRIPT_A11Y_TEMPLATE
+        .replace("{display}", toolDisplayName(toolId))
+        .replace("{state}", if (expanded) "expanded" else "collapsed")
+
+/** Truncated results cap at ~200 chars + "…". */
+private fun truncateToolSummary(text: String, maxChars: Int = 200): String =
+    if (text.length <= maxChars) text else text.take(maxChars) + "…"
 
 @Composable
 private fun MessageImageStack(imageUris: List<String>) {    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
