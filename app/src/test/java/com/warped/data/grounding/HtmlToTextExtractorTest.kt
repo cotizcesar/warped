@@ -48,7 +48,10 @@ class HtmlToTextExtractorTest {
         assertThat(out).contains("Hierba mate — Wikipedia")
         assertThat(out).contains("Hierba mate")
         assertThat(out).contains("yerba mate es una planta")
-        assertThat(out.length).isAtLeast(200)
+        // Phase 52: Jsoup emits the title once (doc.title() + head excluded
+        // from body); the legacy regex path duplicated it (head <title> text
+        // leaked into the body), so the old >= 200 bar encoded that artifact.
+        assertThat(out.length).isAtLeast(150)
         assertThat(out).doesNotContain("<")
         assertThat(out).doesNotContain(">")
     }
