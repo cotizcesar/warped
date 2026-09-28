@@ -1,19 +1,16 @@
 ---
 gsd_state_version: "1.0"
-milestone: v2.1
-milestone_name: Finish v2.0 Leftovers
-current_phase: 48
-status: completed
-last_updated: "2026-09-28T04:22:13.291Z"
-last_activity: 2026-09-27
-last_activity_desc: Phase 48 complete
-state_head: 5f13d38944bed67eeaddcac517aadede8ace2b69
+milestone: v2.2
+milestone_name: Simplificación + Web Grounding
+status: planning
+last_updated: "2026-09-28T12:42:38.925Z"
+last_activity: 2026-09-28
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 10
-  completed_plans: 10
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State: Warped
@@ -30,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-09-27 after v2.1 milestone start)
 
 ## Current Position
 
-Phase: 48
-Plan: Not started
-Status: All phases complete
-Last activity: 2026-09-27 — Roadmap created
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-09-28 — Milestone v2.2 started
 
 ## Phase Structure (v2.1)
 

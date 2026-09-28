@@ -40,9 +40,9 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 **Known deferred:** 7 items carried into v2.1 (see STATE.md Blockers/Concerns). PERF-12/13 benchmark numbers stay CI-gated (require Pixel 7 reference device).
 
-## Current Milestone: v2.1 Finish v2.0 Leftovers — SHIPPED ✅
+## Previous Milestone: v2.1 Finish v2.0 Leftovers — COMPLETE ✅
 
-**Shipped:** 2026-09-28 | [Archive →](.planning/milestones/v2.1-ROADMAP.md) · [Audit →](.planning/v2.1-MILESTONE-AUDIT.md) (passed)
+**Shipped:** 2026-09-28 | [Archive →](.planning/milestones/v2.1-ROADMAP.md) · [Audit →](v2.1-MILESTONE-AUDIT.md) (passed)
 
 4 phases (45–48), 10 plans, 18/18 requirements MET, no partials left:
 - Catalog to latest stable + LiteRT-LM 0.13.1 → 0.17.1 (45)
@@ -53,18 +53,16 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 **Known deferred:** Pixel 7 reference numbers (PERF-16 + PERF-12/13 gate) — emulator note in BENCHMARKS.md, CI-gated.
 
-## Current Milestone: v2.1 Finish v2.0 Leftovers
+## Current Milestone: v2.2 Simplificación + Web Grounding
 
-**Goal:** Complete the deferred v2.0 PARTIALs and carry-overs so every shipped feature is fully done — no partials left.
+**Goal:** Simplificar la app quitando superficie innecesaria (skills, token HF, buscador) y agregar grounding web heurístico con fallback offline, además de arreglar los temas de código del chat.
 
 **Target features:**
-- ChatUiState sub-state split (PERF-01) for Phase 45+ scale
-- Chat message list on LazyColumn with stable keys (PERF-06)
-- Real tool execution: LiteRT-LM @Tool registration (SKILLS-02) + LM Studio tools[] mapping (SKILLS-03)
-- Runtime hardening: runInference double-collect refactor (shareIn) + true OkHttp Call.cancel() plumbing
-- Full dependency refresh: entire catalog to latest stable (incl. LiteRT-LM 0.13.1 → 0.17.1 with its tool-calling fixes)
-- Release hardening sweep + tool-input trust boundary (robust as possible)
-- Cold start under 1 second (Baseline Profiles, lazy init, measured on Pixel 7)
+- Quitar skills: Calculator, CurrentTime, JsonFormatter (+ superficie Skills: chips, prefs, repo, gating, loops local/remoto)
+- Quitar access token de Hugging Face (campo, headers auth, settings, modelos con gate)
+- Quitar buscador de modelos (solo catálogo estático `model_allowlist.json` + descarga directa sin token)
+- Web grounding heurístico: system-prompt + fetch directo (sin API keys); sin internet → solo modelo local/remoto sin web
+- Fix temas de código en el chat (solo aplica Monokai; One Dark, GitHub, Dracula no se aplican)
 
 ## Requirements
 
@@ -108,7 +106,7 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 ### Active
 
-- [ ] v2.1 Finish v2.0 Leftovers — PERF-01 sub-state split, PERF-06 LazyColumn keys, SKILLS-02/03 real tool execution, runInference double-collect refactor, Call.cancel() plumbing (see Current Milestone above)
+- [ ] v2.2 Simplificación + Web Grounding — quitar skills/token HF/buscador, web grounding heurístico con fallback offline, fix temas de código (see Current Milestone above)
 
 ### Out of Scope
 
@@ -171,7 +169,8 @@ Warped has shipped 10 milestones (v1.0 through v2.0) across 44 phases and 287 re
 | v1.8 LM Studio native v1 only | Simplify provider surface, use native REST + native DTOs, drop OpenAI/Anthropic/Ollama/Custom | ✓ Good |
 | v1.8 hand-curated recommended models | Static asset shipping with the app, no API scraping, no ranking algorithms | ✓ Good |
 | v2.0 references Google AI Edge Gallery (2026-06-05) | Reference implementation in same domain (Kotlin + LiteRT-LM on Android, 23.6k stars). Largest, most active OSS in the space. | — Pending |
-| v2.1 finishes v2.0 PARTIALs/carry-overs (2026-09-27) | No new features until every shipped feature is fully done — PERF-01, PERF-06, SKILLS-02/03, double-collect, Call.cancel(). PERF-12/13 numbers stay CI-gated (Pixel 7 hardware required). | — Pending |
+| v2.1 finishes v2.0 PARTIALs/carry-overs (2026-09-27) | No new features until every shipped feature is fully done — PERF-01, PERF-06, SKILLS-02/03, double-collect, Call.cancel(). PERF-12/13 numbers stay CI-gated (Pixel 7 hardware required). | ✓ Good |
+| v2.2 removes v2.1 Skills surface (2026-09-28) | Calculator/CurrentTime/JsonFormatter + chips/prefs/repo/gating/tool-loops deleted one milestone after introduction — user found no value, simplifies codebase and R8 keeps. Zero new dependencies for web grounding (OkHttp fetch only). | — Pending |
 
 ## Evolution
 
@@ -191,4 +190,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-27 after v2.1 Finish v2.0 Leftovers milestone start*
+*Last updated: 2026-09-28 after v2.2 Simplificación + Web Grounding milestone start*
