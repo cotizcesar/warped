@@ -147,6 +147,16 @@ object HtmlToMarkdown {
                 if (alt.isNotEmpty()) out.append(alt).append("\n\n")
             }
             "br" -> out.append("\n")
+            // Phrasing content as a direct body/block child (e.g. adjacent
+            // `<a>` elements): preserve link targets, don't unwrap to text.
+            "a" -> {
+                val rendered = renderLink(el)
+                if (rendered.isNotEmpty()) out.append(rendered).append("\n\n")
+            }
+            "span", "code", "b", "strong", "i", "em", "small", "label" -> {
+                val t = inlineText(el).trim()
+                if (t.isNotEmpty()) out.append(t).append("\n\n")
+            }
             else -> {
                 // Unknown/span containers: recurse into block children,
                 // otherwise emit inline text.
@@ -204,6 +214,23 @@ object HtmlToMarkdown {
         out.append("\n")
     }
 
+    /** `[text](url)` for http(s) targets, bare text otherwise. Shared by
+     * inline rendering and top-level `<a>` blocks. */
+    private fun renderLink(el: Element): String {
+        val text = inlineText(el).trim()
+        if (text.isEmpty()) return ""
+        val href = el.attr("href").trim()
+        return if (href.startsWith("http://", ignoreCase = true) ||
+            href.startsWith("https://", ignoreCase = true)
+        ) {
+            "[$text]($href)"
+        } else {
+            // Non-http(s) scheme (javascript:/data:/...): emit visible
+            // text unwrapped — never a clickable target.
+            text
+        }
+    }
+
     /** Inline markdown for phrasing content: bold/italic/links/images. */
     private fun inlineText(el: Element): String {
         val sb = StringBuilder()
@@ -213,24 +240,14 @@ object HtmlToMarkdown {
 
     private fun appendInline(node: Node, sb: StringBuilder) {
         when (node) {
-            is TextNode -> sb.append(node.wholeText())
+            is TextNode -> sb.append(node.text())
             is Element -> when (node.tagName().lowercase()) {
                 "b", "strong" -> sb.append("**").append(inlineText(node).trim()).append("**")
                 "i", "em" -> sb.append("*").append(inlineText(node).trim()).append("*")
                 "code" -> sb.append("`").append(node.text().trim()).append("`")
                 "a" -> {
-                    val text = inlineText(node).trim()
-                    val href = node.attr("href").trim()
-                    if (text.isEmpty()) return
-                    if (href.startsWith("http://", ignoreCase = true) ||
-                        href.startsWith("https://", ignoreCase = true)
-                    ) {
-                        sb.append("[").append(text).append("](").append(href).append(")")
-                    } else {
-                        // Non-http(s) scheme (javascript:/data:/...): emit
-                        // visible text unwrapped — never a clickable target.
-                        sb.append(text)
-                    }
+                    val rendered = renderLink(node)
+                    if (rendered.isNotEmpty()) sb.append(rendered)
                 }
                 "img" -> {
                     val alt = node.attr("alt").trim()

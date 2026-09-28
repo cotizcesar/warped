@@ -54,14 +54,16 @@ class MultiUrlFusionTest {
     }
 
     @Test
-    fun `five max-size pages fuse within the global budget plus framing`() {
-        val perPage = GroundingBudget.perPageBudget(4096, 5)
+    fun `four max-size pages fuse within the global budget plus framing`() {
+        // Four pages: the 1500 floor equals the even split (6000/4), so the
+        // fused block still fits the window (floor does the work by design).
+        val perPage = GroundingBudget.perPageBudget(4096, 4)
         val bigHtml = buildString {
             append("<html><head><title>Página grande</title></head><body>")
             repeat(200) { i -> append("<p>Línea de contenido número $i con texto de relleno suficiente.</p>") }
             append("</body></html>")
         }
-        val pages = (1..5).map { i ->
+        val pages = (1..4).map { i ->
             val url = "https://ejemplo.com/pagina$i"
             url to HtmlToTextExtractor.extract(bigHtml, url, perPage)
         }

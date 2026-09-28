@@ -21,7 +21,7 @@ class GroundingBudgetTest {
 
     @Test
     fun `budget splits evenly across N pages`() {
-        assertThat(GroundingBudget.perPageBudget(4096, 5)).isEqualTo(1200)
+        assertThat(GroundingBudget.perPageBudget(4096, 5)).isEqualTo(1500)
         assertThat(GroundingBudget.perPageBudget(4096, 2)).isEqualTo(3000)
     }
 

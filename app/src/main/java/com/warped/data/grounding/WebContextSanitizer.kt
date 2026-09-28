@@ -23,7 +23,7 @@ object WebContextSanitizer {
         Regex("(?i)as an ai|como ia|como una ia"),
     )
 
-    private val MARKDOWN_LINK = Regex("\\[([^\\[\\]]*)\\]\\(([^()]*)\\)")
+    private val MARKDOWN_LINK = Regex("\\[([^\\[\\]]*)\\]\\(((?:[^()]|\\([^()]*\\))*)\\)")
 
     private val DANGEROUS_SCHEMES = listOf(
         Regex("(?i)^[\\s\\u0000-\\u0020]*javascript\\s*:"),
@@ -46,7 +46,11 @@ object WebContextSanitizer {
         }
         val kept = neutralized.split("\n").filter { line ->
             val trimmed = line.trim()
-            HIJACK_PATTERNS.none { it.containsMatchIn(trimmed) }
+            // Strip quote nesting so a `>` prefix can never smuggle a
+            // hijack line past the anchored patterns. No fence exemption:
+            // fence contents are scanned exactly like every other line.
+            val unquoted = trimmed.replace(Regex("^(>\\s*)+"), "")
+            HIJACK_PATTERNS.none { it.containsMatchIn(trimmed) || it.containsMatchIn(unquoted) }
         }
         return kept.joinToString("\n")
             .replace("[WEB CONTEXT", "[WEB-CONTEXT")
