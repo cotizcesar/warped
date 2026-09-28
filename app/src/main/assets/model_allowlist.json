@@ -28,6 +28,27 @@
       "blurb": "Chat general y multimodal ligero."
     },
     {
+      "name": "gemma-4-E4B-it",
+      "displayName": "Gemma 4 E4B IT",
+      "repo": "warped-community/gemma-4-E4B-it-litert-lm",
+      "modelFile": "gemma-4-E4B-it.litertlm",
+      "sizeInBytes": 3659530240,
+      "capabilities": {
+        "text": true,
+        "vision": true,
+        "audio": true,
+        "supportsThinking": true,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": true,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "Recomendado 6 GB o más",
+      "blurb": "Más calidad en razonamiento y código, multimodal."
+    },
+    {
       "name": "gemma-3n-E2B-it-int4",
       "displayName": "Gemma 3n E2B IT (int4)",
       "repo": "warped-community/gemma-3n-E2B-it-litert-lm",
@@ -68,27 +89,6 @@
       "taskTypes": ["chat"],
       "ramNote": "Recomendado 8 GB o más (aprox.)",
       "blurb": "Mayor calidad multimodal."
-    },
-    {
-      "name": "gemma-4-E4B-it",
-      "displayName": "Gemma 4 E4B IT",
-      "repo": "warped-community/gemma-4-E4B-it-litert-lm",
-      "modelFile": "gemma-4-E4B-it.litertlm",
-      "sizeInBytes": 3659530240,
-      "capabilities": {
-        "text": true,
-        "vision": true,
-        "audio": true,
-        "supportsThinking": true,
-        "supportsFunctionCalling": false,
-        "speculativeDecoding": true,
-        "extendedContext": false,
-        "mtpSupport": false
-      },
-      "llmPromptTemplates": {},
-      "taskTypes": ["chat"],
-      "ramNote": "Recomendado 6 GB o más",
-      "blurb": "Más calidad en razonamiento y código, multimodal."
     }
   ]
 }
