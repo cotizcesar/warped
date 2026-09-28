@@ -142,7 +142,7 @@ class TavilySearchRepository @Inject constructor(
                 val label = url.ifBlank {
                     result.title.trim().ifBlank { UNKNOWN_SOURCE }
                 }
-                skipped.add(label)
+                if (url.isNotBlank()) skipped.add(url)
                 GroundedSource(
                     url = label,
                     extractedText = null,
