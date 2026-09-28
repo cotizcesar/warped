@@ -88,3 +88,23 @@ val MIGRATION_12_13 = object : Migration(12, 13) {
         )
     }
 }
+
+// local-empty-response follow-up (2026-09-28): repair assistant rows poisoned by the
+// old parseThinkBlocks "no tags -> everything is reasoning" fallback (fixed in 839f268).
+// Those rows have empty content with the full reply stored in reasoning and no think
+// markers; move it back to content so history renders as normal bubbles. Rows carrying
+// genuine tagged reasoning (<think>/<channel>) are untouched, as are non-empty answers.
+val MIGRATION_13_14 = object : Migration(13, 14) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "UPDATE messages SET content = reasoning, reasoning = NULL " +
+                "WHERE role = 'ASSISTANT' " +
+                "AND (content IS NULL OR content = '') " +
+                "AND reasoning IS NOT NULL AND reasoning != '' " +
+                "AND reasoning NOT LIKE '%<think>%' " +
+                "AND reasoning NOT LIKE '%</think>%' " +
+                "AND reasoning NOT LIKE '%<channel%' " +
+                "AND reasoning NOT LIKE '%</channel%'"
+        )
+    }
+}
