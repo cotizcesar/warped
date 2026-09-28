@@ -32,12 +32,12 @@ See: .planning/PROJECT.md (updated 2026-09-28 after v2.2 milestone start)
 
 ## Current Position
 
-Phase: 51 of 51 (Syntax-Theme Fix — ready to plan)
+Phase: 51 of 51 (Syntax-Theme Fix — complete, smoke deferred)
 Plan: —
-Status: Ready to plan
-Last activity: 2026-09-28 — Phase 50 complete (automated gates pass, device smoke deferred to release UAT)
+Status: Complete, ready for lifecycle
+Last activity: 2026-09-28 — Phase 51 complete (automated gates pass, device smoke deferred to release UAT)
 
-Progress: [██████░░░░] 66%
+Progress: [██████████] 100%
 
 ## Phase Structure (v2.2)
 
@@ -45,6 +45,7 @@ Progress: [██████░░░░] 66%
 |-------|------|--------------|--------|------------|
 | 49 | Surface Removal | DEL-01..06 (6) | Complete (smoke deferred) | Phase 48 |
 | 50 | Web Grounding | WEB-01..06 (6) | Complete (smoke deferred) | Phase 49 |
+| 51 | Syntax-Theme Fix | THEME-01..02 (2) | Complete (smoke deferred) | Phase 50 |
 | 51 | Syntax-Theme Fix | THEME-01..02 (2) | Not started | Phase 50 |
 
 **Total v2.2:** 3 phases, 14 requirements, 14/14 mapped ✓
@@ -88,6 +89,7 @@ None yet.
 |-------|-------|--------|
 | 49 | verification_deferred_gaps | /gsd-plan-phase 49 --gaps |
 | 50 | verification_deferred_gaps | /gsd-plan-phase 50 --gaps |
+| 51 | verification_deferred_gaps | /gsd-plan-phase 51 --gaps |
 
 ## Session Continuity
 

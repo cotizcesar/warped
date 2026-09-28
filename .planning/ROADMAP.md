@@ -12,7 +12,7 @@ v2.2 Simplificación + Web Grounding removes dead surface (Skills tool-calling, 
 
 - [x] **Phase 49: Surface Removal** - Skills, HF token, and model search deleted; static catalog only (2026-09-28, automated gates pass, device smoke deferred)
 - [x] **Phase 50: Web Grounding** - URL-in-message fetch → [WEB CONTEXT] injection → grounded answer with offline fallback (2026-09-28, automated gates pass, device smoke deferred)
-- [ ] **Phase 51: Syntax-Theme Fix** - All 4 code presets apply in chat, with regression test
+- [x] **Phase 51: Syntax-Theme Fix** - All 4 code presets apply in chat, with regression test (2026-09-28, automated gates pass, device smoke deferred)
 
 ## Phase Details
 
