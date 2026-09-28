@@ -21,7 +21,7 @@ import org.jsoup.Jsoup
  */
 object HtmlToTextExtractor {
 
-    const val MAX_CHARS = 4000
+    const val MAX_CHARS = 6000
     const val TRUNCATION_MARKER = "… [truncated]"
 
     private val SCRIPT_STYLE_NOSCRIPT = Regex(

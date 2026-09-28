@@ -7,12 +7,14 @@ package com.warped.data.grounding
  * [WEB CONTEXT 1..N] block fits small local-model windows. Numbers are
  * LOW-confidence estimates (see CONTEXT.md) — keep every constant behind
  * these two pure functions (Int in, Int out) so TUNE-01 can refine them
- * later. Pure Kotlin — no Android imports, unit-testable on the JVM.
+ * later. The per-page floor is sized for markdown (denser per char than
+ * flat text); the global tiers stay fit for 4K-token windows.
+ * Pure Kotlin — no Android imports, unit-testable on the JVM.
  */
 object GroundingBudget {
 
-    /** Floor so a page is never truncated into uselessness. */
-    const val MIN_PER_PAGE = 800
+    /** Floor so a page is never truncated into uselessness (markdown-sized). */
+    const val MIN_PER_PAGE = 1500
 
     /**
      * Global char budget for the fused block, keyed on the model window
