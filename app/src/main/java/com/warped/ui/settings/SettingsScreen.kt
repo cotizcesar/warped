@@ -30,6 +30,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -320,6 +323,15 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
             }
         }
 
+        // Web Search section (Phase 55 TAV-01: dedicated card above
+        // Security so the Security card stays untouched)
+        item {
+            Text("Web Search", style = MaterialTheme.typography.titleMedium)
+        }
+        item {
+            TavilyKeyCard(uiState, viewModel)
+        }
+
         // Security section
         item {
             Text("Security", style = MaterialTheme.typography.titleMedium)
@@ -344,6 +356,92 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
             }
         }
         item { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+// =========================================
+// Phase 55 (TAV-01): Tavily key row (D-01)
+//
+// Password-style field (T-55-05: no echo of the stored key — the saved key
+// is never read back into the field, only a presence line), Save + Clear +
+// Test connection, status line with the four test states. Never logs key
+// material.
+// =========================================
+@Composable
+private fun TavilyKeyCard(uiState: SettingsUiState, viewModel: SettingsViewModel) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Tavily search", style = MaterialTheme.typography.bodyLarge)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Ground answers in web search results. Get a key at tavily.com.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                if (uiState.tavilyKeyPresent) "Key saved" else "No key saved",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = uiState.tavilyKeyInput,
+                onValueChange = viewModel::onTavilyKeyInputChange,
+                label = { Text("Tavily API key") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                enabled = !uiState.tavilyTesting,
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = Color(0xFF374151)
+                )
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(
+                    onClick = { viewModel.saveTavilyKey() },
+                    enabled = !uiState.tavilyTesting
+                ) { Text("Save") }
+                TextButton(
+                    onClick = { viewModel.clearTavilyKey() },
+                    enabled = !uiState.tavilyTesting,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Clear") }
+                TextButton(
+                    onClick = { viewModel.testTavilyConnection() },
+                    enabled = !uiState.tavilyTesting
+                ) { Text(if (uiState.tavilyTesting) "Testing..." else "Test connection") }
+            }
+            if (uiState.tavilyStatus != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    uiState.tavilyStatus,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (uiState.tavilyStatusIsError) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Test connection uses one search credit.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 

@@ -58,6 +58,7 @@ class SettingsGroundingToggleTest {
         val localModelRepository = mockk<LocalModelRepository>()
         val presetRepository = mockk<PresetRepository>()
         val apiKeyStore = mockk<ApiKeyStore>()
+        val tavilySearchRepository = mockk<com.warped.data.grounding.TavilySearchRepository>()
 
         every { chatRepository.observeConversations() } returns flowOf(emptyList())
         every { endpointRepository.observeEndpoints() } returns flowOf(emptyList())
@@ -73,6 +74,7 @@ class SettingsGroundingToggleTest {
             presetRepository = presetRepository,
             apiKeyStore = apiKeyStore,
             advancedPreferences = advancedPreferences,
+            tavilySearchRepository = tavilySearchRepository,
         )
     }
 
