@@ -5,7 +5,7 @@ package com.warped.data.grounding
  *
  * Drops instruction-like lines (prompt-injection hijack patterns, ES + EN)
  * at line granularity and escapes delimiter collisions so fetched content
- * can never break out of the [WEB CONTEXT] block or hijack the model.
+ * can never break out of the sources block or hijack the model.
  * Markdown-aware: `[text](target)` link targets allow only http(s) (and
  * protocol-relative `//` as https); javascript:/data:/vbscript: targets —
  * including case/whitespace/control-char padded variants — are stripped to
@@ -56,5 +56,7 @@ object WebContextSanitizer {
             .replace("[WEB CONTEXT", "[WEB-CONTEXT")
             .replace("[FIN WEB CONTEXT", "[FIN-WEB-CONTEXT")
             .replace("[END WEB CONTEXT", "[END-WEB-CONTEXT")
+            .replace("--- Source [", "--- Source-[")
+            .replace("--- End of sources ---", "--- End-of-sources ---")
     }
 }
