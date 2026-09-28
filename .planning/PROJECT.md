@@ -40,6 +40,19 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 **Known deferred:** 7 items carried into v2.1 (see STATE.md Blockers/Concerns). PERF-12/13 benchmark numbers stay CI-gated (require Pixel 7 reference device).
 
+## Current Milestone: v2.1 Finish v2.0 Leftovers — SHIPPED ✅
+
+**Shipped:** 2026-09-28 | [Archive →](.planning/milestones/v2.1-ROADMAP.md) · [Audit →](.planning/v2.1-MILESTONE-AUDIT.md) (passed)
+
+4 phases (45–48), 10 plans, 18/18 requirements MET, no partials left:
+- Catalog to latest stable + LiteRT-LM 0.13.1 → 0.17.1 (45)
+- Cancellable single-flight runInference — Stop means stop (46)
+- Real tool execution local (@Tool) + remote (tools[] loop) with trust boundary (47)
+- Atomic sub-state/LazyColumn split, Baseline Profiles, release hardening (48)
+- Plus device-driven fixes: Thinking fallback, session lifecycle, GPU-constraint retry, spec-decode opt-in, icon badges, seamless model switch, history repair migration v14
+
+**Known deferred:** Pixel 7 reference numbers (PERF-16 + PERF-12/13 gate) — emulator note in BENCHMARKS.md, CI-gated.
+
 ## Current Milestone: v2.1 Finish v2.0 Leftovers
 
 **Goal:** Complete the deferred v2.0 PARTIALs and carry-overs so every shipped feature is fully done — no partials left.

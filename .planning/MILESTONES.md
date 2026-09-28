@@ -1,5 +1,22 @@
 # Milestones
 
+## v2.1 Finish v2.0 Leftovers (Shipped: 2026-09-28)
+
+**Phases completed:** 4 phases (45-48), 10 plans, 18 requirements
+**Requirements:** 18 defined, 18 MET, 0 partials
+**Known deferred items at close:** Pixel 7 reference-device numbers (PERF-16 + PERF-12/13 gate) — emulator note in BENCHMARKS.md, CI-gated
+**Audit:** [`.planning/v2.1-MILESTONE-AUDIT.md`](v2.1-MILESTONE-AUDIT.md) → status: **passed**
+**Archived roadmap:** [`.planning/milestones/v2.1-ROADMAP.md`](milestones/v2.1-ROADMAP.md)
+**Archived requirements:** [`.planning/milestones/v2.1-REQUIREMENTS.md`](milestones/v2.1-REQUIREMENTS.md)
+
+**Key accomplishments:**
+
+1. **Foundation refresh** — Full catalog to latest stable (Hilt 2.60.1, Room 2.8.5, AGP 9.3.0, serialization 1.11.0…) + LiteRT-LM 0.13.1 → 0.17.1 with EngineConfig/ConversationConfig re-verification, R8 keeps, version-namespaced mmap cache; `model_allowlist.json` created with verified-only flags (+ gemma-4-E2B-it)
+2. **Runtime hardening** — Single shared inference Flow (`shareIn` replay=1 per-turn) + true Stop (`Call.cancel()`/`cancelProcess()`); sentinel no-op jobs deleted; rotation-safe; suite 192/192
+3. **Real tool execution** — Skills surface rebuilt Kotlin-only (Calculator, CurrentTime, JsonFormatter + Summarize template); local `@Tool` ToolSets + remote `/v1/chat/completions` tools[] loop (cap 5, cancel-checked); shared schema mapper; Role.TOOL transcript persistence; trust boundary + per-tool tests; per-model gating (default closed)
+4. **Chat perf + startup + release** — Atomic ChatUiState sub-state split + keyed LazyColumn + Jump-to-latest pill; Baseline Profiles seed + lazy native load; log-secret strip (takeLast(100) → length-only); R8 full-mode re-verified; BENCHMARKS <1s target
+5. **Device-driven hardening** — Thinking-fallback fix + history repair migration v14; engine session lifecycle; GPU-constraint retry + spec-decode opt-in (12B loads); icon capability badges + Thinking opt-in; seamless model switch
+
 ## v2.0 Gallery Convergence & Performance Overhaul (Shipped: 2026-06-06)
 
 **Phases completed:** 5 phases (40-44), 23 plans, 53 requirements
