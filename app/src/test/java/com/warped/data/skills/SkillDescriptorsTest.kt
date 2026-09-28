@@ -1,5 +1,8 @@
 package com.warped.data.skills
 
+import com.google.ai.edge.litertlm.Tool
+import com.google.ai.edge.litertlm.ToolParam
+import com.google.ai.edge.litertlm.ToolSet
 import com.google.common.truth.Truth.assertThat
 import com.warped.domain.skills.SkillIds
 import kotlinx.serialization.json.Json
@@ -63,8 +66,7 @@ class SkillDescriptorsTest {
     }
 
     @Test
-    fun `descriptor descriptions equal exported TOOL_PARAM constants (no drift)`() {
-        // Drift-by-construction guard (SKILLS-09): the strings Plan 02 wires
+    fun `descriptor descriptions equal exported TOOL_PARAM constants (no drift)`() {        // Drift-by-construction guard (SKILLS-09): the strings Plan 02 wires
         // into @ToolParam MUST be these constants. If a description is edited
         // in one place but not the other, this fails.
         val calc = skillDescriptor(SkillIds.CALCULATOR)!!
@@ -81,5 +83,67 @@ class SkillDescriptorsTest {
         assertThat(jsonFmt.description).isEqualTo(JSON_TOOL_DESCRIPTION)
         assertThat(jsonFmt.params.single { it.name == "json" }.description)
             .isEqualTo(JSON_TEXT_DESCRIPTION)
+    }
+
+    // 47-02 (SKILLS-09 local side): @Tool/@ToolParam descriptions MUST be the
+    // descriptor constants verbatim — reflection over the ToolSets proves it.
+    // Plain Java reflection: no kotlin-reflect, JVM-safe (no engine init).
+
+    @Test
+    fun `calculator ToolSet annotations match descriptors`() {
+        assertToolShape(
+            CalculatorToolSet::class.java,
+            CALC_TOOL_DESCRIPTION,
+            listOf(CALC_EXPRESSION_DESCRIPTION),
+        )
+    }
+
+    @Test
+    fun `current_time ToolSet annotations match descriptors`() {
+        assertToolShape(
+            CurrentTimeToolSet::class.java,
+            TIME_TOOL_DESCRIPTION,
+            listOf(TIME_TIMEZONE_DESCRIPTION),
+        )
+    }
+
+    @Test
+    fun `json_formatter ToolSet annotations match descriptors`() {
+        assertToolShape(
+            JsonFormatterToolSet::class.java,
+            JSON_TOOL_DESCRIPTION,
+            listOf(JSON_TEXT_DESCRIPTION),
+        )
+    }
+
+    @Test
+    fun `all three skill files expose a ToolSet`() {
+        val toolSets = listOf(
+            CalculatorToolSet::class.java,
+            CurrentTimeToolSet::class.java,
+            JsonFormatterToolSet::class.java,
+        )
+        for (cls in toolSets) {
+            assertThat(ToolSet::class.java.isAssignableFrom(cls)).isTrue()
+        }
+    }
+
+    private fun assertToolShape(
+        toolSet: Class<*>,
+        toolDescription: String,
+        paramDescriptions: List<String>,
+    ) {
+        val methods = toolSet.declaredMethods
+            .filter { it.isAnnotationPresent(Tool::class.java) }
+        assertThat(methods).hasSize(1)
+        val method = methods.single()
+        assertThat(method.getAnnotation(Tool::class.java).description)
+            .isEqualTo(toolDescription)
+        // Positional (parameter names need -parameters): count + descriptions.
+        assertThat(method.parameters).hasLength(paramDescriptions.size)
+        val actual = method.parameters.map {
+            it.getAnnotation(ToolParam::class.java)?.description
+        }
+        assertThat(actual).containsExactlyElementsIn(paramDescriptions).inOrder()
     }
 }
