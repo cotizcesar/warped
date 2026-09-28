@@ -15,6 +15,7 @@ import com.warped.domain.repository.ChatRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import timber.log.Timber
+import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -125,6 +126,29 @@ class ChatRepositoryImpl @Inject constructor(
 
     override suspend fun getSourcesByMessage(messageId: Long): List<GroundedSource> =
         groundedSourceDao.getByMessage(messageId).map { it.toDomain() }
+
+    // Phase 54 (RETRY-01): row-reuse write — delete-then-insert on the
+    // EXISTING assistant row, never a re-save (MessageDao.insert REPLACE
+    // would CASCADE-wipe source rows per the warning above). Null row id
+    // (message deleted after the turn) is a silent no-op: no delete, no
+    // insert, no timestamp touch — orphan rows are never created.
+    override suspend fun replaceSources(
+        conversationId: Long,
+        assistantCreatedAt: Instant,
+        sources: List<GroundedSource>,
+    ) {
+        val rowId = messageDao.findAssistantRowId(
+            conversationId,
+            assistantCreatedAt.toEpochMilli(),
+        ) ?: return
+        groundedSourceDao.deleteByMessage(rowId)
+        if (sources.isNotEmpty()) {
+            groundedSourceDao.insertAll(
+                sources.mapIndexed { index, source -> source.toEntity(rowId, index) },
+            )
+        }
+        conversationDao.updateTimestamp(conversationId, System.currentTimeMillis())
+    }
 
     override suspend fun getWebOverride(conversationId: Long): Boolean? =
         conversationDao.getWebOverride(conversationId)

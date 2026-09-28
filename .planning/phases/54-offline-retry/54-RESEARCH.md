@@ -317,10 +317,10 @@ suspend fun findAssistantRowId(convId: Long, createdAt: Long): Long?
 
 ## Open Questions
 
-1. **Exact `MessageEntity.role` stored literal**
+1. **Exact `MessageEntity.role` stored literal** — (RESOLVED 2026-09-28, 54-01 Task 1)
    - What we know: `MessageDao` has no role-filtered query today; `EntityMappers.toEntity/toDomain` round-trips role somehow.
    - What's unclear: Whether the column holds `'ASSISTANT'` (name) or an ordinal/int.
-   - Recommendation: Planner reads `MessageEntity.kt` + `EntityMappers.kt` (5 min) before writing the `findAssistantRowId` query; fallback is lookup by `(conversation_id, created_at)` without the role predicate.
+   - Answer: **Enum name.** `ChatMessage.toEntity` writes `role = role.name` (`EntityMappers.kt:44`) and `toDomain` reads via `Role.valueOf` with a `toRoleSafe` fallback (`EntityMappers.kt:23-27`) — the column holds `'ASSISTANT'`, not an ordinal. `findAssistantRowId` uses the `role = 'ASSISTANT'` predicate verbatim; no fallback needed.
 
 ## Environment Availability
 

@@ -172,7 +172,7 @@ class WebPageFetcher @Inject constructor(
         GroundingResult.ModelOnly(GroundingResult.Reason.FETCH_FAILED)
     }
 
-    private fun hasValidatedInternet(): Boolean {
+    internal fun hasValidatedInternet(): Boolean {
         return try {
             val cm = context.getSystemService(ConnectivityManager::class.java) ?: return false
             val network = cm.activeNetwork ?: return false

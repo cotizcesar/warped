@@ -5,6 +5,7 @@ import com.warped.domain.model.Conversation
 import com.warped.domain.model.GroundedSource
 import com.warped.domain.model.ProviderType
 import kotlinx.coroutines.flow.Flow
+import java.time.Instant
 
 interface ChatRepository {
     fun observeConversations(): Flow<List<Conversation>>
@@ -27,4 +28,17 @@ interface ChatRepository {
     /** Tri-state override: null = inherit global default-ON. */
     suspend fun getWebOverride(conversationId: Long): Boolean?
     suspend fun setWebOverride(conversationId: Long, override: Boolean?)
+    /**
+     * Phase 54 (RETRY-01): row-reuse write for offline retry. Resolves the
+     * assistant row by (conversationId, assistantCreatedAt), then
+     * delete-then-inserts the source rows keyed by that row id. NEVER
+     * re-saves the message — MessageDao.insert uses REPLACE and would
+     * CASCADE-wipe the rows just written. Null row id (message deleted) is
+     * a silent no-op that never inserts orphan rows. No schema change.
+     */
+    suspend fun replaceSources(
+        conversationId: Long,
+        assistantCreatedAt: Instant,
+        sources: List<GroundedSource>,
+    )
 }

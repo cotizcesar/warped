@@ -30,4 +30,19 @@ interface MessageDao {
 
     @Query("DELETE FROM messages WHERE id = :messageId")
     suspend fun deleteById(messageId: Long)
+
+    /**
+     * Phase 54 (RETRY-01): row-reuse lookup for retry writes. Resolves the
+     * assistant row id by (conversation_id, created_at) — `createdAt` millis
+     * round-trips exactly (Instant.ofEpochMilli/toEpochMilli) and a covering
+     * index exists on (conversation_id, created_at). The role column stores
+     * the enum name (`toEntity` writes `role.name`), so the 'ASSISTANT'
+     * literal is exact. Returns null when the message was deleted — the
+     * caller treats null as a silent no-op and never inserts orphan rows.
+     */
+    @Query(
+        "SELECT id FROM messages WHERE conversation_id = :conversationId " +
+            "AND created_at = :createdAt AND role = 'ASSISTANT' LIMIT 1",
+    )
+    suspend fun findAssistantRowId(conversationId: Long, createdAt: Long): Long?
 }
