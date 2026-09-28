@@ -115,6 +115,7 @@ None — v2.2 phases shipped with accepted deferrals recorded above. Next milest
 | 20260928-honest-delete-unified-download | 2026-09-28 | Complete ✓ | Borrado honesto (por ruta, con errores visibles) + descarga idéntica en catálogo y Models; 321 green; E2E en dispositivo pendiente |
 | 20260928-vision-backend-gpu | 2026-09-28 | Complete ✓ | Visión a GPU probada en init + reintento por slot (main/vision/audio); 328 green; cargar E2B en dispositivo pendiente |
 | 20260928-webfetch-parity | 2026-09-28 | Complete ✓ | Extracción markdown (headings/tablas/código/links), 256KB/30s, UA desktop; sanitizer anti-links maliciosos; 346 green |
+| 20260928-source-delimiter-rename | 2026-09-28 | Complete ✓ | Bloques "Source [N]" sin etiqueta filtrable + escapes viejos conservados; suite verde |
 
 ## Session Continuity
 
