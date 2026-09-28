@@ -73,6 +73,18 @@ class ModelAllowlistTest {
     }
 
     @Test
+    fun `shipped asset catalog order is locked`() {
+        val models = parseModelAllowlist(shippedAssetText())
+
+        assertThat(models.map { it.name }).containsExactly(
+            "gemma-4-E2B-it",
+            "gemma-4-E4B-it",
+            "gemma-3n-E2B-it-int4",
+            "gemma-3n-E4B-it-int4"
+        ).inOrder()
+    }
+
+    @Test
     fun `missing ramNote and blurb parse to nulls without exception`() {
         val raw = """{"models": [{"name": "x", "displayName": "X", "modelFile": "x.task",
             "sizeInBytes": 1, "capabilities": {}}]}"""
