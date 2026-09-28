@@ -101,6 +101,7 @@ None — v2.2 phases shipped with accepted deferrals recorded above. Next milest
 | Slug | Date | Status | Notes |
 |------|------|--------|-------|
 | 20260928-chat-scroll-follow-fix | 2026-09-28 | Complete ✓ | End-pin follow + Latest pill fix (single root cause: item-top pinning); 300/300 unit green; on-device scroll confirmation pending |
+| 20260928-remove-sin-web | 2026-09-28 | Complete ✓ | Sin web chip + skipOnce plumbing removed; SYSTEM_PROMPT always-on when grounding enabled; suite green |
 
 ## Session Continuity
 
