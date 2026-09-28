@@ -51,9 +51,16 @@ data class ChatInputState(
     val isFetchingWeb: Boolean = false,
     // Phase 52 (FETCH-03): N-de-M fan-out progress. Nullable: present only
     // while fetching; cleared on completion/failure/Stop (transient, never
-    // persisted, never a transcript message). The chip copy derives from
-    // done/total; per-source ok/omitida states are recorded here, never
-    // as transcript messages.
+    // persisted, never a transcript message). The Phase 52 chip renders
+    // done/total counts ONLY ("Leyendo N de M…") per the UI-SPEC chip
+    // contract — perSource rows are NOT rendered in this phase. Rows start
+    // as LOADING and the terminal pass records the final OK/OMITIDA
+    // snapshot (transient: published, then cleared with progress in the
+    // same turn); the recording — not a live rendered surface — is the
+    // FETCH-02 "no silent drops" contract, retained for Phase 53
+    // bottom-sheet consumers. Counts-only is sufficient for FETCH-03
+    // because completions land out of order under parallel fan-out and
+    // OMITIDA is only knowable at the terminal pass.
     val webFetchProgress: WebFetchProgress? = null,
 )
 
@@ -62,6 +69,10 @@ data class ChatInputState(
  * Every attempted URL (up to the cap of 5) lands as [OK] or [OMITIDA] —
  * no silent drops. 6th+ URLs are ignored deterministically and never
  * enter this state.
+ *
+ * Recorded, not rendered, in Phase 52: the chip shows done/total counts
+ * only (see `webFetchProgress`); these states are the terminal snapshot
+ * for Phase 53 consumers.
  */
 enum class PerSourceStatus {
     LOADING,

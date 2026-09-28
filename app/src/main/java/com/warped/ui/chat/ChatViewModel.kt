@@ -316,6 +316,13 @@ class ChatViewModel @Inject constructor(
                                     requestUserText = GroundingPrompt.augment(requestUserText, result.block)
                                     groundedSources = result.okUrls
                                     val skipped = result.skippedUrls.toSet()
+                                    // Terminal per-source snapshot: records OK/OMITIDA
+                                    // into progress state (FETCH-02 no-silent-drops
+                                    // contract). Transient by construction — the
+                                    // enclosing finally clears progress right after —
+                                    // and not rendered in Phase 52 (chip is
+                                    // counts-only per UI-SPEC); kept as the recorded
+                                    // state for Phase 53 bottom-sheet consumers.
                                     updateInput { s ->
                                         s.copy(
                                             webFetchProgress = s.webFetchProgress?.copy(
