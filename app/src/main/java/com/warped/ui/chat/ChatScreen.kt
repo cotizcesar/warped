@@ -226,7 +226,12 @@ fun ChatScreen(
     }
     // 48-UI-SPEC §2 visibility rule: non-empty list AND scrolled up AND new
     // content arrived since. Never on empty state, never at bottom.
-    val isEmpty = transcript.messages.isEmpty() && transcript.streamingContent.isEmpty()
+    val isEmpty = transcript.messages.isEmpty()
+        && transcript.streamingContent.isEmpty()
+        && transcript.streamingReasoning.isEmpty()
+        && transcript.toolCallActive == null
+        && transcript.activeToolError == null
+        && !transcript.showNoToolSupportNotice
     val showPill = !isEmpty && !isAtBottom && hasNewContentBelow
 
     Scaffold(
