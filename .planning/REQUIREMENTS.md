@@ -63,25 +63,25 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DEL-01 | TBD | Pending |
-| DEL-02 | TBD | Pending |
-| DEL-03 | TBD | Pending |
-| DEL-04 | TBD | Pending |
-| DEL-05 | TBD | Pending |
-| DEL-06 | TBD | Pending |
-| WEB-01 | TBD | Pending |
-| WEB-02 | TBD | Pending |
-| WEB-03 | TBD | Pending |
-| WEB-04 | TBD | Pending |
-| WEB-05 | TBD | Pending |
-| WEB-06 | TBD | Pending |
-| THEME-01 | TBD | Pending |
-| THEME-02 | TBD | Pending |
+| DEL-01 | Phase 49 | Pending |
+| DEL-02 | Phase 49 | Pending |
+| DEL-03 | Phase 49 | Pending |
+| DEL-04 | Phase 49 | Pending |
+| DEL-05 | Phase 49 | Pending |
+| DEL-06 | Phase 49 | Pending |
+| WEB-01 | Phase 50 | Pending |
+| WEB-02 | Phase 50 | Pending |
+| WEB-03 | Phase 50 | Pending |
+| WEB-04 | Phase 50 | Pending |
+| WEB-05 | Phase 50 | Pending |
+| WEB-06 | Phase 50 | Pending |
+| THEME-01 | Phase 51 | Pending |
+| THEME-02 | Phase 51 | Pending |
 
 **Coverage:**
 - v1 requirements: 14 total
-- Mapped to phases: 0
-- Unmapped: 14 ⚠️ (se resuelve en roadmap)
+- Mapped to phases: 14
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-09-28*
