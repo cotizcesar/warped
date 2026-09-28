@@ -11,6 +11,7 @@ import com.warped.data.local.inference.ModelImportManager
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.data.remote.provider.LMStudioProvider
 import com.warped.data.remote.provider.ProviderRouter
+import com.warped.data.repository.ModelAllowlistRepository
 import com.warped.domain.model.*
 import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.LocalModelRepository
@@ -38,8 +39,17 @@ class UnifiedSelectorViewModel @Inject constructor(
     private val memoryChecker: MemoryChecker,
     private val apiKeyStore: ApiKeyStore,
     private val inputSanitizer: InputSanitizer,
-    private val parameterStore: ParameterStore
+    private val parameterStore: ParameterStore,
+    private val allowlist: ModelAllowlistRepository
 ) : ViewModel() {
+
+    /**
+     * Effective capabilities for a downloaded model — delegates to the
+     * allowlist (verified-only wins; Thinking is opt-in). See
+     * [ModelAllowlistRepository.effectiveCapabilities].
+     */
+    fun effectiveCapabilities(model: LocalModel): ModelCapabilities =
+        allowlist.effectiveCapabilities(model)
 
     private val _uiState = MutableStateFlow(UnifiedSelectorUiState())
     val uiState: StateFlow<UnifiedSelectorUiState> = _uiState.asStateFlow()

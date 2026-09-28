@@ -116,4 +116,35 @@ class ModelAllowlistTest {
         assertThat(models).hasSize(1)
         assertThat(models[0].name).isEqualTo("x")
     }
+
+    @Test
+    fun `effectiveCapabilities prefers allowlist and gates thinking`() {
+        val repo = repositoryBackedBy(shippedAssetText())
+        fun local(name: String, file: String) = com.warped.domain.model.LocalModel(
+            name = name,
+            filePath = "/data/models/$file",
+            sizeBytes = 1L,
+            quantization = "N/A",
+            parameterCount = "Unknown",
+            architecture = "x",
+            importedAt = java.time.Instant.EPOCH
+        )
+
+        // Allowlisted gemma-4-E2B-it: verified text-only — thinking stays off
+        // despite stored all-true caps.
+        val e2b = repo.effectiveCapabilities(local("gemma-4-E2B-it", "gemma-4-E2B-it.litertlm"))
+        assertThat(e2b.reasoning).isFalse()
+        assertThat(e2b.vision).isFalse()
+        assertThat(e2b.tools).isFalse()
+
+        // Allowlisted 3n keeps its verified vision/audio.
+        val n3 = repo.effectiveCapabilities(local("gemma-3n-E2B-it-int4", "gemma-3n-E2B-it-int4.task"))
+        assertThat(n3.vision).isTrue()
+        assertThat(n3.reasoning).isFalse()
+
+        // Unlisted model: stored caps except thinking (opt-in only).
+        val other = repo.effectiveCapabilities(local("gemma-4-E4B-it", "gemma-4-E4B-it.litertlm"))
+        assertThat(other.vision).isTrue()
+        assertThat(other.reasoning).isFalse()
+    }
 }

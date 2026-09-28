@@ -25,6 +25,7 @@ import com.warped.data.local.download.DownloadState
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.domain.model.Endpoint
 import com.warped.domain.model.LocalModel
+import com.warped.domain.model.ModelCapabilities
 import com.warped.domain.model.ProviderType
 import com.warped.ui.components.WarpedAlertDialog
 import com.warped.ui.components.ModelParamsDialog
@@ -168,9 +169,15 @@ fun UnifiedSelectorScreen(
                 items(uiState.localModels, key = { "local-${it.id}" }) { model ->
                     LocalModelSelectorCard(
                         model = model,
+                        capabilities = viewModel.effectiveCapabilities(model),
                         isConnected = uiState.connectedLocalModelId == model.filePath && uiState.isLocalConnected,
                         isConnecting = uiState.isConnecting && uiState.connectingModelName == model.name,
-                        isAnotherConnected = uiState.isLocalConnected && uiState.connectedLocalModelId != model.filePath,
+                        // Seamless switch: rows stay interactive while another model is
+                        // connected — connectLocal unloads the previous engine itself.
+                        // Locked only while a connection is in flight (avoids racing
+                        // two engine inits); the connected row stays tappable to
+                        // disconnect.
+                        connectLocked = uiState.isConnecting,
                         onConnect = {
                             if (viewModel.shouldWarnAboutMemory(model.sizeBytes)) {
                                 showMemoryWarning = model
@@ -230,9 +237,10 @@ fun UnifiedSelectorScreen(
 @Composable
 private fun LocalModelSelectorCard(
     model: LocalModel,
+    capabilities: ModelCapabilities,
     isConnected: Boolean,
     isConnecting: Boolean,
-    isAnotherConnected: Boolean,
+    connectLocked: Boolean,
     onConnect: () -> Unit,
     onDisconnect: () -> Unit,
     onDelete: () -> Unit,
@@ -281,14 +289,9 @@ private fun LocalModelSelectorCard(
                         ModelMetaChip(model.parameterCount)
                     }
                 }
-                if (model.capabilities.vision || model.capabilities.reasoning || model.capabilities.tools || model.capabilities.audio) {
+                if (capabilities.vision || capabilities.reasoning || capabilities.tools || capabilities.audio) {
                     Spacer(Modifier.height(4.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        if (model.capabilities.vision) CapabilityBadge("Vision", Color(0xFF9C27B0))
-                        if (model.capabilities.audio) CapabilityBadge("Audio", Color(0xFF4CAF50))
-                        if (model.capabilities.reasoning) CapabilityBadge("Thinking", Color(0xFFFF9800))
-                        if (model.capabilities.tools) CapabilityBadge("Tools", Color(0xFF2196F3))
-                    }
+                    com.warped.ui.components.CapabilityIconRow(capabilities)
                 }
             }
 
@@ -300,7 +303,7 @@ private fun LocalModelSelectorCard(
                     onCheckedChange = { checked ->
                         if (checked) onConnect() else onDisconnect()
                     },
-                    enabled = !isAnotherConnected || isConnected
+                    enabled = !connectLocked || isConnected
                 )
             }
 
@@ -422,22 +425,6 @@ private fun ModelMetaChip(text: String) {
             style = MaterialTheme.typography.labelSmall,
             color = Color(0xFF9CA3AF),
             fontSize = 11.sp
-        )
-    }
-}
-
-@Composable
-private fun CapabilityBadge(label: String, color: Color) {
-    Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = color.copy(alpha = 0.12f)
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = color,
-            fontWeight = FontWeight.SemiBold
         )
     }
 }

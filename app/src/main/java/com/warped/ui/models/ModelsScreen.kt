@@ -10,16 +10,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Audiotrack
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -388,28 +384,7 @@ fun ModelCard(
             val caps = capabilities ?: model.capabilities
             if (caps.vision || caps.reasoning || caps.tools || caps.audio) {
                 Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (caps.vision) CapabilityBadge(
-                        icon = Icons.Filled.Visibility,
-                        contentDescription = "Vision",
-                        color = Color(0xFF9C27B0)
-                    )
-                    if (caps.audio) CapabilityBadge(
-                        icon = Icons.Filled.Audiotrack,
-                        contentDescription = "Audio",
-                        color = Color(0xFF4CAF50)
-                    )
-                    if (caps.reasoning) CapabilityBadge(
-                        icon = Icons.Filled.Psychology,
-                        contentDescription = "Thinking",
-                        color = Color(0xFFFF9800)
-                    )
-                    if (caps.tools) CapabilityBadge(
-                        icon = Icons.Filled.Build,
-                        contentDescription = "Tools",
-                        color = Color(0xFF2196F3)
-                    )
-                }
+                com.warped.ui.components.CapabilityIconRow(caps)
             }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -464,25 +439,6 @@ private fun ModelFormatBadge(format: String) {
             style = MaterialTheme.typography.labelSmall,
             color = color,
             fontWeight = FontWeight.SemiBold
-        )
-    }
-}
-
-@Composable
-private fun CapabilityBadge(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    contentDescription: String,
-    color: Color
-) {
-    Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = color.copy(alpha = 0.12f)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp).size(14.dp),
-            tint = color
         )
     }
 }

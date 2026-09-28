@@ -113,4 +113,28 @@ class ModelAllowlistRepository @Inject constructor(
             else -> false
         }
     }
+
+    /**
+     * Effective UI capabilities for a downloaded model. The allowlist
+     * (verified-only) wins when it contains the model — matched by file name,
+     * then by display name.
+     *
+     * Thinking is allowlist opt-in: only models with verified thought output
+     * show the Thinking badge (device-proven 2026-09-28 that untagged models
+     * like gemma-4-E2B-it never emit thinking). Other flags fall back to the
+     * model's stored capabilities when unlisted.
+     */
+    fun effectiveCapabilities(model: com.warped.domain.model.LocalModel): com.warped.domain.model.ModelCapabilities {
+        val fileName = model.filePath.substringAfterLast("/")
+        val entry = findByModelFile(fileName) ?: findByName(model.name)
+        if (entry != null) {
+            return com.warped.domain.model.ModelCapabilities(
+                vision = entry.capabilities.vision,
+                reasoning = entry.capabilities.supportsThinking,
+                tools = entry.capabilities.supportsFunctionCalling,
+                audio = entry.capabilities.audio
+            )
+        }
+        return model.capabilities.copy(reasoning = false)
+    }
 }
