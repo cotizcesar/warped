@@ -63,10 +63,17 @@ class ModelImportManager @Inject constructor(
         }
 
     suspend fun deleteModel(model: LocalModel) = withContext(Dispatchers.IO) {
-        try {
-            File(model.filePath).delete()
-            localModelRepository.deleteModel(model.id)
-        } catch (e: Exception) {
+        val file = File(model.filePath)
+        val fileExists = file.exists()
+        if (fileExists && !file.delete()) {
+            throw IllegalStateException("Could not delete model file at ${model.filePath}")
+        }
+        val rowsDeleted = localModelRepository.deleteByFilePath(model.filePath)
+        if (rowsDeleted == 0) {
+            if (fileExists) {
+                throw IllegalStateException("Model file removed but no library entry found for ${model.filePath}")
+            }
+            throw IllegalStateException("Model not found on device or in library: ${model.name}")
         }
     }
 

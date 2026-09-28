@@ -46,4 +46,7 @@ interface LocalModelDao {
 
     @Query("DELETE FROM local_models WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("DELETE FROM local_models WHERE file_path = :filePath")
+    suspend fun deleteByFilePath(filePath: String): Int
 }

@@ -318,11 +318,6 @@ fun ModelsScreen(
                     }
                 }
             }
-
-            if (uiState.error != null) {
-                // Error is now shown via the SnackbarHost in the Scaffold.
-                // Keep this block as a no-op for now (in case we want to show inline later).
-            }
         }
     }
 }

@@ -97,6 +97,9 @@ class ModelsViewModel @Inject constructor(
     fun deleteModel(model: LocalModel) {
         viewModelScope.launch(coroutineExceptionHandler) {
             try {
+                if (activeModelSelection.localSelection.value.modelId == model.filePath) {
+                    activeModelSelection.disconnectLocal()
+                }
                 modelImportManager.deleteModel(model)
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message) }

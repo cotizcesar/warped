@@ -47,4 +47,7 @@ class LocalModelRepositoryImpl @Inject constructor(
     override suspend fun deleteModel(id: Long) {
         localModelDao.deleteById(id)
     }
+
+    override suspend fun deleteByFilePath(filePath: String): Int =
+        localModelDao.deleteByFilePath(filePath)
 }

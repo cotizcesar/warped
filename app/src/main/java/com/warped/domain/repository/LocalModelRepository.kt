@@ -12,4 +12,5 @@ interface LocalModelRepository {
     suspend fun saveModel(model: LocalModel): Long
     suspend fun updateParameters(modelId: Long, parameters: GenerationParameters)
     suspend fun deleteModel(id: Long)
+    suspend fun deleteByFilePath(filePath: String): Int
 }
