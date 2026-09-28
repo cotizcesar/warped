@@ -47,4 +47,14 @@ class CatalogCardTextTest {
         assertThat(expandedText(entry(null, "Chat general.")))
             .isEqualTo("Chat general.")
     }
+
+    @Test
+    fun `title end padding is narrow when idle`() {
+        assertThat(titleEndPaddingDp(false)).isEqualTo(52)
+    }
+
+    @Test
+    fun `title end padding reserves the active cluster`() {
+        assertThat(titleEndPaddingDp(true)).isEqualTo(128)
+    }
 }

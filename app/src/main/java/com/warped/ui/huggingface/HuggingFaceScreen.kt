@@ -139,6 +139,15 @@ fun expandedText(entry: AllowlistedModel): String? {
 }
 
 /**
+ * Active-cluster title end-padding (quick plan 2026-09-28): the idle /
+ * downloaded / failed icon cluster fits in 52dp, but the active download
+ * cluster (24dp ring + 4dp spacer + 48dp pause/resume + 48dp cancel ≈ 124dp)
+ * needs a 128dp slot so long titles ellipsize before the cluster.
+ * Returns the dp value as Int; call sites apply `.dp`.
+ */
+fun titleEndPaddingDp(active: Boolean): Int = if (active) 128 else 52
+
+/**
  * Pure on-device/session downloaded rule: true when the in-session
  * WorkManager state is terminal-complete (non-null, not active, no error,
  * progress >= 1f) OR the file is already on-device. JVM-testable.
@@ -218,7 +227,7 @@ private fun CatalogModelCard(
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(end = 52.dp)
+                    modifier = Modifier.padding(end = titleEndPaddingDp(active).dp)
                 )
                 Box(Modifier.align(Alignment.CenterEnd)) {
                     CatalogDownloadActions(
@@ -312,32 +321,36 @@ private fun CatalogDownloadActions(
     when {
         active -> {
             val paused = downloadState?.isPaused == true
-            if (!paused) {
-                CircularProgressIndicator(
-                    progress = { (downloadState?.progress ?: 0f).coerceIn(0f, 1f) },
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(Modifier.width(4.dp))
-                IconButton(onClick = onPause) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (!paused) {
+                    CircularProgressIndicator(
+                        progress = { (downloadState?.progress ?: 0f).coerceIn(0f, 1f) },
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = Color(0xFF333333)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    IconButton(onClick = onPause) {
+                        Icon(
+                            imageVector = Icons.Filled.Pause,
+                            contentDescription = "Pausar descarga"
+                        )
+                    }
+                } else {
+                    IconButton(onClick = onResume) {
+                        Icon(
+                            imageVector = Icons.Filled.PlayArrow,
+                            contentDescription = "Reanudar descarga"
+                        )
+                    }
+                }
+                IconButton(onClick = onCancelClick) {
                     Icon(
-                        imageVector = Icons.Filled.Pause,
-                        contentDescription = "Pausar descarga"
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "Cancelar descarga",
+                        tint = MaterialTheme.colorScheme.error
                     )
                 }
-            } else {
-                IconButton(onClick = onResume) {
-                    Icon(
-                        imageVector = Icons.Filled.PlayArrow,
-                        contentDescription = "Reanudar descarga"
-                    )
-                }
-            }
-            IconButton(onClick = onCancelClick) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = "Cancelar descarga",
-                    tint = MaterialTheme.colorScheme.error
-                )
             }
         }
         downloaded -> Box(
