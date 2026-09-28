@@ -37,8 +37,8 @@ class ModelAllowlistTest {
         assertThat(models).hasSize(4)
         val e2b = models.first { it.name == "gemma-3n-E2B-it-int4" }
         assertThat(e2b.displayName).isEqualTo("Gemma 3n E2B IT (int4)")
-        assertThat(e2b.modelFile).isEqualTo("gemma-3n-E2B-it-int4.task")
-        assertThat(e2b.sizeInBytes).isEqualTo(3136226711L)
+        assertThat(e2b.modelFile).isEqualTo("gemma-3n-E2B-it-int4.litertlm")
+        assertThat(e2b.sizeInBytes).isEqualTo(3655827456L)
         assertThat(e2b.taskTypes).contains("chat")
         val g4 = models.first { it.name == "gemma-4-E2B-it" }
         assertThat(g4.displayName).isEqualTo("Gemma 4 E2B IT")
@@ -51,6 +51,22 @@ class ModelAllowlistTest {
         assertThat(e4b.sizeInBytes).isEqualTo(3659530240L)
         assertThat(e4b.repo).isEqualTo("warped-community/gemma-4-E4B-it-litert-lm")
         assertThat(e4b.taskTypes).contains("chat")
+    }
+
+    @Test
+    fun `shipped 3n entries pin litertlm file mapping`() {
+        val models = parseModelAllowlist(shippedAssetText())
+        val byName = models.associateBy { it.name }
+
+        val e2b = byName["gemma-3n-E2B-it-int4"]
+        assertThat(e2b?.repo).isEqualTo("warped-community/gemma-3n-E2B-it-litert-lm")
+        assertThat(e2b?.modelFile).isEqualTo("gemma-3n-E2B-it-int4.litertlm")
+        assertThat(e2b?.sizeInBytes).isEqualTo(3655827456L)
+
+        val e4b = byName["gemma-3n-E4B-it-int4"]
+        assertThat(e4b?.repo).isEqualTo("warped-community/gemma-3n-E4B-it-litert-lm")
+        assertThat(e4b?.modelFile).isEqualTo("gemma-3n-E4B-it-int4.litertlm")
+        assertThat(e4b?.sizeInBytes).isEqualTo(4919541760L)
     }
 
     @Test
@@ -175,7 +191,7 @@ class ModelAllowlistTest {
         val repo = repositoryBackedBy(shippedAssetText())
 
         assertThat(repo.models).hasSize(4)
-        assertThat(repo.findByModelFile("gemma-3n-E4B-it-int4.task")?.name)
+        assertThat(repo.findByModelFile("gemma-3n-E4B-it-int4.litertlm")?.name)
             .isEqualTo("gemma-3n-E4B-it-int4")
         assertThat(repo.findByModelFile("gemma-4-E4B-it.litertlm")?.name)
             .isEqualTo("gemma-4-E4B-it")
@@ -238,7 +254,7 @@ class ModelAllowlistTest {
         assertThat(e2b.tools).isFalse()
 
         // Allowlisted 3n keeps its verified vision/audio.
-        val n3 = repo.effectiveCapabilities(local("gemma-3n-E2B-it-int4", "gemma-3n-E2B-it-int4.task"))
+        val n3 = repo.effectiveCapabilities(local("gemma-3n-E2B-it-int4", "gemma-3n-E2B-it-int4.litertlm"))
         assertThat(n3.vision).isTrue()
         assertThat(n3.reasoning).isFalse()
 
