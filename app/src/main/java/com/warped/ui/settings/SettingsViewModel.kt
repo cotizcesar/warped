@@ -208,7 +208,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun saveTavilyKey() {
-        val input = _uiState.value.tavilyKeyInput
+        val input = _uiState.value.tavilyKeyInput.trim()
         if (input.isBlank()) {
             _uiState.update {
                 it.copy(
