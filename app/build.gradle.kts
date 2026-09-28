@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.baselineprofile)  // PERF-16: embeds baseline-prof.txt into release
 }
 
 android {
@@ -159,6 +160,9 @@ dependencies {
     // SplashScreen
     implementation(libs.core.splashscreen)
 
+    // Baseline Profiles (PERF-16): installs the release baseline profile on first run
+    implementation(libs.profileinstaller)
+
     // Security
     implementation(libs.security.crypto)
     implementation(libs.sqlcipher)
@@ -185,8 +189,8 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.compose.ui.test)
     androidTestImplementation(libs.room.testing)
-    androidTestImplementation("androidx.benchmark:benchmark-macro-junit4:1.3.3")
-    androidTestImplementation("androidx.benchmark:benchmark-junit4:1.3.3")
+    androidTestImplementation("androidx.benchmark:benchmark-macro-junit4:1.5.0")
+    androidTestImplementation("androidx.benchmark:benchmark-junit4:1.5.0")
     androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
 }
 

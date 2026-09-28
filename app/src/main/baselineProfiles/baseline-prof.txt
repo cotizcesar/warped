@@ -1,0 +1,4 @@
+Lcom/warped/WarpedApplication;
+HSLcom/warped/WarpedApplication;->onCreate()V
+Lcom/warped/MainActivity;
+HSLcom/warped/MainActivity;->onCreate(Landroid/os/Bundle;)V
