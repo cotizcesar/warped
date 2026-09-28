@@ -128,7 +128,20 @@ class LMStudioProvider(
             .filter { it.role != Role.SYSTEM }
             .filter { it.content.isNotBlank() }
             .map {
-                val content = if (it.role == Role.USER) inputSanitizer.sanitize(it.content) else it.content
+                // 47-03: resumed role:tool rows (persisted as
+                // "<toolId>\n<summary>") replay as plain-text summaries on
+                // the native path, which has no role:tool concept. Plain
+                // chat (no TOOL rows) is byte-identical to before.
+                val content = when (it.role) {
+                    Role.USER -> inputSanitizer.sanitize(it.content)
+                    Role.TOOL -> {
+                        val idx = it.content.indexOf('\n')
+                        val toolId = if (idx < 0) it.content else it.content.substring(0, idx)
+                        val summary = if (idx < 0) "" else it.content.substring(idx + 1)
+                        "Used ${com.warped.domain.skills.toolDisplayNameCapitalized(toolId)}: $summary"
+                    }
+                    else -> it.content
+                }
                 LmStudioInputItem(type = "text", content = content)
             }
 
@@ -283,6 +296,30 @@ class LMStudioProvider(
         }
         awaitClose { currentCall = null }
     }.flowOn(Dispatchers.IO)
+
+    /**
+     * 47-03 (D-04/D-07): OpenAI-compatible tool-loop entry — PARALLEL path.
+     *
+     * Speaks `POST {base}/v1/chat/completions` with `tools[]` via
+     * [LmStudioToolLoop] (index-keyed SSE accumulator, local execution,
+     * `role:tool` re-POST, 5-round cap, malformed fallback). The native
+     * `/api/v1/chat` [chat] path above is untouched for plain chat.
+     */
+    fun chatCompletionsWithTools(
+        request: ChatRequest,
+        tools: List<com.warped.data.remote.dto.OpenAiTool>,
+        executor: com.warped.domain.skills.ToolExecutor,
+        onCallCreated: (Call) -> Unit = {},
+    ): Flow<StreamToken> {
+        val loop = LmStudioToolLoop(
+            client = client,
+            baseUrl = baseUrl,
+            modelId = modelId,
+            executor = executor,
+            inputSanitizer = inputSanitizer,
+        )
+        return loop.run(request, tools, onCallCreated)
+    }
 
     private fun handleSseEvent(eventType: String, event: LmStudioSseEvent): List<StreamToken> {
         val tokens = mutableListOf<StreamToken>()

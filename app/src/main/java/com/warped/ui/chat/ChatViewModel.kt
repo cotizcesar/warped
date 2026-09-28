@@ -388,6 +388,9 @@ class ChatViewModel @Inject constructor(
                             // path below stays untouched.
                             _uiState.update { it.copy(toolCallActive = token.toolName) }
                         }
+                        // 47-03 (Task 2): ToolCompleted persistence + error rows.
+                        // Placeholder keeps the Task 1 commit compiling.
+                        is StreamToken.ToolCompleted -> Unit
                         is StreamToken.Done -> {
                             _uiState.update { it.copy(toolCallActive = null) }
                             rawBuffer.append(tokenBuffer.joinToString(""))

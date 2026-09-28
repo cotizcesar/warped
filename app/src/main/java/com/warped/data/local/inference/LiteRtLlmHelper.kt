@@ -76,6 +76,9 @@ class LiteRtLlmHelper @Inject constructor(
                         // 47-02: live tool status passes through untouched
                         // (never think-stripped, never filtered).
                         is StreamToken.ToolStatus -> token
+                        // 47-03: remote-loop records are local-path passthrough
+                        // (local automatic mode never emits them).
+                        is StreamToken.ToolCompleted -> token
                     }
                 }
             }

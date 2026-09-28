@@ -110,6 +110,8 @@ class PromptLabViewModel @Inject constructor(
                         }
                         // 47-02: tool status is not text — ignored by PromptLab.
                         is StreamToken.ToolStatus -> Unit
+                        // 47-03: remote-loop completion records are not text either.
+                        is StreamToken.ToolCompleted -> Unit
                     }
                 }
             } catch (e: Exception) {

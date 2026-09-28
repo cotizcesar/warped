@@ -93,6 +93,8 @@ class ModelBenchmarkWorker @AssistedInject constructor(
                         is StreamToken.Error -> throw IllegalStateException(token.message)
                         // 47-02: tool status is not text — ignored by benchmarks.
                         is StreamToken.ToolStatus -> Unit
+                        // 47-03: remote-loop completion records carry no text.
+                        is StreamToken.ToolCompleted -> Unit
                     }
                 }
             } catch (e: Exception) {

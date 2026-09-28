@@ -54,6 +54,23 @@ object ToolGating {
     }
 
     /**
+     * 47-03 (D-04/D-07): remote tool support for an LM Studio model id.
+     * Allowlist verdict OR-ed with the native models-list capability
+     * (`trained_for_tool_use`, cached by LMStudioProvider.listModels).
+     * Shared by LmStudioHelper (loop-vs-native routing) and ChatViewModel
+     * (no-support notice) so both sides gate identically.
+     */
+    fun supportsRemoteTools(
+        allowlist: ModelAllowlistRepository,
+        modelId: String?,
+    ): Boolean {
+        if (modelId.isNullOrBlank()) return false
+        if (allowlist.supportsFunctionCalling(modelId)) return true
+        return com.warped.data.repository.LmStudioModelCache.lastData.any { entry ->
+            entry.key == modelId && entry.capabilities?.trainedForToolUse == true
+        }
+    }
+    /**
      * Prompt-injection fallback (v2.0 behavior preserved): skill one-liners
      * from the shared descriptors, injected as a system message when gating
      * says no-support.

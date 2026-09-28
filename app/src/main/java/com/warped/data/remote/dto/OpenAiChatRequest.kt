@@ -51,7 +51,16 @@ data class OpenAiJsonSchema(
 @Serializable
 data class OpenAiMessage(
     val role: String,
-    val content: String
+    val content: String,
+    /**
+     * 47-03 (D-04, RESEARCH Pattern 3): completions tool-loop fields.
+     * Both nullable + defaulted so existing positional/named call sites
+     * (`OpenAiMessage(role, content)`) and `encodeDefaults` behavior are
+     * unaffected. `toolCallId` addresses the `role:tool` re-POST;
+     * `toolCalls` carries the assistant tool-call echo.
+     */
+    @SerialName("tool_call_id") val toolCallId: String? = null,
+    @SerialName("tool_calls") val toolCalls: List<OpenAiNonStreamingToolCall>? = null
 )
 
 @Serializable

@@ -15,6 +15,7 @@ import com.warped.data.local.security.ApiKeyStore
 import com.warped.data.repository.ModelAllowlistRepository
 import com.warped.domain.model.ActiveModelSelection
 import com.warped.domain.skills.SkillRepository
+import com.warped.domain.skills.ToolExecutor
 import kotlinx.coroutines.flow.MutableStateFlow
 import com.warped.domain.model.ChatMessage
 import com.warped.domain.model.ChatRequest
@@ -65,8 +66,19 @@ import java.util.concurrent.atomic.AtomicInteger
 private fun relaxedSkills(): SkillRepository {
     val skills = mockk<SkillRepository>(relaxed = true)
     every { skills.enabledSkills } returns MutableStateFlow(emptyList())
+    every { skills.enabledMap } returns MutableStateFlow(emptyMap())
     return skills
 }
+
+/** 47-03: helper routing gates CLOSED here (zero enabled → PlainChat, native path). */
+private fun testHelper(apiKeyStore: ApiKeyStore): LmStudioHelper =
+    LmStudioHelper(
+        InputSanitizer(),
+        apiKeyStore,
+        relaxedSkills(),
+        mockk<ModelAllowlistRepository>(relaxed = true),
+        mockk<ToolExecutor>(relaxed = true),
+    )
 class LmStudioCancelTest {
 
     private var server: HttpServer? = null
@@ -199,7 +211,7 @@ class LmStudioCancelTest {
         val baseUrl = startServer(scriptedHandler)
         val apiKeyStore = mockk<ApiKeyStore>()
         every { apiKeyStore.getKey(any()) } returns null
-        val helper = LmStudioHelper(InputSanitizer(), apiKeyStore)
+        val helper = testHelper(apiKeyStore)
         helper.setEndpoint(
             Endpoint(
                 id = 1L,
