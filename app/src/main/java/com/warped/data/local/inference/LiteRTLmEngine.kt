@@ -22,10 +22,27 @@ class LiteRTLmEngine @Inject constructor(
 ) {
 
     companion object {
-        init {
+        /** Set once the native library has been loaded (lazy — see [ensureNativeLoaded]). */
+        @Volatile
+        private var nativeLoaded = false
+
+        /**
+         * Load the native library on first real use, never at class-load.
+         *
+         * PERF-16: this used to live in a `companion object init {}` block, which
+         * ran `System.loadLibrary` the moment Hilt constructed the engine graph
+         * node at Application creation (WarpedApplication eagerly injects
+         * EngineManager). Class construction is now pure-Java (context ref only);
+         * the dlopen happens here, on the first [init] call — i.e. first model
+         * load, never on the cold-start path.
+         */
+        @Synchronized
+        private fun ensureNativeLoaded() {
+            if (nativeLoaded) return
             try {
                 System.loadLibrary("litertlm_jni")
                 Engine.setNativeMinLogSeverity(LogSeverity.ERROR)
+                nativeLoaded = true
             } catch (e: UnsatisfiedLinkError) { Timber.e(e, "LiteRTLmEngine: native lib not found") }
         }
     }
@@ -71,6 +88,8 @@ class LiteRTLmEngine @Inject constructor(
         enableSpeculativeDecoding: Boolean = true
     ) {
         require(!isInitialized()) { "LiteRTLmEngine is already initialized. Call close() first." }
+
+        ensureNativeLoaded()
 
         val litertlmBackend = when (backend) {
             BackendType.CPU -> Backend.CPU()

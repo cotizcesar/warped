@@ -11,10 +11,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Cold-start macrobenchmark.
+ * Cold-start macrobenchmark (PERF-16).
  *
  * Measures the time from `am start` until the first frame is fully drawn
- * for the launcher activity. Target: <1.5s on Pixel 7 / Android 14.
+ * for the launcher activity. Target: <1s on Pixel 7 / Android 14 (normative
+ * PERF-16 target; emulator numbers are recorded with an explicit
+ * emulator-vs-Pixel note in BENCHMARKS.md, never compared to the target).
  *
  * Run on a connected device with:
  *   ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.warped.benchmark.ColdStartBenchmark
@@ -27,7 +29,7 @@ class ColdStartBenchmark {
     @Test
     fun coldStart() {
         rule.measureRepeated(
-            packageName = "com.warped",
+            packageName = "com.warped.app",
             metrics = listOf(StartupTimingMetric(), FrameTimingMetric()),
             compilationMode = CompilationMode.DEFAULT,
             startupMode = StartupMode.COLD,

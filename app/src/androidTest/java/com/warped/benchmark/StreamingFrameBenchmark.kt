@@ -25,7 +25,7 @@ class StreamingFrameBenchmark {
     @Test
     fun streamingFrameRate() {
         rule.measureRepeated(
-            packageName = "com.warped",
+            packageName = "com.warped.app",
             metrics = listOf(FrameTimingMetric()),
             compilationMode = CompilationMode.DEFAULT,
             iterations = 3,
