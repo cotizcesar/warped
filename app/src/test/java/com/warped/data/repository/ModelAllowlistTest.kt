@@ -34,7 +34,7 @@ class ModelAllowlistTest {
     fun `shipped asset parses with expected entries`() {
         val models = parseModelAllowlist(shippedAssetText())
 
-        assertThat(models).hasSize(3)
+        assertThat(models).hasSize(4)
         val e2b = models.first { it.name == "gemma-3n-E2B-it-int4" }
         assertThat(e2b.displayName).isEqualTo("Gemma 3n E2B IT (int4)")
         assertThat(e2b.modelFile).isEqualTo("gemma-3n-E2B-it-int4.task")
@@ -45,6 +45,37 @@ class ModelAllowlistTest {
         assertThat(g4.modelFile).isEqualTo("gemma-4-E2B-it.litertlm")
         assertThat(g4.sizeInBytes).isEqualTo(2588147712L)
         assertThat(g4.taskTypes).contains("chat")
+        val e4b = models.first { it.name == "gemma-4-E4B-it" }
+        assertThat(e4b.displayName).isEqualTo("Gemma 4 E4B IT")
+        assertThat(e4b.modelFile).isEqualTo("gemma-4-E4B-it.litertlm")
+        assertThat(e4b.sizeInBytes).isEqualTo(3659530240L)
+        assertThat(e4b.repo).isEqualTo("warped-community/gemma-4-E4B-it-litert-lm")
+        assertThat(e4b.taskTypes).contains("chat")
+    }
+
+    @Test
+    fun `shipped entries carry explicit repo slugs`() {
+        val models = parseModelAllowlist(shippedAssetText())
+
+        for (model in models) {
+            assertThat(model.repo).isNotNull()
+            assertThat(model.repoSlug).endsWith("-litert-lm")
+            assertThat(model.repoSlug).isEqualTo(model.repo)
+        }
+    }
+
+    @Test
+    fun `repoSlug falls back to legacy slug when repo is absent`() {
+        val legacy = AllowlistedModel(
+            name = "some-legacy-model",
+            displayName = "Some Legacy Model",
+            modelFile = "some-legacy-model.litertlm",
+            sizeInBytes = 1L
+        )
+        assertThat(legacy.repoSlug).isEqualTo("warped-community/some-legacy-model")
+
+        val blank = legacy.copy(repo = "  ")
+        assertThat(blank.repoSlug).isEqualTo("warped-community/some-legacy-model")
     }
 
     @Test
@@ -59,25 +90,30 @@ class ModelAllowlistTest {
         val expectedTextModality = mapOf(
             "gemma-3n-E2B-it-int4" to true,
             "gemma-3n-E4B-it-int4" to true,
-            "gemma-4-E2B-it" to true
+            "gemma-4-E2B-it" to true,
+            "gemma-4-E4B-it" to true
         )
         // 3n multimodal + speculative decoding verified; gemma-4
-        // vision/audio docs-verified, thinking docs-verified, speculative
-        // decoding still unverified (stays false).
+        // vision/audio docs-verified, thinking docs-verified. E2B
+        // speculative decoding still unverified (stays false); E4B
+        // speculative decoding docs-verified true.
         val expectedVisionAudio = mapOf(
             "gemma-3n-E2B-it-int4" to true,
             "gemma-3n-E4B-it-int4" to true,
-            "gemma-4-E2B-it" to true
+            "gemma-4-E2B-it" to true,
+            "gemma-4-E4B-it" to true
         )
         val expectedSpeculativeDecoding = mapOf(
             "gemma-3n-E2B-it-int4" to true,
             "gemma-3n-E4B-it-int4" to true,
-            "gemma-4-E2B-it" to false
+            "gemma-4-E2B-it" to false,
+            "gemma-4-E4B-it" to true
         )
         val expectedThinking = mapOf(
             "gemma-3n-E2B-it-int4" to false,
             "gemma-3n-E4B-it-int4" to false,
-            "gemma-4-E2B-it" to true
+            "gemma-4-E2B-it" to true,
+            "gemma-4-E4B-it" to true
         )
         for (model in models) {
             val caps = model.capabilities
@@ -96,9 +132,14 @@ class ModelAllowlistTest {
     fun `repository exposes capability queries`() {
         val repo = repositoryBackedBy(shippedAssetText())
 
-        assertThat(repo.models).hasSize(3)
+        assertThat(repo.models).hasSize(4)
         assertThat(repo.findByModelFile("gemma-3n-E4B-it-int4.task")?.name)
             .isEqualTo("gemma-3n-E4B-it-int4")
+        assertThat(repo.findByModelFile("gemma-4-E4B-it.litertlm")?.name)
+            .isEqualTo("gemma-4-E4B-it")
+        assertThat(repo.supportsThinking("gemma-4-E4B-it")).isTrue()
+        assertThat(repo.supportsFunctionCalling("gemma-4-E4B-it")).isFalse()
+        assertThat(repo.supportsSpeculativeDecoding("gemma-4-E4B-it")).isTrue()
         assertThat(repo.supportsThinking("gemma-3n-E2B-it-int4")).isFalse()
         assertThat(repo.supportsFunctionCalling("gemma-3n-E2B-it-int4")).isFalse()
         assertThat(repo.supportsSpeculativeDecoding("gemma-3n-E2B-it-int4")).isTrue()
@@ -159,8 +200,15 @@ class ModelAllowlistTest {
         assertThat(n3.vision).isTrue()
         assertThat(n3.reasoning).isFalse()
 
+        // Allowlisted E4B: docs-verified vision/audio/thinking; no Tools badge.
+        val e4b = repo.effectiveCapabilities(local("gemma-4-E4B-it", "gemma-4-E4B-it.litertlm"))
+        assertThat(e4b.reasoning).isTrue()
+        assertThat(e4b.vision).isTrue()
+        assertThat(e4b.audio).isTrue()
+        assertThat(e4b.tools).isFalse()
+
         // Unlisted model: stored caps except thinking (opt-in only).
-        val other = repo.effectiveCapabilities(local("gemma-4-E4B-it", "gemma-4-E4B-it.litertlm"))
+        val other = repo.effectiveCapabilities(local("some-future-model", "some-future-model.litertlm"))
         assertThat(other.vision).isTrue()
         assertThat(other.reasoning).isFalse()
     }
