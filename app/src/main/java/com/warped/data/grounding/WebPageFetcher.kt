@@ -14,6 +14,7 @@ import okhttp3.Request
 import okio.Buffer
 import timber.log.Timber
 import java.io.IOException
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -30,6 +31,13 @@ import kotlin.math.min
  * keys (tag-gated per-endpoint) can never leak to arbitrary fetched hosts.
  * Runs on Dispatchers.IO; cancel via [cancel] (Stop button / new-turn
  * pre-cancel). Fetch failures inject zero bytes — the turn goes model-only.
+ *
+ * Phase 52 (FETCH-01, T-52-05): the in-flight set is fan-out-safe. The v2.2
+ * single `activeCall` field raced under parallel fetch (a second call
+ * overwrote the first, so Stop leaked the earlier socket); the concurrent
+ * set below tracks every in-flight call and [cancel] aborts all of them.
+ * The [budget] parameter threads the per-page slice of the global grounding
+ * budget into extraction (default keeps the frozen single-page behavior).
  */
 @Singleton
 class WebPageFetcher @Inject constructor(
@@ -58,14 +66,25 @@ class WebPageFetcher @Inject constructor(
         }
         .build()
 
-    @Volatile
-    private var activeCall: Call? = null
+    /**
+     * Phase 52 (T-52-05): every in-flight call, tracked concurrently.
+     * Added right after `newCall()`, removed in `finally` — [cancel]
+     * iterates a snapshot so Stop / new-turn pre-cancel aborts ALL
+     * in-flight sockets under fan-out (no post-Stop grounding).
+     */
+    private val activeCalls = ConcurrentHashMap.newKeySet<Call>()
 
     fun cancel() {
-        activeCall?.cancel()
+        activeCalls.toList().forEach { call ->
+            try {
+                call.cancel()
+            } catch (_: Exception) {
+                // Best-effort: one dead call must not shield the rest.
+            }
+        }
     }
 
-    suspend fun fetch(url: String): GroundingResult = withContext(Dispatchers.IO) {
+    suspend fun fetch(url: String, budget: Int = HtmlToTextExtractor.MAX_CHARS): GroundingResult = withContext(Dispatchers.IO) {
         if (!hasValidatedInternet()) {
             return@withContext GroundingResult.ModelOnly(GroundingResult.Reason.OFFLINE)
         }
@@ -79,7 +98,7 @@ class WebPageFetcher @Inject constructor(
                     .header("Accept", "text/html, text/plain")
                     .build()
                 val call = client.newCall(request)
-                activeCall = call
+                activeCalls.add(call)
                 try {
                     call.execute().use { response ->
                         if (response.isRedirect) {
@@ -119,7 +138,7 @@ class WebPageFetcher @Inject constructor(
                             remaining -= read
                         }
                         val raw = sink.readUtf8()
-                        val extracted = HtmlToTextExtractor.extract(raw, currentUrl)
+                        val extracted = HtmlToTextExtractor.extract(raw, currentUrl, budget)
                         if (extracted.isBlank()) {
                             return@withContext GroundingResult.ModelOnly(GroundingResult.Reason.FETCH_FAILED)
                         }
@@ -127,10 +146,10 @@ class WebPageFetcher @Inject constructor(
                         // usable and the extractor marks truncation.
                         val sanitized = WebContextSanitizer.sanitize(extracted)
                         val block = GroundingPrompt.buildBlock(currentUrl, sanitized)
-                        return@withContext GroundingResult.Grounded(block, currentUrl)
+                        return@withContext GroundingResult.Grounded(block, currentUrl, sanitized)
                     }
                 } finally {
-                    if (activeCall === call) activeCall = null
+                    activeCalls.remove(call)
                 }
             }
         } catch (e: CancellationException) {
