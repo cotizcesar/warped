@@ -297,7 +297,9 @@ class ChatViewModel @Inject constructor(
                 // Validate model capabilities
                 if (selectedProvider == ProviderType.LITE_RT_LM) {
                     val capabilities = state.localModels.firstOrNull { it.filePath == modelId }?.capabilities
-                    if (images.isNotEmpty() && capabilities?.vision != true) {
+                    if (capabilities == null) {
+                        Timber.w("ChatVM: capabilities unknown for $modelId — skipping media gate")
+                    } else if (images.isNotEmpty() && !capabilities.vision) {
                         updateTranscript {
                             it.copy(
                                 error = ChatError.Unknown("This model does not support images (no vision capability)."),
@@ -307,7 +309,7 @@ class ChatViewModel @Inject constructor(
                         updateInput { it.copy(isGenerating = false) }
                         return@launch
                     }
-                    if (audioBytes != null && capabilities?.audio != true) {
+                    if (audioBytes != null && capabilities.audio != true) {
                         updateTranscript {
                             it.copy(
                                 error = ChatError.Unknown("This model does not support audio input."),
