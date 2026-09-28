@@ -20,4 +20,17 @@ object UrlDetector {
         val trimmed = match.value.trimEnd('.', ',', ';', ':', '!', '?')
         return trimmed.ifEmpty { null }
     }
+
+    /**
+     * Phase 52 (FETCH-01): deterministic fan-out input — all http(s) URLs
+     * in [text] with the same trailing-punctuation trim semantics as
+     * [firstUrl], deduped preserving first-seen order, capped at [max].
+     */
+    fun allUrls(text: String, max: Int = 5): List<String> =
+        URL_REGEX.findAll(text)
+            .map { it.value.trimEnd('.', ',', ';', ':', '!', '?') }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .take(max)
+            .toList()
 }

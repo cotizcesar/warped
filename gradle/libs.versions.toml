@@ -14,6 +14,7 @@ retrofit = "3.0.0"
 kotlinx-serialization = "1.11.0"
 kotlinx-serialization-converter = "3.0.0"  # match retrofit 3.x (Gradle already resolved 1.0.0 -> 3.0.0 via conflict)
 coroutines = "1.11.0"
+jsoup = "1.23.2"
 datastore = "1.2.1"
 workmanager = "2.12.0"
 security-crypto = "1.1.0"  # latest stable
@@ -85,6 +86,9 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 # Coroutines
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+
+# HTML parsing (parse-only; never Jsoup.connect())
+jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
 
 # WorkManager
 work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workmanager" }

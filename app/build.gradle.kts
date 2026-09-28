@@ -151,6 +151,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
 
+    // HTML parsing (parse-only; never Jsoup.connect())
+    implementation(libs.jsoup)
+
     // DataStore
     implementation(libs.datastore.preferences)
 

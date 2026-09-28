@@ -20,6 +20,16 @@ object GroundingPrompt {
         "[WEB CONTEXT — fuente [1]: $url]\n$text\n[FIN WEB CONTEXT]"
 
     /**
+     * Phase 52 (FETCH-01): numbered fusion of N pages in paste order.
+     * [pages] is a list of url-to-text pairs; block i cites URL i so
+     * Fuentes order == block order.
+     */
+    fun buildFusedBlock(pages: List<Pair<String, String>>): String =
+        pages.mapIndexed { i, (url, text) ->
+            "[WEB CONTEXT ${i + 1} — fuente [${i + 1}]: $url]\n$text\n[FIN WEB CONTEXT ${i + 1}]"
+        }.joinToString("\n\n")
+
+    /**
      * Returns "$SYSTEM_PROMPT\n\n$block\n\n$original" when [block] is
      * non-null, [original] untouched otherwise (toggle OFF / model-only path).
      */
