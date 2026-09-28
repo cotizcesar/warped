@@ -400,7 +400,11 @@ class ChatViewModel @Inject constructor(
                                     it.copy(
                                         streamingContent = cleanContent,
                                         streamingReasoning = reasoning,
-                                        toolCallActive = null  // clear tool indicator once content arrives
+                                        // WR-03: NEVER touch toolCallActive here —
+                                        // clearing is owned exclusively by
+                                        // ToolStatus(null)/Done, or content
+                                        // Deltas race ToolStatus mid-loop and
+                                        // the "Using …" row flickers.
                                     )
                                 }
                                 tokenBuffer.clear()
