@@ -41,6 +41,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -53,6 +55,10 @@ import kotlinx.coroutines.launch
 import com.warped.ui.chat.components.ChatInputBar
 import com.warped.ui.chat.components.MessageBubble
 import com.warped.ui.chat.components.ModelSelectorSheet
+import com.warped.ui.chat.components.NoToolSupportNotice
+import com.warped.ui.chat.components.ToolErrorRow
+import com.warped.ui.chat.components.formatToolStatus
+import com.warped.ui.chat.components.formatToolStatusA11y
 import com.warped.ui.components.WarpedAlertDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -204,6 +210,11 @@ fun ChatScreen(
                 modelHasAudio = uiState.localModels.firstOrNull { it.filePath == uiState.selectedLocalModelId }?.capabilities?.audio == true,
                 onAudioRecorded = { bytes -> audioBytes = bytes },
                 onAudioRecordingChanged = { isRecording = it },
+                // 47-01 UI-SPEC §2: skill chips hoisted state.
+                skillEnabled = uiState.skillEnabled,
+                onToggleSkill = { id ->
+                    viewModel.setSkillEnabled(id, !(uiState.skillEnabled[id] ?: true))
+                },
             )
         }
     ) { padding ->
@@ -284,11 +295,22 @@ fun ChatScreen(
                                 codeFontScale = uiState.codeFontScale
                             )
                         } else if (uiState.isStreaming) {
+                            // 47-01 UI-SPEC §3: exact "Using {display}…" copy via
+                            // the shared toolDisplayName() mapping (never paraphrased).
                             val statusText = uiState.toolCallActive?.let { tool ->
-                                "Using ${tool.replace("_", " ")}..."
+                                formatToolStatus(tool)
                             } ?: "Thinking..."
+                            val statusA11y = uiState.toolCallActive?.let { tool ->
+                                formatToolStatusA11y(tool)
+                            }
                             Row(
-                                modifier = Modifier.padding(vertical = 8.dp),
+                                modifier = Modifier
+                                    .padding(vertical = 8.dp)
+                                    .then(
+                                        if (statusA11y != null) Modifier.semantics {
+                                            contentDescription = statusA11y
+                                        } else Modifier
+                                    ),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 CircularProgressIndicator(
@@ -303,6 +325,16 @@ fun ChatScreen(
                                     color = Color(0xFF545450)
                                 )
                             }
+                        }
+                        // 47-01 UI-SPEC §6: no-support notice, inline where the
+                        // status row would have been, once per turn.
+                        if (uiState.showNoToolSupportNotice) {
+                            NoToolSupportNotice()
+                        }
+                        // 47-01 UI-SPEC §4: tool error row below the bubble it
+                        // belongs to; fallback text streams in the bubble.
+                        uiState.activeToolError?.let { toolError ->
+                            ToolErrorRow(toolId = toolError.toolId, reason = toolError.reason)
                         }
                     }
                     // Top fade gradient overlay

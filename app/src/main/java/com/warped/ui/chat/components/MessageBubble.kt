@@ -24,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import com.warped.ui.components.WarpedAlertDialog
 import androidx.compose.runtime.*
@@ -35,9 +36,12 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.warped.domain.model.ChatMessage
 import com.warped.domain.model.Role
@@ -52,6 +56,13 @@ fun MessageBubble(
     codeFontScale: Float = 1.0f,
 ) {
     val isUser = message.role == Role.USER
+    // 47-01 UI-SPEC §5: persisted tool rows render as collapsed transcript
+    // rows mirroring the Thinking panel — outside any bubble. TOOL rows must
+    // never crash history load (SKILLS-11 foundation).
+    if (message.role == Role.TOOL) {
+        ToolResultRow(content = message.content)
+        return
+    }
     var showReasoning by remember { mutableStateOf(false) }
     @Suppress("DEPRECATION")
     val clipboardManager = LocalClipboardManager.current
@@ -190,9 +201,118 @@ fun MessageBubble(
     }
 }
 
+/**
+ * 47-01 UI-SPEC §5: collapsed transcript row for a completed tool call
+ * (role:tool), mirroring the Thinking panel above byte-for-byte in styling.
+ * Collapsed by default; expanded shows the summarized result (~200 chars).
+ */
 @Composable
-private fun MessageImageStack(imageUris: List<String>) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+fun ToolResultRow(
+    content: String,
+    codeTheme: SyntaxTheme = SyntaxTheme.MONOKAI,
+    codeFontScale: Float = 1.0f,
+) {
+    val (toolId, summary) = remember(content) { parseToolResultContent(content) }
+    var expanded by remember { mutableStateOf(false) }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .clickable { expanded = !expanded }
+                .padding(vertical = 4.dp)
+                .semanticsForToolResult(toolId, expanded),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = formatToolTranscriptHeader(toolId),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF545450)
+            )
+            Spacer(Modifier.width(4.dp))
+            Icon(
+                imageVector = if (expanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = Color(0xFF545450),
+                modifier = Modifier.size(16.dp)
+            )
+        }
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(),
+            exit = shrinkVertically()
+        ) {
+            Surface(
+                color = Color.Transparent,
+                modifier = Modifier.padding(start = 16.dp)
+            ) {
+                SelectionContainer {
+                    MarkdownText(
+                        text = summarizeToolResult(summary),
+                        baseColor = Color(0xFF545450),
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        fontStyle = FontStyle.Italic,
+                        codeTheme = codeTheme,
+                        codeFontScale = codeFontScale
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+    }
+}
+
+private fun Modifier.semanticsForToolResult(toolId: String, expanded: Boolean): Modifier =
+    this.then(
+        Modifier.semantics {
+            contentDescription = formatToolTranscriptA11y(toolId, expanded)
+        }
+    )
+
+/**
+ * 47-01 UI-SPEC §4: inline tool error row — ErrorOutline icon + 0xFFEF4444
+ * `"{Display} failed: {reason}"`, maxLines 2 ellipsis. The fallback answer
+ * renders as normal assistant text in the sibling bubble (Plans 02/03).
+ */
+@Composable
+fun ToolErrorRow(toolId: String, reason: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = formatToolErrorA11y(reason) },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Filled.ErrorOutline,
+            contentDescription = null,
+            tint = Color(0xFFEF4444),
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = formatToolError(toolId, reason),
+            style = MaterialTheme.typography.bodySmall,
+            color = Color(0xFFEF4444),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+/**
+ * 47-01 UI-SPEC §6: muted inline notice when the model lacks tool support.
+ * Informational only — no icon, no error color, no dismissal.
+ */
+@Composable
+fun NoToolSupportNotice() {
+    Text(
+        text = NO_TOOL_SUPPORT_NOTICE,
+        style = MaterialTheme.typography.bodySmall,
+        color = Color(0xFF545450),
+        fontStyle = FontStyle.Italic
+    )
+}
+
+@Composable
+private fun MessageImageStack(imageUris: List<String>) {    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         imageUris.forEach { dataUrl ->
             var showFullImage by remember { mutableStateOf(false) }
             val bitmap = remember(dataUrl) {

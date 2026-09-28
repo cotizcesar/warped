@@ -16,6 +16,8 @@ import com.warped.domain.model.*
 import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.LocalModelRepository
+import com.warped.domain.skills.SkillIds
+import com.warped.domain.skills.SkillRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +45,7 @@ class ChatViewModel @Inject constructor(
     private val engineManager: EngineManager,
     private val memoryChecker: MemoryChecker,
     private val advancedPreferences: AdvancedPreferences,
+    private val skillRepository: SkillRepository,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -169,6 +172,24 @@ class ChatViewModel @Inject constructor(
             advancedPreferences.thinkingEnabled.collect { enabled ->
                 _uiState.update { it.copy(enableThinking = enabled) }
             }
+        }
+        // 47-01: skill toggles are ViewModel-backed (survive rotation) and
+        // DataStore-persisted (survive process death). All-on until toggled.
+        viewModelScope.launch(coroutineExceptionHandler) {
+            skillRepository.enabledMap.collect { map ->
+                _uiState.update { it.copy(skillEnabled = map) }
+            }
+        }
+    }
+
+    /**
+     * 47-01 UI-SPEC §2: toggle a skill chip → writes SkillPreferences
+     * DataStore via SkillRepository. No-op while generating (chips disabled).
+     */
+    fun setSkillEnabled(id: String, enabled: Boolean) {
+        if (id !in SkillIds.TOOL_IDS) return
+        viewModelScope.launch(coroutineExceptionHandler) {
+            skillRepository.setEnabled(id, enabled)
         }
     }
 

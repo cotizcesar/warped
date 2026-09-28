@@ -50,7 +50,15 @@ data class ChatUiState(
     val conversationModelId: String? = null,
     val conversationProviderType: ProviderType? = null,
     val toolCallActive: String? = null,  // tool name while tool is executing (e.g. "web_search")
+    // 47-01 Skills surface (UI-SPEC §§2-6): per-skill toggles (all-on
+    // defaults filled by the ViewModel), transient tool error, and the
+    // no-tool-support notice flag. Set by Plans 02/03; rendered here.
+    val skillEnabled: Map<String, Boolean> = emptyMap(),
+    val activeToolError: ActiveToolError? = null,
+    val showNoToolSupportNotice: Boolean = false,
 )
+
+data class ActiveToolError(val toolId: String, val reason: String)
 
 enum class TrafficLightState {
     GREEN, YELLOW, RED, GRAY
