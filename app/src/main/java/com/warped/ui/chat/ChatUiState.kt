@@ -255,7 +255,8 @@ fun trafficLightStatusText(
     val isLocal = connection.selectedLocalModelId != null
     val isRemote = connection.selectedRemoteModelId != null
     val localName = connection.localModels.firstOrNull { it.filePath == connection.selectedLocalModelId }?.name
-    val remoteName = connection.selectedRemoteModelId?.substringAfterLast("/")
+        ?: connection.selectedLocalModelId?.substringAfterLast("/") ?: "Unknown model"
+    val remoteName = connection.selectedRemoteModelId?.substringAfterLast("/") ?: "Unknown model"
     val error = transcript.error
     return when {
         light == TrafficLightState.YELLOW -> "Generating response…"
