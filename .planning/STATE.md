@@ -4,14 +4,14 @@ milestone: v2.3
 milestone_name: Web Grounding v2
 status: planning
 stopped_at: v2.3 roadmap created (Phases 52–54)
-last_updated: "2026-09-28T15:55:29.320Z"
+last_updated: "2026-09-28T16:06:24.319Z"
 last_activity: 2026-09-28 — v2.3 roadmap created (Phases 52–54, 12 requirements mapped)
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 0
+  completed_plans: 2
+  percent: 33
 ---
 
 # Project State: Warped
@@ -61,6 +61,9 @@ Progress: [░░░░░░░░░░] 0%
 - [v2.3]: Message-scoped foreground retry first; WorkManager only as explicit opt-in (FEATURES+PITFALLS over STACK default).
 - [v2.2]: Zero new dependencies — v2.3 adds exactly one: Jsoup 1.23.2 (parse-only, never `Jsoup.connect()`) + desugar NIO build config.
 - [v2.1]: LiteRT-LM target 0.17.1; Summarize stays PromptTemplate (persona, not function).
+- [Phase ?]: budget threaded into fetch() (single truncation point) instead of orchestrator-side re-truncation
+- [Phase ?]: coroutineScope (not supervisorScope) preserves the single-cancel-path contract
+- [Phase ?]: ephemeral modelOnlySourceCount carries the M>1 plural signal, no Room change
 
 ### Pending Todos
 
@@ -84,6 +87,7 @@ None yet.
 | Device smoke | THEME-01 per-preset visual (light + dark) | Accepted, release UAT | v2.2 close |
 | Tech debt | Orphaned Keystore `huggingface_token` entry on upgrades (harmless, never read) | Accepted | v2.2 close |
 | Coverage | Nyquist VALIDATION.md missing for phases 49/50/51 (`/gsd-validate-phase 49\|50\|51`) | TODO, not a compliance failure | v2.2 close |
+| Phase 52 P02 | ~35 min | 3 tasks | 11 files |
 
 ## Deferred Verification
 
@@ -93,6 +97,6 @@ None — v2.2 phases shipped with accepted deferrals recorded above. Next milest
 
 **Resume file:** —
 
-Last session: 2026-09-28T15:55:29.315Z
+Last session: 2026-09-28T16:06:24.315Z
 Stopped at: v2.3 roadmap created (Phases 52–54)
 Resume: `/gsd-plan-phase 52`

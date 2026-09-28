@@ -11,7 +11,7 @@ v2.2 Simplificación + Web Grounding shipped 2026-09-28 (Phases 49–51): dead s
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 52: Multi-URL Fetch Foundation** - Parallel fan-out, fused context, global budget, Jsoup extraction swap
+- [x] **Phase 52: Multi-URL Fetch Foundation** - Parallel fan-out, fused context, global budget, Jsoup extraction swap (completed 2026-09-28)
 - [ ] **Phase 53: Sources Preview + Per-Chat Toggle** - Bottom-sheet preview, Fuentes list, tri-state toggle, one Room migration v15
 - [ ] **Phase 54: Offline Retry** - Message-scoped queued retry on reconnect
 
@@ -45,7 +45,7 @@ v2.2 Simplificación + Web Grounding shipped 2026-09-28 (Phases 49–51): dead s
 **Plans**: 2 plans
 
 - [x] 52-01-PLAN.md — Jsoup swap, allUrls, budget, fused blocks + exit-gate tests
-- [ ] 52-02-PLAN.md — cancel fix, fan-out orchestrator, hook + N-source UI
+- [x] 52-02-PLAN.md — cancel fix, fan-out orchestrator, hook + N-source UI
 
 **UI hint**: yes
 
@@ -89,7 +89,7 @@ Phases execute in numeric order: 52 → 53 → 54. Next milestone continues from
 | 49. Surface Removal | 2/2 | Complete (smoke deferred) | 2026-09-28 |
 | 50. Web Grounding | 2/2 | Complete (smoke deferred) | 2026-09-28 |
 | 51. Syntax-Theme Fix | 1/1 | Complete (smoke deferred) | 2026-09-28 |
-| 52. Multi-URL Fetch Foundation | 1/2 | In Progress|  |
+| 52. Multi-URL Fetch Foundation | 2/2 | Complete   | 2026-09-28 |
 | 53. Sources Preview + Per-Chat Toggle | 0/TBD | Not started | - |
 | 54. Offline Retry | 0/TBD | Not started | - |
 

@@ -10,8 +10,8 @@ Extend the v2.2 single-URL heuristic grounding pipeline to multi-page context wi
 ### Multi-URL Fetch
 
 - [x] **FETCH-01**: User pasting 2–5 URLs in one message gets a fused answer grounded in all fetchable pages (parallel fan-out, numbered `[WEB CONTEXT 1..N]` blocks)
-- [ ] **FETCH-02**: User gets a grounded answer from the pages that loaded even when one link is dead (partial grounding; model-only banner only when ALL pages fail)
-- [ ] **FETCH-03**: User sees fetch progress per source ("Leyendo 2 de 4…") with per-source ok/skipped states (silent drops never happen)
+- [x] **FETCH-02**: User gets a grounded answer from the pages that loaded even when one link is dead (partial grounding; model-only banner only when ALL pages fail)
+- [x] **FETCH-03**: User sees fetch progress per source ("Leyendo 2 de 4…") with per-source ok/skipped states (silent drops never happen)
 
 ### Sources
 
@@ -59,8 +59,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | FETCH-01 | Phase 52 | Complete |
-| FETCH-02 | Phase 52 | Pending |
-| FETCH-03 | Phase 52 | Pending |
+| FETCH-02 | Phase 52 | Complete |
+| FETCH-03 | Phase 52 | Complete |
 | SRC-01 | Phase 53 | Pending |
 | SRC-02 | Phase 53 | Pending |
 | SRC-03 | Phase 53 | Pending |
