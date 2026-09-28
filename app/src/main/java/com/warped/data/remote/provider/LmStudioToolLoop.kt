@@ -10,6 +10,7 @@ import com.warped.data.remote.dto.OpenAiNonStreamingToolCall
 import com.warped.data.remote.dto.OpenAiStreamChunk
 import com.warped.data.remote.dto.OpenAiTool
 import com.warped.data.skills.skillDescriptor
+import com.warped.data.skills.isJsonTooDeep
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.Role
 import com.warped.domain.model.StreamToken
@@ -333,7 +334,11 @@ class LmStudioToolLoop(
                         Timber.w("LmStudioToolLoop: malformed tool call (blank name) — content fallback")
                         return RoundOutcome(roundText = roundText.toString(), malformed = true)
                     }
-                    val parsed = runCatching { json.parseToJsonElement(callItem.argsJson) }.getOrNull()
+                    // WR-04: depth pre-check before the recursive descent
+                    // parser — StackOverflowError would escape runCatching
+                    // (Error, not Exception) on model-controlled args.
+                    val parsed = if (isJsonTooDeep(callItem.argsJson)) null
+                    else runCatching { json.parseToJsonElement(callItem.argsJson) }.getOrNull()
                     if (parsed == null || parsed !is JsonObject) {
                         Timber.w("LmStudioToolLoop: malformed tool args — content fallback")
                         return RoundOutcome(roundText = roundText.toString(), malformed = true)
@@ -382,7 +387,9 @@ class LmStudioToolLoop(
                 Timber.w("LmStudioToolLoop: malformed non-streaming call — content fallback")
                 return RoundOutcome(roundText = roundText.toString(), malformed = true)
             }
-            val parsed = runCatching { json.parseToJsonElement(call.argsJson) }.getOrNull()
+            // WR-04: same depth pre-check as the streaming path.
+            val parsed = if (isJsonTooDeep(call.argsJson)) null
+            else runCatching { json.parseToJsonElement(call.argsJson) }.getOrNull()
             if (parsed == null || parsed !is JsonObject) {
                 Timber.w("LmStudioToolLoop: malformed non-streaming args — content fallback")
                 return RoundOutcome(roundText = roundText.toString(), malformed = true)

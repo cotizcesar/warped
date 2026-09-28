@@ -28,6 +28,10 @@ fun formatJson(jsonText: String): ToolResult {
     return try {
         if (jsonText.isBlank()) return ToolResult.Failure("empty JSON")
         if (jsonText.length > JSON_MAX_CHARS) return ToolResult.Failure("JSON too large")
+        // WR-04: reject deep nesting before parsing — StackOverflowError is
+        // an Error, not an Exception, and would escape the never-throw
+        // boundary below (model-controlled input makes this triggerable).
+        if (isJsonTooDeep(jsonText)) return ToolResult.Failure("JSON too deeply nested")
         val element: JsonElement = try {
             Json.parseToJsonElement(jsonText)
         } catch (e: Exception) {

@@ -44,3 +44,41 @@ fun ChatMessage.toProviderText(): Pair<String, String> =
     } else {
         role.name.lowercase() to content
     }
+
+/**
+ * WR-04: nesting-depth pre-check against `StackOverflowError`.
+ * `StackOverflowError` is an `Error`, not an `Exception`, so it escapes
+ * every `catch (e: Exception)` guard on the tool trust boundary
+ * (`formatJson`, `@Tool` wrappers, `LocalToolExecutor`, the remote loop's
+ * arg validation). A deeply-nested payload (`[[[[…]]]]`, trivially under
+ * the 64KB cap) recurses in `Json.parseToJsonElement` and kills the turn.
+ * Counting brackets up front is cheap and string-aware (brackets inside
+ * JSON strings don't count), so deeply-nested input is rejected before
+ * the parser ever recurses.
+ */
+const val JSON_MAX_DEPTH = 100
+
+fun isJsonTooDeep(jsonText: String, maxDepth: Int = JSON_MAX_DEPTH): Boolean {
+    var depth = 0
+    var inString = false
+    var escaped = false
+    for (c in jsonText) {
+        if (inString) {
+            when {
+                escaped -> escaped = false
+                c == '\\' -> escaped = true
+                c == '"' -> inString = false
+            }
+            continue
+        }
+        when (c) {
+            '"' -> inString = true
+            '{', '[' -> {
+                depth++
+                if (depth > maxDepth) return true
+            }
+            '}', ']' -> depth--
+        }
+    }
+    return false
+}
