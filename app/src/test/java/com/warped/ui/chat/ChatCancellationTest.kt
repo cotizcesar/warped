@@ -205,6 +205,8 @@ class ChatCancellationTest {
                         is StreamToken.Error -> isStreaming = false
                         // 47-02: tool status carries no text content.
                         is StreamToken.ToolStatus -> Unit
+                        // 47-03: completion records carry no text either.
+                        is StreamToken.ToolCompleted -> Unit
                     }
                 }
             }

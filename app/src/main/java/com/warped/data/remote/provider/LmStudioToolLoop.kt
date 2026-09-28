@@ -138,6 +138,11 @@ class LmStudioToolLoop(
             if (currentCoroutineContext().isActive) {
                 send(StreamToken.Done(null, null))
             }
+            // Finite flow (unlike the endless native SSE stream): complete
+            // after Done so collectors terminate. A bare awaitClose here
+            // would suspend forever — close() first, then awaitClose only
+            // covers the cancellation path (returns at once when closed).
+            close()
         } catch (e: CancellationException) {
             // Stop means stop: never map cancellation to an Error token.
             throw e
