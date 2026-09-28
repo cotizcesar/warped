@@ -88,6 +88,12 @@ class WebPageFetcher @Inject constructor(
         if (!hasValidatedInternet()) {
             return@withContext GroundingResult.ModelOnly(GroundingResult.Reason.OFFLINE)
         }
+        // Floor the per-page extraction budget at the extractor's
+        // crash-preventing minimum so a degenerate caller value can never
+        // reach truncation arithmetic as a negative (see HtmlToTextExtractor).
+        // Production callers pass perPageBudget (>= MIN_PER_PAGE) — this only
+        // guards direct callers of this overload.
+        val safeBudget = budget.coerceAtLeast(HtmlToTextExtractor.TRUNCATION_MARKER.length + 1)
         try {
             var currentUrl = url
             var hops = 0
@@ -138,7 +144,7 @@ class WebPageFetcher @Inject constructor(
                             remaining -= read
                         }
                         val raw = sink.readUtf8()
-                        val extracted = HtmlToTextExtractor.extract(raw, currentUrl, budget)
+                        val extracted = HtmlToTextExtractor.extract(raw, currentUrl, safeBudget)
                         if (extracted.isBlank()) {
                             return@withContext GroundingResult.ModelOnly(GroundingResult.Reason.FETCH_FAILED)
                         }

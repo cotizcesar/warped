@@ -42,11 +42,20 @@ object HtmlToTextExtractor {
     /**
      * Extracts readable text from [html] truncated to [budget] chars.
      * Used per page with [GroundingBudget.perPageBudget].
+     *
+     * [budget] is floored at the crash-preventing minimum
+     * ([TRUNCATION_MARKER].length + 1) so a degenerate caller value can
+     * never drive `budget - marker - 1` negative into `take(negative)`
+     * (`IllegalArgumentException`) and turn a grounding turn into an
+     * exception path. Production budgets floor much higher upstream
+     * ([GroundingBudget.MIN_PER_PAGE]); this floor only preserves the
+     * no-crash contract for direct callers.
      */
     fun extract(html: String, url: String, budget: Int): String {
-        val jsoupResult = extractJsoup(html, url, budget)
+        val safeBudget = budget.coerceAtLeast(TRUNCATION_MARKER.length + 1)
+        val jsoupResult = extractJsoup(html, url, safeBudget)
         if (jsoupResult.isNotBlank()) return jsoupResult
-        return extractLegacy(html, budget)
+        return extractLegacy(html, safeBudget)
     }
 
     private fun extractJsoup(html: String, url: String, budget: Int): String {
