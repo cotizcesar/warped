@@ -108,6 +108,7 @@ None — v2.2 phases shipped with accepted deferrals recorded above. Next milest
 | 20260928-catalog-downloaded-spacing | 2026-09-28 | Complete ✓ | On-device downloaded check (disco, no solo sesión) + espaciado iconos/título a la mitad; 309 green |
 | 20260928-kill-purple-theme | 2026-09-28 | Complete ✓ | Morado eliminado (5 puntos → neutro 2B2B29 + coral, visión a azul claro); grep gate limpio; 309 green |
 | 20260928-card-title-top-spacing | 2026-09-28 | Complete ✓ | Header overlay (título define altura, acciones superpuestas): misma separación en todos lados; confirmación visual pendiente |
+| 20260928-catalog-order | 2026-09-28 | Complete ✓ | Orden 4-E2B → 4-E4B → 3n-E2B → 3n-E4B con test que lo fija; 310 green |
 
 ## Session Continuity
 
