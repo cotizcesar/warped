@@ -1,3 +1,7 @@
+---
+status: gaps_found
+score: "all automated gates pass; 1 manual smoke deferred"
+---
 # Phase 49 (Surface Removal) — Verification
 
 **Date:** 2026-09-28
