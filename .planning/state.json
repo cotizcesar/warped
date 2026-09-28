@@ -1,33 +1,43 @@
 {
   "contract": "1.0.0",
   "flavor": "core",
-  "milestone": "v2.1 — Finish v2.0 Leftovers",
+  "milestone": "v2.3 — Web Grounding v2",
   "phases": [
     {
-      "number": "45",
-      "name": "Foundation Refresh",
+      "number": "49",
+      "name": "Surface Removal",
+      "status": "pending"
+    },
+    {
+      "number": "50",
+      "name": "Web Grounding",
+      "status": "pending"
+    },
+    {
+      "number": "51",
+      "name": "Syntax-Theme Fix",
+      "status": "pending"
+    },
+    {
+      "number": "52",
+      "name": "Multi-URL Fetch Foundation",
       "status": "complete"
     },
     {
-      "number": "46",
-      "name": "Runtime Hardening",
-      "status": "complete"
+      "number": "53",
+      "name": "Sources Preview + Per-Chat Toggle",
+      "status": "pending"
     },
     {
-      "number": "47",
-      "name": "Real Tool Execution",
-      "status": "complete"
-    },
-    {
-      "number": "48",
-      "name": "Chat Perf + Startup + Release",
-      "status": "complete"
+      "number": "54",
+      "name": "Offline Retry",
+      "status": "pending"
     }
   ],
   "next": {
-    "command": "/gsd:new-milestone",
-    "label": "Start a new milestone",
-    "reason": "All phases complete — start a new milestone"
+    "command": "/gsd:progress --next",
+    "label": "Advance to the next step (plan phase 53)",
+    "reason": "Phase 53 of 3 — needs a plan"
   },
-  "updated_at": "2026-09-28T04:22:13.302Z"
+  "updated_at": "2026-09-28T16:21:44.468Z"
 }
