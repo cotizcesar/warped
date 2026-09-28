@@ -142,6 +142,18 @@ class ChatGroundingToggleTest {
         okUrls = listOf("https://a.example/uno"),
         skippedUrls = listOf("https://dead.example/x"),
         pageTexts = mapOf("https://a.example/uno" to "Texto a."),
+        details = listOf(
+            com.warped.domain.model.GroundedSource(
+                url = "https://a.example/uno",
+                extractedText = "Texto a.",
+                status = GroundedSourceStatus.OK,
+            ),
+            com.warped.domain.model.GroundedSource(
+                url = "https://dead.example/x",
+                extractedText = null,
+                status = GroundedSourceStatus.OMITIDA,
+            ),
+        ),
     )
 
     @Test

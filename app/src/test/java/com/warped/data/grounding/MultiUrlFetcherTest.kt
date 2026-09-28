@@ -184,4 +184,30 @@ class MultiUrlFetcherTest {
         assertThat(seen.last()).isEqualTo(3 to 3)
         assertThat(seen.map { it.second }.toSet()).containsExactly(3)
     }
+
+    @Test
+    fun `redirect preserves resolved url text and ok status in details`() = runTest {
+        // CR-01: pasted short URL resolves post-redirect; the fusion-time
+        // details union must carry the resolved URL with OK + text (never a
+        // pasted-key lookup that would record OMITIDA and drop the text).
+        val pasted = "http://short.example/x"
+        val resolved = "https://cdn.example/final"
+        coEvery { fetcher.fetch(pasted, any()) } returns grounded(resolved)
+        coEvery { fetcher.fetch("https://dead.example/x", any()) } returns
+            GroundingResult.ModelOnly(GroundingResult.Reason.FETCH_FAILED)
+
+        val result = orchestrator.fetchAll(listOf(pasted, "https://dead.example/x"), 4096)
+
+        val fused = result as MultiUrlResult.Fused
+        assertThat(fused.okUrls).containsExactly(resolved)
+        assertThat(fused.details.map { it.url }).containsExactly(
+            resolved,
+            "https://dead.example/x",
+        ).inOrder()
+        assertThat(fused.details[0].status)
+            .isEqualTo(com.warped.domain.model.GroundedSourceStatus.OK)
+        assertThat(fused.details[0].extractedText).isEqualTo("Texto de $resolved.")
+        assertThat(fused.details[1].status)
+            .isEqualTo(com.warped.domain.model.GroundedSourceStatus.OMITIDA)
+    }
 }

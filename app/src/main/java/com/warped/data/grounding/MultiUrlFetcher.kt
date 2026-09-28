@@ -1,5 +1,7 @@
 package com.warped.data.grounding
 
+import com.warped.domain.model.GroundedSource
+import com.warped.domain.model.GroundedSourceStatus
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -41,8 +43,17 @@ sealed interface MultiUrlResult {
          * covering exactly [okUrls] in the same order. Threaded through so
          * the repository can persist ok rows with text alongside omitida rows
          * (null text) in fetch-block order. Defaults empty for pre-53 callers.
+         *
+         * Phase 53 CR-01: [details] is the lossless union of all N fetched
+         * sources in fetch-block order, built at fusion time where both the
+         * pasted and post-redirect resolved URLs are known. OK rows carry the
+         * resolved URL + extracted text; skipped rows carry the pasted URL
+         * with null text + OMITIDA. Persist [details] directly — never look
+         * up pasted URLs in [pageTexts] (keyed by resolved URL, misses on
+         * redirect).
          */
         val pageTexts: Map<String, String> = emptyMap(),
+        val details: List<GroundedSource> = emptyList(),
     ) : MultiUrlResult
 
     data class AllFailed(
@@ -100,11 +111,30 @@ class MultiUrlFetcher @Inject constructor(
             }
             MultiUrlResult.AllFailed(reason)
         } else {
+            // CR-01: lossless union in fetch-block order — resolved URL +
+            // text for grounded pages, pasted URL + OMITIDA for skipped.
+            val details = results.map { (pastedUrl, result) ->
+                when (result) {
+                    is GroundingResult.Grounded ->
+                        GroundedSource(
+                            url = result.url,
+                            extractedText = result.text,
+                            status = GroundedSourceStatus.OK,
+                        )
+                    is GroundingResult.ModelOnly ->
+                        GroundedSource(
+                            url = pastedUrl,
+                            extractedText = null,
+                            status = GroundedSourceStatus.OMITIDA,
+                        )
+                }
+            }
             MultiUrlResult.Fused(
                 block = GroundingPrompt.buildFusedBlock(okPages),
                 okUrls = okPages.map { (url, _) -> url },
                 skippedUrls = skipped,
                 pageTexts = okPages.toMap(),
+                details = details,
             )
         }
     }

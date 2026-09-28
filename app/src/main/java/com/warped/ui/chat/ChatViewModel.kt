@@ -393,11 +393,16 @@ class ChatViewModel @Inject constructor(
                                 is MultiUrlResult.Fused -> {
                                     requestUserText = GroundingPrompt.augment(requestUserText, result.block)
                                     groundedSources = result.okUrls
-                                    // Phase 53 (SRC-02): retain the union of all N
-                                    // fetched sources in fetch-block order for the
-                                    // post-inference persist (ok rows with text,
-                                    // omitida rows with null text).
-                                    groundedSourceDetails = buildSourceDetails(groundedUrls, result)
+                                    // Phase 53 (SRC-02): CR-01 — persist the fusion-time
+                                    // details union directly (resolved URLs + text
+                                    // survive redirects). The legacy pasted-key
+                                    // lookup is fallback-only for hand-built Fused
+                                    // carriers that predate details.
+                                    groundedSourceDetails = if (result.details.isNotEmpty()) {
+                                        result.details
+                                    } else {
+                                        buildSourceDetails(groundedUrls, result)
+                                    }
                                     val skipped = result.skippedUrls.toSet()
                                     // Terminal per-source snapshot: records OK/OMITIDA
                                     // into progress state (FETCH-02 no-silent-drops
