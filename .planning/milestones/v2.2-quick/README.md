@@ -1,0 +1,15 @@
+# Archived Quick Tasks
+
+- [260430-qv6-no-salen-los-modelos-en-el-detalle-del-m](260430-qv6-no-salen-los-modelos-en-el-detalle-del-m/260430-qv6-SUMMARY.md)
+- [260430-rdt-unificar-diseno-detalle-con-listado-prin](260430-rdt-unificar-diseno-detalle-con-listado-prin/260430-rdt-SUMMARY.md)
+- [260430-ryn-rediseno-chat-ocultar-topbar-selector-mo](260430-ryn-rediseno-chat-ocultar-topbar-selector-mo/260430-ryn-SUMMARY.md)
+- [260430-sx3-navegar-a-models-al-terminar-descarga-ar](260430-sx3-navegar-a-models-al-terminar-descarga-ar/260430-sx3-SUMMARY.md)
+- [260430-tac-descargas-en-segundo-plano-listar-modelo](260430-tac-descargas-en-segundo-plano-listar-modelo/260430-tac-SUMMARY.md)
+- [260430-u5f-editar-y-borrar-endpoints-anthropic-prov](260430-u5f-editar-y-borrar-endpoints-anthropic-prov/260430-u5f-SUMMARY.md)
+- [260430-ulx-endpoints-en-selector-chat-titulo-models](260430-ulx-endpoints-en-selector-chat-titulo-models/260430-ulx-SUMMARY.md)
+- [260430-v7v-cargar-modelo-local-con-loading-listar-m](260430-v7v-cargar-modelo-local-con-loading-listar-m/260430-v7v-SUMMARY.md)
+- [260430-vsl-lm-studio-nativo-v1-api-remover-openai-a](260430-vsl-lm-studio-nativo-v1-api-remover-openai-a/260430-vsl-SUMMARY.md)
+- [260430-wgt-arreglar-delete-endpoints-dropdown-model](260430-wgt-arreglar-delete-endpoints-dropdown-model/260430-wgt-SUMMARY.md)
+- [260430-wtn-fix-real-delete-endpoints-y-fetch-modelo](260430-wtn-fix-real-delete-endpoints-y-fetch-modelo/260430-wtn-SUMMARY.md)
+- [260504-lmi-litert-lm-solo-env-a-el-primer-mensaje-d](260504-lmi-litert-lm-solo-env-a-el-primer-mensaje-d/260504-lmi-SUMMARY.md)
+- [260926-txv-hacer-que-compile-el-proyecto-fix-room-a](260926-txv-hacer-que-compile-el-proyecto-fix-room-a/260926-txv-SUMMARY.md)
