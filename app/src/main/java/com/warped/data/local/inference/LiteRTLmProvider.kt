@@ -7,7 +7,15 @@ import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.SamplerConfig
+import com.google.ai.edge.litertlm.ToolSet
 import com.google.ai.edge.litertlm.LiteRtLmJniException
+import com.google.ai.edge.litertlm.tool
+import com.warped.data.repository.ModelAllowlistRepository
+import com.warped.data.skills.CalculatorToolSet
+import com.warped.data.skills.CurrentTimeToolSet
+import com.warped.data.skills.JsonFormatterToolSet
+import com.warped.data.skills.ToolGateDecision
+import com.warped.data.skills.ToolGating
 import com.warped.domain.model.ActiveModelSelection
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.ConnectionStatus
@@ -17,14 +25,20 @@ import com.warped.domain.model.ProviderType
 import com.warped.domain.model.Role
 import com.warped.domain.model.StreamToken
 import com.warped.domain.provider.LlmProvider
+import com.warped.domain.skills.SkillIds
+import com.warped.domain.skills.SkillRepository
+import com.warped.domain.skills.ToolEventSink
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.text.Normalizer
 import javax.inject.Inject
@@ -34,7 +48,9 @@ import javax.inject.Singleton
 class LiteRTLmProvider @Inject constructor(
     private val engineManager: EngineManager,
     private val inputSanitizer: InputSanitizer,
-    private val activeModelSelection: ActiveModelSelection
+    private val activeModelSelection: ActiveModelSelection,
+    private val skillRepository: SkillRepository,
+    private val allowlistRepository: ModelAllowlistRepository,
 ) : LlmProvider {
 
     override val type = ProviderType.LITE_RT_LM
@@ -43,6 +59,33 @@ class LiteRTLmProvider @Inject constructor(
         /** 0.17.x reasoning channel name (see [extractThoughtContent]). */
         const val THOUGHT_CHANNEL = "thought"
     }
+
+    /**
+     * 47-02: live tool status. Each `@Tool` body posts start/finish here via
+     * [toolEventSink] (automatic mode emits no engine events — Pitfall 4);
+     * every chat() turn forwards the state as [StreamToken.ToolStatus].
+     * Plain StateFlow set — lock-free, safe to post from engine threads.
+     */
+    private val toolStatus = MutableStateFlow<String?>(null)
+
+    private val toolEventSink = object : ToolEventSink {
+        override fun onStart(toolName: String) {
+            toolStatus.value = toolName
+        }
+
+        override fun onFinish(toolName: String) {
+            if (toolStatus.value == toolName) toolStatus.value = null
+        }
+    }
+
+    /**
+     * 47-02 T-47-09: Qwen-family template-wedge session fallback. Once a
+     * tool_response/template [LiteRtLmJniException] wedge is observed, all
+     * subsequent turns in this session take the prompt-injection fallback
+     * (gating forced CLOSED) instead of re-arming engine tools.
+     */
+    @Volatile
+    private var toolsDegraded = false
 
     @Volatile
     private var activeConversation: Conversation? = null
@@ -78,7 +121,26 @@ class LiteRTLmProvider @Inject constructor(
         }
     }
 
-    override fun chat(request: ChatRequest): Flow<StreamToken> = flow {
+    override fun chat(request: ChatRequest): Flow<StreamToken> {
+        // Inner turn flow stays a plain flow{} (FlowCollector receiver for
+        // the shared sendContentsWithRetry helper); the outer channelFlow
+        // merges it with the @Tool status forwarding below.
+        val body: Flow<StreamToken> = kotlinx.coroutines.flow.flow {
+            chatInternal(request)
+        }
+        return channelFlow {
+            // 47-02: forward @Tool start/finish posts as ToolStatus tokens
+            // for this turn (automatic mode emits no engine events).
+            val statusJob = launch { toolStatus.collect { send(StreamToken.ToolStatus(it)) } }
+            try {
+                body.collect { send(it) }
+            } finally {
+                statusJob.cancel()
+            }
+        }.flowOn(Dispatchers.Default)
+    }
+
+    private suspend fun FlowCollector<StreamToken>.chatInternal(request: ChatRequest) {
         // Step 1: Sanitize all messages
         val sanitizedMessages = request.messages.map { msg ->
             msg.copy(content = inputSanitizer.sanitize(msg.content))
@@ -97,14 +159,14 @@ class LiteRTLmProvider @Inject constructor(
         } catch (e: LiteRtLmJniException) {
             Timber.e(e, "LiteRTLmProvider: JNI native error — ${e.message}")
             emit(StreamToken.Error("LiteRT-LM native error: ${e.message ?: "Unknown JNI error"}"))
-            return@flow
+            return
         } catch (e: Exception) {
                     emit(StreamToken.Error("Failed to load LiteRT-LM engine: ${e.message}"))
-                    return@flow
+                    return
                 }
             } else {
                 emit(StreamToken.Error("No LiteRT-LM engine is loaded. Select a .litertlm or .task model first."))
-                return@flow
+                return
             }
         }
 
@@ -115,10 +177,13 @@ class LiteRTLmProvider @Inject constructor(
                 Role.SYSTEM -> Message.system(msg.content)
                 Role.USER -> Message.user(msg.content)
                 Role.ASSISTANT -> Message.model(msg.content)
-                // 47-01: tool summaries resume as model-side context. The
-                // dedicated Message.tool(ToolResponse) mapping lands with the
-                // local executor (Plan 02); never crash here.
-                Role.TOOL -> Message.model(msg.content)
+                // 47-02: tool summaries resume as dedicated tool messages.
+                // Content encoding is "<toolId>\n<summary>" (47-01 ToolCopy
+                // contract, mirrored locally — never import UI code here).
+                Role.TOOL -> {
+                    val (toolId, summary) = splitToolContent(msg.content)
+                    Message.tool(Contents.of(Content.ToolResponse(toolId, summary)))
+                }
             }
         }.dropLast(1) // exclude current message from history
 
@@ -157,18 +222,42 @@ class LiteRTLmProvider @Inject constructor(
             seed = if (params.seed != -1) params.seed else 0
         )
 
-        // Step 6: Create conversation config with history, tools, and auto tool calling
+        // Step 6: Create conversation config — tools from enabled chips (47-02).
+        // Config applies ONLY at creation (long-lived conversation reuse):
+        // chip toggles call resetConversation() so the next chat() rebuilds.
+        // Gating defaults CLOSED (verified-only rule — no flag flips here).
+        val enabledIds = skillRepository.enabledSkills.value.map { it.id }
+        val modelPath = activeModelSelection.activeModel.value?.modelId
+        val supported = !toolsDegraded &&
+            ToolGating.supportsLocalTools(allowlistRepository, modelPath)
+        val gate = ToolGating.decide(enabledIds, supported)
+        val toolProviders = if (gate is ToolGateDecision.UseTools) {
+            // FRESH ToolSet instances per conversation creation — never reuse
+            // (event-sink residue). automaticToolCalling rides the pinned
+            // 0.17.1 build (LRT-08 int-arg/streaming fixes adopted, no
+            // registration rewrite needed per AAR diff).
+            gate.ids.mapNotNull { id -> newToolSet(id)?.let { tool(it) } }
+        } else {
+            emptyList()
+        }
+        // No-support fallback: prompt-injection one-liners as a system message
+        // (v2.0 behavior preserved). Zero-enabled → no tools[], no notice.
+        val fallbackSystem = if (gate is ToolGateDecision.NoSupportFallback) {
+            listOf(Message.system(ToolGating.fallbackSystemPrompt(gate.ids)))
+        } else {
+            emptyList()
+        }
         val conversationConfig = ConversationConfig(
-            initialMessages = historyMessages,
+            initialMessages = fallbackSystem + historyMessages,
             samplerConfig = samplerConfig,
             extraContext = emptyMap(),
-            tools = emptyList(),
-            automaticToolCalling = false
+            tools = toolProviders,
+            automaticToolCalling = toolProviders.isNotEmpty()
         )
 
         // Step 7: Send content with retry loop
         sendContentsWithRetry(currentContents, conversationConfig, 0)
-    }.flowOn(Dispatchers.Default)
+    }
 
     override suspend fun listModels(): Result<List<ModelInfo>> {
         return try {
@@ -268,6 +357,23 @@ class LiteRTLmProvider @Inject constructor(
             // with `>=` semantics (`check(round >= MAX_TOOL_ROUNDS)`).
             // Full loop is Phase 47.
             coroutineScope { ensureActive() }
+            // 47-02 T-47-09: tool template wedge (Qwen-family). Degrade this
+            // turn to a no-tools retry ONCE — attempt jumps to maxRetries so
+            // a second failure surfaces Error instead of looping — then
+            // session fallback (toolsDegraded) for all subsequent turns.
+            if (e is LiteRtLmJniException && isToolWedge(e) &&
+                conversationConfig.automaticToolCalling && attempt == 0
+            ) {
+                Timber.w(e, "LiteRTLmProvider: tool wedge — no-tools retry once + session fallback")
+                toolsDegraded = true
+                resetConversation()
+                val noTools = conversationConfig.copy(
+                    tools = emptyList(),
+                    automaticToolCalling = false
+                )
+                sendContentsWithRetry(contents, noTools, maxRetries)
+                return
+            }
             val isEngineError = e is IllegalStateException ||
                 e.message?.contains("not alive", ignoreCase = true) == true ||
                 e.message?.contains("not initialized", ignoreCase = true) == true
@@ -306,6 +412,37 @@ class LiteRTLmProvider @Inject constructor(
                 throw e
             }
         }
+    }
+
+    /**
+     * 47-02: fresh ToolSet per skill id for conversation creation. Ids are
+     * pre-filtered to TOOL_IDS by [ToolGating.decide] — unknown maps to null
+     * and is skipped, never executed.
+     */
+    private fun newToolSet(id: String): ToolSet? = when (id) {
+        SkillIds.CALCULATOR -> CalculatorToolSet(toolEventSink)
+        SkillIds.CURRENT_TIME -> CurrentTimeToolSet(toolEventSink)
+        SkillIds.JSON_FORMATTER -> JsonFormatterToolSet(toolEventSink)
+        else -> null
+    }
+
+    /**
+     * 47-02: split a persisted `role=tool` row ("<toolId>\n<summary>").
+     * Default mirrors `ToolCopy.parseToolResultContent` (local mirror —
+     * data layer never imports UI code).
+     */
+    private fun splitToolContent(content: String): Pair<String, String> {
+        val idx = content.indexOf('\n')
+        return if (idx < 0) SkillIds.CALCULATOR to content
+        else content.substring(0, idx) to content.substring(idx + 1)
+    }
+
+    /** 47-02 T-47-09: Qwen-family template-wedge signature. */
+    private fun isToolWedge(e: LiteRtLmJniException): Boolean {
+        val msg = e.message.orEmpty()
+        return msg.contains("tool_response", ignoreCase = true) ||
+            msg.contains("tool_call", ignoreCase = true) ||
+            msg.contains("template", ignoreCase = true)
     }
 
     private fun decodeImage(dataUrl: String): ByteArray? {

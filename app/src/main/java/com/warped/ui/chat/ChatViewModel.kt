@@ -8,9 +8,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.warped.data.local.inference.BackendType
 import com.warped.data.local.inference.EngineManager
+import com.warped.data.local.inference.LiteRTLmProvider
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.preferences.AdvancedPreferences
 import com.warped.data.remote.provider.ProviderRouter
+import com.warped.data.repository.ModelAllowlistRepository
+import com.warped.data.skills.ToolGateDecision
+import com.warped.data.skills.ToolGating
 import com.warped.domain.llm.LlmModelHelper
 import com.warped.domain.model.*
 import com.warped.domain.repository.ChatRepository
@@ -46,6 +50,8 @@ class ChatViewModel @Inject constructor(
     private val memoryChecker: MemoryChecker,
     private val advancedPreferences: AdvancedPreferences,
     private val skillRepository: SkillRepository,
+    private val modelAllowlistRepository: ModelAllowlistRepository,
+    private val liteRTLmProvider: LiteRTLmProvider,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -185,11 +191,22 @@ class ChatViewModel @Inject constructor(
     /**
      * 47-01 UI-SPEC §2: toggle a skill chip → writes SkillPreferences
      * DataStore via SkillRepository. No-op while generating (chips disabled).
+     *
+     * 47-02 Pitfall 1: ConversationConfig.tools applies only at creation —
+     * a toggle resets the local conversation so the next turn rebuilds it
+     * with the new tool set. Guarded against mid-stream races.
      */
     fun setSkillEnabled(id: String, enabled: Boolean) {
         if (id !in SkillIds.TOOL_IDS) return
         viewModelScope.launch(coroutineExceptionHandler) {
             skillRepository.setEnabled(id, enabled)
+            if (!_uiState.value.isStreaming) {
+                try {
+                    liteRTLmProvider.resetConversation()
+                } catch (e: Exception) {
+                    Timber.e(e, "Chat: resetConversation on skill toggle failed")
+                }
+            }
         }
     }
 
@@ -213,7 +230,7 @@ class ChatViewModel @Inject constructor(
 
         val imageDataUrls = images.mapNotNull { uriToBase64(it) }
         val userMessage = ChatMessage(role = Role.USER, content = text.trim(), imageUris = imageDataUrls)
-        _uiState.update { it.copy(messages = it.messages + userMessage, inputText = "", isStreaming = true, toolCallActive = null) }
+        _uiState.update { it.copy(messages = it.messages + userMessage, inputText = "", isStreaming = true, toolCallActive = null, showNoToolSupportNotice = false) }
 
         // CR-02: cancel any in-flight turn before starting a new one — otherwise
         // two collectors interleave tokens into one bubble and activeHelper is
@@ -306,6 +323,22 @@ class ChatViewModel @Inject constructor(
                     images = imageDataUrls,
                     audioBytes = audioBytes
                 )
+                // 47-02 UI-SPEC §6: no-tool-support notice — once per turn,
+                // only when skills are enabled on an unsupported local model.
+                // Same ToolGating truth as LiteRTLmProvider; zero enabled →
+                // PlainChat → no notice.
+                if (selectedProvider == ProviderType.LITE_RT_LM) {
+                    val enabledIds = SkillIds.TOOL_IDS.filter {
+                        _uiState.value.skillEnabled[it] == true
+                    }
+                    val gate = ToolGating.decide(
+                        enabledIds,
+                        ToolGating.supportsLocalTools(modelAllowlistRepository, modelId)
+                    )
+                    if (gate is ToolGateDecision.NoSupportFallback) {
+                        _uiState.update { it.copy(showNoToolSupportNotice = true) }
+                    }
+                }
                 val tokenBuffer = mutableListOf<String>()
                 var lastEmitTime = System.currentTimeMillis()
 
@@ -326,8 +359,7 @@ class ChatViewModel @Inject constructor(
                 ).shareIn(this, SharingStarted.Eagerly, replay = 1).collect { token ->
 
                     when (token) {
-                        is StreamToken.Delta -> {
-                            // Detect tool call patterns [tool:NAME] and show indicator
+                        is StreamToken.Delta -> {                            // Detect tool call patterns [tool:NAME] and show indicator
                             val toolMatch = Regex("\\[tool:(\\w+)\\]").find(token.content)
                             if (toolMatch != null) {
                                 _uiState.update { it.copy(toolCallActive = toolMatch.groupValues[1]) }
@@ -348,6 +380,13 @@ class ChatViewModel @Inject constructor(
                                 tokenBuffer.clear()
                                 lastEmitTime = now
                             }
+                        }
+                        is StreamToken.ToolStatus -> {
+                            // 47-02: live @Tool signal from the provider sink
+                            // (local automatic mode) or the remote loop
+                            // (47-03). Null clears. Old [tool:NAME] regex
+                            // path below stays untouched.
+                            _uiState.update { it.copy(toolCallActive = token.toolName) }
                         }
                         is StreamToken.Done -> {
                             _uiState.update { it.copy(toolCallActive = null) }
@@ -514,7 +553,9 @@ class ChatViewModel @Inject constructor(
                 error = null,
                 conversationModelId = null,
                 conversationProviderType = null,
-                modelUnavailable = false
+                modelUnavailable = false,
+                showNoToolSupportNotice = false,
+                toolCallActive = null
             )
         }
     }

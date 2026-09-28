@@ -108,6 +108,8 @@ class PromptLabViewModel @Inject constructor(
                         is StreamToken.Error -> _ui.update {
                             it.copy(isRunning = false, error = token.message)
                         }
+                        // 47-02: tool status is not text — ignored by PromptLab.
+                        is StreamToken.ToolStatus -> Unit
                     }
                 }
             } catch (e: Exception) {

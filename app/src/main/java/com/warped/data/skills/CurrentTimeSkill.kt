@@ -1,5 +1,10 @@
 package com.warped.data.skills
 
+import com.google.ai.edge.litertlm.Tool
+import com.google.ai.edge.litertlm.ToolParam
+import com.google.ai.edge.litertlm.ToolSet
+import com.warped.domain.skills.SkillIds
+import com.warped.domain.skills.ToolEventSink
 import com.warped.domain.skills.ToolResult
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -38,5 +43,31 @@ fun getCurrentTime(timezone: String?): ToolResult {
     } catch (e: Exception) {
         // Belt-and-braces: the trust boundary guarantees no throw-out.
         ToolResult.Failure("time unavailable")
+    }
+}
+
+/**
+ * 47-02 (D-04): CurrentTime `@Tool` via [ToolSet]. Descriptions import the
+ * Plan 01 descriptor constants verbatim (SKILLS-09 no-drift). The timezone
+ * param is nullable-with-default (engine-optional); blank/absent resolves to
+ * the device zone in [getCurrentTime]. Same [ToolEventSink] + never-throw
+ * contract as [CalculatorToolSet].
+ */
+class CurrentTimeToolSet(private val events: ToolEventSink) : ToolSet {
+    @Tool(description = TIME_TOOL_DESCRIPTION)
+    fun currentTime(
+        @ToolParam(description = TIME_TIMEZONE_DESCRIPTION) timezone: String? = null,
+    ): String {
+        events.onStart(SkillIds.CURRENT_TIME)
+        return try {
+            when (val r = getCurrentTime(timezone)) {
+                is ToolResult.Success -> sanitizeToolOutput(r.text)
+                is ToolResult.Failure -> "Error: ${r.reason}"
+            }
+        } catch (e: Exception) {
+            "Error: time unavailable"
+        } finally {
+            events.onFinish(SkillIds.CURRENT_TIME)
+        }
     }
 }

@@ -1,5 +1,10 @@
 package com.warped.data.skills
 
+import com.google.ai.edge.litertlm.Tool
+import com.google.ai.edge.litertlm.ToolParam
+import com.google.ai.edge.litertlm.ToolSet
+import com.warped.domain.skills.SkillIds
+import com.warped.domain.skills.ToolEventSink
 import com.warped.domain.skills.ToolResult
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -34,5 +39,29 @@ fun formatJson(jsonText: String): ToolResult {
     } catch (e: Exception) {
         // Belt-and-braces: the trust boundary guarantees no throw-out.
         ToolResult.Failure("invalid JSON")
+    }
+}
+
+/**
+ * 47-02 (D-04): JsonFormatter `@Tool` via [ToolSet]. Descriptions import the
+ * Plan 01 descriptor constants verbatim (SKILLS-09 no-drift). Same
+ * [ToolEventSink] + never-throw contract as [CalculatorToolSet].
+ */
+class JsonFormatterToolSet(private val events: ToolEventSink) : ToolSet {
+    @Tool(description = JSON_TOOL_DESCRIPTION)
+    fun jsonFormatter(
+        @ToolParam(description = JSON_TEXT_DESCRIPTION) json: String,
+    ): String {
+        events.onStart(SkillIds.JSON_FORMATTER)
+        return try {
+            when (val r = formatJson(json)) {
+                is ToolResult.Success -> sanitizeToolOutput(r.text)
+                is ToolResult.Failure -> "Error: ${r.reason}"
+            }
+        } catch (e: Exception) {
+            "Error: formatting failed"
+        } finally {
+            events.onFinish(SkillIds.JSON_FORMATTER)
+        }
     }
 }

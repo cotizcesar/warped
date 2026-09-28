@@ -91,6 +91,8 @@ class ModelBenchmarkWorker @AssistedInject constructor(
                         }
                         is StreamToken.Done -> Unit
                         is StreamToken.Error -> throw IllegalStateException(token.message)
+                        // 47-02: tool status is not text — ignored by benchmarks.
+                        is StreamToken.ToolStatus -> Unit
                     }
                 }
             } catch (e: Exception) {

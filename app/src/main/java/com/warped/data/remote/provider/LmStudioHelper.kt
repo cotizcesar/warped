@@ -111,6 +111,8 @@ class LmStudioHelper @Inject constructor(
                         is StreamToken.Delta -> StreamToken.Delta(stripThinkTags(token.content))
                         is StreamToken.Done -> StreamToken.Done(stats = token.stats, reasoning = null)
                         is StreamToken.Error -> token
+                        // 47-02: tool status passes through untouched.
+                        is StreamToken.ToolStatus -> token
                     }
                 }
             }

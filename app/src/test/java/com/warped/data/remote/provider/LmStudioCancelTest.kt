@@ -12,7 +12,10 @@ import com.warped.data.local.inference.LiteRTLmEngine
 import com.warped.data.local.inference.LiteRTLmProvider
 import com.warped.data.local.inference.LiteRtLlmHelper
 import com.warped.data.local.security.ApiKeyStore
+import com.warped.data.repository.ModelAllowlistRepository
 import com.warped.domain.model.ActiveModelSelection
+import com.warped.domain.skills.SkillRepository
+import kotlinx.coroutines.flow.MutableStateFlow
 import com.warped.domain.model.ChatMessage
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.Endpoint
@@ -58,6 +61,12 @@ import java.util.concurrent.atomic.AtomicInteger
  * HTTP tests use runBlocking (real socket IO is incompatible with runTest virtual
  * time); mock-only test (f) uses runTest.
  */
+
+private fun relaxedSkills(): SkillRepository {
+    val skills = mockk<SkillRepository>(relaxed = true)
+    every { skills.enabledSkills } returns MutableStateFlow(emptyList())
+    return skills
+}
 class LmStudioCancelTest {
 
     private var server: HttpServer? = null
@@ -251,7 +260,13 @@ class LmStudioCancelTest {
         val conversation = mockk<Conversation>(relaxed = true)
         val engineManager = mockk<EngineManager>(relaxed = true)
         val activeSelection = mockk<ActiveModelSelection>(relaxed = true)
-        val provider = LiteRTLmProvider(engineManager, InputSanitizer(), activeSelection)
+        val provider = LiteRTLmProvider(
+            engineManager,
+            InputSanitizer(),
+            activeSelection,
+            relaxedSkills(),
+            mockk(relaxed = true),
+        )
         LiteRTLmProvider::class.java.getDeclaredField("activeConversation").apply {
             isAccessible = true
         }.set(provider, conversation)
@@ -292,8 +307,17 @@ class LmStudioCancelTest {
         every { engineManager.createLiteRTConversation(any()) } returns conversation
         every { engineManager.switchToLiteRT(any()) } just Runs
         val activeSelection = mockk<ActiveModelSelection>(relaxed = true)
+        // 47-02: provider reads activeModel for tool gating — null model
+        // gates CLOSED (no tools), preserving this test's engine-error path.
+        every { activeSelection.activeModel } returns MutableStateFlow(null)
 
-        val provider = LiteRTLmProvider(engineManager, InputSanitizer(), activeSelection)
+        val provider = LiteRTLmProvider(
+            engineManager,
+            InputSanitizer(),
+            activeSelection,
+            relaxedSkills(),
+            mockk(relaxed = true),
+        )
         collectJob = launch {
             provider.chat(chatRequest()).collect { }
         }
