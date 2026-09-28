@@ -62,7 +62,12 @@ v2.2 Simplificación + Web Grounding shipped 2026-09-28 (Phases 49–51): dead s
   4. User can override web grounding per conversation (on/off/inherit-global) and send a one-off model-only message ("Sin web") without changing any toggle
   5. User's per-chat web preference and persisted sources survive app restarts (single Room migration v15)
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+- [ ] 53-01-PLAN.md — Persistence + contract tracer: v15 migration, DAO, domain contracts, MigrationTest
+- [ ] 53-02-PLAN.md — Hydration + precedence + tri-state toggle and Sin web chip wiring
+- [ ] 53-03-PLAN.md — Preview sheet + clickable Fuentes + guarded browser intent
+
 **UI hint**: yes
 
 ### Phase 54: Offline Retry
@@ -90,7 +95,7 @@ Phases execute in numeric order: 52 → 53 → 54. Next milestone continues from
 | 50. Web Grounding | 2/2 | Complete (smoke deferred) | 2026-09-28 |
 | 51. Syntax-Theme Fix | 1/1 | Complete (smoke deferred) | 2026-09-28 |
 | 52. Multi-URL Fetch Foundation | 2/2 | Complete    | 2026-09-28 |
-| 53. Sources Preview + Per-Chat Toggle | 0/TBD | Not started | - |
+| 53. Sources Preview + Per-Chat Toggle | 0/3 | Not started | - |
 | 54. Offline Retry | 0/TBD | Not started | - |
 
 ---
