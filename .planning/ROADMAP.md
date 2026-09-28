@@ -83,8 +83,9 @@ v2.2 Simplificación + Web Grounding shipped 2026-09-28 (Phases 49–51): dead s
 
 **Plans**: 2 plans
 
-- [ ] 54-01-PLAN.md — replaceSources row-reuse, retryGrounding + guards, exit-gate tests
-- [ ] 54-02-PLAN.md — queued banner + Reintentar button, resume refresh + wiring
+- [x] 54-01-PLAN.md — replaceSources row-reuse, retryGrounding + guards, exit-gate tests
+- [x] 54-02-PLAN.md — queued banner + Reintentar button, resume refresh + wiring
+
 **UI hint**: yes
 
 ## Progress
@@ -99,7 +100,7 @@ Phases execute in numeric order: 52 → 53 → 54. Next milestone continues from
 | 51. Syntax-Theme Fix | 1/1 | Complete (smoke deferred) | 2026-09-28 |
 | 52. Multi-URL Fetch Foundation | 2/2 | Complete    | 2026-09-28 |
 | 53. Sources Preview + Per-Chat Toggle | 4/4 | Complete    | 2026-09-28 |
-| 54. Offline Retry | 0/TBD | Not started | - |
+| 54. Offline Retry | 2/2 | Complete    | 2026-09-28 |
 
 ---
 

@@ -27,7 +27,7 @@ Extend the v2.2 single-URL heuristic grounding pipeline to multi-page context wi
 
 ### Offline Retry & Extraction
 
-- [ ] **RETRY-01**: User offline at send time gets a queued state with "Reintentar" on reconnect (message-scoped, OFFLINE-only; retry fetches, never rewrites history or re-runs inference silently)
+- [x] **RETRY-01**: User offline at send time gets a queued state with "Reintentar" on reconnect (message-scoped, OFFLINE-only; retry fetches, never rewrites history or re-runs inference silently)
 - [x] **EXTRACT-01**: User gets cleaner grounded answers via Jsoup 1.23.2 parse-only extraction replacing the hand-rolled regex core (fetch policy unchanged: stripped client, 64KB cap, timeouts; never `Jsoup.connect()`)
 - [x] **EXTRACT-02**: User on small local models gets answers that fit context (global grounding budget divided across pages, model-window-aware, replacing fixed per-page constants)
 
@@ -67,7 +67,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TOGGLE-01 | Phase 53 | Complete |
 | TOGGLE-02 | Phase 53 | Complete |
 | TOGGLE-03 | Phase 53 | Complete |
-| RETRY-01 | Phase 54 | Pending |
+| RETRY-01 | Phase 54 | Complete |
 | EXTRACT-01 | Phase 52 | Complete |
 | EXTRACT-02 | Phase 52 | Complete |
 

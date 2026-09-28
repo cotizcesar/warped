@@ -31,13 +31,13 @@
     {
       "number": "54",
       "name": "Offline Retry",
-      "status": "pending"
+      "status": "complete"
     }
   ],
   "next": {
     "command": "/gsd:progress --next",
-    "label": "Advance to the next step (plan phase 54)",
-    "reason": "Phase 54 of 3 — needs a plan"
+    "label": "Advance to the next step (plan phase 53)",
+    "reason": "Phase 53 of 3 — needs a plan"
   },
-  "updated_at": "2026-09-28T17:30:34.922Z"
+  "updated_at": "2026-09-28T18:07:56.180Z"
 }
