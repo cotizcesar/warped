@@ -769,6 +769,11 @@ class ChatViewModel @Inject constructor(
             if (urls.isEmpty()) return@launch
             updateInput {
                 it.copy(
+                    // WR-01: isGenerating surfaces the existing Stop button
+                    // during retry (matching the Leyendo chip copy) and
+                    // disables Send mid-retry; stopGeneration() semantics
+                    // unchanged. Cleared in the owned finally below.
+                    isGenerating = true,
                     isFetchingWeb = true,
                     webFetchProgress = WebFetchProgress(
                         done = 0,
@@ -837,7 +842,7 @@ class ChatViewModel @Inject constructor(
                 // turn or retry set after it.
                 if (retryJob === myJob) {
                     retryJob = null
-                    updateInput { it.copy(isFetchingWeb = false, webFetchProgress = null) }
+                    updateInput { it.copy(isGenerating = false, isFetchingWeb = false, webFetchProgress = null) }
                     refreshConnectivity()
                 }
             }
