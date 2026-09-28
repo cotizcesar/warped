@@ -230,7 +230,15 @@ fun ChatScreen(
     // per-token animateScrollTo defect); otherwise the hasNewContentBelow
     // latch sets and the pill takes over.
     val showStreamingBubble = transcript.streamingContent.isNotEmpty() || transcript.streamingReasoning.isNotEmpty()
-    val trailingCount = if (showStreamingBubble) 1 else 0
+    // QUICK-B: transient "Pensando…" row — streaming with no content or
+    // reasoning yet (and no web-fetch chip, which already covers that gap).
+    // Reuses the single trailing-item slot below: mutually exclusive with
+    // the streaming bubble, exactly one trailing row, same pin/pill math.
+    val showThinkingRow = transcript.isStreaming &&
+        transcript.streamingContent.isEmpty() &&
+        transcript.streamingReasoning.isEmpty() &&
+        !input.isFetchingWeb
+    val trailingCount = if (showStreamingBubble || showThinkingRow) 1 else 0
     val totalItems = transcript.messages.size + trailingCount
     LaunchedEffect(
         transcript.messages.size,
@@ -428,6 +436,12 @@ fun ChatScreen(
                                     codeTheme = connection.codeTheme,
                                     codeFontScale = connection.codeFontScale
                                 )
+                            }
+                        } else if (showThinkingRow) {
+                            // QUICK-B: transient processing row. Yields to the
+                            // streaming bubble on first token/reasoning.
+                            item(key = ChatListKeys.THINKING) {
+                                ThinkingRow()
                             }
                         }
                     }
@@ -832,6 +846,37 @@ private fun WebOverrideMenuItem(
         } else null,
         onClick = onClick
     )
+}
+
+/**
+ * QUICK-B: transient "Pensando…" processing row for the streaming gap
+ * before the first token/reasoning arrives. Static string only — no user
+ * content, no injection surface. Assistant-aligned (Start, transparent) to
+ * match MessageBubble style; announces politely for accessibility.
+ */
+@Composable
+private fun ThinkingRow() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                contentDescription = "Pensando. Generando respuesta."
+            },
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(14.dp),
+            strokeWidth = 2.dp,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = "Pensando…",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
 }
 
 /**

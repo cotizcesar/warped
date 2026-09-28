@@ -118,12 +118,26 @@ fun WarpedNavGraph() {
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet(
-                drawerShape = RoundedCornerShape(0.dp),
-                drawerContainerColor = DrawerBg,
-                drawerContentColor = DrawerTextPrimary
+            // QUICK-C: full-width sheet. ModalDrawerSheet caps width at 360dp
+            // internally (M3 DrawerSheet sizeIn maxWidth = ContainerWidth,
+            // applied AFTER the caller modifier — verified against the
+            // material3 1.4.0 sources this BOM resolves), so a bare
+            // fillMaxWidth on ModalDrawerSheet would NOT widen it. This
+            // Surface replicates the sheet (0dp shape, DrawerBg /
+            // DrawerTextPrimary, system-bars insets) at full size.
+            // Gestures + scrim stay with ModalNavigationDrawer; every item
+            // below is untouched.
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(0.dp),
+                color = DrawerBg,
+                contentColor = DrawerTextPrimary
             ) {
-                Column(modifier = Modifier.fillMaxHeight()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .windowInsetsPadding(DrawerDefaults.windowInsets)
+                ) {
                     Spacer(Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),

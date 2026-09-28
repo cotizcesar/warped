@@ -145,6 +145,9 @@ data class ChatConnectionState(
  */
 object ChatListKeys {
     const val STREAMING = "streaming"
+    // QUICK-B: transient "Pensando…" row key. Constant by construction —
+    // never derived from content hashes (T-quick-02).
+    const val THINKING = "thinking"
 }
 
 /**

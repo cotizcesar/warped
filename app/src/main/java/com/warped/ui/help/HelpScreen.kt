@@ -147,11 +147,11 @@ fun HelpScreen(onNavigateBack: () -> Unit) {
                     icon = Icons.Filled.Settings,
                     title = "6. Tool Calling",
                     steps = listOf(
-                        "LiteRT-LM models (Gemma 3n) can use built-in tools automatically.",
-                        "Available tools: getCurrentTime (date/time), calculate (math), getDeviceInfo.",
-                        "Just ask naturally — the model decides when to call a tool.",
-                        "Example: \"What time is it?\" or \"Calculate 156 × 23.5\".",
-                        "Tool execution is automatic — you just see the result.",
+                        "There is currently no automatic tool execution in the app (removed in v2.2).",
+                        "Capability badges (Vision, Audio, Tools, Thinking) reflect model support only.",
+                        "If a model supports thinking, enable it from the chat input bar to see its reasoning.",
+                        "Example: ask \"What time is it?\" — the model answers from its own knowledge.",
+                        "Tip: enable web grounding (Web: Sí) when you need current information.",
                     )
                 )
             }
