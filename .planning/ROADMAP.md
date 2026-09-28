@@ -42,7 +42,10 @@ v2.2 Simplificación + Web Grounding shipped 2026-09-28 (Phases 49–51): dead s
   1. User stores a Tavily key in Settings (Keystore-encrypted) with a working test-connection
   2. User gets answers grounded in top-N Tavily results with numbered citations through the same Fuentes/preview pipeline
   3. Search never runs when grounding is off or offline, with a clear missing/invalid-key message
-**Plans**: TBD
+**Plans**: 2 plans
+
+- [ ] 55-01-PLAN.md — Tavily key alias + search-to-fused producer (tracer backbone)
+- [ ] 55-02-PLAN.md — Settings key UI + ChatViewModel search branch with gates
 **UI hint**: yes
 
 ### Phase 56: Local Agentic Loop
