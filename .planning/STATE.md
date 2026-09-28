@@ -104,6 +104,7 @@ None — v2.2 phases shipped with accepted deferrals recorded above. Next milest
 | 20260928-remove-sin-web | 2026-09-28 | Complete ✓ | Sin web chip + skipOnce plumbing removed; SYSTEM_PROMPT always-on when grounding enabled; suite green |
 | 20260928-gemma-caps-thinking-drawer | 2026-09-28 | Complete ✓ | E2B flags (thinking/vision/audio) per Google docs; Pensando… row; full-width drawer; Help tools text fixed; 291 green; on-device confirmation pending |
 | 20260928-catalog-repo-url-fix | 2026-09-28 | Complete ✓ | Explicit repo field (fixes 404 on all catalog downloads) + E4B entry; 297 green; 3n modelFile/size swap deferred |
+| 20260928-catalog-card-redesign | 2026-09-28 | Complete ✓ | Dense card (title + download icon, feature icons + size, tap expands RAM + uso); 7 download states preserved; visual check on-device pending |
 
 ## Session Continuity
 
