@@ -359,6 +359,18 @@ class ChatViewModel @Inject constructor(
                         _uiState.update { it.copy(showNoToolSupportNotice = true) }
                     }
                 }
+                // WR-05: tool execution is wired ONLY to LITE_RT_LM and
+                // LM_STUDIO — every other provider leaves enabled skills
+                // silently dead, so raise the same once-per-turn notice
+                // there instead of showing chips-ON with zero behavior.
+                if (selectedProvider != ProviderType.LITE_RT_LM && selectedProvider != ProviderType.LM_STUDIO) {
+                    val enabledIds = SkillIds.TOOL_IDS.filter {
+                        _uiState.value.skillEnabled[it] == true
+                    }
+                    if (enabledIds.isNotEmpty()) {
+                        _uiState.update { it.copy(showNoToolSupportNotice = true) }
+                    }
+                }
                 // 47-03 (D-06): per-turn tool records from the remote loop.
                 // Persisted as role=TOOL rows on Done; failures also raise
                 // the transient "{Display} failed: …" error row.
