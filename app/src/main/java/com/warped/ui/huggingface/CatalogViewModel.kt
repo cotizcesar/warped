@@ -6,9 +6,11 @@ import com.warped.data.local.download.DownloadState
 import com.warped.data.local.download.ModelDownloadManager
 import com.warped.data.repository.AllowlistedModel
 import com.warped.data.repository.ModelAllowlistRepository
+import com.warped.domain.repository.LocalModelRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.net.URLEncoder
 import javax.inject.Inject
@@ -30,6 +32,7 @@ import javax.inject.Inject
 class CatalogViewModel @Inject constructor(
     allowlistRepository: ModelAllowlistRepository,
     private val downloadManager: ModelDownloadManager,
+    localModelRepository: LocalModelRepository,
 ) : ViewModel() {
 
     /** Synchronous asset parse — first paint shows the populated list, no skeleton. */
@@ -41,6 +44,16 @@ class CatalogViewModel @Inject constructor(
             SharingStarted.Eagerly,
             emptyMap(),
         )
+
+    /** On-device file names (entry.modelFile match key) from the models table. */
+    val downloadedFileNames: StateFlow<Set<String>> =
+        localModelRepository.observeModels()
+            .map { models -> models.map { it.filePath.substringAfterLast('/') }.toSet() }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.Eagerly,
+                emptySet(),
+            )
 
     fun downloadId(entry: AllowlistedModel): String =
         "${entry.repoSlug}/${entry.modelFile}"
