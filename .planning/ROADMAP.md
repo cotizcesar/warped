@@ -64,9 +64,9 @@ v2.2 Simplificación + Web Grounding shipped 2026-09-28 (Phases 49–51): dead s
 
 **Plans**: 3 plans
 
-- [ ] 53-01-PLAN.md — Persistence + contract tracer: v15 migration, DAO, domain contracts, MigrationTest
-- [ ] 53-02-PLAN.md — Hydration + precedence + tri-state toggle and Sin web chip wiring
-- [ ] 53-03-PLAN.md — Preview sheet + clickable Fuentes + guarded browser intent
+- [x] 53-01-PLAN.md — Persistence + contract tracer: v15 migration, DAO, domain contracts, MigrationTest
+- [x] 53-02-PLAN.md — Hydration + precedence + tri-state toggle and Sin web chip wiring
+- [x] 53-03-PLAN.md — Preview sheet + clickable Fuentes + guarded browser intent
 
 **UI hint**: yes
 
@@ -95,7 +95,7 @@ Phases execute in numeric order: 52 → 53 → 54. Next milestone continues from
 | 50. Web Grounding | 2/2 | Complete (smoke deferred) | 2026-09-28 |
 | 51. Syntax-Theme Fix | 1/1 | Complete (smoke deferred) | 2026-09-28 |
 | 52. Multi-URL Fetch Foundation | 2/2 | Complete    | 2026-09-28 |
-| 53. Sources Preview + Per-Chat Toggle | 0/3 | Not started | - |
+| 53. Sources Preview + Per-Chat Toggle | 4/4 | Complete    | 2026-09-28 |
 | 54. Offline Retry | 0/TBD | Not started | - |
 
 ---

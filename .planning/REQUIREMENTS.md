@@ -15,15 +15,15 @@ Extend the v2.2 single-URL heuristic grounding pipeline to multi-page context wi
 
 ### Sources
 
-- [ ] **SRC-01**: User can tap a source to preview its extracted text in a bottom sheet without leaving chat
-- [ ] **SRC-02**: User sees a numbered Fuentes list covering all N fetched sources for the turn
-- [ ] **SRC-03**: User can open the full page in the browser from the preview ("Abrir en navegador")
+- [x] **SRC-01**: User can tap a source to preview its extracted text in a bottom sheet without leaving chat
+- [x] **SRC-02**: User sees a numbered Fuentes list covering all N fetched sources for the turn
+- [x] **SRC-03**: User can open the full page in the browser from the preview ("Abrir en navegador")
 
 ### Per-Chat Toggle
 
-- [ ] **TOGGLE-01**: User can override web grounding per conversation (tri-state: on/off/inherit-global, null = follow global default-ON)
-- [ ] **TOGGLE-02**: User can send a one-off model-only message from the composer ("Sin web" override) without changing any toggle
-- [ ] **TOGGLE-03**: User's per-chat web preference and persisted sources survive app restarts (combined Room migration v15: override column + sources table)
+- [x] **TOGGLE-01**: User can override web grounding per conversation (tri-state: on/off/inherit-global, null = follow global default-ON)
+- [x] **TOGGLE-02**: User can send a one-off model-only message from the composer ("Sin web" override) without changing any toggle
+- [x] **TOGGLE-03**: User's per-chat web preference and persisted sources survive app restarts (combined Room migration v15: override column + sources table)
 
 ### Offline Retry & Extraction
 
@@ -61,12 +61,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FETCH-01 | Phase 52 | Complete |
 | FETCH-02 | Phase 52 | Complete |
 | FETCH-03 | Phase 52 | Complete |
-| SRC-01 | Phase 53 | Pending |
-| SRC-02 | Phase 53 | Pending |
-| SRC-03 | Phase 53 | Pending |
-| TOGGLE-01 | Phase 53 | Pending |
-| TOGGLE-02 | Phase 53 | Pending |
-| TOGGLE-03 | Phase 53 | Pending |
+| SRC-01 | Phase 53 | Complete |
+| SRC-02 | Phase 53 | Complete |
+| SRC-03 | Phase 53 | Complete |
+| TOGGLE-01 | Phase 53 | Complete |
+| TOGGLE-02 | Phase 53 | Complete |
+| TOGGLE-03 | Phase 53 | Complete |
 | RETRY-01 | Phase 54 | Pending |
 | EXTRACT-01 | Phase 52 | Complete |
 | EXTRACT-02 | Phase 52 | Complete |

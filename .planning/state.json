@@ -26,7 +26,7 @@
     {
       "number": "53",
       "name": "Sources Preview + Per-Chat Toggle",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "54",
@@ -36,8 +36,8 @@
   ],
   "next": {
     "command": "/gsd:progress --next",
-    "label": "Advance to the next step (plan phase 53)",
-    "reason": "Phase 53 of 3 — needs a plan"
+    "label": "Advance to the next step (plan phase 54)",
+    "reason": "Phase 54 of 3 — needs a plan"
   },
-  "updated_at": "2026-09-28T16:21:44.468Z"
+  "updated_at": "2026-09-28T17:30:34.922Z"
 }
