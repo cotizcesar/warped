@@ -4,7 +4,7 @@ package com.warped.data.grounding
  * Phase 52 (EXTRACT-02): global model-window-aware grounding budget.
  *
  * A single char budget is split evenly across N pages so the fused
- * [WEB CONTEXT 1..N] block fits small local-model windows. Numbers are
+ * Source [1..N] block fits small local-model windows. Numbers are
  * LOW-confidence estimates (see CONTEXT.md) — keep every constant behind
  * these two pure functions (Int in, Int out) so TUNE-01 can refine them
  * later. The per-page floor is sized for markdown (denser per char than

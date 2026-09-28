@@ -10,14 +10,14 @@ package com.warped.data.grounding
 object GroundingPrompt {
 
     const val SYSTEM_PROMPT =
-        "Answer using the [WEB CONTEXT] block when relevant. " +
+        "Answer using the sources below when relevant. " +
             "Cite sources with [1]/[2] markers. " +
             "If you need fresh information and there is no context block, " +
             "ask the user to paste a link. " +
             "Never invent URLs: only cite URLs from the block or pasted by the user."
 
     fun buildBlock(url: String, text: String): String =
-        "[WEB CONTEXT — source [1]: $url]\n$text\n[END WEB CONTEXT]"
+        "--- Source [1]: $url ---\n$text\n--- End of sources ---"
 
     /**
      * Phase 52 (FETCH-01): numbered fusion of N pages in paste order.
@@ -25,13 +25,13 @@ object GroundingPrompt {
      * Fuentes order == block order.
      */
     fun buildFusedBlock(pages: List<Pair<String, String>>): String =
-        pages.mapIndexed { i, (url, text) ->
-            "[WEB CONTEXT ${i + 1} — source [${i + 1}]: $url]\n$text\n[END WEB CONTEXT ${i + 1}]"
-        }.joinToString("\n\n")
+        (pages.mapIndexed { i, (url, text) ->
+            "--- Source [${i + 1}]: $url ---\n$text"
+        } + "--- End of sources ---").joinToString("\n\n")
 
     /**
      * Contract: [block] non-null → "$SYSTEM_PROMPT\n\n$block\n\n$original"
-     * ([WEB CONTEXT] behavior, unchanged); [block] null +
+     * (block-injection behavior, unchanged); [block] null +
      * [groundingEnabled] true → "$SYSTEM_PROMPT\n\n$original" (a grounded
      * turn with no pasted URLs still tells the model web search is
      * available); [block] null + [groundingEnabled] false → [original]
