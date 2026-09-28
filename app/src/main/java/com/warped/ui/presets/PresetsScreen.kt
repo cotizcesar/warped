@@ -1,5 +1,6 @@
 package com.warped.ui.presets
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -352,9 +353,8 @@ fun PresetItem(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = if (isSelected) CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        ) else CardDefaults.cardColors()
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
+        border = if (isSelected) BorderStroke(1.dp, Color(0xFFD97757)) else null
     ) {
         Row(
             modifier = Modifier

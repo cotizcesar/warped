@@ -203,7 +203,7 @@ private fun CatalogModelCard(
                 }
             ),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+            containerColor = Color(0xFF2B2B29)
         )
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -369,7 +369,7 @@ private fun CatalogCapabilityIcons(entry: AllowlistedModel) {
             CapabilityIconBadge(
                 icon = Icons.Filled.Visibility,
                 contentDescription = "Visión",
-                color = Color(0xFF9C27B0)
+                color = Color(0xFF64B5F6)
             )
         }
         if (entry.capabilities.audio) {

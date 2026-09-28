@@ -33,7 +33,7 @@ fun CapabilityIconRow(caps: ModelCapabilities) {
         if (caps.vision) CapabilityIconBadge(
             icon = Icons.Filled.Visibility,
             contentDescription = "Vision",
-            color = Color(0xFF9C27B0)
+            color = Color(0xFF64B5F6)
         )
         if (caps.audio) CapabilityIconBadge(
             icon = Icons.Filled.Audiotrack,

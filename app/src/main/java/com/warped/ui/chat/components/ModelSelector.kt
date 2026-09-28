@@ -1,5 +1,6 @@
 package com.warped.ui.chat.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -171,8 +172,9 @@ private fun ModelRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                else Color.Transparent
+        color = if (isSelected) Color(0xFF2B2B29)
+                else Color.Transparent,
+        border = if (isSelected) BorderStroke(1.dp, Color(0xFFD97757)) else null
     ) {
         Row(
             modifier = Modifier
