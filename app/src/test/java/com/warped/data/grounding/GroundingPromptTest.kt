@@ -19,7 +19,7 @@ class GroundingPromptTest {
         val out = GroundingPrompt.augment("pregunta original", block, groundingEnabled = true)
 
         val promptIdx = out.indexOf(GroundingPrompt.SYSTEM_PROMPT)
-        val blockIdx = out.indexOf("[WEB CONTEXT")
+        val blockIdx = out.indexOf("--- Source [")
         val originalIdx = out.indexOf("pregunta original")
         assertThat(promptIdx).isAtLeast(0)
         assertThat(blockIdx).isGreaterThan(promptIdx)
@@ -46,7 +46,24 @@ class GroundingPromptTest {
         val block = GroundingPrompt.buildBlock("https://a.com/x", "texto")
 
         assertThat(block).isEqualTo(
-            "[WEB CONTEXT — source [1]: https://a.com/x]\ntexto\n[END WEB CONTEXT]"
+            "--- Source [1]: https://a.com/x ---\ntexto\n--- End of sources ---"
         )
+    }
+
+    @Test
+    fun `built blocks never contain the web context label phrase`() {
+        val echoTrigger = Regex("WEB CONTEXT\\s*\\d")
+        val single = GroundingPrompt.buildBlock("https://a.com/x", "texto")
+        val fused = GroundingPrompt.buildFusedBlock(
+            listOf("https://a.com/uno" to "uno", "https://b.com/dos" to "dos")
+        )
+        val augmented = GroundingPrompt.augment("pregunta", single, groundingEnabled = true)
+
+        for (out in listOf(single, fused, augmented)) {
+            assertThat(echoTrigger.containsMatchIn(out)).isFalse()
+            assertThat(out).contains("--- Source [1]")
+            assertThat(out).contains("--- End of sources ---")
+            assertThat(out).doesNotContain("[END WEB CONTEXT")
+        }
     }
 }
