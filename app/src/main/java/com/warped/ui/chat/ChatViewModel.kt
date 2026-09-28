@@ -6,6 +6,10 @@ import android.util.Base64
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.warped.data.grounding.GroundingPrompt
+import com.warped.data.grounding.GroundingResult
+import com.warped.data.grounding.UrlDetector
+import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.inference.BackendType
 import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.MemoryChecker
@@ -43,6 +47,7 @@ class ChatViewModel @Inject constructor(
     private val engineManager: EngineManager,
     private val memoryChecker: MemoryChecker,
     private val advancedPreferences: AdvancedPreferences,
+    private val fetcher: WebPageFetcher,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -93,6 +98,14 @@ class ChatViewModel @Inject constructor(
 
     /** Monotonic turn counter backing the [activeHelper] stale-finally guard. */
     private val generationSeq = AtomicLong(0L)
+
+    /**
+     * Phase 50 (WEB-06): grounding toggle snapshot, collected from
+     * DataStore (default ON). Read at turn start; toggle takes effect on
+     * the next sent message.
+     */
+    @Volatile
+    private var webGroundingEnabled = true
 
     private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         timber.log.Timber.e(throwable, "Unhandled coroutine exception")
@@ -205,6 +218,11 @@ class ChatViewModel @Inject constructor(
                 updateInput { it.copy(enableThinking = enabled) }
             }
         }
+        viewModelScope.launch(coroutineExceptionHandler) {
+            advancedPreferences.webGroundingEnabled.collect { enabled ->
+                webGroundingEnabled = enabled
+            }
+        }
     }
 
     fun sendMessage(text: String, images: List<Uri> = emptyList(), audioBytes: ByteArray? = null) {
@@ -233,6 +251,8 @@ class ChatViewModel @Inject constructor(
         // CR-02: cancel any in-flight turn before starting a new one — otherwise
         // two collectors interleave tokens into one bubble and activeHelper is
         // clobbered (Stop then only halts the newest turn's transport).
+        // Phase 50: also cancel any in-flight grounding fetch Call.
+        try { fetcher.cancel() } catch (e: Exception) { Timber.e(e, "Chat: prior fetch cancel failed") }
         generationJob?.let {
             try { activeHelper?.stopResponse() } catch (e: Exception) { Timber.e(e, "Chat: prior stopResponse failed") }
             it.cancel()
@@ -245,6 +265,36 @@ class ChatViewModel @Inject constructor(
             try {
                 val conversationId = ensureConversation(text, hasMedia = images.isNotEmpty() || audioBytes != null)
                 chatRepository.saveMessage(conversationId, userMessage)
+
+                // Phase 50 (WEB-01..WEB-04): grounding fetch hook — detect →
+                // fetch → augment. Runs after save, before helper resolution.
+                // History keeps persisted originals; only the outgoing
+                // request's current message carries the augmented text.
+                var requestUserText = userMessage.content
+                var groundedSources: List<String> = emptyList()
+                var modelOnlyNotice: ModelOnlyNotice? = null
+                if (webGroundingEnabled) {
+                    val groundedUrl = UrlDetector.firstUrl(userMessage.content)
+                    if (groundedUrl != null) {
+                        updateInput { it.copy(isFetchingWeb = true) }
+                        try {
+                            when (val result = withContext(Dispatchers.IO) { fetcher.fetch(groundedUrl) }) {
+                                is GroundingResult.Grounded -> {
+                                    requestUserText = GroundingPrompt.augment(requestUserText, result.block)
+                                    groundedSources = listOf(result.url)
+                                }
+                                is GroundingResult.ModelOnly -> {
+                                    modelOnlyNotice = when (result.reason) {
+                                        GroundingResult.Reason.OFFLINE -> ModelOnlyNotice.OFFLINE
+                                        GroundingResult.Reason.FETCH_FAILED -> ModelOnlyNotice.FETCH_FAILED
+                                    }
+                                }
+                            }
+                        } finally {
+                            updateInput { it.copy(isFetchingWeb = false) }
+                        }
+                    }
+                }
 
                 val selectedProvider = effectiveProvider
                 val modelId = effectiveModelId
@@ -320,8 +370,17 @@ class ChatViewModel @Inject constructor(
                 activeHelper = helper
                 helper.initialize(modelId)
 
+                // Phase 50: the persisted history keeps original text; the
+                // outgoing request's current message carries the augmented
+                // text for BOTH local and remote paths.
+                val historyMessages = _transcript.value.messages
+                val requestMessages = if (groundedSources.isNotEmpty() && historyMessages.isNotEmpty()) {
+                    historyMessages.dropLast(1) + historyMessages.last().copy(content = requestUserText)
+                } else {
+                    historyMessages
+                }
                 val request = ChatRequest(
-                    messages = _transcript.value.messages,
+                    messages = requestMessages,
                     parameters = _connection.value.generationParameters.copy(
                         reasoningEnabled = _input.value.reasoningEnabled
                     ),
@@ -386,7 +445,9 @@ class ChatViewModel @Inject constructor(
                                     content = content,
                                     tokenCount = content.length / 4,
                                     reasoning = finalReasoning.ifEmpty { token.reasoning },
-                                    stats = token.stats
+                                    stats = token.stats,
+                                    groundedSources = groundedSources,
+                                    modelOnlyNotice = modelOnlyNotice,
                                 )
                                 updateTranscript {
                                     it.copy(
@@ -455,6 +516,9 @@ class ChatViewModel @Inject constructor(
     fun stopGeneration() {
         // WR-05: snapshot-then-null so a stale Stop never clobbers a newer turn's
         // transport started after this call was dispatched.
+        // Phase 50: cancel the in-flight grounding fetch BEFORE the helper's
+        // transport stop (same snapshot-then-null ordering).
+        try { fetcher.cancel() } catch (e: Exception) { Timber.e(e, "Chat: fetch cancel failed") }
         val helper = activeHelper
         activeHelper = null
         try {
@@ -469,7 +533,7 @@ class ChatViewModel @Inject constructor(
             streamingContent = "",
             streamingReasoning = ""
         ) }
-        updateInput { it.copy(isGenerating = false) }
+        updateInput { it.copy(isGenerating = false, isFetchingWeb = false) }
     }
 
     fun selectConversation(conversationId: Long) {

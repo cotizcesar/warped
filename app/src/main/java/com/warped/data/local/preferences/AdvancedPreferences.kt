@@ -30,6 +30,7 @@ class AdvancedPreferences @Inject constructor(
         val KEY_CODE_FONT_SCALE = floatPreferencesKey("code_font_scale")
         val KEY_CACHE_MAX_SIZE_BYTES = longPreferencesKey("cache_max_size_bytes")
         val KEY_THINKING_ENABLED = booleanPreferencesKey("thinking_enabled")
+        val KEY_WEB_GROUNDING = booleanPreferencesKey("web_grounding_enabled")
         const val DEFAULT_CACHE_MAX_SIZE_BYTES: Long = 500L * 1024L * 1024L
         const val MIN_CACHE_MAX_SIZE_BYTES: Long = 50L * 1024L * 1024L
     }
@@ -112,6 +113,16 @@ class AdvancedPreferences @Inject constructor(
     suspend fun setThinkingEnabled(enabled: Boolean) {
         context.advancedPreferencesStore.edit { prefs ->
             prefs[KEY_THINKING_ENABLED] = enabled
+        }
+    }
+
+    val webGroundingEnabled: Flow<Boolean> = context.advancedPreferencesStore.data.map { prefs ->
+        prefs[KEY_WEB_GROUNDING] ?: true
+    }.distinctUntilChanged()
+
+    suspend fun setWebGroundingEnabled(enabled: Boolean) {
+        context.advancedPreferencesStore.edit { prefs ->
+            prefs[KEY_WEB_GROUNDING] = enabled
         }
     }
 }

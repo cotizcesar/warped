@@ -46,6 +46,9 @@ data class ChatInputState(
     val enableThinking: Boolean = false,
     val supportsThinking: Boolean = false,
     val isGenerating: Boolean = false,
+    // Phase 50 (WEB-06): true while the grounding fetch is in flight.
+    // Owner: send/stop turn code, mirrors isGenerating.
+    val isFetchingWeb: Boolean = false,
 )
 
 @Immutable
@@ -120,6 +123,7 @@ data class ChatUiState(
     val endpointModels: Map<Long, List<String>> = emptyMap(),
     val isStreaming: Boolean = false,
     val generationParameters: GenerationParameters = GenerationParameters(),
+    val isFetchingWeb: Boolean = false,
     val isLoadingModel: Boolean = false,
     val loadingModelName: String = "",
     val modelLoadError: String? = null,
@@ -164,6 +168,7 @@ fun combineSnapshot(
     endpoints = connection.endpoints,
     endpointModels = connection.endpointModels,
     isStreaming = transcript.isStreaming,
+    isFetchingWeb = input.isFetchingWeb,
     generationParameters = connection.generationParameters,
     isLoadingModel = connection.isLoadingModel,
     loadingModelName = connection.loadingModelName,

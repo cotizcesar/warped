@@ -284,7 +284,10 @@ class ChatCancellationTest {
         every { advancedPreferences.syntaxTheme } returns flowOf(SyntaxTheme.MONOKAI)
         every { advancedPreferences.codeFontScale } returns flowOf(1.0f)
         every { advancedPreferences.thinkingEnabled } returns flowOf(false)
+        every { advancedPreferences.webGroundingEnabled } returns flowOf(false)
         every { providerRouter.resolveLocalHelper(any(), any()) } returns helper
+        val fetcher = mockk<com.warped.data.grounding.WebPageFetcher>()
+        every { fetcher.cancel() } just Runs
 
         return ChatViewModel(
             chatRepository = chatRepository,
@@ -297,6 +300,7 @@ class ChatCancellationTest {
             engineManager = engineManager,
             memoryChecker = memoryChecker,
             advancedPreferences = advancedPreferences,
+            fetcher = fetcher,
             context = context,
         )
     }
