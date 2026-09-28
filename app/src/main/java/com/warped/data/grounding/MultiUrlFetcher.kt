@@ -102,7 +102,11 @@ class MultiUrlFetcher @Inject constructor(
     }
 
     companion object {
-        /** Matches FETCH-01 2–5 range; 6th+ URLs are ignored deterministically. */
+        /**
+         * Single source of truth for the FETCH-01 cap (2–5 range; 6th+
+         * URLs are ignored deterministically). [UrlDetector.allUrls]
+         * defaults its [max] to this — never duplicate the literal.
+         */
         const val MAX_URLS = 5
     }
 }

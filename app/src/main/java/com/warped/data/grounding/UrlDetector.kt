@@ -25,12 +25,16 @@ object UrlDetector {
      * Phase 52 (FETCH-01): deterministic fan-out input — all http(s) URLs
      * in [text] with the same trailing-punctuation trim semantics as
      * [firstUrl], deduped preserving first-seen order, capped at [max].
+     *
+     * The default cap is the single source of truth in
+     * [MultiUrlFetcher.MAX_URLS] (FETCH-01 contract) — never a duplicated
+     * literal here. Negative [max] yields an empty list (never throws).
      */
-    fun allUrls(text: String, max: Int = 5): List<String> =
+    fun allUrls(text: String, max: Int = MultiUrlFetcher.MAX_URLS): List<String> =
         URL_REGEX.findAll(text)
             .map { it.value.trimEnd('.', ',', ';', ':', '!', '?') }
             .filter { it.isNotEmpty() }
             .distinct()
-            .take(max)
+            .take(max.coerceAtLeast(0))
             .toList()
 }
