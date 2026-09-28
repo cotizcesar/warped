@@ -95,6 +95,10 @@ core-splashscreen = { group = "androidx.core", name = "core-splashscreen", versi
 # Baseline Profiles (PERF-16): installs the checked-in baseline-prof.txt on Android 7+ without Play
 profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }
 
+# Benchmark (PERF-16): pinned to version.ref baselineprofile — bump in one place
+benchmark-macro-junit4 = { group = "androidx.benchmark", name = "benchmark-macro-junit4", version.ref = "baselineprofile" }
+benchmark-junit4 = { group = "androidx.benchmark", name = "benchmark-junit4", version.ref = "baselineprofile" }
+
 # Collections
 kotlinx-collections-immutable = { group = "org.jetbrains.kotlinx", name = "kotlinx-collections-immutable", version.ref = "kotlinx-collections-immutable" }
 

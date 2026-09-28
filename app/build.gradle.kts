@@ -189,8 +189,8 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.compose.ui.test)
     androidTestImplementation(libs.room.testing)
-    androidTestImplementation("androidx.benchmark:benchmark-macro-junit4:1.5.0")
-    androidTestImplementation("androidx.benchmark:benchmark-junit4:1.5.0")
+    androidTestImplementation(libs.benchmark.macro.junit4)
+    androidTestImplementation(libs.benchmark.junit4)
     androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
 }
 
