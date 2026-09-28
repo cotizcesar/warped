@@ -201,12 +201,16 @@ class ChatViewModel @Inject constructor(
         if (id !in SkillIds.TOOL_IDS) return
         viewModelScope.launch(coroutineExceptionHandler) {
             skillRepository.setEnabled(id, enabled)
-            if (!_uiState.value.isStreaming) {
-                try {
-                    liteRTLmProvider.resetConversation()
-                } catch (e: Exception) {
-                    Timber.e(e, "Chat: resetConversation on skill toggle failed")
-                }
+            // WR-08: reset unconditionally — never skip it. A stale ToolSet
+            // running the next turn with the old tools is worse than a
+            // redundant reset; resetConversation() only drops the cached
+            // handle (the next chat() rebuilds it), so it is safe to call
+            // even if a toggle races turn start through the launch hop.
+            // (Chips are additionally click-disabled while generating.)
+            try {
+                liteRTLmProvider.resetConversation()
+            } catch (e: Exception) {
+                Timber.e(e, "Chat: resetConversation on skill toggle failed")
             }
         }
     }
