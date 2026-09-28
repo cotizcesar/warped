@@ -3,11 +3,11 @@ package com.warped.ui.navigation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Science
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import kotlinx.serialization.Serializable
@@ -82,7 +82,7 @@ val Screen.label: String
         Screen.Selector -> "Models & Endpoints"
         Screen.Models -> "Models"
         Screen.Endpoints -> "Endpoints"
-        Screen.HuggingFace -> "HF"
+        Screen.HuggingFace -> "Model catalog"
         Screen.Presets -> "Presets"
         Screen.Settings -> "Settings"
         Screen.Help -> "Help"
@@ -100,7 +100,7 @@ val Screen.icon: ImageVector
         Screen.Selector -> Icons.Filled.Dns
         Screen.Models -> Icons.Filled.Memory
         Screen.Endpoints -> Icons.Filled.Dns
-        Screen.HuggingFace -> Icons.Filled.Search
+        Screen.HuggingFace -> Icons.Filled.Download
         Screen.Presets -> Icons.Filled.Settings
         Screen.Settings -> Icons.Filled.Settings
         Screen.Help -> Icons.Filled.Info

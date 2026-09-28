@@ -1,7 +1,5 @@
 package com.warped.ui.huggingface
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,62 +24,44 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.warped.domain.model.SyntaxTheme
-import com.warped.ui.chat.components.MarkdownText
-import kotlinx.coroutines.delay
+import com.warped.data.local.download.DownloadState
+import com.warped.data.repository.AllowlistedModel
+import com.warped.ui.components.WarpedAlertDialog
 
+/**
+ * Phase 49 (DEL-05): static model catalog.
+ *
+ * One card per `model_allowlist.json` catalog entry — no text field, no
+ * timed query, no gated-model branch, no external link. Downloads reuse the
+ * inline progress pattern backed by ModelDownloadManager/Worker with no
+ * Authorization header.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HuggingFaceScreen(
-    viewModel: HuggingFaceViewModel = hiltViewModel(),
+    viewModel: CatalogViewModel = hiltViewModel(),
     onNavigateToModels: () -> Unit = {}
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var searchText by remember { mutableStateOf(uiState.searchQuery) }
-    val canSearch = searchText.trim().length >= 3
-
-    LaunchedEffect(uiState.searchQuery) {
-        if (searchText != uiState.searchQuery) {
-            searchText = uiState.searchQuery
-        }
-    }
-
-    LaunchedEffect(searchText) {
-        val query = searchText.trim()
-        if (query.length < 3) return@LaunchedEffect
-        delay(400)
-        if (searchText.trim() != query) return@LaunchedEffect
-        viewModel.search(query)
-    }
-
-    LaunchedEffect(uiState.downloadSuccess) {
-        if (uiState.downloadSuccess) {
-            viewModel.clearDownloadSuccess()
-            onNavigateToModels()
-        }
-    }
+    val downloadStates by viewModel.downloadStates.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Hugging Face") },
+                title = { Text("Model catalog") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateToModels) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to models")
@@ -90,176 +70,78 @@ fun HuggingFaceScreen(
             )
         }
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp)
-        ) {
-            Spacer(Modifier.height(12.dp))
-
-            OutlinedTextField(
-                value = searchText,
-                onValueChange = {
-                    searchText = it
-                    viewModel.onSearchTextChanged(it)
-                },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Search models") },
-                supportingText = {
-                    Text(
-                        if (canSearch) "Enter 3+ characters to search" else "Type to search..."
-                    )
-                },
-                singleLine = true
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            val activeModelId = uiState.activeDownloadId?.substringBeforeLast("/")
-            val downloadState = DownloadCardState(
-                fileName = uiState.downloadingFileName,
-                isDownloading = uiState.isDownloading,
-                isPaused = uiState.isDownloadPaused,
-                progress = uiState.downloadProgress,
-                downloadedBytes = uiState.downloadedBytes,
-                totalBytes = uiState.totalDownloadBytes,
-                speed = uiState.downloadSpeedBytesPerSecond,
-                error = uiState.downloadError
-            )
-
-            SearchResults(
-                isLoading = uiState.isLoading,
-                results = uiState.searchResults,
-                error = uiState.error,
-                searchQuery = uiState.searchQuery,
-                activeModelId = activeModelId,
-                downloadState = downloadState,
-                onDownload = { model, fileName, size ->
-                    viewModel.startDirectDownload(model, fileName, size)
-                },
-                onPause = { viewModel.pauseDownload() },
-                onResume = { viewModel.resumeDownload() },
-                onCancel = { viewModel.cancelDownload() },
-                onClearError = { viewModel.clearError() }
-            )
-        }
-    }
-}
-
-private data class DownloadCardState(
-    val fileName: String,
-    val isDownloading: Boolean,
-    val isPaused: Boolean,
-    val progress: Float,
-    val downloadedBytes: Long,
-    val totalBytes: Long,
-    val speed: Long,
-    val error: String?
-)
-
-@Composable
-private fun SearchResults(
-    isLoading: Boolean,
-    results: List<com.warped.data.remote.dto.HuggingFaceModel>,
-    error: String?,
-    searchQuery: String,
-    activeModelId: String?,
-    downloadState: DownloadCardState,
-    onDownload: (model: com.warped.data.remote.dto.HuggingFaceModel, fileName: String, fileSize: Long) -> Unit,
-    onPause: () -> Unit,
-    onResume: () -> Unit,
-    onCancel: () -> Unit,
-    onClearError: () -> Unit
-) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        if (isLoading) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-        }
-
-        if (results.isNotEmpty()) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(results, key = { it.id }) { model ->
-                    val capabilities = deriveCapabilities(model.tags, model.pipelineTag)
-                    val litertlmFile = model.siblings
-                        .firstOrNull { it.rfilename.endsWith(".litertlm", ignoreCase = true) }
-                    val fileSize = litertlmFile?.size?.takeIf { it > 0 }
-                        ?: litertlmFile?.lfs?.size ?: 0L
-                    ModelListCard(
-                        title = model.id.substringAfterLast("/"),
-                        subtitle = model.id,
-                        capabilities = capabilities,
-                        description = model.description.takeIf { it.isNotBlank() },
-                        descriptionAsMarkdown = true,
-                        fileName = litertlmFile?.rfilename,
-                        fileSize = fileSize,
-                        isActive = activeModelId == model.id,
-                        downloadState = downloadState,
-                        onDownload = {
-                            if (litertlmFile != null) onDownload(model, litertlmFile.rfilename, fileSize)
-                        },
-                        onPause = onPause,
-                        onResume = onResume,
-                        onCancel = onCancel
-                    )
-                }
-            }
-        } else if (!isLoading) {
+        if (viewModel.models.isEmpty()) {
+            // Zero entries means the bundled asset failed to load (it always
+            // ships at least 1 entry) — render the load-failure copy, no skeleton.
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    if (error != null) {
-                        Text(
-                            error,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        TextButton(onClick = onClearError) { Text("Dismiss") }
-                    } else {
-                        Text(
-                            if (searchQuery.isNotBlank()) "No results found" else "Loading warped-community models...",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    }
+                Text(
+                    "Couldn't load the model catalog. Restart the app and try again.",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp)
+            ) {
+                items(viewModel.models, key = { it.name }) { entry ->
+                    val downloadId = viewModel.downloadId(entry)
+                    CatalogModelCard(
+                        entry = entry,
+                        downloadState = downloadStates[downloadId],
+                        onDownload = { viewModel.startDownload(entry) },
+                        onPause = { viewModel.pauseDownload(downloadId) },
+                        onResume = { viewModel.resumeDownload(downloadId) },
+                        onCancel = { viewModel.cancelDownload(downloadId) }
+                    )
                 }
             }
         }
     }
 }
 
-private fun deriveCapabilities(tags: List<String>, pipelineTag: String): List<String> {
-    val caps = mutableListOf<String>()
-    if (pipelineTag == "image-text-to-text") caps.add("vision")
-    val lower = tags.map { it.lowercase() }
-    if (lower.any { it.contains("audio") }) caps.add("audio")
-    if (lower.any { it in listOf("tool_use", "function-calling", "tools") || it.contains("tool") }) caps.add("tools")
-    if (lower.any { it in listOf("thinking", "reasoning") || it.contains("think") }) caps.add("thinking")
-    return caps
-}
-
 @Composable
-private fun ModelListCard(
-    title: String,
-    subtitle: String,
-    capabilities: List<String>,
-    description: String?,
-    descriptionAsMarkdown: Boolean,
-    fileName: String?,
-    fileSize: Long,
-    isActive: Boolean,
-    downloadState: DownloadCardState,
+private fun CatalogModelCard(
+    entry: AllowlistedModel,
+    downloadState: DownloadState?,
     onDownload: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onCancel: () -> Unit
 ) {
-    val context = LocalContext.current
+    // A "Cancelled" error is terminal-idle: the partial file is deleted and a
+    // fresh Download restarts cleanly.
+    val active = downloadState != null &&
+        (downloadState.isDownloading || downloadState.isPaused) &&
+        downloadState.error != "Cancelled"
+    val downloaded = downloadState != null && !active &&
+        downloadState.error == null && downloadState.progress >= 1f
+    var showCancelConfirm by remember { mutableStateOf(false) }
+
+    if (showCancelConfirm) {
+        WarpedAlertDialog(
+            onDismissRequest = { showCancelConfirm = false },
+            title = { Text("Cancel download?") },
+            text = { Text("The partial file will be deleted.") },
+            confirmButton = {
+                TextButton(
+                    onClick = { showCancelConfirm = false; onCancel() },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Cancel download") }
+            },
+            dismissButton = { TextButton(onClick = { showCancelConfirm = false }) { Text("Keep") } }
+        )
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -280,69 +162,68 @@ private fun ModelListCard(
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = title,
+                        text = entry.displayName,
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 1
                     )
                     Text(
-                        text = subtitle,
+                        text = entry.modelFile,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1
                     )
                 }
             }
-            if (capabilities.isNotEmpty()) {
+            val badges = buildList {
+                if (entry.capabilities.vision) add("vision")
+                if (entry.capabilities.audio) add("audio")
+            }
+            if (badges.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    capabilities.forEach { cap ->
-                        CapabilityBadge(capability = cap)
+                    badges.forEach { cap ->
+                        CatalogCapabilityBadge(capability = cap)
                     }
                 }
             }
-            if (!description.isNullOrBlank()) {
-                Spacer(Modifier.height(6.dp))
-                if (descriptionAsMarkdown) {
-                    MarkdownText(
-                        text = description,
-                        maxLines = 4,
-                        codeTheme = SyntaxTheme.MONOKAI,
-                    )
-                } else {
-                    Text(
-                        text = description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2
-                    )
-                }
-            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = formatFileSize(entry.sizeInBytes),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
 
             Spacer(Modifier.height(10.dp))
 
-            if (fileName == null) {
-                Text(
-                    text = "No .litertlm file found",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else if (isActive) {
-                InlineDownloadProgress(
-                    state = downloadState,
+            when {
+                active -> CatalogDownloadProgress(
+                    state = downloadState!!,
                     onPause = onPause,
                     onResume = onResume,
-                    onCancel = onCancel,
-                    onOpenExternal = { url ->
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                    }
+                    onCancelClick = { showCancelConfirm = true }
                 )
-            } else {
-                Spacer(Modifier.height(4.dp))
-                OutlinedButton(
-                    onClick = onDownload,
-                    modifier = Modifier.align(Alignment.End)
-                ) {
-                    Text("Download")
+                downloaded -> Text(
+                    text = "Downloaded",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                else -> {
+                    if (downloadState?.error != null && downloadState.error != "Cancelled") {
+                        Text(
+                            text = downloadState.error,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(Modifier.height(6.dp))
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedButton(
+                        onClick = onDownload,
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text("Download")
+                    }
                 }
             }
         }
@@ -350,12 +231,10 @@ private fun ModelListCard(
 }
 
 @Composable
-private fun CapabilityBadge(capability: String) {
+private fun CatalogCapabilityBadge(capability: String) {
     val color = when (capability) {
         "vision" -> androidx.compose.ui.graphics.Color(0xFF2196F3)
         "audio" -> androidx.compose.ui.graphics.Color(0xFFFF9800)
-        "tools" -> androidx.compose.ui.graphics.Color(0xFF9C27B0)
-        "thinking" -> androidx.compose.ui.graphics.Color(0xFF00BCD4)
         else -> MaterialTheme.colorScheme.primary
     }
     androidx.compose.material3.Surface(
@@ -373,12 +252,11 @@ private fun CapabilityBadge(capability: String) {
 }
 
 @Composable
-private fun InlineDownloadProgress(
-    state: DownloadCardState,
+private fun CatalogDownloadProgress(
+    state: DownloadState,
     onPause: () -> Unit,
     onResume: () -> Unit,
-    onCancel: () -> Unit,
-    onOpenExternal: (String) -> Unit
+    onCancelClick: () -> Unit
 ) {
     val progressInt = (state.progress * 100).toInt().coerceIn(0, 100)
     Column {
@@ -393,7 +271,7 @@ private fun InlineDownloadProgress(
         )
         Text(
             text = "${formatFileSize(state.downloadedBytes)} / ${formatFileSize(state.totalBytes)}" +
-                if (state.isDownloading) " · ${formatDownloadSpeed(state.speed)}" else "",
+                if (state.isDownloading) " · ${formatDownloadSpeed(state.speedBytesPerSecond)}" else "",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -405,24 +283,17 @@ private fun InlineDownloadProgress(
                 TextButton(onClick = onPause) { Text("Pause") }
             }
             TextButton(
-                onClick = onCancel,
+                onClick = onCancelClick,
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
             ) { Text("Cancel") }
         }
         if (state.error != null) {
-            val isGated = state.error.startsWith("Gated model", ignoreCase = true)
             Spacer(Modifier.height(6.dp))
             Text(
                 text = state.error,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall
             )
-            if (isGated) {
-                Spacer(Modifier.height(4.dp))
-                OutlinedButton(onClick = { onOpenExternal("https://huggingface.co/${state.fileName.substringBefore('/')}") }) {
-                    Text("Open on Hugging Face")
-                }
-            }
         }
     }
 }

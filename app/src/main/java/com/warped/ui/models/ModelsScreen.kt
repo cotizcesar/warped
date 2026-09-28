@@ -10,11 +10,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -145,11 +145,11 @@ fun ModelsScreen(
                             onClick = { showAddWizard = false; onOpenHuggingFace() },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(Icons.Filled.Search, null, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Filled.Download, null, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Download from Hugging Face", style = MaterialTheme.typography.bodyLarge)
-                                Text("Browse and download LiteRT-LM models", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Download model", style = MaterialTheme.typography.bodyLarge)
+                                Text("Choose from the built-in catalog", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                         HorizontalDivider()
@@ -240,6 +240,8 @@ fun ModelsScreen(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("No models or endpoints yet", style = MaterialTheme.typography.bodyLarge, color = Color(0xFF9CA3AF))
+                        Spacer(Modifier.height(8.dp))
+                        Text("Tap Add Model to download one from the catalog or import a file.", style = MaterialTheme.typography.bodySmall, color = Color(0xFF9CA3AF))
                         Spacer(Modifier.height(8.dp))
                         OutlinedButton(
                             onClick = { showAddWizard = true },

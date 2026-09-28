@@ -14,8 +14,6 @@ data class SettingsUiState(
     val showDeleteEndpointDialog: Long? = null,
     val message: String? = null,
     val error: String? = null,
-    val hfToken: String = "",
-    val hasHfToken: Boolean = false,
     val codeTheme: SyntaxTheme = SyntaxTheme.MONOKAI,
     val codeFontScale: Float = 1.0f,
     val contextSize: Int = 4096,

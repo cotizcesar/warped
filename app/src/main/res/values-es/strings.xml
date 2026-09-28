@@ -25,12 +25,9 @@
     <string name="select_model">Selecciona un modelo</string>
     <string name="no_models_select_model">Sin modelos, selecciona uno</string>
     <string name="no_model_selected">Selecciona un modelo antes de enviar un mensaje.</string>
-    <string name="hugging_face_suggestions">Sugerencias de modelos de Hugging Face</string>
     <string name="download_model_first">Descarga este modelo antes de usarlo en chat local.</string>
     <string name="compatible_with_device">Compatible con este dispositivo</string>
     <string name="may_be_too_large">Puede ser muy grande para este dispositivo</string>
-    <string name="search_models">Buscar modelos</string>
-    <string name="search_models_hint">Escribe al menos 3 letras para buscar</string>
     <string name="search_minimum_length">Ingresa al menos 3 letras</string>
     <string name="thinking">Pensando</string>
     <string name="generating">Generando…</string>
@@ -60,8 +57,6 @@
     <string name="failed_to_fetch_models">Error al obtener modelos: %1$s</string>
     <string name="recents">Recientes</string>
     <string name="empty_state_message">Selecciona el modelo y empieza a escribir…</string>
-    <string name="download_from_hf">Descargar desde Hugging Face</string>
-    <string name="download_from_hf_desc">Explorar y descargar modelos LiteRT-LM</string>
     <string name="import_model_file">Importar archivo de modelo</string>
     <string name="import_model_file_desc">Cargar un modelo .litertlm desde tu dispositivo</string>
     <string name="connect_lm_studio">Conectar LM Studio</string>
@@ -86,7 +81,6 @@
     <string name="downloading">Descargando</string>
     <string name="no_results_found">Sin resultados</string>
     <string name="loading_models">Cargando modelos…</string>
-    <string name="hugging_face">Hugging Face</string>
     <string name="provider_openai">OpenAI</string>
     <string name="provider_anthropic">Anthropic</string>
     <string name="provider_ollama">Ollama</string>

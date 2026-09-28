@@ -16,7 +16,6 @@ import com.warped.MainActivity
 import com.warped.WarpedApplication
 import com.warped.data.local.db.dao.DownloadCheckpointDao
 import com.warped.data.local.db.entity.DownloadCheckpointEntity
-import com.warped.data.local.security.ApiKeyStore
 import com.warped.domain.model.LocalModel
 import com.warped.domain.repository.LocalModelRepository
 import dagger.assisted.Assisted
@@ -35,7 +34,6 @@ class ModelDownloadWorker @AssistedInject constructor(
     private val okHttpClient: OkHttpClient,
     private val localModelRepository: LocalModelRepository,
     private val checkpointDao: DownloadCheckpointDao,
-    private val apiKeyStore: ApiKeyStore,
 ) : CoroutineWorker(context, workerParams) {
 
     companion object {
@@ -103,17 +101,9 @@ class ModelDownloadWorker @AssistedInject constructor(
             }
 
         return try {
-            val authUrl = if (effectiveGated && fileUrl.contains("huggingface.co")) {
-                val token = apiKeyStore.getHuggingFaceToken()
-                if (token != null) {
-                    val tokenStr = String(token)
-                    token.fill('0')
-                    val sep = if (fileUrl.contains("?")) "&" else "?"
-                    "$fileUrl${sep}token=$tokenStr"
-                } else fileUrl
-            } else fileUrl
-
-            val requestBuilder = Request.Builder().url(authUrl)
+            // Phase 49 (DEL-04): direct downloads — no token, no Authorization
+            // header. The static catalog ships only public models.
+            val requestBuilder = Request.Builder().url(fileUrl)
             // Only send Range on resume. A fresh download is a plain GET so the
             // server returns 200 OK with the full body chunked. Sending
             // `Range: bytes=0-` on files > ~2GB gets rejected with 416 by HF's
@@ -131,7 +121,7 @@ class ModelDownloadWorker @AssistedInject constructor(
                 } else null
                 Timber.e("ModelDownloadWorker: HF error body — $hfErrorBody")
                 val errorMsg = when (response.code) {
-                    401 -> "Not authenticated — add your HuggingFace token in Settings -> Hugging Face."
+                    401 -> "Download failed (unauthorized). The server rejected the request — check your connection and try again."
                     403 -> {
                         if (!hfErrorBody.isNullOrBlank()) {
                             val modelId = hfErrorBody.substringAfter("model ").substringBefore(" is restricted").ifBlank { null }

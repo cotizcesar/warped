@@ -40,12 +40,6 @@ class SettingsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch(coroutineExceptionHandler) {
-            try {
-                val hasToken = apiKeyStore.getHuggingFaceToken() != null
-                _uiState.update { it.copy(hasHfToken = hasToken) }
-            } catch (e: Exception) { Timber.e(e, "Settings: initial load failed") }
-        }
-        viewModelScope.launch(coroutineExceptionHandler) {
             chatRepository.observeConversations().collect { conversations ->
                 _uiState.update { it.copy(chatCount = conversations.size) }
             }
@@ -160,39 +154,5 @@ class SettingsViewModel @Inject constructor(
 
     fun clearMessage() {
         _uiState.update { it.copy(message = null, error = null) }
-    }
-
-    fun updateHfToken(token: String) {
-        _uiState.update { it.copy(hfToken = token) }
-    }
-
-    fun saveHfToken() {
-        val token = _uiState.value.hfToken.trim()
-        if (token.isBlank()) return
-        viewModelScope.launch(coroutineExceptionHandler) {
-            try {
-                apiKeyStore.storeHuggingFaceToken(token.toCharArray())
-                // Verify token was persisted
-                val saved = apiKeyStore.getHuggingFaceToken()
-                if (saved != null) {
-                    _uiState.update { it.copy(hfToken = "", hasHfToken = true, message = "Access Token saved") }
-                } else {
-                    _uiState.update { it.copy(error = "Token saved but could not be verified. Try again.") }
-                }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = "Failed to save token: ${e.message}") }
-            }
-        }
-    }
-
-    fun deleteHfToken() {
-        viewModelScope.launch(coroutineExceptionHandler) {
-            try {
-                apiKeyStore.deleteHuggingFaceToken()
-                _uiState.update { it.copy(hasHfToken = false, hfToken = "", message = "Access Token removed") }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = "Failed to remove token: ${e.message}") }
-            }
-        }
     }
 }

@@ -116,51 +116,6 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(vertical = 12.dp)
     ) {
-        // Hugging Face section
-        item {
-            Text("Hugging Face", style = MaterialTheme.typography.titleMedium)
-        }
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Access Token", style = MaterialTheme.typography.bodyLarge)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        if (uiState.hasHfToken) "Token configured" else "Required for gated/private models",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (uiState.hasHfToken) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (!uiState.hasHfToken) {
-                        Spacer(Modifier.height(8.dp))
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            OutlinedTextField(
-                                value = uiState.hfToken,
-                                onValueChange = { viewModel.updateHfToken(it) },
-                                label = { Text("Token") },
-                                placeholder = { Text("hf_...") },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            TextButton(onClick = { viewModel.saveHfToken() }) { Text("Save") }
-                        }
-                    }
-                    if (uiState.hasHfToken) {
-                        Spacer(Modifier.height(4.dp))
-                        TextButton(
-                            onClick = { viewModel.deleteHfToken() },
-                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                        ) { Text("Remove token") }
-                    }
-                }
-            }
-        }
-
         // Data section
         item {
             Text("Data", style = MaterialTheme.typography.titleMedium)
