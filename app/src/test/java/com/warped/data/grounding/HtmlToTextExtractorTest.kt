@@ -78,4 +78,49 @@ class HtmlToTextExtractorTest {
 
         assertThat(out).isEqualTo("Hola")
     }
+
+    // Phase 52 (EXTRACT-01): Jsoup-core density + regex-fallback gates.
+
+    @Test
+    fun `jsoup core strips nav footer aside that the legacy path keeps`() {
+        val html = """
+            <html><head><title>Noticia</title></head><body>
+            <nav>menú inicio contacto</nav>
+            <aside>publicidad lateral</aside>
+            <footer>pie copyright</footer>
+            <article><h1>Titular real</h1><p>Cuerpo de la noticia con contenido.</p></article>
+            </body></html>
+        """.trimIndent()
+        val out = HtmlToTextExtractor.extract(html, "https://example.com/noticia")
+
+        // Absent nav/aside/footer text proves the Jsoup core (not the regex
+        // fallback, which keeps those regions) produced this output.
+        assertThat(out).doesNotContain("publicidad lateral")
+        assertThat(out).doesNotContain("menú inicio")
+        assertThat(out).doesNotContain("pie copyright")
+        assertThat(out).contains("Titular real")
+        assertThat(out).contains("Cuerpo de la noticia")
+        // Line-broken blocks, not a wall of text: title + heading + prose.
+        assertThat(out.split("\n")).hasSize(3)
+    }
+
+    @Test
+    fun `script-only html returns legacy output without crashing`() {
+        val html = "<html><head><script>var x = 1;</script></head>" +
+            "<body><script>evil()</script></body></html>"
+
+        val out = HtmlToTextExtractor.extract(html, "https://example.com/vacio")
+
+        // Both Jsoup core and the legacy fallback yield blank here; the
+        // contract is an empty (legacy) answer, never a blank-crash.
+        assertThat(out).isEmpty()
+    }
+
+    @Test
+    fun `blank pages from both paths yield empty output`() {
+        assertThat(HtmlToTextExtractor.extract("", "https://example.com")).isEmpty()
+        assertThat(
+            HtmlToTextExtractor.extract("<!-- solo un comentario -->", "https://example.com")
+        ).isEmpty()
+    }
 }

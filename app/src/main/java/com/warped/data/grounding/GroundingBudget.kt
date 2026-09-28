@@ -17,9 +17,15 @@ object GroundingBudget {
     /**
      * Global char budget for the fused block, keyed on the model window
      * signal (`GenerationParameters.contextSize`, default 4096).
+     *
+     * Small windows (<= 2048) shrink one tier so the fused block still
+     * fits; larger windows scale up modestly (+1 char per 4 over 4096).
      */
-    fun globalBudget(contextSize: Int): Int =
-        if (contextSize <= 4096) 6000 else 6000 + (contextSize - 4096) / 4
+    fun globalBudget(contextSize: Int): Int = when {
+        contextSize <= 2048 -> 4500
+        contextSize <= 4096 -> 6000
+        else -> 6000 + (contextSize - 4096) / 4
+    }
 
     /**
      * Per-page slice of the global budget for [n] pages, never below
