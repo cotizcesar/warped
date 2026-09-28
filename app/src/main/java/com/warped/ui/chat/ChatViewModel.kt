@@ -56,8 +56,39 @@ class ChatViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(ChatUiState())
-    val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+    // 48-01 (PERF-14): single-owner sub-states. Each field is written ONLY
+    // by its owner updater (updateTranscript/updateInput/updateConnection);
+    // reads spanning owners use snapshot(). uiState is the deprecated
+    // combine-derived shim (no direct writes, ever).
+    private val _transcript = MutableStateFlow(ChatTranscriptState())
+    val transcriptState: StateFlow<ChatTranscriptState> = _transcript.asStateFlow()
+
+    private val _input = MutableStateFlow(ChatInputState())
+    val inputState: StateFlow<ChatInputState> = _input.asStateFlow()
+
+    private val _connection = MutableStateFlow(ChatConnectionState())
+    val connectionState: StateFlow<ChatConnectionState> = _connection.asStateFlow()
+
+    @Deprecated("PERF-14 shim: collect transcriptState/inputState/connectionState instead")
+    @Suppress("DEPRECATION")
+    val uiState: StateFlow<ChatUiState> = combine(_transcript, _input, _connection, ::combineSnapshot)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, combineSnapshot(ChatTranscriptState(), ChatInputState(), ChatConnectionState()))
+
+    @Suppress("DEPRECATION")
+    private fun snapshot(): ChatUiState =
+        combineSnapshot(_transcript.value, _input.value, _connection.value)
+
+    private fun updateTranscript(op: (ChatTranscriptState) -> ChatTranscriptState) {
+        _transcript.update(op)
+    }
+
+    private fun updateInput(op: (ChatInputState) -> ChatInputState) {
+        _input.update(op)
+    }
+
+    private fun updateConnection(op: (ChatConnectionState) -> ChatConnectionState) {
+        _connection.update(op)
+    }
 
     private var generationJob: Job? = null
 
@@ -80,21 +111,21 @@ class ChatViewModel @Inject constructor(
     init {
         // Restore persisted loaded instance ID
         activeModelSelection.activeModel.value?.instanceId?.let {
-            _uiState.value = _uiState.value.copy(loadedInstanceId = it)
+            updateConnection { state -> state.copy(loadedInstanceId = it) }
         }
         viewModelScope.launch(coroutineExceptionHandler) {
             chatRepository.observeConversations().collect { conversations ->
-                _uiState.update { it.copy(conversations = conversations) }
+                updateConnection { it.copy(conversations = conversations) }
             }
         }
         viewModelScope.launch(coroutineExceptionHandler) {
             parameterStore.parameters.collect { params ->
-                _uiState.update { it.copy(generationParameters = params) }
+                updateConnection { it.copy(generationParameters = params) }
             }
         }
         viewModelScope.launch(coroutineExceptionHandler) {
             localModelRepository.observeModels().collect { models ->
-                _uiState.update { state ->
+                updateConnection { state ->
                     val activeLocalId = state.selectedLocalModelId
                     if (activeLocalId != null) {
                         val selectedModel = models.firstOrNull { it.filePath == activeLocalId }
@@ -124,67 +155,71 @@ class ChatViewModel @Inject constructor(
                     lastAutoAppliedModelId = null
                 }
 
-                _uiState.update {
+                updateConnection {
                     it.copy(
                         selectedLocalModelId = modelId,
                         isLocalModelLoaded = connected,
                         isLoadingModel = loading,
                         loadingModelName = modelId?.substringAfterLast("/") ?: it.loadingModelName,
                         loadedInstanceId = local.instanceId ?: it.loadedInstanceId,
-                        supportsThinking = supportsThinkingFor(modelId, it.selectedRemoteModelId),
                     )
+                }
+                updateInput {
+                    it.copy(supportsThinking = supportsThinkingFor(modelId, _connection.value.selectedRemoteModelId))
                 }
             }
         }
         viewModelScope.launch(coroutineExceptionHandler) {
             activeModelSelection.remoteSelection.collect { remote ->
-                _uiState.update {
+                updateConnection {
                     it.copy(
                         selectedRemoteModelId = remote.modelId,
                         selectedRemoteProvider = remote.providerType,
-                        supportsThinking = supportsThinkingFor(it.selectedLocalModelId, remote.modelId),
                     )
+                }
+                updateInput {
+                    it.copy(supportsThinking = supportsThinkingFor(_connection.value.selectedLocalModelId, remote.modelId))
                 }
             }
         }
         viewModelScope.launch(coroutineExceptionHandler) {
             activeModelSelection.activeModel.collect { activeModel ->
                 if (activeModel != null) {
-                    _uiState.update {
+                    updateConnection {
                         it.copy(
                             selectedModelId = activeModel.modelId,
                             selectedProvider = activeModel.providerType,
-                            error = null
                         )
                     }
+                    updateTranscript { it.copy(error = null) }
                 }
             }
         }
         viewModelScope.launch(coroutineExceptionHandler) {
             endpointRepository.observeEndpoints().collect { endpoints ->
-                _uiState.update { it.copy(endpoints = endpoints) }
+                updateConnection { it.copy(endpoints = endpoints) }
             }
         }
         viewModelScope.launch(coroutineExceptionHandler) {
             advancedPreferences.syntaxTheme.collect { theme ->
-                _uiState.update { it.copy(codeTheme = theme) }
+                updateConnection { it.copy(codeTheme = theme) }
             }
         }
         viewModelScope.launch(coroutineExceptionHandler) {
             advancedPreferences.codeFontScale.collect { scale ->
-                _uiState.update { it.copy(codeFontScale = scale) }
+                updateConnection { it.copy(codeFontScale = scale) }
             }
         }
         viewModelScope.launch(coroutineExceptionHandler) {
             advancedPreferences.thinkingEnabled.collect { enabled ->
-                _uiState.update { it.copy(enableThinking = enabled) }
+                updateInput { it.copy(enableThinking = enabled) }
             }
         }
         // 47-01: skill toggles are ViewModel-backed (survive rotation) and
         // DataStore-persisted (survive process death). All-on until toggled.
         viewModelScope.launch(coroutineExceptionHandler) {
             skillRepository.enabledMap.collect { map ->
-                _uiState.update { it.copy(skillEnabled = map) }
+                updateInput { it.copy(skillEnabled = map) }
             }
         }
     }
@@ -216,7 +251,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun sendMessage(text: String, images: List<Uri> = emptyList(), audioBytes: ByteArray? = null) {
-        val state = _uiState.value
+        val state = snapshot()
 
         val effectiveModelId = state.selectedLocalModelId ?: state.selectedRemoteModelId
         val effectiveProvider = state.selectedLocalModelId?.let { ProviderType.LITE_RT_LM }
@@ -224,18 +259,19 @@ class ChatViewModel @Inject constructor(
 
         if (text.isBlank() && images.isEmpty() && audioBytes == null) return
         if (effectiveModelId == null || effectiveProvider == null) {
-            _uiState.update { it.copy(error = ChatError.NoModelSelected) }
+            updateTranscript { it.copy(error = ChatError.NoModelSelected) }
             return
         }
 
         if (state.modelUnavailable) {
-            _uiState.update { it.copy(error = ChatError.ModelUnavailable) }
+            updateTranscript { it.copy(error = ChatError.ModelUnavailable) }
             return
         }
 
         val imageDataUrls = images.mapNotNull { uriToBase64(it) }
         val userMessage = ChatMessage(role = Role.USER, content = text.trim(), imageUris = imageDataUrls)
-        _uiState.update { it.copy(messages = it.messages + userMessage, inputText = "", isStreaming = true, toolCallActive = null, activeToolError = null, showNoToolSupportNotice = false) }
+        updateTranscript { it.copy(messages = it.messages + userMessage, isStreaming = true, toolCallActive = null, activeToolError = null, showNoToolSupportNotice = false) }
+        updateInput { it.copy(inputText = "", isGenerating = true) }
 
         // CR-02: cancel any in-flight turn before starting a new one — otherwise
         // two collectors interleave tokens into one bubble and activeHelper is
@@ -262,21 +298,23 @@ class ChatViewModel @Inject constructor(
                 if (selectedProvider == ProviderType.LITE_RT_LM) {
                     val capabilities = state.localModels.firstOrNull { it.filePath == modelId }?.capabilities
                     if (images.isNotEmpty() && capabilities?.vision != true) {
-                        _uiState.update {
+                        updateTranscript {
                             it.copy(
                                 error = ChatError.Unknown("This model does not support images (no vision capability)."),
                                 isStreaming = false
                             )
                         }
+                        updateInput { it.copy(isGenerating = false) }
                         return@launch
                     }
                     if (audioBytes != null && capabilities?.audio != true) {
-                        _uiState.update {
+                        updateTranscript {
                             it.copy(
                                 error = ChatError.Unknown("This model does not support audio input."),
                                 isStreaming = false
                             )
                         }
+                        updateInput { it.copy(isGenerating = false) }
                         return@launch
                     }
                 }
@@ -285,12 +323,13 @@ class ChatViewModel @Inject constructor(
                 if (selectedProvider == ProviderType.LITE_RT_LM) {
                     val modelFile = java.io.File(modelId)
                     if (!modelFile.exists()) {
-                        _uiState.update {
+                        updateTranscript {
                             it.copy(
                                 error = ChatError.DownloadModelFirst,
                                 isStreaming = false
                             )
                         }
+                        updateInput { it.copy(isGenerating = false) }
                         return@launch
                     }
                     // Model loads on-demand on first message
@@ -323,9 +362,9 @@ class ChatViewModel @Inject constructor(
                 helper.initialize(modelId)
 
                 val request = ChatRequest(
-                    messages = _uiState.value.messages,
-                    parameters = _uiState.value.generationParameters.copy(
-                        reasoningEnabled = _uiState.value.reasoningEnabled
+                    messages = _transcript.value.messages,
+                    parameters = _connection.value.generationParameters.copy(
+                        reasoningEnabled = _input.value.reasoningEnabled
                     ),
                     images = imageDataUrls,
                     audioBytes = audioBytes
@@ -336,14 +375,14 @@ class ChatViewModel @Inject constructor(
                 // PlainChat → no notice.
                 if (selectedProvider == ProviderType.LITE_RT_LM) {
                     val enabledIds = SkillIds.TOOL_IDS.filter {
-                        _uiState.value.skillEnabled[it] == true
+                        _input.value.skillEnabled[it] == true
                     }
                     val gate = ToolGating.decide(
                         enabledIds,
                         ToolGating.supportsLocalTools(modelAllowlistRepository, modelId)
                     )
                     if (gate is ToolGateDecision.NoSupportFallback) {
-                        _uiState.update { it.copy(showNoToolSupportNotice = true) }
+                        updateTranscript { it.copy(showNoToolSupportNotice = true) }
                     }
                 }
                 // 47-03 UI-SPEC §6 (remote parity): same notice contract for
@@ -353,14 +392,14 @@ class ChatViewModel @Inject constructor(
                 // renders once per turn; zero enabled → silent plain chat.
                 if (selectedProvider == ProviderType.LM_STUDIO) {
                     val enabledIds = SkillIds.TOOL_IDS.filter {
-                        _uiState.value.skillEnabled[it] == true
+                        _input.value.skillEnabled[it] == true
                     }
                     val gate = ToolGating.decide(
                         enabledIds,
                         ToolGating.supportsRemoteTools(modelAllowlistRepository, modelId)
                     )
                     if (gate is ToolGateDecision.NoSupportFallback) {
-                        _uiState.update { it.copy(showNoToolSupportNotice = true) }
+                        updateTranscript { it.copy(showNoToolSupportNotice = true) }
                     }
                 }
                 // WR-05: tool execution is wired ONLY to LITE_RT_LM and
@@ -369,10 +408,10 @@ class ChatViewModel @Inject constructor(
                 // there instead of showing chips-ON with zero behavior.
                 if (selectedProvider != ProviderType.LITE_RT_LM && selectedProvider != ProviderType.LM_STUDIO) {
                     val enabledIds = SkillIds.TOOL_IDS.filter {
-                        _uiState.value.skillEnabled[it] == true
+                        _input.value.skillEnabled[it] == true
                     }
                     if (enabledIds.isNotEmpty()) {
-                        _uiState.update { it.copy(showNoToolSupportNotice = true) }
+                        updateTranscript { it.copy(showNoToolSupportNotice = true) }
                     }
                 }
                 // 47-03 (D-06): per-turn tool records from the remote loop.
@@ -385,7 +424,7 @@ class ChatViewModel @Inject constructor(
                 var lastEmitTime = System.currentTimeMillis()
 
                 val rawBuffer = StringBuilder()
-                val reasoningActive = _uiState.value.reasoningEnabled
+                val reasoningActive = _input.value.reasoningEnabled
                 val modelMayThink = state.localModels.firstOrNull { it.filePath == modelId }?.capabilities?.reasoning == true
                 Timber.d("ChatVM: sendMessage reasoningActive=%b modelMayThink=%b", reasoningActive, modelMayThink)
 
@@ -404,7 +443,7 @@ class ChatViewModel @Inject constructor(
                         is StreamToken.Delta -> {                            // Detect tool call patterns [tool:NAME] and show indicator
                             val toolMatch = Regex("\\[tool:(\\w+)\\]").find(token.content)
                             if (toolMatch != null) {
-                                _uiState.update { it.copy(toolCallActive = toolMatch.groupValues[1]) }
+                                updateTranscript { it.copy(toolCallActive = toolMatch.groupValues[1]) }
                             }
                             tokenBuffer.add(token.content)
                             val now = System.currentTimeMillis()
@@ -412,7 +451,7 @@ class ChatViewModel @Inject constructor(
                                 val chunk = tokenBuffer.joinToString("")
                                 rawBuffer.append(chunk)
                                 val (cleanContent, reasoning) = parseThinkBlocks(rawBuffer.toString(), reasoningActive, modelMayThink)
-                                _uiState.update {
+                                updateTranscript {
                                     it.copy(
                                         streamingContent = cleanContent,
                                         streamingReasoning = reasoning,
@@ -432,7 +471,7 @@ class ChatViewModel @Inject constructor(
                             // (local automatic mode) or the remote loop
                             // (47-03). Null clears. Old [tool:NAME] regex
                             // path below stays untouched.
-                            _uiState.update { it.copy(toolCallActive = token.toolName) }
+                            updateTranscript { it.copy(toolCallActive = token.toolName) }
                         }
                         // 47-03: remote-loop completion record — collect for
                         // the Done-time role:tool persistence; failures raise
@@ -443,7 +482,7 @@ class ChatViewModel @Inject constructor(
                         is StreamToken.ToolCompleted -> {
                             toolRecords.add(token)
                             if (token.errorReason != null) {
-                                _uiState.update {
+                                updateTranscript {
                                     it.copy(
                                         activeToolError = ActiveToolError(
                                             toolId = token.toolId,
@@ -454,7 +493,7 @@ class ChatViewModel @Inject constructor(
                             }
                         }
                         is StreamToken.Done -> {
-                            _uiState.update { it.copy(toolCallActive = null) }
+                            updateTranscript { it.copy(toolCallActive = null) }
                             rawBuffer.append(tokenBuffer.joinToString(""))
                             val (finalClean, finalReasoning) = parseThinkBlocks(rawBuffer.toString(), reasoningActive, modelMayThink)
                             val content = if (finalClean.isBlank()) finalClean else finalClean.trimStart()
@@ -480,7 +519,7 @@ class ChatViewModel @Inject constructor(
                                     reasoning = finalReasoning.ifEmpty { token.reasoning },
                                     stats = token.stats
                                 )
-                                _uiState.update {
+                                updateTranscript {
                                     it.copy(
                                         messages = it.messages + toolMessages + assistantMessage,
                                         streamingContent = "",
@@ -488,6 +527,7 @@ class ChatViewModel @Inject constructor(
                                         isStreaming = false
                                     )
                                 }
+                                updateInput { it.copy(isGenerating = false) }
                                 for (toolMessage in toolMessages) {
                                     chatRepository.saveMessage(conversationId, toolMessage)
                                 }
@@ -498,7 +538,7 @@ class ChatViewModel @Inject constructor(
                                 // so the turn stays auditable; the error row
                                 // (if any) keeps the bubble non-empty.
                                 if (toolMessages.isNotEmpty()) {
-                                    _uiState.update {
+                                    updateTranscript {
                                         it.copy(
                                             messages = it.messages + toolMessages,
                                             streamingContent = "",
@@ -506,17 +546,19 @@ class ChatViewModel @Inject constructor(
                                             isStreaming = false
                                         )
                                     }
+                                    updateInput { it.copy(isGenerating = false) }
                                     for (toolMessage in toolMessages) {
                                         chatRepository.saveMessage(conversationId, toolMessage)
                                     }
                                 } else {
-                                    _uiState.update {
+                                    updateTranscript {
                                         it.copy(
                                             streamingContent = "",
                                             streamingReasoning = "",
                                             isStreaming = false
                                         )
                                     }
+                                    updateInput { it.copy(isGenerating = false) }
                                 }
                             }
                         }
@@ -525,7 +567,7 @@ class ChatViewModel @Inject constructor(
                             // the error — a transport failure after N successful
                             // tool rounds must keep its audit trail.
                             persistToolRecords(conversationId, toolRecords)
-                            _uiState.update {
+                            updateTranscript {
                                 it.copy(
                                     error = ChatError.Network(token.message),
                                     streamingContent = "",
@@ -533,6 +575,7 @@ class ChatViewModel @Inject constructor(
                                     isStreaming = false
                                 )
                             }
+                            updateInput { it.copy(isGenerating = false) }
                         }
                     }
                 }
@@ -543,7 +586,7 @@ class ChatViewModel @Inject constructor(
                 // WR-02: keep the audit trail — persist completed tool rows
                 // before the rethrow (best-effort; cancel must never throw).
                 runCatching {
-                    val cid = _uiState.value.conversationId
+                    val cid = _transcript.value.conversationId
                     if (cid != null && turnToolRecords.isNotEmpty()) {
                         val toolMessages = turnToolRecords.map { record ->
                             ChatMessage(
@@ -551,18 +594,19 @@ class ChatViewModel @Inject constructor(
                                 content = toolResultContent(record.toolId, record.summary),
                             )
                         }
-                        _uiState.update { it.copy(messages = it.messages + toolMessages) }
+                        updateTranscript { it.copy(messages = it.messages + toolMessages) }
                         for (toolMessage in toolMessages) chatRepository.saveMessage(cid, toolMessage)
                     }
                 }
                 throw e
             } catch (e: Exception) {
-                _uiState.update {
+                updateTranscript {
                     it.copy(
                         error = ChatError.Network(e.message ?: "Unknown error"),
                         isStreaming = false
                     )
                 }
+                updateInput { it.copy(isGenerating = false) }
             } finally {
                 // 46-01: clear the serving helper on turn end — but only if no newer
                 // turn has started since (stale-finally guard via turnId/seq).
@@ -590,13 +634,14 @@ class ChatViewModel @Inject constructor(
         }
         generationJob?.cancel()
         generationJob = null
-        _uiState.update { it.copy(
+        updateTranscript { it.copy(
             isStreaming = false,
             streamingContent = "",
             streamingReasoning = "",
             toolCallActive = null,
             activeToolError = null
         ) }
+        updateInput { it.copy(isGenerating = false) }
     }
 
     fun selectConversation(conversationId: Long) {
@@ -617,17 +662,21 @@ class ChatViewModel @Inject constructor(
                 }
 
                 val modelMissing = conversation.modelId != null && !isModelAvailable(conversation.modelId, conversation.providerType)
-                _uiState.update {
-                    val isLocalConv = conversation.providerType == ProviderType.LITE_RT_LM
+                updateTranscript {
                     it.copy(
                         conversationId = conversation.id,
                         messages = messages,
-                        selectedLocalModelId = if (isLocalConv) conversation.modelId else null,
-                        selectedRemoteModelId = if (!isLocalConv) conversation.modelId else null,
-                        selectedRemoteProvider = if (!isLocalConv) conversation.providerType else null,
                         streamingContent = "",
                         streamingReasoning = "",
                         error = null,
+                    )
+                }
+                updateConnection {
+                    val isLocalConv = conversation.providerType == ProviderType.LITE_RT_LM
+                    it.copy(
+                        selectedLocalModelId = if (isLocalConv) conversation.modelId else null,
+                        selectedRemoteModelId = if (!isLocalConv) conversation.modelId else null,
+                        selectedRemoteProvider = if (!isLocalConv) conversation.providerType else null,
                         conversationModelId = conversation.modelId,
                         conversationProviderType = conversation.providerType,
                         modelUnavailable = modelMissing
@@ -667,43 +716,47 @@ class ChatViewModel @Inject constructor(
         // WR-01: fresh conversation is a new session — drop the wedge
         // verdict so a verified tool-supporting model re-arms engine tools.
         try { liteRTLmProvider.clearToolsDegraded() } catch (e: Exception) { Timber.e(e, "Chat: clearToolsDegraded failed") }
-        _uiState.update {
+        updateTranscript {
             it.copy(
                 conversationId = null,
                 messages = emptyList(),
                 streamingContent = "",
                 streamingReasoning = "",
                 error = null,
-                conversationModelId = null,
-                conversationProviderType = null,
-                modelUnavailable = false,
                 showNoToolSupportNotice = false,
                 activeToolError = null,
                 toolCallActive = null
             )
         }
+        updateConnection {
+            it.copy(
+                conversationModelId = null,
+                conversationProviderType = null,
+                modelUnavailable = false
+            )
+        }
     }
 
     fun updateInput(text: String) {
-        _uiState.update { it.copy(inputText = text) }
+        updateInput { it.copy(inputText = text) }
     }
 
     fun launchModelSelection(modelId: String, providerType: ProviderType, endpointId: Long? = null) {
-        val state = _uiState.value
+        val state = snapshot()
 
         // If we're in a conversation and the model is different, block and show dialog
         val conversationModelId = state.conversationModelId
         if (conversationModelId != null && state.messages.isNotEmpty() &&
             (modelId != conversationModelId || providerType != state.conversationProviderType)) {
-            _uiState.update { it.copy(pendingModelSwitch = ModelSwitchRequest(modelId, providerType, endpointId)) }
+            updateConnection { it.copy(pendingModelSwitch = ModelSwitchRequest(modelId, providerType, endpointId)) }
             return
         }
 
         // Check memory for local models
         if (providerType == ProviderType.LITE_RT_LM) {
-            val model = _uiState.value.localModels.firstOrNull { it.filePath == modelId }
+            val model = _connection.value.localModels.firstOrNull { it.filePath == modelId }
             if (model != null && memoryChecker.shouldWarn(model.sizeBytes)) {
-                _uiState.update { it.copy(memoryWarningModel = model) }
+                updateConnection { it.copy(memoryWarningModel = model) }
                 return
             }
         }
@@ -713,19 +766,23 @@ class ChatViewModel @Inject constructor(
     }
 
     fun confirmModelSwitch() {
-        val pending = _uiState.value.pendingModelSwitch ?: return
+        val pending = _connection.value.pendingModelSwitch ?: return
         viewModelScope.launch(coroutineExceptionHandler) {
             // Create new conversation, clearing old ID and messages
-            _uiState.update {
+            updateTranscript {
                 it.copy(
                     conversationId = null,
                     messages = emptyList(),
                     streamingContent = "",
                     streamingReasoning = "",
+                    error = null
+                )
+            }
+            updateConnection {
+                it.copy(
                     conversationModelId = pending.modelId,
                     conversationProviderType = pending.providerType,
                     pendingModelSwitch = null,
-                    error = null
                 )
             }
             setSelectedModel(pending.modelId, pending.providerType, pending.endpointId, isSameModel = false)
@@ -733,11 +790,11 @@ class ChatViewModel @Inject constructor(
     }
 
     fun cancelModelSwitch() {
-        _uiState.update { it.copy(pendingModelSwitch = null) }
+        updateConnection { it.copy(pendingModelSwitch = null) }
     }
 
     fun dismissModelUnavailable() {
-        _uiState.update { it.copy(
+        updateConnection { it.copy(
             modelUnavailable = false,
             conversationModelId = null,
             conversationProviderType = null
@@ -745,8 +802,8 @@ class ChatViewModel @Inject constructor(
     }
 
     fun confirmLoadMemoryWarning() {
-        val model = _uiState.value.memoryWarningModel ?: return
-        _uiState.update { it.copy(memoryWarningModel = null) }
+        val model = _connection.value.memoryWarningModel ?: return
+        updateConnection { it.copy(memoryWarningModel = null) }
         val providerType = if (model.isLiteRtLm()) ProviderType.LITE_RT_LM else ProviderType.LITE_RT_LM
         viewModelScope.launch(coroutineExceptionHandler) {
             setSelectedModel(model.filePath, providerType, null, isSameModel = false)
@@ -754,17 +811,17 @@ class ChatViewModel @Inject constructor(
     }
 
     fun dismissMemoryWarning() {
-        _uiState.update { it.copy(memoryWarningModel = null) }
+        updateConnection { it.copy(memoryWarningModel = null) }
     }
 
     private fun setSelectedModel(modelId: String, providerType: ProviderType, endpointId: Long?, isSameModel: Boolean) {
-        val oldLocalId = _uiState.value.selectedLocalModelId
-        val oldRemoteId = _uiState.value.selectedRemoteModelId
-        val oldInstance = _uiState.value.loadedInstanceId
+        val oldLocalId = _connection.value.selectedLocalModelId
+        val oldRemoteId = _connection.value.selectedRemoteModelId
+        val oldInstance = _connection.value.loadedInstanceId
 
         if (providerType == ProviderType.LITE_RT_LM) {
             activeModelSelection.markLocalLoading(modelId)
-            _uiState.update {
+            updateConnection {
                 it.copy(
                     selectedLocalModelId = modelId,
                     selectedRemoteModelId = null,
@@ -788,7 +845,7 @@ class ChatViewModel @Inject constructor(
                     activeModelSelection.selectRemote(modelId, providerType, endpoint.id)
                 }
             }
-            _uiState.update {
+            updateConnection {
                 it.copy(
                     selectedLocalModelId = null,
                     selectedRemoteModelId = modelId,
@@ -835,7 +892,7 @@ class ChatViewModel @Inject constructor(
             ProviderType.LM_STUDIO -> {
                 viewModelScope.launch(coroutineExceptionHandler) {
                     try {
-                        _uiState.update { it.copy(loadedInstanceId = null) }
+                        updateConnection { it.copy(loadedInstanceId = null) }
                         val endpoint = endpointRepository.getActive()
                         if (endpoint != null) {
                             // RUNTIME-04: route through the unified LlmModelHelper surface.
@@ -845,7 +902,7 @@ class ChatViewModel @Inject constructor(
                                 (helper as? com.warped.data.remote.provider.LmStudioHelper)
                                     ?.getInstanceId()
                             if (instanceId != null) {
-                                _uiState.update { it.copy(loadedInstanceId = instanceId) }
+                                updateConnection { it.copy(loadedInstanceId = instanceId) }
                                 activeModelSelection.connectLocal(
                                     modelId, providerType, instanceId,
                                 )
@@ -865,11 +922,11 @@ class ChatViewModel @Inject constructor(
     }
 
     fun updateParameters(params: GenerationParameters) {
-        _uiState.update { it.copy(generationParameters = params) }
+        updateConnection { it.copy(generationParameters = params) }
     }
 
     fun toggleReasoning() {
-        _uiState.update { it.copy(reasoningEnabled = !it.reasoningEnabled) }
+        updateInput { it.copy(reasoningEnabled = !it.reasoningEnabled) }
     }
 
     /**
@@ -885,7 +942,7 @@ class ChatViewModel @Inject constructor(
      * state value is updated by the AdvancedPreferences collector in init().
      */
     fun toggleThinking() {
-        val next = !_uiState.value.enableThinking
+        val next = !_input.value.enableThinking
         viewModelScope.launch(coroutineExceptionHandler) {
             advancedPreferences.setThinkingEnabled(next)
         }
@@ -899,20 +956,20 @@ class ChatViewModel @Inject constructor(
     }
 
     fun clearError() {
-        _uiState.update { it.copy(error = null) }
+        updateTranscript { it.copy(error = null) }
     }
 
     fun deleteMessage(messageId: Long) {
         viewModelScope.launch(coroutineExceptionHandler) {
             chatRepository.deleteMessage(messageId)
-            _uiState.update { state ->
+            updateTranscript { state ->
                 state.copy(messages = state.messages.filter { it.id != messageId.toString() })
             }
         }
     }
 
     fun clearModelLoadError() {
-        _uiState.update { it.copy(modelLoadError = null) }
+        updateConnection { it.copy(modelLoadError = null) }
     }
 
     /**
@@ -921,12 +978,12 @@ class ChatViewModel @Inject constructor(
      */
     fun fetchEndpointModels(endpointId: Long) {
         viewModelScope.launch(coroutineExceptionHandler) {
-            val endpoint = _uiState.value.endpoints.firstOrNull { it.id == endpointId } ?: return@launch
+            val endpoint = _connection.value.endpoints.firstOrNull { it.id == endpointId } ?: return@launch
             val modelId = endpoint.modelId ?: ""
             val provider = providerRouter.resolve(endpoint, modelId)
             provider.listModels()
                 .onSuccess { models ->
-                    _uiState.update { state ->
+                    updateConnection { state ->
                         state.copy(
                             endpointModels = state.endpointModels + (endpointId to models.map { it.id })
                         )
@@ -943,32 +1000,33 @@ class ChatViewModel @Inject constructor(
      * Called when the model picker sheet opens.
      */
     fun fetchAllEndpointModels() {
-        _uiState.value.endpoints.forEach { endpoint ->
+        _connection.value.endpoints.forEach { endpoint ->
             fetchEndpointModels(endpoint.id)
         }
     }
 
     private fun refreshActiveBackend() {
-        val isLocal = _uiState.value.selectedLocalModelId != null && _uiState.value.isLocalModelLoaded
+        val connection = _connection.value
+        val isLocal = connection.selectedLocalModelId != null && connection.isLocalModelLoaded
         val backend = if (isLocal) {
             engineManager.getActiveEngine()?.backend
         } else null
         val isLoaded = isLocal && engineManager.getActiveEngine() != null
-        _uiState.update { it.copy(activeBackend = backend, isLocalModelLoaded = isLocal && isLoaded) }
+        updateConnection { it.copy(activeBackend = backend, isLocalModelLoaded = isLocal && isLoaded) }
     }
 
     fun unloadLocalModels() {
         try { engineManager.scheduleUnload() } catch (e: Exception) { Timber.e(e, "Chat: scheduleUnload failed") }
-        _uiState.update { it.copy(isLocalModelLoaded = false, activeBackend = null) }
+        updateConnection { it.copy(isLocalModelLoaded = false, activeBackend = null) }
     }
 
     private suspend fun preloadLocalModel(filePath: String) {
-        val model = _uiState.value.localModels.firstOrNull { it.filePath == filePath }
+        val model = _connection.value.localModels.firstOrNull { it.filePath == filePath }
         if (model != null && !memoryChecker.canLoadModel(model.sizeBytes)) {
             val memInfo = memoryChecker.getMemoryInfo()
             val modelMB = model.sizeBytes / (1024 * 1024)
             val availMB = memInfo.availableBytes / (1024 * 1024)
-            _uiState.update {
+            updateConnection {
                 it.copy(
                     modelLoadError = "Not enough memory: model needs ${modelMB} MB but only ${availMB} MB available. Free up memory or use a smaller quantization."
                 )
@@ -981,17 +1039,17 @@ class ChatViewModel @Inject constructor(
         }
 
         val modelName = filePath.substringAfterLast("/").removeSuffix(".litertlm")
-        _uiState.update { it.copy(isLoadingModel = true, loadingModelName = modelName, modelLoadError = null) }
+        updateConnection { it.copy(isLoadingModel = true, loadingModelName = modelName, modelLoadError = null) }
         try {
             withContext(Dispatchers.Default) {
                 engineManager.switchToLiteRT(filePath)
             }
             activeModelSelection.connectLocal(filePath, ProviderType.LITE_RT_LM)
-            _uiState.update { it.copy(isLoadingModel = false, loadingModelName = "") }
+            updateConnection { it.copy(isLoadingModel = false, loadingModelName = "") }
             refreshActiveBackend()
         } catch (e: Exception) {
             activeModelSelection.disconnectLocal()
-            _uiState.update { it.copy(isLoadingModel = false, modelLoadError = e.message) }
+            updateConnection { it.copy(isLoadingModel = false, modelLoadError = e.message) }
         }
     }
 
@@ -1054,7 +1112,7 @@ class ChatViewModel @Inject constructor(
                     content = toolResultContent(record.toolId, record.summary),
                 )
             }
-            _uiState.update { it.copy(messages = it.messages + toolMessages) }
+            updateTranscript { it.copy(messages = it.messages + toolMessages) }
             for (toolMessage in toolMessages) chatRepository.saveMessage(conversationId, toolMessage)
         } catch (e: Exception) {
             Timber.e(e, "Chat: persistToolRecords failed")
@@ -1062,7 +1120,7 @@ class ChatViewModel @Inject constructor(
     }
 
     private suspend fun ensureConversation(firstMessage: String, hasMedia: Boolean = false): Long {
-        val state = _uiState.value
+        val state = snapshot()
         if (state.conversationId != null) return state.conversationId
 
         val title = when {
@@ -1084,9 +1142,9 @@ class ChatViewModel @Inject constructor(
             modelId = effectiveModelId,
             endpointId = effectiveEndpointId
         )
-        _uiState.update {
+        updateTranscript { it.copy(conversationId = conversationId) }
+        updateConnection {
             it.copy(
-                conversationId = conversationId,
                 conversationModelId = effectiveModelId,
                 conversationProviderType = effectiveProvider
             )
@@ -1101,7 +1159,7 @@ class ChatViewModel @Inject constructor(
                 localModelRepository.existsByFilePath(modelId)
             }
             else -> {
-                _uiState.value.endpoints.any { it.modelId == modelId && it.apiType == providerType }
+                _connection.value.endpoints.any { it.modelId == modelId && it.apiType == providerType }
             }
         }
     }

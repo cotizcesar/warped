@@ -1,5 +1,6 @@
 package com.warped.ui.chat
 
+import androidx.compose.runtime.Immutable
 import com.warped.data.local.inference.BackendType
 import com.warped.domain.model.ChatMessage
 import com.warped.domain.model.ConnectionStatus
@@ -10,6 +11,100 @@ import com.warped.domain.model.LocalModel
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.SyntaxTheme
 
+/**
+ * 48-01 (PERF-14): single-owner @Immutable sub-states replacing the 30-field
+ * [ChatUiState] monolith as the source of truth.
+ *
+ * Ownership (each field has exactly one writer group):
+ * - [ChatTranscriptState]: streaming Delta collector (streamingContent/
+ *   streamingReasoning), send/Done/Error/stop/new-conversation turn boundaries
+ *   (messages/isStreaming/clears), tool paths (toolCallActive/activeToolError/
+ *   showNoToolSupportNotice), error paths (error).
+ * - [ChatInputState]: updateInput + send-clear (inputText), skillRepository
+ *   collector (skillEnabled), toggleReasoning (reasoningEnabled),
+ *   AdvancedPreferences collector (enableThinking), selection collectors
+ *   (supportsThinking), turn code mirrors isStreaming (isGenerating).
+ * - [ChatConnectionState]: selection/endpoint/prefs collectors and model
+ *   lifecycle paths (everything low-frequency).
+ *
+ * Streaming tokens never touch the input flow; keystrokes never touch the
+ * transcript flow.
+ */
+@Immutable
+data class ChatTranscriptState(
+    val conversationId: Long? = null,
+    val messages: List<ChatMessage> = emptyList(),
+    val isStreaming: Boolean = false,
+    val streamingContent: String = "",
+    val streamingReasoning: String = "",
+    val toolCallActive: String? = null,
+    val activeToolError: ActiveToolError? = null,
+    val showNoToolSupportNotice: Boolean = false,
+    val error: ChatError? = null,
+)
+
+@Immutable
+data class ChatInputState(
+    val inputText: String = "",
+    val skillEnabled: Map<String, Boolean> = emptyMap(),
+    val reasoningEnabled: Boolean = true,
+    val enableThinking: Boolean = false,
+    val supportsThinking: Boolean = false,
+    val isGenerating: Boolean = false,
+)
+
+@Immutable
+data class ChatConnectionState(
+    @Deprecated("Use selectedLocalModelId or selectedRemoteModelId instead")
+    val selectedProvider: ProviderType? = null,
+    @Deprecated("Use selectedLocalModelId or selectedRemoteModelId instead")
+    val selectedModelId: String? = null,
+    val selectedLocalModelId: String? = null,
+    val selectedRemoteModelId: String? = null,
+    val selectedRemoteProvider: ProviderType? = null,
+    val isLocalModelConnected: Boolean = false,
+    val connectionStatus: ConnectionStatus = ConnectionStatus.Unknown,
+    val conversations: List<Conversation> = emptyList(),
+    val localModels: List<LocalModel> = emptyList(),
+    val endpoints: List<Endpoint> = emptyList(),
+    val endpointModels: Map<Long, List<String>> = emptyMap(),
+    val generationParameters: GenerationParameters = GenerationParameters(),
+    val isLoadingModel: Boolean = false,
+    val loadingModelName: String = "",
+    val modelLoadError: String? = null,
+    val loadedInstanceId: String? = null,
+    val activeBackend: BackendType? = null,  // null unless LITE_RT_LM is loaded
+    val isLocalModelLoaded: Boolean = false,
+    val memoryWarningModel: com.warped.domain.model.LocalModel? = null,
+    val codeTheme: SyntaxTheme = SyntaxTheme.MONOKAI,
+    val codeFontScale: Float = 1.0f,
+    val modelUnavailable: Boolean = false,
+    val pendingModelSwitch: ModelSwitchRequest? = null,
+    val conversationModelId: String? = null,
+    val conversationProviderType: ProviderType? = null,
+)
+
+/**
+ * 48-01 (PERF-15, threat T-48-01/T-48-02): synthetic keys for the transient
+ * trailing LazyColumn items. Constants by construction — never derived from
+ * content hashes — so rotation can never duplicate the streaming bubble and
+ * fling reuse can never cross-contaminate rows.
+ */
+object ChatListKeys {
+    const val STREAMING = "streaming"
+    const val TOOL_STATUS = "tool-status"
+    const val NO_TOOL_SUPPORT = "no-tool-support"
+    fun toolError(toolId: String): String = "tool-error-$toolId"
+}
+
+/**
+ * 48-01 compat snapshot: the pre-split monolith, now DERIVED (combine of the
+ * three sub-states in ChatViewModel) instead of written directly. No external
+ * screen collects ChatViewModel.uiState (verified: all other `uiState`
+ * collectors belong to their own ViewModels), so this stays for one phase as
+ * the migration shim for existing tests/callers, then goes away.
+ */
+@Deprecated("PERF-14 shim: collect transcriptState/inputState/connectionState instead")
 data class ChatUiState(
     val conversationId: Long? = null,
     val messages: List<ChatMessage> = emptyList(),
@@ -58,6 +153,55 @@ data class ChatUiState(
     val showNoToolSupportNotice: Boolean = false,
 )
 
+/** 48-01: the single derivation point monolith-shim ← sub-states. */
+@Suppress("DEPRECATION")
+fun combineSnapshot(
+    transcript: ChatTranscriptState,
+    input: ChatInputState,
+    connection: ChatConnectionState,
+): ChatUiState = ChatUiState(
+    conversationId = transcript.conversationId,
+    messages = transcript.messages,
+    inputText = input.inputText,
+    isGenerating = input.isGenerating,
+    streamingContent = transcript.streamingContent,
+    streamingReasoning = transcript.streamingReasoning,
+    selectedProvider = connection.selectedProvider,
+    selectedModelId = connection.selectedModelId,
+    selectedLocalModelId = connection.selectedLocalModelId,
+    selectedRemoteModelId = connection.selectedRemoteModelId,
+    selectedRemoteProvider = connection.selectedRemoteProvider,
+    isLocalModelConnected = connection.isLocalModelConnected,
+    connectionStatus = connection.connectionStatus,
+    error = transcript.error,
+    conversations = connection.conversations,
+    localModels = connection.localModels,
+    endpoints = connection.endpoints,
+    endpointModels = connection.endpointModels,
+    isStreaming = transcript.isStreaming,
+    generationParameters = connection.generationParameters,
+    isLoadingModel = connection.isLoadingModel,
+    loadingModelName = connection.loadingModelName,
+    modelLoadError = connection.modelLoadError,
+    loadedInstanceId = connection.loadedInstanceId,
+    reasoningEnabled = input.reasoningEnabled,
+    enableThinking = input.enableThinking,
+    supportsThinking = input.supportsThinking,
+    activeBackend = connection.activeBackend,
+    isLocalModelLoaded = connection.isLocalModelLoaded,
+    memoryWarningModel = connection.memoryWarningModel,
+    codeTheme = connection.codeTheme,
+    codeFontScale = connection.codeFontScale,
+    modelUnavailable = connection.modelUnavailable,
+    pendingModelSwitch = connection.pendingModelSwitch,
+    conversationModelId = connection.conversationModelId,
+    conversationProviderType = connection.conversationProviderType,
+    toolCallActive = transcript.toolCallActive,
+    skillEnabled = input.skillEnabled,
+    activeToolError = transcript.activeToolError,
+    showNoToolSupportNotice = transcript.showNoToolSupportNotice,
+)
+
 data class ActiveToolError(val toolId: String, val reason: String)
 
 enum class TrafficLightState {
@@ -81,26 +225,38 @@ data class ModelSwitchRequest(
     val endpointId: Long? = null,
 )
 
-fun ChatUiState.trafficLightState(): TrafficLightState {
-    val isLocal = selectedLocalModelId != null && isLocalModelLoaded
-    val isRemote = selectedRemoteModelId != null && selectedRemoteProvider != null
+/**
+ * 48-01: traffic-light derivation over the split states (PERF-04 precedent:
+ * a low-frequency combine/derivedStateOf, never a monolith read). The
+ * [ChatUiState] extension below delegates here so behavior is defined once.
+ */
+fun trafficLightState(
+    transcript: ChatTranscriptState,
+    connection: ChatConnectionState,
+): TrafficLightState {
+    val isLocal = connection.selectedLocalModelId != null && connection.isLocalModelLoaded
+    val isRemote = connection.selectedRemoteModelId != null && connection.selectedRemoteProvider != null
     return when {
-        isStreaming -> TrafficLightState.YELLOW
-        memoryWarningModel != null -> TrafficLightState.RED
-        error != null -> TrafficLightState.RED
-        isLocal && isLocalModelLoaded -> TrafficLightState.GREEN
-        isRemote && connectionStatus == ConnectionStatus.Connected -> TrafficLightState.GREEN
+        transcript.isStreaming -> TrafficLightState.YELLOW
+        connection.memoryWarningModel != null -> TrafficLightState.RED
+        transcript.error != null -> TrafficLightState.RED
+        isLocal && connection.isLocalModelLoaded -> TrafficLightState.GREEN
+        isRemote && connection.connectionStatus == ConnectionStatus.Connected -> TrafficLightState.GREEN
         isLocal || isRemote -> TrafficLightState.RED
         else -> TrafficLightState.GRAY
     }
 }
 
-fun ChatUiState.trafficLightStatusText(): String {
-    val light = trafficLightState()
-    val isLocal = selectedLocalModelId != null
-    val isRemote = selectedRemoteModelId != null
-    val localName = localModels.firstOrNull { it.filePath == selectedLocalModelId }?.name
-    val remoteName = selectedRemoteModelId?.substringAfterLast("/")
+fun trafficLightStatusText(
+    transcript: ChatTranscriptState,
+    connection: ChatConnectionState,
+): String {
+    val light = trafficLightState(transcript, connection)
+    val isLocal = connection.selectedLocalModelId != null
+    val isRemote = connection.selectedRemoteModelId != null
+    val localName = connection.localModels.firstOrNull { it.filePath == connection.selectedLocalModelId }?.name
+    val remoteName = connection.selectedRemoteModelId?.substringAfterLast("/")
+    val error = transcript.error
     return when {
         light == TrafficLightState.YELLOW -> "Generating response…"
         light == TrafficLightState.GREEN && isLocal -> "Local: $localName — Connected"
@@ -113,3 +269,37 @@ fun ChatUiState.trafficLightStatusText(): String {
         else -> "No model selected"
     }
 }
+
+@Suppress("DEPRECATION")
+fun ChatUiState.trafficLightState(): TrafficLightState = trafficLightState(
+    ChatTranscriptState(
+        isStreaming = isStreaming,
+        error = error,
+    ),
+    ChatConnectionState(
+        selectedLocalModelId = selectedLocalModelId,
+        selectedRemoteModelId = selectedRemoteModelId,
+        selectedRemoteProvider = selectedRemoteProvider,
+        connectionStatus = connectionStatus,
+        localModels = localModels,
+        isLocalModelLoaded = isLocalModelLoaded,
+        memoryWarningModel = memoryWarningModel,
+    ),
+)
+
+@Suppress("DEPRECATION")
+fun ChatUiState.trafficLightStatusText(): String = trafficLightStatusText(
+    ChatTranscriptState(
+        isStreaming = isStreaming,
+        error = error,
+    ),
+    ChatConnectionState(
+        selectedLocalModelId = selectedLocalModelId,
+        selectedRemoteModelId = selectedRemoteModelId,
+        selectedRemoteProvider = selectedRemoteProvider,
+        connectionStatus = connectionStatus,
+        localModels = localModels,
+        isLocalModelLoaded = isLocalModelLoaded,
+        memoryWarningModel = memoryWarningModel,
+    ),
+)
