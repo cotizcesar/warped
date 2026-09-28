@@ -10,7 +10,9 @@ import com.warped.data.local.inference.ModelImportManager
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.remote.provider.LMStudioProvider
+import com.warped.data.repository.ModelAllowlistRepository
 import com.warped.data.remote.provider.ProviderRouter
+import com.warped.domain.model.ModelCapabilities
 import com.warped.domain.model.ActiveModelSelection
 import com.warped.domain.model.Endpoint
 import com.warped.domain.model.LocalModel
@@ -38,8 +40,29 @@ class ModelsViewModel @Inject constructor(
     private val memoryChecker: MemoryChecker,
     private val apiKeyStore: ApiKeyStore,
     private val providerRouter: ProviderRouter,
-    private val inputSanitizer: InputSanitizer
+    private val inputSanitizer: InputSanitizer,
+    private val allowlist: ModelAllowlistRepository
 ) : ViewModel() {
+
+    /**
+     * Effective capabilities for a downloaded model. The allowlist (verified-only,
+     * 45-02 LRT-09) wins when it contains the model — matched by file name, then by
+     * display name. Models absent from the allowlist fall back to their stored
+     * capabilities. This keeps unverified badges (e.g. Thinking on gemma-4-E2B-it,
+     * which emits no thinking) off the card.
+     */
+    fun effectiveCapabilities(model: LocalModel): ModelCapabilities {
+        val fileName = model.filePath.substringAfterLast("/")
+        val entry = allowlist.findByModelFile(fileName)
+            ?: allowlist.findByName(model.name)
+            ?: return model.capabilities
+        return ModelCapabilities(
+            vision = entry.capabilities.vision,
+            reasoning = entry.capabilities.supportsThinking,
+            tools = entry.capabilities.supportsFunctionCalling,
+            audio = entry.capabilities.audio
+        )
+    }
 
     private val _uiState = MutableStateFlow(ModelsUiState())
     val uiState: StateFlow<ModelsUiState> = _uiState.asStateFlow()

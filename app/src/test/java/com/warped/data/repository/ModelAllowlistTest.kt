@@ -32,26 +32,44 @@ class ModelAllowlistTest {
     fun `shipped asset parses with expected entries`() {
         val models = parseModelAllowlist(shippedAssetText())
 
-        assertThat(models).hasSize(2)
+        assertThat(models).hasSize(3)
         val e2b = models.first { it.name == "gemma-3n-E2B-it-int4" }
         assertThat(e2b.displayName).isEqualTo("Gemma 3n E2B IT (int4)")
         assertThat(e2b.modelFile).isEqualTo("gemma-3n-E2B-it-int4.task")
         assertThat(e2b.sizeInBytes).isEqualTo(3136226711L)
         assertThat(e2b.taskTypes).contains("chat")
+        val g4 = models.first { it.name == "gemma-4-E2B-it" }
+        assertThat(g4.displayName).isEqualTo("Gemma 4 E2B IT")
+        assertThat(g4.modelFile).isEqualTo("gemma-4-E2B-it.litertlm")
+        assertThat(g4.sizeInBytes).isEqualTo(2588147712L)
+        assertThat(g4.taskTypes).contains("chat")
     }
 
     @Test
     fun `shipped asset flags are verified-only`() {
         val models = parseModelAllowlist(shippedAssetText())
 
+        // Per-model verified surface on 0.17.x Android. Unverified stays off
+        // (T-45-06, D-allowlist): thinking / function-calling / extended-context /
+        // MTP must be false on EVERY entry until device-verified.
+        val expectedTextModality = mapOf(
+            "gemma-3n-E2B-it-int4" to true,
+            "gemma-3n-E4B-it-int4" to true,
+            "gemma-4-E2B-it" to true
+        )
+        // 3n multimodal + speculative decoding verified; gemma-4 text-only verified
+        // (device chat 2026-09-28, no think output observed).
+        val expectedFullCaps = mapOf(
+            "gemma-3n-E2B-it-int4" to true,
+            "gemma-3n-E4B-it-int4" to true,
+            "gemma-4-E2B-it" to false
+        )
         for (model in models) {
             val caps = model.capabilities
-            // Engine-surface verified on 0.17.x Android (AAR bytecode + app code paths).
-            assertThat(caps.text).isTrue()
-            assertThat(caps.vision).isTrue()
-            assertThat(caps.audio).isTrue()
-            assertThat(caps.speculativeDecoding).isTrue()
-            // NOT per-model verified on device — must stay off (T-45-06, D-allowlist).
+            assertThat(caps.text).isEqualTo(expectedTextModality[model.name] == true)
+            assertThat(caps.vision).isEqualTo(expectedFullCaps[model.name] == true)
+            assertThat(caps.audio).isEqualTo(expectedFullCaps[model.name] == true)
+            assertThat(caps.speculativeDecoding).isEqualTo(expectedFullCaps[model.name] == true)
             assertThat(caps.supportsThinking).isFalse()
             assertThat(caps.supportsFunctionCalling).isFalse()
             assertThat(caps.extendedContext).isFalse()
@@ -63,7 +81,7 @@ class ModelAllowlistTest {
     fun `repository exposes capability queries`() {
         val repo = repositoryBackedBy(shippedAssetText())
 
-        assertThat(repo.models).hasSize(2)
+        assertThat(repo.models).hasSize(3)
         assertThat(repo.findByModelFile("gemma-3n-E4B-it-int4.task")?.name)
             .isEqualTo("gemma-3n-E4B-it-int4")
         assertThat(repo.supportsThinking("gemma-3n-E2B-it-int4")).isFalse()

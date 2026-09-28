@@ -10,12 +10,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -281,6 +285,7 @@ fun ModelsScreen(
                     items(uiState.models, key = { "local-${it.id}" }) { model ->
                         ModelCard(
                             model = model,
+                            capabilities = viewModel.effectiveCapabilities(model),
                             onLoad = {
                                 if (viewModel.shouldWarnAboutMemory(model.sizeBytes)) {
                                     showMemoryWarning = model
@@ -327,6 +332,7 @@ fun ModelsScreen(
 @Composable
 fun ModelCard(
     model: LocalModel,
+    capabilities: com.warped.domain.model.ModelCapabilities? = null,
     onLoad: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -379,13 +385,30 @@ fun ModelCard(
                     ModelMetaChip(model.parameterCount)
                 }
             }
-            if (model.capabilities.vision || model.capabilities.reasoning || model.capabilities.tools || model.capabilities.audio) {
+            val caps = capabilities ?: model.capabilities
+            if (caps.vision || caps.reasoning || caps.tools || caps.audio) {
                 Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (model.capabilities.vision) CapabilityBadge("Vision", Color(0xFF9C27B0))
-                    if (model.capabilities.audio) CapabilityBadge("Audio", Color(0xFF4CAF50))
-                    if (model.capabilities.reasoning) CapabilityBadge("Thinking", Color(0xFFFF9800))
-                    if (model.capabilities.tools) CapabilityBadge("Tools", Color(0xFF2196F3))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (caps.vision) CapabilityBadge(
+                        icon = Icons.Filled.Visibility,
+                        contentDescription = "Vision",
+                        color = Color(0xFF9C27B0)
+                    )
+                    if (caps.audio) CapabilityBadge(
+                        icon = Icons.Filled.Audiotrack,
+                        contentDescription = "Audio",
+                        color = Color(0xFF4CAF50)
+                    )
+                    if (caps.reasoning) CapabilityBadge(
+                        icon = Icons.Filled.Psychology,
+                        contentDescription = "Thinking",
+                        color = Color(0xFFFF9800)
+                    )
+                    if (caps.tools) CapabilityBadge(
+                        icon = Icons.Filled.Build,
+                        contentDescription = "Tools",
+                        color = Color(0xFF2196F3)
+                    )
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -446,17 +469,20 @@ private fun ModelFormatBadge(format: String) {
 }
 
 @Composable
-private fun CapabilityBadge(label: String, color: Color) {
+private fun CapabilityBadge(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    color: Color
+) {
     Surface(
         shape = RoundedCornerShape(6.dp),
         color = color.copy(alpha = 0.12f)
     ) {
-        Text(
-            text = label,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = color,
-            fontWeight = FontWeight.SemiBold
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp).size(14.dp),
+            tint = color
         )
     }
 }
