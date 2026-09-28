@@ -24,9 +24,17 @@ import kotlin.math.min
  * Phase 50 (WEB-01, WEB-02): bounded, cancelable single-page fetcher.
  *
  * Policy: offline short-circuits to [GroundingResult.ModelOnly] without
- * opening a socket; otherwise one fetch with an 8s connect / 10s read / 20s
- * call budget, max 3 manual redirects, 64KB body cap streamed in 8KB chunks
- * (never an unbounded whole-body read), text/html + text/plain only, browser User-Agent.
+ * opening a socket; otherwise one fetch with a 10s connect / 15s read / 30s
+ * call budget, max 3 manual redirects, 256KB body cap streamed in 8KB chunks
+ * (never an unbounded whole-body read), text/html + text/plain +
+ * text/markdown only, desktop Chrome User-Agent with markdown-first Accept
+ * negotiation (mirrors OpenCode webfetch). HTML grounds as structured
+ * markdown via [HtmlToMarkdown] with a flat-text fallback
+ * ([HtmlToTextExtractor]) when markdown converts to blank. The endpoint
+ * [AuthInterceptor] is stripped from the derived client so API
+ * keys (tag-gated per-endpoint) can never leak to arbitrary fetched hosts.
+ * Runs on Dispatchers.IO; cancel via [cancel] (Stop button / new-turn
+ * pre-cancel). Fetch failures inject zero bytes — the turn goes model-only.
  * The endpoint [AuthInterceptor] is stripped from the derived client so API
  * keys (tag-gated per-endpoint) can never leak to arbitrary fetched hosts.
  * Runs on Dispatchers.IO; cancel via [cancel] (Stop button / new-turn
@@ -46,17 +54,17 @@ class WebPageFetcher @Inject constructor(
 ) {
 
     companion object {
-        const val MAX_BODY_BYTES = 65536
+        const val MAX_BODY_BYTES = 262144
         private const val CHUNK_BYTES = 8192L
         private const val MAX_REDIRECTS = 3
         const val USER_AGENT =
-            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36"
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
     }
 
     private val client: OkHttpClient = baseClient.newBuilder()
-        .connectTimeout(8, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
-        .callTimeout(20, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .callTimeout(30, TimeUnit.SECONDS)
         .followRedirects(false)
         .apply {
             // AuthInterceptor is tag-gated per endpoint, but the fetch
@@ -101,7 +109,7 @@ class WebPageFetcher @Inject constructor(
                 val request = Request.Builder()
                     .url(currentUrl)
                     .header("User-Agent", USER_AGENT)
-                    .header("Accept", "text/html, text/plain")
+                    .header("Accept", "text/markdown;q=1.0, text/plain;q=0.8, text/html;q=0.7, */*;q=0.1")
                     .build()
                 val call = client.newCall(request)
                 activeCalls.add(call)
@@ -124,11 +132,13 @@ class WebPageFetcher @Inject constructor(
                             return@withContext GroundingResult.ModelOnly(GroundingResult.Reason.FETCH_FAILED)
                         }
                         // Missing content-type is treated as html; only
-                        // text/html and text/plain bodies are grounded.
+                        // text/html, text/plain, and text/markdown bodies ground.
                         val contentType = response.header("Content-Type")?.lowercase().orEmpty()
+                        val isMarkdown = contentType.contains("text/markdown")
                         if (contentType.isNotEmpty() &&
                             !contentType.contains("text/html") &&
-                            !contentType.contains("text/plain")
+                            !contentType.contains("text/plain") &&
+                            !isMarkdown
                         ) {
                             return@withContext GroundingResult.ModelOnly(GroundingResult.Reason.FETCH_FAILED)
                         }
@@ -144,11 +154,22 @@ class WebPageFetcher @Inject constructor(
                             remaining -= read
                         }
                         val raw = sink.readUtf8()
-                        val extracted = HtmlToTextExtractor.extract(raw, currentUrl, safeBudget)
+                        val extracted = if (isMarkdown) {
+                            // text/markdown direct passthrough (no conversion).
+                            raw.trim().takeIf { it.isNotEmpty() }
+                                ?.let { truncatePassthrough(it, safeBudget) }
+                                .orEmpty()
+                        } else if (contentType.contains("text/plain")) {
+                            HtmlToTextExtractor.extract(raw, currentUrl, safeBudget)
+                        } else {
+                            val markdown = HtmlToMarkdown.convert(raw, currentUrl, safeBudget)
+                            if (markdown.isNotBlank()) markdown
+                            else HtmlToTextExtractor.extract(raw, currentUrl, safeBudget)
+                        }
                         if (extracted.isBlank()) {
                             return@withContext GroundingResult.ModelOnly(GroundingResult.Reason.FETCH_FAILED)
                         }
-                        // A 64KB-cap abort still grounds: partial content is
+                        // A 256KB-cap abort still grounds: partial content is
                         // usable and the extractor marks truncation.
                         val sanitized = WebContextSanitizer.sanitize(extracted)
                         val block = GroundingPrompt.buildBlock(currentUrl, sanitized)
@@ -170,6 +191,21 @@ class WebPageFetcher @Inject constructor(
         }
         @Suppress("UNREACHABLE_CODE")
         GroundingResult.ModelOnly(GroundingResult.Reason.FETCH_FAILED)
+    }
+
+    /**
+     * Line-boundary truncation for text/markdown passthrough bodies,
+     * mirroring the extractor marker contract.
+     */
+    private fun truncatePassthrough(text: String, budget: Int): String {
+        if (text.length <= budget) return text
+        val marker = HtmlToTextExtractor.TRUNCATION_MARKER
+        val cut = budget - marker.length - 1
+        val head = if (cut <= 0) text.take(budget) else {
+            val nl = text.lastIndexOf('\n', cut)
+            if (nl > 0) text.take(nl) else text.take(cut)
+        }
+        return "$head\n$marker"
     }
 
     internal fun hasValidatedInternet(): Boolean {
