@@ -245,6 +245,8 @@ class ChatViewModel @Inject constructor(
         // WR-04: atomic increment — @Volatile ++ is a non-atomic read-modify-write.
         val turnId = generationSeq.incrementAndGet()
         generationJob = viewModelScope.launch(coroutineExceptionHandler) {
+            // WR-02: hoisted so the cancel path can persist the audit trail.
+            val turnToolRecords = mutableListOf<StreamToken.ToolCompleted>()
             try {
                 val conversationId = ensureConversation(text, hasMedia = images.isNotEmpty() || audioBytes != null)
                 chatRepository.saveMessage(conversationId, userMessage)
@@ -360,7 +362,9 @@ class ChatViewModel @Inject constructor(
                 // 47-03 (D-06): per-turn tool records from the remote loop.
                 // Persisted as role=TOOL rows on Done; failures also raise
                 // the transient "{Display} failed: …" error row.
-                val toolRecords = mutableListOf<StreamToken.ToolCompleted>()
+                // WR-02: accumulator is the hoisted turnToolRecords so the
+                // Error/cancel paths persist the same audit trail.
+                val toolRecords = turnToolRecords
                 val tokenBuffer = mutableListOf<String>()
                 var lastEmitTime = System.currentTimeMillis()
 
@@ -497,6 +501,10 @@ class ChatViewModel @Inject constructor(
                             }
                         }
                         is StreamToken.Error -> {
+                            // WR-02: persist completed tool rows before surfacing
+                            // the error — a transport failure after N successful
+                            // tool rounds must keep its audit trail.
+                            persistToolRecords(conversationId, toolRecords)
                             _uiState.update {
                                 it.copy(
                                     error = ChatError.Network(token.message),
@@ -512,6 +520,21 @@ class ChatViewModel @Inject constructor(
                 // CR-01: Stop means stop — user-initiated cancel is not an error.
                 // Rethrow so structured concurrency observes cancellation; the
                 // finally (stale-seq guard) still runs on the rethrow path.
+                // WR-02: keep the audit trail — persist completed tool rows
+                // before the rethrow (best-effort; cancel must never throw).
+                runCatching {
+                    val cid = _uiState.value.conversationId
+                    if (cid != null && turnToolRecords.isNotEmpty()) {
+                        val toolMessages = turnToolRecords.map { record ->
+                            ChatMessage(
+                                role = Role.TOOL,
+                                content = toolResultContent(record.toolId, record.summary),
+                            )
+                        }
+                        _uiState.update { it.copy(messages = it.messages + toolMessages) }
+                        for (toolMessage in toolMessages) chatRepository.saveMessage(cid, toolMessage)
+                    }
+                }
                 throw e
             } catch (e: Exception) {
                 _uiState.update {
@@ -993,6 +1016,29 @@ class ChatViewModel @Inject constructor(
 
         Timber.d("ChatVM: parseThinkBlocks result — clean=%d reasoning=%d", clean.length, reasoning.length)
         return Pair(clean.trim(), reasoning.toString().trim())
+    }
+
+    /**
+     * WR-02: persist completed tool rows on non-Done turn endings (Error).
+     * Best-effort: persistence failure must never mask the original error.
+     */
+    private suspend fun persistToolRecords(
+        conversationId: Long,
+        toolRecords: List<StreamToken.ToolCompleted>,
+    ) {
+        if (toolRecords.isEmpty()) return
+        try {
+            val toolMessages = toolRecords.map { record ->
+                ChatMessage(
+                    role = Role.TOOL,
+                    content = toolResultContent(record.toolId, record.summary),
+                )
+            }
+            _uiState.update { it.copy(messages = it.messages + toolMessages) }
+            for (toolMessage in toolMessages) chatRepository.saveMessage(conversationId, toolMessage)
+        } catch (e: Exception) {
+            Timber.e(e, "Chat: persistToolRecords failed")
+        }
     }
 
     private suspend fun ensureConversation(firstMessage: String, hasMedia: Boolean = false): Long {
