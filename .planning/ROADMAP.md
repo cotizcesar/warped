@@ -38,7 +38,9 @@ v2.2 Simplificación + Web Grounding shipped 2026-09-28 (Phases 49–51): dead s
   3. User sees fetch progress per source ("Leyendo 2 de 4…") with per-source ok/skipped states — no silent drops
   4. User on a small local model gets answers that fit context (global grounding budget divided across pages, model-window-aware)
   5. User gets cleaner grounded answers via Jsoup parse-only extraction with the v2.2 fetch policy unchanged (stripped client, 64KB cap, timeouts)
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 52-01-PLAN.md — Jsoup swap, allUrls, budget, fused blocks + exit-gate tests
+- [ ] 52-02-PLAN.md — cancel fix, fan-out orchestrator, hook + N-source UI
 **UI hint**: yes
 
 ### Phase 53: Sources Preview + Per-Chat Toggle
