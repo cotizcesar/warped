@@ -64,16 +64,21 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 **Known deferred:** 4 release-UAT device smokes (DEL-06 release smoke, WEB-05 banner visual, WEB-06 chip/Fuentes/E2E, THEME-01 per-preset visual light+dark). Orphaned Keystore `huggingface_token` entry on upgrades (harmless).
 
-## Current Milestone: v2.3 Web Grounding v2
+## Previous Milestone: v2.3 Web Grounding v2 — COMPLETE ✅
 
-**Goal:** Pasted URLs ground answers with multi-page context, previewable sources, and offline resilience.
+**Shipped:** 2026-09-28 | [Archive →](.planning/milestones/v2.3-ROADMAP.md) · [Audit →](milestones/v2.3-MILESTONE-AUDIT.md) (gaps_found, accepted)
 
-**Target features:**
-- Multi-URL fetch (2–5 URLs per message, fused context)
-- Sources preview UI (tap a source to preview extracted text without leaving chat)
-- Per-chat web toggle (per-conversation/per-message override of the global default-ON)
-- Offline retry queue (retry fetch automatically when back online)
-- Extraction quality decided by research (extend heuristic vs robust HTML→text)
+3 phases (52–54), 8 plans, 12 requirements — 12/12 verified:
+- Multi-URL fetch: parallel fan-out (cap 5), fused `[WEB CONTEXT 1..N]` blocks, partial grounding, per-source `Leyendo N de M…` progress, concurrent-safe cancel
+- Jsoup 1.23.2 parse-only extraction (never `connect()`), frozen fetch policy, global model-window-aware grounding budget + adversarial/budget exit gates
+- Sources preview bottom sheet (zero-I/O, guarded `Abrir en navegador`), clickable Fuentes, `grounded_sources` table + single `MIGRATION_14_15` (JVM static gate)
+- Per-chat tri-state toggle (Sí/No/Heredar) + one-off `Sin web` chip via pure `GroundingPrecedence`
+- Offline retry: queued `En espera` banner + validated-online `Reintentar`, same-entry fetch, sources-only attach, same-row reuse, Stop/overlap/streaming guards
+- 289/289 unit green; SECURED all phases (11/11, 16/16, 8/8); integration 5/5 flows wired
+
+**Known deferred:** 3 release-UAT device smokes (MIG-01 on-device MigrationTest, WEB-07 grounding visuals both themes, WEB-08 offline→retry live E2E). UI polish trio + budget on-device validation (TUNE-01/02 triggers). Pre-existing carry-overs: Pixel 7 reference numbers, v2.2 smokes, orphaned Keystore entry.
+
+## Current Milestone: (next — run `/gsd-new-milestone`)
 
 ## Requirements
 
@@ -119,6 +124,11 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 - ✓ Model discovery is static-catalog-only — `model_allowlist.json` with direct token-free downloads (progress/cancel) — v2.2
 - ✓ Pasted URLs ground the answer — bounded fetch → `[WEB CONTEXT]` block with hijack sanitization, numbered sources, offline model-only fallback, default-ON toggle — v2.2 (device-smoke visuals deferred)
 - ✓ All 4 code presets apply in chat code blocks — Monokai-only hardcode fixed, all-4-preset regression tests — v2.2 (visual confirmation deferred)
+- ✓ User pasting 2–5 URLs gets one answer grounded in all fetchable pages (parallel fan-out, fused `[WEB CONTEXT 1..N]`, partial grounding, per-source `Leyendo N de M…` progress) — v2.3
+- ✓ User gets cleaner grounded answers via Jsoup 1.23.2 parse-only extraction with frozen fetch policy + model-window-aware global grounding budget — v2.3
+- ✓ User previews each source in a bottom sheet (extracted text, `Abrir en navegador`) from a numbered Fuentes list covering all N sources — v2.3
+- ✓ User overrides web grounding per conversation (Sí/No/Heredar) and sends one-off model-only messages (`Sin web`); preferences + sources survive restarts (Room v15) — v2.3
+- ✓ User offline at send time retries grounding on reconnect (`Reintentar`, message-scoped foreground, same rows, history untouched, inference never re-run) — v2.3
 
 ### Active
 

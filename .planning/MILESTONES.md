@@ -1,5 +1,35 @@
 # Milestones
 
+## v2.3 Web Grounding v2 (Shipped: 2026-09-28)
+
+**Phases completed:** 3 phases (52-54), 8 plans, 12 requirements
+**Requirements:** 12 defined, 12 verified (automatable evidence 100%; 3 device-smoke follow-ups accepted as release-UAT, user-approved)
+**Known verification overrides:** 0 partials — all phases passed verification (52: 5/5, 53: 6/6 via gap-closure static migration gate, 54: 3/3); 289/289 unit green; SECURED all phases
+**Audit:** [`.planning/milestones/v2.3-MILESTONE-AUDIT.md`](milestones/v2.3-MILESTONE-AUDIT.md) → status: **gaps_found** (accepted)
+**Archived roadmap:** [`.planning/milestones/v2.3-ROADMAP.md`](milestones/v2.3-ROADMAP.md)
+**Archived requirements:** [`.planning/milestones/v2.3-REQUIREMENTS.md`](milestones/v2.3-REQUIREMENTS.md)
+**Closeout type:** override_closeout
+
+**Key accomplishments:**
+
+1. **Multi-URL fetch foundation** — Parallel fan-out (`coroutineScope`+`awaitAll`, cap 5, paste-order numbering), fused `[WEB CONTEXT 1..N]` blocks, partial grounding with all-fail-only banner, per-source `Leyendo N de M…` progress, concurrent-safe cancel set
+2. **Jsoup extraction swap** — Jsoup 1.23.2 parse-only (`Jsoup.parse`, never `connect()`, zero `Jsoup.connect` grep-clean) replacing the regex core with fallback; fetch policy frozen (stripped client, 64KB cap, 8/10/20s timeouts, 3 redirects)
+3. **Global grounding budget** — Model-window-aware tiers (4500/6000/scaled) divided across pages (800 floor), 5×max-size exit gate; multi-page adversarial suite (dead-of-3, all-dead, cap, cross-page hijack)
+4. **Sources preview + persistence** — Bottom-sheet preview (zero-I/O open, `Abrir en navegador` guarded intent), clickable Fuentes (omitida struck), `grounded_sources` table + single `MIGRATION_14_15` with JVM static gate
+5. **Per-chat toggle** — Tri-state `web_override` (Sí/No/Heredar, null inherits) + one-off `Sin web` chip; pure `GroundingPrecedence` (skipOnce > perChat > global) with truth-table tests
+6. **Offline retry** — Queued `En espera` banner + validated-online-gated `Reintentar`; same-entry `fetchAll`, sources-only attach (assistant text byte-identical, inference never runs), same-row `replaceSources`, Stop/overlap/streaming guards
+
+### Known Gaps (accepted, release-UAT device smokes)
+- **MIG-01:** on-device MigrationTest v14→v15 (live SQLite/SQLCipher row survival)
+- **WEB-07:** grounding visuals on hardware, both themes (chip, Fuentes, sheet, queued/Reintentar banner)
+- **WEB-08:** offline→resume→tap→Fuentes E2E with live fetch on hardware
+
+### Tech debt
+- GroundingBudget tiers LOW-confidence until on-device validation (TUNE-01 trigger-gated)
+- Missing UNIQUE index on `grounded_sources(message_id, source_index)` (delete-then-insert covers; hardening follow-up)
+- Phase 53 UI polish trio (override indicator, Fuente-heading redundancy, all-omitida visibility)
+- Nyquist: no `VALIDATION.md` in any v2.3 phase — coverage TODO (same as v2.2)
+
 ## v2.2 Simplificación + Web Grounding (Shipped: 2026-09-28)
 
 **Phases completed:** 3 phases (49-51), 5 plans, 11 tasks, 14 requirements
