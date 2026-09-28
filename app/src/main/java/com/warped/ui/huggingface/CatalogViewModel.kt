@@ -71,8 +71,10 @@ class CatalogViewModel @Inject constructor(
         )
     }
 
+    // No UI entry point after unified download look (Cancel only) — kept for re-wire
     fun pauseDownload(downloadId: String) = downloadManager.pauseDownload(downloadId)
 
+    // No UI entry point after unified download look (Cancel only) — kept for re-wire
     fun resumeDownload(downloadId: String) = downloadManager.resumeDownload(downloadId)
 
     fun cancelDownload(downloadId: String) = downloadManager.cancelDownload(downloadId)

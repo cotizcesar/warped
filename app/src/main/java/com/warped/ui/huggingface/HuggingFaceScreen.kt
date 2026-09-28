@@ -11,23 +11,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -52,8 +47,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.data.local.download.DownloadState
 import com.warped.data.repository.AllowlistedModel
+import com.warped.ui.components.ActiveDownloadContent
 import com.warped.ui.components.CapabilityIconBadge
 import com.warped.ui.components.WarpedAlertDialog
+import com.warped.ui.components.formatFileSize
 
 /**
  * Phase 49 (DEL-05): static model catalog.
@@ -115,8 +112,6 @@ fun HuggingFaceScreen(
                         downloadState = downloadStates[downloadId],
                         isOnDevice = entry.modelFile in downloadedFileNames,
                         onDownload = { viewModel.startDownload(entry) },
-                        onPause = { viewModel.pauseDownload(downloadId) },
-                        onResume = { viewModel.resumeDownload(downloadId) },
                         onCancel = { viewModel.cancelDownload(downloadId) }
                     )
                 }
@@ -139,13 +134,14 @@ fun expandedText(entry: AllowlistedModel): String? {
 }
 
 /**
- * Active-cluster title end-padding (quick plan 2026-09-28): the idle /
- * downloaded / failed icon cluster fits in 52dp, but the active download
- * cluster (24dp ring + 4dp spacer + 48dp pause/resume + 48dp cancel ≈ 124dp)
- * needs a 128dp slot so long titles ellipsize before the cluster.
- * Returns the dp value as Int; call sites apply `.dp`.
+ * Title end-padding (quick plan 2026-09-28, unified download look): the
+ * active download cluster is gone (Cancel only, rendered in the shared
+ * [ActiveDownloadContent] section below), so the title row always reserves
+ * the 52dp idle/downloaded/failed icon slot. The [active] parameter is
+ * retained for call-site stability; both states return 52.
  */
-fun titleEndPaddingDp(active: Boolean): Int = if (active) 128 else 52
+@Suppress("UNUSED_PARAMETER")
+fun titleEndPaddingDp(active: Boolean): Int = 52
 
 /**
  * Pure on-device/session downloaded rule: true when the in-session
@@ -167,8 +163,6 @@ private fun CatalogModelCard(
     downloadState: DownloadState?,
     isOnDevice: Boolean = false,
     onDownload: () -> Unit,
-    onPause: () -> Unit,
-    onResume: () -> Unit,
     onCancel: () -> Unit
 ) {
     // A "Cancelled" error is terminal-idle: the partial file is deleted and a
@@ -219,6 +213,9 @@ private fun CatalogModelCard(
             // Collapsed row 1: title + download-state icon cluster (overlay:
             // title alone defines the row height; actions float centered-end
             // on top, free to bleed symmetrically into card padding).
+            // Unified download look: the active cluster is gone — active
+            // downloads render in the shared ActiveDownloadContent section
+            // below, so the title always reserves the 52dp idle slot.
             Box(
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -232,13 +229,9 @@ private fun CatalogModelCard(
                 Box(Modifier.align(Alignment.CenterEnd)) {
                     CatalogDownloadActions(
                         downloadState = downloadState,
-                        active = active,
                         downloaded = downloaded,
                         failed = failed,
-                        onDownload = onDownload,
-                        onPause = onPause,
-                        onResume = onResume,
-                        onCancelClick = { showCancelConfirm = true }
+                        onDownload = onDownload
                     )
                 }
             }
@@ -257,10 +250,17 @@ private fun CatalogModelCard(
                     maxLines = 1
                 )
             }
-            // Active download: compact progress parity (label + bytes/total).
+            // Active download: shared linear-bar + status-line + Cancel look
+            // (identical to the Models screen DownloadCard). Cancel and
+            // Delete both go through the cancel-confirm dialog — cancelling
+            // deletes the partial file (see dialog copy).
             if (active) {
                 Spacer(Modifier.height(6.dp))
-                CatalogInlineProgress(state = downloadState!!)
+                ActiveDownloadContent(
+                    download = downloadState!!,
+                    onCancel = { showCancelConfirm = true },
+                    onDeleteIncomplete = { showCancelConfirm = true }
+                )
             }
             // Retained error text (icon form keeps the message for a11y;
             // retry = download icon tap).
@@ -303,57 +303,19 @@ private fun CatalogModelCard(
 }
 
 /**
- * Download-state icon cluster (1:1 with the pre-redesign states): idle
- * download, downloading mini-progress + pause + cancel, paused resume +
- * cancel, downloaded status, error retry. All content descriptions in Spanish.
+ * Download-state icon cluster (unified download look, quick plan
+ * 2026-09-28): downloaded status or idle download / error retry only. The
+ * active pause/resume/cancel cluster is gone — active downloads render in
+ * the shared ActiveDownloadContent section with Cancel only (D1).
  */
 @Composable
 private fun CatalogDownloadActions(
     downloadState: DownloadState?,
-    active: Boolean,
     downloaded: Boolean,
     failed: Boolean,
-    onDownload: () -> Unit,
-    onPause: () -> Unit,
-    onResume: () -> Unit,
-    onCancelClick: () -> Unit
+    onDownload: () -> Unit
 ) {
     when {
-        active -> {
-            val paused = downloadState?.isPaused == true
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (!paused) {
-                    CircularProgressIndicator(
-                        progress = { (downloadState?.progress ?: 0f).coerceIn(0f, 1f) },
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = Color(0xFF333333)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    IconButton(onClick = onPause) {
-                        Icon(
-                            imageVector = Icons.Filled.Pause,
-                            contentDescription = "Pause download"
-                        )
-                    }
-                } else {
-                    IconButton(onClick = onResume) {
-                        Icon(
-                            imageVector = Icons.Filled.PlayArrow,
-                            contentDescription = "Resume download"
-                        )
-                    }
-                }
-                Spacer(Modifier.width(8.dp))
-                IconButton(onClick = onCancelClick) {
-                    Icon(
-                        imageVector = Icons.Filled.Close,
-                        contentDescription = "Cancel download",
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                }
-            }
-        }
         downloaded -> Box(
             modifier = Modifier.size(48.dp),
             contentAlignment = Alignment.Center
@@ -410,45 +372,3 @@ private fun CatalogCapabilityIcons(entry: AllowlistedModel) {
     }
 }
 
-@Composable
-private fun CatalogInlineProgress(state: DownloadState) {
-    val progressInt = (state.progress * 100).toInt().coerceIn(0, 100)
-    Column {
-        Text(
-            text = "${if (state.isPaused) "Paused" else "Downloading"}: " +
-                "${state.fileName.substringAfterLast('/')} ($progressInt%)",
-            style = MaterialTheme.typography.bodySmall
-        )
-        Text(
-            text = "${formatFileSize(state.downloadedBytes)} / ${formatFileSize(state.totalBytes)}" +
-                if (state.isDownloading) " · ${formatDownloadSpeed(state.speedBytesPerSecond)}" else "",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        if (state.error != null && state.error != "Cancelled") {
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = state.error,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall
-            )
-        }
-    }
-}
-
-private fun formatFileSize(bytes: Long): String {
-    return when {
-        bytes >= 1024L * 1024 * 1024 -> "%.2f GB".format(bytes.toDouble() / (1024L * 1024 * 1024))
-        bytes >= 1024 * 1024 -> "%.1f MB".format(bytes.toDouble() / (1024 * 1024))
-        bytes >= 1024 -> "%.1f KB".format(bytes.toDouble() / 1024)
-        else -> "$bytes B"
-    }
-}
-
-private fun formatDownloadSpeed(bytesPerSecond: Long): String {
-    return if (bytesPerSecond > 0) {
-        "${formatFileSize(bytesPerSecond)}/s"
-    } else {
-        "--/s"
-    }
-}

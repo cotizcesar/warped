@@ -34,7 +34,9 @@ import com.warped.data.local.inference.MemoryChecker
 import com.warped.domain.model.Endpoint
 import com.warped.domain.model.LocalModel
 import com.warped.ui.endpoints.components.EndpointForm
+import com.warped.ui.components.ActiveDownloadContent
 import com.warped.ui.components.WarpedAlertDialog
+import com.warped.ui.components.formatFileSize
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -451,66 +453,11 @@ private fun DownloadCard(
         colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
         shape = RoundedCornerShape(12.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(download.fileName.substringAfterLast("/"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(4.dp))
-            if (download.isDownloading) {
-                LinearProgressIndicator(
-                    progress = { download.progress },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "${(download.progress * 100).toInt()}% · ${formatFileSize(download.downloadedBytes)} / " +
-                        "${formatFileSize(download.totalBytes)} · ${formatDownloadSpeed(download.speedBytesPerSecond)}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = onCancel) { Text("Cancel") }
-            } else if (download.isPaused) {
-                Text(
-                    "Paused · ${formatFileSize(download.downloadedBytes)} / ${formatFileSize(download.totalBytes)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFFFF9800)
-                )
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = onDeleteIncomplete) { Text("Delete") }
-                }
-            } else {
-                Text(
-                    "Interrupted · ${formatFileSize(download.downloadedBytes)} downloaded",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
-                )
-                if (download.error != null) {
-                    Text(
-                        download.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = onDeleteIncomplete) { Text("Delete partial file") }
-            }
-        }
-    }
-}
-
-private fun formatFileSize(bytes: Long): String {
-    return when {
-        bytes >= 1024L * 1024 * 1024 -> "%.2f GB".format(bytes.toDouble() / (1024L * 1024 * 1024))
-        bytes >= 1024 * 1024 -> "%.1f MB".format(bytes.toDouble() / (1024 * 1024))
-        bytes >= 1024 -> "%.1f KB".format(bytes.toDouble() / 1024)
-        else -> "$bytes B"
-    }
-}
-
-private fun formatDownloadSpeed(bytesPerSecond: Long): String {
-    return if (bytesPerSecond > 0) {
-        "${formatFileSize(bytesPerSecond)}/s"
-    } else {
-        "--/s"
+        ActiveDownloadContent(
+            download = download,
+            onCancel = onCancel,
+            onDeleteIncomplete = onDeleteIncomplete
+        )
     }
 }
 
