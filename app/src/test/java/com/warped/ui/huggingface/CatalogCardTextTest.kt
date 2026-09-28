@@ -54,7 +54,7 @@ class CatalogCardTextTest {
     }
 
     @Test
-    fun `title end padding reserves the active cluster`() {
-        assertThat(titleEndPaddingDp(true)).isEqualTo(128)
+    fun `title end padding stays narrow when active (unified look, no wide cluster)`() {
+        assertThat(titleEndPaddingDp(true)).isEqualTo(52)
     }
 }
