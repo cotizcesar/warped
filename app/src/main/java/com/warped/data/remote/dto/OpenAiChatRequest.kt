@@ -50,8 +50,14 @@ data class OpenAiJsonSchema(
 
 @Serializable
 data class OpenAiMessage(
+    /**
+     * WR-07: nullable so a pure tool round re-POSTs `content:null`
+     * alongside `tool_calls` (the OpenAI spec shape) instead of forcing
+     * `"content":""`, which strict OpenAI-compatible servers reject.
+     * Existing `OpenAiMessage(role, content)` call sites are unaffected.
+     */
     val role: String,
-    val content: String,
+    val content: String? = null,
     /**
      * 47-03 (D-04, RESEARCH Pattern 3): completions tool-loop fields.
      * Both nullable + defaulted so existing positional/named call sites

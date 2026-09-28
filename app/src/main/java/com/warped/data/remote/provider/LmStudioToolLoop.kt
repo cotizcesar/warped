@@ -211,7 +211,9 @@ class LmStudioToolLoop(
                 )
                 toolMessages += OpenAiMessage(role = "tool", content = replyText, toolCallId = call.id)
             }
-            messages += OpenAiMessage(role = "assistant", content = outcome.roundText, toolCalls = echo)
+            // WR-07: pure tool rounds carry no text — re-POST content:null
+            // (spec shape) rather than "" so strict servers accept the echo.
+            messages += OpenAiMessage(role = "assistant", content = outcome.roundText.ifEmpty { null }, toolCalls = echo)
             messages += toolMessages
             // Loop continues → re-POST with the appended tool context.
         }
