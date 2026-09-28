@@ -331,8 +331,6 @@ fun ChatScreen(
                 modelHasAudio = connection.localModels.firstOrNull { it.filePath == connection.selectedLocalModelId }?.capabilities?.audio == true,
                 onAudioRecorded = { bytes -> audioBytes = bytes },
                 onAudioRecordingChanged = { isRecording = it },
-                skipWebOnce = input.skipWebOnce,
-                onToggleSkipWeb = { viewModel.toggleSkipWebOnce() },
             )
             }
         }

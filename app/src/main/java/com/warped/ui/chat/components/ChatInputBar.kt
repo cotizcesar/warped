@@ -50,11 +50,6 @@ fun ChatInputBar(
     modelHasAudio: Boolean = false,
     onAudioRecorded: ((ByteArray) -> Unit)? = null,
     onAudioRecordingChanged: ((Boolean) -> Unit)? = null,
-    // Phase 53 (TOGGLE-03): one-shot "Sin web" composer chip. Active state
-    // uses the primary accent (same idiom as the thinking chip); inactive
-    // uses default chip colors. Resets after every send (ViewModel-owned).
-    skipWebOnce: Boolean = false,
-    onToggleSkipWeb: () -> Unit = {},
 ) {
     Surface(
         color = Color(0xFF2B2B29),
@@ -167,25 +162,6 @@ fun ChatInputBar(
                             stringResource(R.string.thinking),
                             color = if (!canThink) Color.White.copy(alpha = 0.25f)
                                 else if (reasoningEnabled) Color.White
-                                else Color.White.copy(alpha = 0.6f),
-                            fontSize = MaterialTheme.typography.labelSmall.fontSize
-                        )
-                    }
-                    // Phase 53 (TOGGLE-03): one-off "Sin web" chip — skips
-                    // grounding for this send only, never changes the toggle.
-                    Spacer(Modifier.width(8.dp))
-                    Button(
-                        onClick = onToggleSkipWeb,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (skipWebOnce) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent
-                        ),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                        shape = MaterialTheme.shapes.small,
-                        modifier = Modifier.height(28.dp)
-                    ) {
-                        Text(
-                            "Sin web",
-                            color = if (skipWebOnce) Color.White
                                 else Color.White.copy(alpha = 0.6f),
                             fontSize = MaterialTheme.typography.labelSmall.fontSize
                         )

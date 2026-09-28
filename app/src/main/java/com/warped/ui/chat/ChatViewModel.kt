@@ -281,14 +281,6 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Phase 53 (TOGGLE-03): flip the one-shot composer "Sin web" chip.
-     * Consumed once at the next send; never touches the toggle.
-     */
-    fun toggleSkipWebOnce() {
-        updateInput { it.copy(skipWebOnce = !it.skipWebOnce) }
-    }
-
-    /**
      * Phase 53 (TOGGLE-01): tri-state per-chat override write. Applies to the
      * next send only — history is never refetched. Before the first send
      * (no conversation row yet) the value is held as [pendingWebOverride]
@@ -337,12 +329,8 @@ class ChatViewModel @Inject constructor(
 
         val imageDataUrls = images.mapNotNull { uriToBase64(it) }
         val userMessage = ChatMessage(role = Role.USER, content = text.trim(), imageUris = imageDataUrls)
-        // Phase 53 (TOGGLE-03): consume the one-shot Sin web flag synchronously
-        // at send start and reset it immediately — every send consumes it
-        // regardless of outcome, and the turn closure below sees a stable value.
-        val skipWebOnce = _input.value.skipWebOnce
         updateTranscript { it.copy(messages = it.messages + userMessage, isStreaming = true) }
-        updateInput { it.copy(inputText = "", isGenerating = true, skipWebOnce = false) }
+        updateInput { it.copy(inputText = "", isGenerating = true) }
 
         // CR-02: cancel any in-flight turn before starting a new one — otherwise
         // two collectors interleave tokens into one bubble and activeHelper is
@@ -378,12 +366,12 @@ class ChatViewModel @Inject constructor(
                 var groundedSourceDetails: List<GroundedSource> = emptyList()
                 var modelOnlyNotice: ModelOnlyNotice? = null
                 var modelOnlySourceCount: Int = 1
-                // Phase 53 (TOGGLE-02/threat T-53-05): single precedence
-                // decision at the top of the hook — one-off Sin web first,
-                // then the per-chat override read ONCE for this send (never a
-                // hot Flow: avoids mid-turn flips and recomposition storms),
-                // then the global default-ON. False skips fetch entirely with
-                // the existing v2.2 model-only behavior unchanged.
+                // Grounding precedence (threat T-53-05): single decision
+                // at the top of the hook — the per-chat override read ONCE
+                // for this send (never a hot Flow: avoids mid-turn flips and
+                // recomposition storms), then the global default-ON. False
+                // skips grounding entirely with the model-only behavior
+                // unchanged.
                 val perChatOverride = try {
                     chatRepository.getWebOverride(conversationId)
                 } catch (e: Exception) {
@@ -391,7 +379,6 @@ class ChatViewModel @Inject constructor(
                     null
                 }
                 val doGround = GroundingPrecedence.shouldGround(
-                    skipOnce = skipWebOnce,
                     perChat = perChatOverride,
                     global = webGroundingEnabled,
                 )
