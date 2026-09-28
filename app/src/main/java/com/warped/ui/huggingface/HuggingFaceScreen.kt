@@ -329,7 +329,7 @@ private fun CatalogDownloadActions(
                         color = MaterialTheme.colorScheme.primary,
                         trackColor = Color(0xFF333333)
                     )
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(8.dp))
                     IconButton(onClick = onPause) {
                         Icon(
                             imageVector = Icons.Filled.Pause,
@@ -344,6 +344,7 @@ private fun CatalogDownloadActions(
                         )
                     }
                 }
+                Spacer(Modifier.width(8.dp))
                 IconButton(onClick = onCancelClick) {
                     Icon(
                         imageVector = Icons.Filled.Close,
