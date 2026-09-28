@@ -935,9 +935,20 @@ class ChatViewModel @Inject constructor(
      * 41-02: Decide whether the active model supports thinking.
      * Local model id has priority; falls back to the remote model id.
      * Returns false when no model is selected.
+     *
+     * 48 (WR-03): capability check, not a presence check — consults the
+     * local model's reasoning capability. Fail-open while the model list
+     * has not loaded yet (unknown ≠ unsupported). Remote models have no
+     * capability data source yet, so presence still gates there.
      */
-    private fun supportsThinkingFor(localId: String?, remoteId: String?): Boolean =
-        localId != null || remoteId != null
+    private fun supportsThinkingFor(localId: String?, remoteId: String?): Boolean {
+        if (localId != null) {
+            val models = _connection.value.localModels
+            if (models.isEmpty()) return true
+            return models.firstOrNull { it.filePath == localId }?.capabilities?.reasoning == true
+        }
+        return remoteId != null
+    }
 
     /**
      * 41-02: Flip the "Thinking" toggle and persist via DataStore. The actual UI
