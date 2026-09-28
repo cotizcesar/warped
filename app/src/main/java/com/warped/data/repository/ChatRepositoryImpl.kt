@@ -126,6 +126,6 @@ class ChatRepositoryImpl @Inject constructor(
         conversationDao.getWebOverride(conversationId)
 
     override suspend fun setWebOverride(conversationId: Long, override: Boolean?) {
-        conversationDao.setWebOverride(conversationId, override, System.currentTimeMillis())
+        conversationDao.setWebOverride(conversationId, override)
     }
 }

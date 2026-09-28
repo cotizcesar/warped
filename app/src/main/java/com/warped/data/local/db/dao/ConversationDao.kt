@@ -26,11 +26,14 @@ interface ConversationDao {
 
     // Phase 53 (TOGGLE-01): tri-state override read/write. Room maps nullable
     // INTEGER to Boolean? natively (null/0/1); the migration test proves it.
+    // WR-02: the override is a preference, not recency — never bump
+    // updated_at here (observeAll orders by updated_at DESC; a toggle on an
+    // old conversation must not teleport it to the top of the list).
     @Query("SELECT web_override FROM conversations WHERE id = :id")
     suspend fun getWebOverride(id: Long): Boolean?
 
-    @Query("UPDATE conversations SET web_override = :override, updated_at = :ts WHERE id = :id")
-    suspend fun setWebOverride(id: Long, override: Boolean?, ts: Long)
+    @Query("UPDATE conversations SET web_override = :override WHERE id = :id")
+    suspend fun setWebOverride(id: Long, override: Boolean?)
 
     @Query("DELETE FROM conversations")
     suspend fun deleteAll()
