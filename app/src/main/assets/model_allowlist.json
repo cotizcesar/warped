@@ -52,8 +52,8 @@
       "name": "gemma-3n-E2B-it-int4",
       "displayName": "Gemma 3n E2B IT (int4)",
       "repo": "warped-community/gemma-3n-E2B-it-litert-lm",
-      "modelFile": "gemma-3n-E2B-it-int4.task",
-      "sizeInBytes": 3136226711,
+      "modelFile": "gemma-3n-E2B-it-int4.litertlm",
+      "sizeInBytes": 3655827456,
       "capabilities": {
         "text": true,
         "vision": true,
@@ -73,8 +73,8 @@
       "name": "gemma-3n-E4B-it-int4",
       "displayName": "Gemma 3n E4B IT (int4)",
       "repo": "warped-community/gemma-3n-E4B-it-litert-lm",
-      "modelFile": "gemma-3n-E4B-it-int4.task",
-      "sizeInBytes": 4405655031,
+      "modelFile": "gemma-3n-E4B-it-int4.litertlm",
+      "sizeInBytes": 4919541760,
       "capabilities": {
         "text": true,
         "vision": true,
