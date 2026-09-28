@@ -235,14 +235,29 @@ fun ChatScreen(
                 // transcript message, never persisted. Unmounts on
                 // completion/failure/Stop; the existing Stop covers cancel
                 // (isGenerating stays true during fetch).
+                // Phase 52 (FETCH-03): N-source copy derives from
+                // webFetchProgress — "Leyendo N de M…" during fan-out,
+                // legacy "Leyendo página…" for the single-URL case.
                 if (input.isFetchingWeb) {
+                    val progress = input.webFetchProgress
+                    val isMulti = progress != null && progress.total > 1
+                    val chipText = if (isMulti) {
+                        "Leyendo ${progress.done} de ${progress.total}…"
+                    } else {
+                        "Leyendo página…"
+                    }
+                    val chipDescription = if (isMulti) {
+                        "Leyendo ${progress.done} de ${progress.total} páginas. " +
+                            "Pulsa Detener para cancelar la lectura."
+                    } else {
+                        "Leyendo página. Pulsa Detener para cancelar la lectura."
+                    }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp)
                             .semantics {
-                                contentDescription =
-                                    "Leyendo página. Pulsa Detener para cancelar la lectura."
+                                contentDescription = chipDescription
                             },
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -253,7 +268,7 @@ fun ChatScreen(
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = "Leyendo página…",
+                            text = chipText,
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )

@@ -92,7 +92,7 @@ fun MessageBubble(
         // text, never error text as context. 4dp above the qualified
         // assistant message; grounded answers render no banner.
         if (!isUser && message.modelOnlyNotice != null) {
-            ModelOnlyBanner(notice = message.modelOnlyNotice)
+            ModelOnlyBanner(notice = message.modelOnlyNotice, totalSources = message.modelOnlySourceCount)
             Spacer(Modifier.height(4.dp))
         }
         Surface(
@@ -238,9 +238,14 @@ fun MessageBubble(
  * Phase 50 (WEB-06): model-only notice banner. UI-rendered from ephemeral
  * state (never model-generated, never a Snackbar, not dismissible) — scrolls
  * with its message inside MessageBubble.
+ *
+ * Phase 52 (FETCH-02): renders ONLY on all-fail (the ViewModel never sets
+ * a notice on partial grounding). The fetch-failure copy pluralizes when
+ * M > 1 attempted URLs died; OFFLINE copy is unchanged (worst-case
+ * collapse already resolved upstream).
  */
 @Composable
-private fun ModelOnlyBanner(notice: ModelOnlyNotice) {
+private fun ModelOnlyBanner(notice: ModelOnlyNotice, totalSources: Int = 1) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
             imageVector = Icons.Filled.Info,
@@ -254,7 +259,13 @@ private fun ModelOnlyBanner(notice: ModelOnlyNotice) {
                 ModelOnlyNotice.OFFLINE ->
                     "Sin conexión. Respuesta solo del modelo, sin contenido de la página."
                 ModelOnlyNotice.FETCH_FAILED ->
-                    "No se pudo leer la página. Respuesta solo del modelo — revisa tu conexión o pega otro enlace."
+                    if (totalSources > 1) {
+                        "No se pudieron leer las páginas. Respuesta solo del modelo — " +
+                            "revisa tu conexión o pega otros enlaces."
+                    } else {
+                        "No se pudo leer la página. Respuesta solo del modelo — " +
+                            "revisa tu conexión o pega otro enlace."
+                    }
             },
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
