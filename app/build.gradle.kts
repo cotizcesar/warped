@@ -83,6 +83,13 @@ android {
             useLegacyPackaging = false
         }
     }
+
+    // Phase 53: expose Room exported schemas (app/schemas/<db-fqn>/*.json) as
+    // androidTest assets so MigrationTestHelper.runMigrationsAndValidate can
+    // resolve them on-device. assembleDebug regenerates 15.json before the test.
+    sourceSets {
+        getByName("androidTest").assets.srcDirs(files("$projectDir/schemas"))
+    }
 }
 
 kotlin {
