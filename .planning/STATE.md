@@ -5,16 +5,16 @@ milestone_name: Simplificación + Web Grounding (In Progress)
 current_phase: 49
 current_phase_name: Surface Removal
 status: executing
-stopped_at: Phase 49 UI-SPEC approved
-last_updated: "2026-09-28T13:06:27.712Z"
+stopped_at: Phase 50 UI-SPEC approved
+last_updated: "2026-09-28T13:44:01.613Z"
 last_activity: 2026-09-28
 last_activity_desc: v2.2 roadmap created (Phases 49–51)
-state_head: 6274243dd4278995d46d513ce5a03c3f0764230e
+state_head: 179d669c022c85dc6d401cb4122492f35ebc0cd1
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 2
-  completed_plans: 0
+  completed_plans: 2
   percent: 0
 ---
 
@@ -32,19 +32,19 @@ See: .planning/PROJECT.md (updated 2026-09-28 after v2.2 milestone start)
 
 ## Current Position
 
-Phase: 50 of 51 (Web Grounding — ready to plan)
+Phase: 51 of 51 (Syntax-Theme Fix — ready to plan)
 Plan: —
 Status: Ready to plan
-Last activity: 2026-09-28 — Phase 49 complete (automated gates pass, device smoke deferred to release UAT)
+Last activity: 2026-09-28 — Phase 50 complete (automated gates pass, device smoke deferred to release UAT)
 
-Progress: [███░░░░░░░] 33%
+Progress: [██████░░░░] 66%
 
 ## Phase Structure (v2.2)
 
 | Phase | Name | Requirements | Status | Depends On |
 |-------|------|--------------|--------|------------|
-| 49 | Surface Removal | DEL-01..06 (6) | Not started | Phase 48 |
-| 50 | Web Grounding | WEB-01..06 (6) | Not started | Phase 49 |
+| 49 | Surface Removal | DEL-01..06 (6) | Complete (smoke deferred) | Phase 48 |
+| 50 | Web Grounding | WEB-01..06 (6) | Complete (smoke deferred) | Phase 49 |
 | 51 | Syntax-Theme Fix | THEME-01..02 (2) | Not started | Phase 50 |
 
 **Total v2.2:** 3 phases, 14 requirements, 14/14 mapped ✓
@@ -87,11 +87,12 @@ None yet.
 | Phase | State | Resume |
 |-------|-------|--------|
 | 49 | verification_deferred_gaps | /gsd-plan-phase 49 --gaps |
+| 50 | verification_deferred_gaps | /gsd-plan-phase 50 --gaps |
 
 ## Session Continuity
 
-**Resume file:** .planning/phases/49-surface-removal/49-UI-SPEC.md
+**Resume file:** .planning/phases/50-web-grounding/50-UI-SPEC.md
 
-Last session: 2026-09-28T13:03:01.004Z
-Stopped at: Phase 49 UI-SPEC approved
+Last session: 2026-09-28T13:44:01.584Z
+Stopped at: Phase 50 UI-SPEC approved
 Resume: `/gsd-plan-phase 49`
