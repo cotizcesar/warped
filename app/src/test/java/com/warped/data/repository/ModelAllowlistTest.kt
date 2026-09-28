@@ -54,6 +54,36 @@ class ModelAllowlistTest {
     }
 
     @Test
+    fun `shipped asset ramNote and blurb match locked Spanish strings`() {
+        val models = parseModelAllowlist(shippedAssetText())
+        val byName = models.associateBy { it.name }
+
+        assertThat(byName["gemma-4-E2B-it"]?.ramNote).isEqualTo("Desde ~4 GB de RAM")
+        assertThat(byName["gemma-4-E2B-it"]?.blurb).isEqualTo("Chat general y multimodal ligero.")
+        assertThat(byName["gemma-4-E4B-it"]?.ramNote).isEqualTo("Recomendado 6 GB o más")
+        assertThat(byName["gemma-4-E4B-it"]?.blurb)
+            .isEqualTo("Más calidad en razonamiento y código, multimodal.")
+        assertThat(byName["gemma-3n-E2B-it-int4"]?.ramNote)
+            .isEqualTo("Desde ~6 GB de RAM (aprox.)")
+        assertThat(byName["gemma-3n-E2B-it-int4"]?.blurb)
+            .isEqualTo("Chat con visión y audio eficiente.")
+        assertThat(byName["gemma-3n-E4B-it-int4"]?.ramNote)
+            .isEqualTo("Recomendado 8 GB o más (aprox.)")
+        assertThat(byName["gemma-3n-E4B-it-int4"]?.blurb).isEqualTo("Mayor calidad multimodal.")
+    }
+
+    @Test
+    fun `missing ramNote and blurb parse to nulls without exception`() {
+        val raw = """{"models": [{"name": "x", "displayName": "X", "modelFile": "x.task",
+            "sizeInBytes": 1, "capabilities": {}}]}"""
+        val models = parseModelAllowlist(raw)
+
+        assertThat(models).hasSize(1)
+        assertThat(models[0].ramNote).isNull()
+        assertThat(models[0].blurb).isNull()
+    }
+
+    @Test
     fun `shipped entries carry explicit repo slugs`() {
         val models = parseModelAllowlist(shippedAssetText())
 

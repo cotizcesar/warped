@@ -3,7 +3,7 @@
     "engine": "litertlm-android",
     "engineVersion": "0.17.1",
     "verifiedOn": "2026-09-28",
-    "note": "Capability flags reflect ONLY features verified against 0.17.x on Android (45-02 LRT-09, D-allowlist). Unverified 0.17.0 features (MTP, extended context) and per-model function-calling are explicitly false until device-verified. gemma-4-E2B-it and gemma-4-E4B-it vision/audio/thinking are docs-verified from Google official Gemma 4 docs (2026-09-28); device confirmation pending — user validates on hardware. E4B file size verified via Hugging Face CDN HEAD on 2026-09-28."
+    "note": "Capability flags reflect ONLY features verified against 0.17.x on Android (45-02 LRT-09, D-allowlist). Unverified 0.17.0 features (MTP, extended context) and per-model function-calling are explicitly false until device-verified. gemma-4-E2B-it and gemma-4-E4B-it vision/audio/thinking are docs-verified from Google official Gemma 4 docs (2026-09-28); device confirmation pending — user validates on hardware. E4B file size verified via Hugging Face CDN HEAD on 2026-09-28. Mobile footprint basis: E2B 1.1GB / E4B 2.5GB Google-published mobile numbers; 3n numbers are conservative approximations (no published mobile footprint) — marked (aprox.)."
   },
   "models": [
     {
@@ -23,7 +23,9 @@
         "mtpSupport": false
       },
       "llmPromptTemplates": {},
-      "taskTypes": ["chat"]
+      "taskTypes": ["chat"],
+      "ramNote": "Desde ~4 GB de RAM",
+      "blurb": "Chat general y multimodal ligero."
     },
     {
       "name": "gemma-3n-E2B-it-int4",
@@ -42,7 +44,9 @@
         "mtpSupport": false
       },
       "llmPromptTemplates": {},
-      "taskTypes": ["chat"]
+      "taskTypes": ["chat"],
+      "ramNote": "Desde ~6 GB de RAM (aprox.)",
+      "blurb": "Chat con visión y audio eficiente."
     },
     {
       "name": "gemma-3n-E4B-it-int4",
@@ -61,7 +65,9 @@
         "mtpSupport": false
       },
       "llmPromptTemplates": {},
-      "taskTypes": ["chat"]
+      "taskTypes": ["chat"],
+      "ramNote": "Recomendado 8 GB o más (aprox.)",
+      "blurb": "Mayor calidad multimodal."
     },
     {
       "name": "gemma-4-E4B-it",
@@ -80,7 +86,9 @@
         "mtpSupport": false
       },
       "llmPromptTemplates": {},
-      "taskTypes": ["chat"]
+      "taskTypes": ["chat"],
+      "ramNote": "Recomendado 6 GB o más",
+      "blurb": "Más calidad en razonamiento y código, multimodal."
     }
   ]
 }

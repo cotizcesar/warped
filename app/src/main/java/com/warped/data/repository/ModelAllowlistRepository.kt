@@ -65,7 +65,17 @@ data class AllowlistedModel(
      * `warped-community/${name}` slug applies. The `name` is a
      * short-stable display/lookup key — never the URL source.
      */
-    val repo: String? = null
+    val repo: String? = null,
+    /**
+     * Optional Spanish RAM guidance + short purpose blurb for the catalog card
+     * expanded view (quick plan 2026-09-28).
+     *
+     * Back-compat: absent or blank → null → expanded section hidden (no
+     * expand affordance, no crash). Never invent RAM guidance for entries
+     * lacking these fields.
+     */
+    val ramNote: String? = null,
+    val blurb: String? = null
 ) {
     /**
      * Effective repo slug for download URL construction.
