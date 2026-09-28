@@ -20,8 +20,11 @@ import javax.inject.Inject
  * auth, no gated-model filtering. Downloads go direct (no Authorization
  * header) through [ModelDownloadManager]/[ModelDownloadWorker].
  *
- * All models ship under the `warped-community` Hugging Face org; the
- * allowlist `name` is the repo slug within it.
+ * All models ship under the `warped-community` Hugging Face org; each
+ * allowlist entry carries its explicit `repo` slug (full org/repo path).
+ * Download URLs and IDs derive from `entry.repoSlug` — the legacy
+ * `warped-community/${name}` slug applies only when `repo` is absent
+ * (see [AllowlistedModel.repoSlug]).
  */
 @HiltViewModel
 class CatalogViewModel @Inject constructor(
@@ -40,7 +43,7 @@ class CatalogViewModel @Inject constructor(
         )
 
     fun downloadId(entry: AllowlistedModel): String =
-        "$REPO_PREFIX/${entry.name}/${entry.modelFile}"
+        "${entry.repoSlug}/${entry.modelFile}"
 
     fun startDownload(entry: AllowlistedModel) {
         val encodedFile = entry.modelFile.split("/").joinToString("/") {
@@ -49,7 +52,7 @@ class CatalogViewModel @Inject constructor(
         downloadManager.startDownload(
             modelId = downloadId(entry),
             fileName = entry.modelFile,
-            fileUrl = "https://huggingface.co/$REPO_PREFIX/${entry.name}/resolve/main/$encodedFile",
+            fileUrl = "https://huggingface.co/${entry.repoSlug}/resolve/main/$encodedFile",
             fileSizeBytes = entry.sizeInBytes,
             isGated = false,
         )
@@ -60,8 +63,4 @@ class CatalogViewModel @Inject constructor(
     fun resumeDownload(downloadId: String) = downloadManager.resumeDownload(downloadId)
 
     fun cancelDownload(downloadId: String) = downloadManager.cancelDownload(downloadId)
-
-    private companion object {
-        const val REPO_PREFIX = "warped-community"
-    }
 }
