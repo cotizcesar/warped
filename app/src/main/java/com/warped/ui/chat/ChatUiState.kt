@@ -65,6 +65,11 @@ data class ChatInputState(
     // because completions land out of order under parallel fan-out and
     // OMITIDA is only knowable at the terminal pass.
     val webFetchProgress: WebFetchProgress? = null,
+    // Phase 54 (RETRY-01): validated-connectivity flag gating the Reintentar
+    // affordance. Refreshed on init/resume, after each send, and after each
+    // retry — never a live observer (no auto-retry by lock). Default false;
+    // init calls refreshConnectivity() for the real value.
+    val isValidatedOnline: Boolean = false,
 )
 
 /**
@@ -178,6 +183,7 @@ data class ChatUiState(
     val generationParameters: GenerationParameters = GenerationParameters(),
     val isFetchingWeb: Boolean = false,
     val webFetchProgress: WebFetchProgress? = null,
+    val isValidatedOnline: Boolean = false,
     val isLoadingModel: Boolean = false,
     val loadingModelName: String = "",
     val modelLoadError: String? = null,
@@ -226,6 +232,7 @@ fun combineSnapshot(
     isStreaming = transcript.isStreaming,
     isFetchingWeb = input.isFetchingWeb,
     webFetchProgress = input.webFetchProgress,
+    isValidatedOnline = input.isValidatedOnline,
     generationParameters = connection.generationParameters,
     isLoadingModel = connection.isLoadingModel,
     loadingModelName = connection.loadingModelName,

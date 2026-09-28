@@ -92,6 +92,15 @@ class ChatViewModel @Inject constructor(
     private var generationJob: Job? = null
 
     /**
+     * Phase 54 (RETRY-01): foreground retry scope, sibling to
+     * [generationJob]. A second tap while a retry is in flight is a no-op
+     * (guarded on `isFetchingWeb`); cancelled on new send (same pre-cancel
+     * position as [generationJob]) and in [stopGeneration]. Stop-during-retry
+     * leaves the transcript untouched — the queued OFFLINE banner survives.
+     */
+    private var retryJob: Job? = null
+
+    /**
      * 46-01 RUNTIME-13/14: the helper serving the current turn, retained at
      * provider-resolution time so [stopGeneration] can reach `stopResponse()`
      * (transport-level halt). Nulled on stop and on turn completion (sequence-guarded
@@ -245,6 +254,26 @@ class ChatViewModel @Inject constructor(
                 updateConnection { it.copy(webGroundingEnabled = enabled) }
             }
         }
+        // Phase 54 (RETRY-01): seed the validated-online flag from the same
+        // NET_CAPABILITY_VALIDATED gate the fetcher uses.
+        refreshConnectivity()
+    }
+
+    /**
+     * Phase 54 (RETRY-01): re-read the fetcher's validated-connectivity gate
+     * into input state. Called on init, after each send completes, and after
+     * each retry completes/fails — never a live observer (reconnect alone
+     * must NOT fetch, per the no-auto-retry lock). Best-effort: a gate
+     * failure reads as offline, never a crash.
+     */
+    fun refreshConnectivity() {
+        val online = try {
+            fetcher.hasValidatedInternet()
+        } catch (e: Exception) {
+            Timber.w(e, "Chat: connectivity check failed, treating as offline")
+            false
+        }
+        updateInput { it.copy(isValidatedOnline = online) }
     }
 
     /**
@@ -322,6 +351,11 @@ class ChatViewModel @Inject constructor(
         }
         generationJob = null
         activeHelper = null
+        // Phase 54 (RETRY-01): a new send supersedes any in-flight retry —
+        // same pre-cancel position as generationJob so a retry can never
+        // write rows for a turn the new send is replacing.
+        retryJob?.cancel()
+        retryJob = null
         // WR-04: atomic increment — @Volatile ++ is a non-atomic read-modify-write.
         val turnId = generationSeq.incrementAndGet()
         generationJob = viewModelScope.launch(coroutineExceptionHandler) {
@@ -674,6 +708,115 @@ class ChatViewModel @Inject constructor(
                 // 46-01: clear the serving helper on turn end — but only if no newer
                 // turn has started since (stale-finally guard via turnId/seq).
                 if (turnId == generationSeq.get()) activeHelper = null
+                // Phase 54 (RETRY-01): the send may have crossed a
+                // connectivity transition — refresh the Reintentar gate.
+                refreshConnectivity()
+            }
+        }
+    }
+
+    /**
+     * Phase 54 (RETRY-01): message-scoped foreground retry for
+     * OFFLINE-grounded turns. Sources-only attach on success: refetch via the
+     * same [MultiUrlFetcher.fetchAll] entry point, persist rows via
+     * [ChatRepository.replaceSources] (never a re-save), clear the notice and
+     * render Fuentes — assistant text byte-identical, no
+     * [GroundingPrompt.augment], no inference call. AllFailed leaves the
+     * transcript untouched (banner + retry intact). Guards (threats T-54-02/
+     * T-54-04): OFFLINE-only eligibility re-checked on data (not UI
+     * visibility); taps while a fetch is in flight are no-ops; validated
+     * connectivity re-checked synchronously (stale flag → hide, no fetch).
+     */
+    fun retryGrounding(assistantMessageId: String) {
+        if (_input.value.isFetchingWeb) return
+        if (!fetcher.hasValidatedInternet()) {
+            refreshConnectivity()
+            return
+        }
+        retryJob?.cancel()
+        retryJob = viewModelScope.launch(coroutineExceptionHandler) {
+            val msgs = _transcript.value.messages
+            val idx = msgs.indexOfFirst {
+                it.id == assistantMessageId && it.modelOnlyNotice == ModelOnlyNotice.OFFLINE
+            }
+            // OFFLINE-only gate on data: stale taps on FETCH_FAILED turns
+            // (or unknown ids) return without fetching.
+            if (idx <= 0) return@launch
+            val conversationId = _transcript.value.conversationId ?: return@launch
+            // OFFLINE turns persist zero source rows, so re-derive the
+            // turn's original URLs from the nearest preceding USER message
+            // (persisted content survives restarts; ephemeral groundedUrls
+            // are long gone).
+            val userContent = msgs.take(idx).lastOrNull { it.role == Role.USER }?.content
+                ?: return@launch
+            val urls = UrlDetector.allUrls(userContent)
+            if (urls.isEmpty()) return@launch
+            updateInput {
+                it.copy(
+                    isFetchingWeb = true,
+                    webFetchProgress = WebFetchProgress(
+                        done = 0,
+                        total = urls.size,
+                        perSource = urls.map { url ->
+                            SourceFetchState(url, PerSourceStatus.LOADING)
+                        },
+                    ),
+                )
+            }
+            try {
+                val contextSize = _connection.value.generationParameters.contextSize
+                when (
+                    val result = multiUrlFetcher.fetchAll(
+                        urls = urls,
+                        contextSize = contextSize,
+                        onProgress = { done, total ->
+                            updateInput { s ->
+                                s.copy(
+                                    webFetchProgress = s.webFetchProgress?.copy(
+                                        done = done,
+                                        total = total,
+                                    ),
+                                )
+                            }
+                        },
+                    )
+                ) {
+                    is MultiUrlResult.Fused -> {
+                        val details = if (result.details.isNotEmpty()) {
+                            result.details
+                        } else {
+                            buildSourceDetails(urls, result)
+                        }
+                        try {
+                            chatRepository.replaceSources(
+                                conversationId,
+                                msgs[idx].createdAt,
+                                details,
+                            )
+                        } catch (e: Exception) {
+                            Timber.e(e, "Chat: retry failed to persist sources")
+                        }
+                        updateTranscript { s ->
+                            s.copy(
+                                messages = s.messages.mapIndexed { i, m ->
+                                    if (i == idx) {
+                                        m.copy(
+                                            modelOnlyNotice = null,
+                                            groundedSources = result.okUrls,
+                                            groundedSourceDetails = details,
+                                        )
+                                    } else {
+                                        m
+                                    }
+                                },
+                            )
+                        }
+                    }
+                    is MultiUrlResult.AllFailed -> Unit
+                }
+            } finally {
+                updateInput { it.copy(isFetchingWeb = false, webFetchProgress = null) }
+                refreshConnectivity()
             }
         }
     }
@@ -700,6 +843,11 @@ class ChatViewModel @Inject constructor(
         }
         generationJob?.cancel()
         generationJob = null
+        // Phase 54 (RETRY-01): Stop during retry returns to the queued
+        // state — cancel the retry scope; the transcript is untouched so the
+        // OFFLINE banner + Reintentar survive with zero extra work.
+        retryJob?.cancel()
+        retryJob = null
         updateTranscript { it.copy(
             isStreaming = false,
             streamingContent = "",
