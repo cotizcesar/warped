@@ -18,9 +18,17 @@ import javax.inject.Singleton
  *
  * Verified-only rule (D-allowlist, T-45-06): a flag is true ONLY if the feature was
  * actually verified against 0.17.x on Android. Engine-surface verification (AAR bytecode
- * + app code paths) covers text/vision/audio + speculative decoding; per-model thinking,
+ * + app code paths) covers text/vision/audio + speculative decoding; per-model
  * function calling, MTP, and extended context stay false until device-verified (tool
  * wiring itself belongs to Phase 47).
+ *
+ * gemma-4-E2B-it exception (2026-09-28): vision/audio/supportsThinking are
+ * docs-verified from the Google official Gemma 4 model card + LiteRT-LM docs
+ * (device confirmation pending — user validates on hardware). Function-calling
+ * stays false: tool execution was removed in v2.2 Phase 49 DEL-01, so a Tools
+ * badge would promise a missing feature. supportsThinking=true enables the
+ * toggle + badge + think-tag parse/display only — ThinkingConfig engine
+ * wiring is a recorded tech-debt follow-up.
  */
 @Serializable
 data class AllowlistCapabilities(
@@ -120,9 +128,9 @@ class ModelAllowlistRepository @Inject constructor(
      * then by display name.
      *
      * Thinking is allowlist opt-in: only models with verified thought output
-     * show the Thinking badge (device-proven 2026-09-28 that untagged models
-     * like gemma-4-E2B-it never emit thinking). Other flags fall back to the
-     * model's stored capabilities when unlisted.
+     * show the Thinking badge. gemma-4-E2B-it is docs-verified (Google official
+     * Gemma 4 docs, 2026-09-28; device confirmation pending). Other flags fall
+     * back to the model's stored capabilities when unlisted.
      */
     fun effectiveCapabilities(model: com.warped.domain.model.LocalModel): com.warped.domain.model.ModelCapabilities {
         val fileName = model.filePath.substringAfterLast("/")

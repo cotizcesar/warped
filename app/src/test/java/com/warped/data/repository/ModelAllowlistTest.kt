@@ -12,8 +12,10 @@ import java.io.ByteArrayInputStream
  * 45-02 LRT-09: allowlist asset + repository verification.
  *
  * The shipped asset is parsed directly (not a copy) so this test guards the file
- * RUNTIME-05 requires to ship. Verified-only rule: MTP / extended-context / thinking /
+ * RUNTIME-05 requires to ship. Verified-only rule: MTP / extended-context /
  * function-calling must stay false until device-verified on 0.17.x.
+ * gemma-4-E2B-it vision/audio/thinking are docs-verified (Google official
+ * Gemma 4 docs 2026-09-28, device confirmation pending).
  */
 class ModelAllowlistTest {
 
@@ -50,27 +52,40 @@ class ModelAllowlistTest {
         val models = parseModelAllowlist(shippedAssetText())
 
         // Per-model verified surface on 0.17.x Android. Unverified stays off
-        // (T-45-06, D-allowlist): thinking / function-calling / extended-context /
-        // MTP must be false on EVERY entry until device-verified.
+        // (T-45-06, D-allowlist): function-calling / extended-context / MTP
+        // must be false on EVERY entry until device-verified. gemma-4-E2B-it
+        // thinking is docs-verified (Google official Gemma 4 docs 2026-09-28,
+        // device confirmation pending); 3n thinking stays off.
         val expectedTextModality = mapOf(
             "gemma-3n-E2B-it-int4" to true,
             "gemma-3n-E4B-it-int4" to true,
             "gemma-4-E2B-it" to true
         )
-        // 3n multimodal + speculative decoding verified; gemma-4 text-only verified
-        // (device chat 2026-09-28, no think output observed).
-        val expectedFullCaps = mapOf(
+        // 3n multimodal + speculative decoding verified; gemma-4
+        // vision/audio docs-verified, thinking docs-verified, speculative
+        // decoding still unverified (stays false).
+        val expectedVisionAudio = mapOf(
+            "gemma-3n-E2B-it-int4" to true,
+            "gemma-3n-E4B-it-int4" to true,
+            "gemma-4-E2B-it" to true
+        )
+        val expectedSpeculativeDecoding = mapOf(
             "gemma-3n-E2B-it-int4" to true,
             "gemma-3n-E4B-it-int4" to true,
             "gemma-4-E2B-it" to false
         )
+        val expectedThinking = mapOf(
+            "gemma-3n-E2B-it-int4" to false,
+            "gemma-3n-E4B-it-int4" to false,
+            "gemma-4-E2B-it" to true
+        )
         for (model in models) {
             val caps = model.capabilities
             assertThat(caps.text).isEqualTo(expectedTextModality[model.name] == true)
-            assertThat(caps.vision).isEqualTo(expectedFullCaps[model.name] == true)
-            assertThat(caps.audio).isEqualTo(expectedFullCaps[model.name] == true)
-            assertThat(caps.speculativeDecoding).isEqualTo(expectedFullCaps[model.name] == true)
-            assertThat(caps.supportsThinking).isFalse()
+            assertThat(caps.vision).isEqualTo(expectedVisionAudio[model.name] == true)
+            assertThat(caps.audio).isEqualTo(expectedVisionAudio[model.name] == true)
+            assertThat(caps.speculativeDecoding).isEqualTo(expectedSpeculativeDecoding[model.name] == true)
+            assertThat(caps.supportsThinking).isEqualTo(expectedThinking[model.name] == true)
             assertThat(caps.supportsFunctionCalling).isFalse()
             assertThat(caps.extendedContext).isFalse()
             assertThat(caps.mtpSupport).isFalse()
@@ -130,11 +145,13 @@ class ModelAllowlistTest {
             importedAt = java.time.Instant.EPOCH
         )
 
-        // Allowlisted gemma-4-E2B-it: verified text-only — thinking stays off
-        // despite stored all-true caps.
+        // Allowlisted gemma-4-E2B-it: docs-verified vision/audio/thinking
+        // (Google official Gemma 4 docs 2026-09-28, device confirmation
+        // pending); function-calling stays false (tool execution removed,
+        // Phase 49 DEL-01).
         val e2b = repo.effectiveCapabilities(local("gemma-4-E2B-it", "gemma-4-E2B-it.litertlm"))
-        assertThat(e2b.reasoning).isFalse()
-        assertThat(e2b.vision).isFalse()
+        assertThat(e2b.reasoning).isTrue()
+        assertThat(e2b.vision).isTrue()
         assertThat(e2b.tools).isFalse()
 
         // Allowlisted 3n keeps its verified vision/audio.
