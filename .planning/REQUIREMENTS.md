@@ -9,7 +9,7 @@ Extend the v2.2 single-URL heuristic grounding pipeline to multi-page context wi
 
 ### Multi-URL Fetch
 
-- [ ] **FETCH-01**: User pasting 2–5 URLs in one message gets a fused answer grounded in all fetchable pages (parallel fan-out, numbered `[WEB CONTEXT 1..N]` blocks)
+- [x] **FETCH-01**: User pasting 2–5 URLs in one message gets a fused answer grounded in all fetchable pages (parallel fan-out, numbered `[WEB CONTEXT 1..N]` blocks)
 - [ ] **FETCH-02**: User gets a grounded answer from the pages that loaded even when one link is dead (partial grounding; model-only banner only when ALL pages fail)
 - [ ] **FETCH-03**: User sees fetch progress per source ("Leyendo 2 de 4…") with per-source ok/skipped states (silent drops never happen)
 
@@ -28,8 +28,8 @@ Extend the v2.2 single-URL heuristic grounding pipeline to multi-page context wi
 ### Offline Retry & Extraction
 
 - [ ] **RETRY-01**: User offline at send time gets a queued state with "Reintentar" on reconnect (message-scoped, OFFLINE-only; retry fetches, never rewrites history or re-runs inference silently)
-- [ ] **EXTRACT-01**: User gets cleaner grounded answers via Jsoup 1.23.2 parse-only extraction replacing the hand-rolled regex core (fetch policy unchanged: stripped client, 64KB cap, timeouts; never `Jsoup.connect()`)
-- [ ] **EXTRACT-02**: User on small local models gets answers that fit context (global grounding budget divided across pages, model-window-aware, replacing fixed per-page constants)
+- [x] **EXTRACT-01**: User gets cleaner grounded answers via Jsoup 1.23.2 parse-only extraction replacing the hand-rolled regex core (fetch policy unchanged: stripped client, 64KB cap, timeouts; never `Jsoup.connect()`)
+- [x] **EXTRACT-02**: User on small local models gets answers that fit context (global grounding budget divided across pages, model-window-aware, replacing fixed per-page constants)
 
 ## v2.4 Requirements
 
@@ -58,7 +58,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FETCH-01 | Phase 52 | Pending |
+| FETCH-01 | Phase 52 | Complete |
 | FETCH-02 | Phase 52 | Pending |
 | FETCH-03 | Phase 52 | Pending |
 | SRC-01 | Phase 53 | Pending |
@@ -68,10 +68,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TOGGLE-02 | Phase 53 | Pending |
 | TOGGLE-03 | Phase 53 | Pending |
 | RETRY-01 | Phase 54 | Pending |
-| EXTRACT-01 | Phase 52 | Pending |
-| EXTRACT-02 | Phase 52 | Pending |
+| EXTRACT-01 | Phase 52 | Complete |
+| EXTRACT-02 | Phase 52 | Complete |
 
 **Coverage:**
+
 - v2.3 requirements: 12 total
 - Mapped to phases: 12
 - Unmapped: 0 ✓

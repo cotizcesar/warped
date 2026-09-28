@@ -7,6 +7,7 @@ v2.2 Simplificación + Web Grounding shipped 2026-09-28 (Phases 49–51): dead s
 ## Phases
 
 **Phase Numbering:**
+
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
@@ -29,41 +30,52 @@ v2.2 Simplificación + Web Grounding shipped 2026-09-28 (Phases 49–51): dead s
 **Milestone Goal:** Pasted URLs ground answers with multi-page context, previewable sources, and offline resilience.
 
 ### Phase 52: Multi-URL Fetch Foundation
+
 **Goal**: Pasted URLs ground answers with fused multi-page context that fits small local-model windows
 **Depends on**: Phase 51
 **Requirements**: FETCH-01, FETCH-02, FETCH-03, EXTRACT-01, EXTRACT-02
 **Success Criteria** (what must be TRUE):
+
   1. User pasting 2–5 URLs in one message gets one answer grounded in all fetchable pages with numbered sources
   2. User gets a grounded answer from working pages when one link is dead, and the model-only banner only when ALL pages fail
   3. User sees fetch progress per source ("Leyendo 2 de 4…") with per-source ok/skipped states — no silent drops
   4. User on a small local model gets answers that fit context (global grounding budget divided across pages, model-window-aware)
   5. User gets cleaner grounded answers via Jsoup parse-only extraction with the v2.2 fetch policy unchanged (stripped client, 64KB cap, timeouts)
+
 **Plans**: 2 plans
-- [ ] 52-01-PLAN.md — Jsoup swap, allUrls, budget, fused blocks + exit-gate tests
+
+- [x] 52-01-PLAN.md — Jsoup swap, allUrls, budget, fused blocks + exit-gate tests
 - [ ] 52-02-PLAN.md — cancel fix, fan-out orchestrator, hook + N-source UI
+
 **UI hint**: yes
 
 ### Phase 53: Sources Preview + Per-Chat Toggle
+
 **Goal**: Users can preview what each source says and control web grounding per conversation
 **Depends on**: Phase 52
 **Requirements**: SRC-01, SRC-02, SRC-03, TOGGLE-01, TOGGLE-02, TOGGLE-03
 **Success Criteria** (what must be TRUE):
+
   1. User can tap a source to preview its extracted text in a bottom sheet without leaving chat
   2. User sees a numbered Fuentes list covering all N fetched sources for the turn
   3. User can open the full page in the browser from the preview ("Abrir en navegador")
   4. User can override web grounding per conversation (on/off/inherit-global) and send a one-off model-only message ("Sin web") without changing any toggle
   5. User's per-chat web preference and persisted sources survive app restarts (single Room migration v15)
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 54: Offline Retry
+
 **Goal**: Users offline at send time can retry grounding when back online without resending
 **Depends on**: Phase 53
 **Requirements**: RETRY-01
 **Success Criteria** (what must be TRUE):
+
   1. User offline at send time sees a queued state with a "Reintentar" affordance on reconnect
   2. Retry fetches the URLs again through the same grounding entry point — history is never rewritten and inference never re-runs silently
   3. Retry results land in the same persisted source rows the preview sheet reads
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -77,7 +89,7 @@ Phases execute in numeric order: 52 → 53 → 54. Next milestone continues from
 | 49. Surface Removal | 2/2 | Complete (smoke deferred) | 2026-09-28 |
 | 50. Web Grounding | 2/2 | Complete (smoke deferred) | 2026-09-28 |
 | 51. Syntax-Theme Fix | 1/1 | Complete (smoke deferred) | 2026-09-28 |
-| 52. Multi-URL Fetch Foundation | 0/TBD | Not started | - |
+| 52. Multi-URL Fetch Foundation | 1/2 | In Progress|  |
 | 53. Sources Preview + Per-Chat Toggle | 0/TBD | Not started | - |
 | 54. Offline Retry | 0/TBD | Not started | - |
 
