@@ -2,6 +2,7 @@ package com.warped.data.highlighting
 
 import com.warped.domain.highlighting.LanguageDetector
 import com.warped.domain.highlighting.SyntaxHighlighter
+import com.warped.domain.model.SyntaxTheme
 import com.warped.domain.model.SyntaxToken
 import com.warped.domain.model.TokenType
 import dev.snipme.highlights.Highlights
@@ -26,18 +27,29 @@ class SyntaxHighlighterImpl @Inject constructor(
         }
     }
 
-    private fun cacheKey(code: String, language: String): String = "$code|$language"
+    private fun cacheKey(code: String, language: String, theme: SyntaxTheme): String = "$code|$language|${theme.key}"
 
-    override suspend fun highlight(code: String, language: String): List<SyntaxToken> {
+    // Backward-compatible 2-arg overload for direct concrete-class callers
+    // (interface default does not apply through the concrete type).
+    suspend fun highlight(code: String, language: String): List<SyntaxToken> =
+        highlight(code, language, SyntaxTheme.MONOKAI)
+
+    override suspend fun highlight(code: String, language: String, theme: SyntaxTheme): List<SyntaxToken> {
         if (code.length > 500_000) {
             Timber.w("SyntaxHighlighter: code block too large (%d chars) — returning plain tokens", code.length)
             return listOf(SyntaxToken(0, code.length, TokenType.PLAIN, code))
         }
-        val key = cacheKey(code, language)
+        val key = cacheKey(code, language, theme)
         val cached = cacheMutex.withLock { cache[key] }
         if (cached != null) return cached
         return withContext(Dispatchers.Default) {
             val syntaxLanguage = languageDetector.resolveSyntaxLanguage(language)
+            // Keep the Monokai engine structure pass: Highlights 1.1.0 only ships
+            // monokai/darcula/notepad/matrix/pastel/atom_one built-ins (no one_dark/github
+            // counterparts), and TypeMapper.map consumes only CodeStructure locations —
+            // theme colors never reach tokens. The domain SyntaxTheme
+            // darkVariant/lightVariant applied in CodeBlock stays the single color
+            // source of truth. Never swap per-preset engine built-ins here.
             val highlights = Highlights.Builder()
                 .code(code)
                 .language(syntaxLanguage)

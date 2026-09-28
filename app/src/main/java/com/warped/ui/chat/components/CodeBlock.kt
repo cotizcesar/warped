@@ -125,7 +125,7 @@ fun CodeBlock(
     val highlighter = remember { highlighterEntryPoint.syntaxHighlighter() }
 
     // ── Launch async highlighting ────────────────────────────
-    LaunchedEffect(code, language, isStreaming) {
+    LaunchedEffect(code, language, syntaxTheme, isStreaming) {
         tokens = emptyList()
         if (code.isBlank()) return@LaunchedEffect
         if (code.length > 500_000) {
@@ -138,7 +138,7 @@ fun CodeBlock(
         }
         try {
             val result = withContext(Dispatchers.Default) {
-                highlighter.highlight(code, language)
+                highlighter.highlight(code, language, syntaxTheme)
             }
             tokens = result
         } catch (e: Exception) {
