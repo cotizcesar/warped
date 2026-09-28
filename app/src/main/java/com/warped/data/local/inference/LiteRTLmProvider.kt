@@ -342,7 +342,7 @@ class LiteRTLmProvider @Inject constructor(
             conversation.sendMessageAsync(contents).collect { responseMsg ->
                 val content = extractTextContent(responseMsg)
                 if (content.isNotEmpty()) {
-                    Timber.d("LiteRTLmProvider: delta (${content.length} chars): %s", content.takeLast(100))
+                    Timber.d("LiteRTLmProvider: delta (%d chars)", content.length)
                     emit(StreamToken.Delta(content))
                 }
             }
