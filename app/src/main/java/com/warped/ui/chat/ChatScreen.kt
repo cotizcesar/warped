@@ -50,6 +50,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.R
 import com.warped.data.local.inference.BackendType
@@ -120,6 +123,21 @@ fun ChatScreen(
     DisposableEffect(Unit) {
         onDispose {
             viewModel.unloadLocalModels()
+        }
+    }
+    // Phase 54 (RETRY-01): resume-only connectivity refresh flips the
+    // Reintentar visibility gate — never triggers a fetch by itself
+    // (no-auto-retry lock).
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshConnectivity()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
@@ -387,7 +405,14 @@ fun ChatScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         items(transcript.messages, key = { it.id }) { message ->
-                            MessageBubble(message = message, codeTheme = connection.codeTheme, codeFontScale = connection.codeFontScale)
+                            MessageBubble(
+                                message = message,
+                                codeTheme = connection.codeTheme,
+                                codeFontScale = connection.codeFontScale,
+                                isValidatedOnline = input.isValidatedOnline,
+                                isFetchingWeb = input.isFetchingWeb,
+                                onRetry = { viewModel.retryGrounding(it) }
+                            )
                         }
                         if (showStreamingBubble) {
                             item(key = ChatListKeys.STREAMING) {
