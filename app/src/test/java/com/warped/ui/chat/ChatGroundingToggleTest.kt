@@ -45,14 +45,15 @@ import org.junit.jupiter.api.io.TempDir
 import java.io.File
 
 /**
- * Phase 53 (TOGGLE-01..03/SRC-02): ChatViewModel grounding-hook wiring.
+ * ChatViewModel grounding-hook wiring.
  *
- * The hook evaluates shouldGround(skipOnce, perChat, global) at the top of
- * the fetch block: the Sin web chip skips fetch for one send and resets,
- * a per-chat No skips fetch despite the global ON, Heredar inherits the
- * global ON (fetch runs, ok + omitida details persist via
+ * The hook evaluates shouldGround(perChat, global) at the top of the fetch
+ * block: a per-chat No skips grounding despite the global ON, Heredar
+ * inherits the global ON (fetch runs, ok + omitida details persist via
  * saveMessageWithSources), and a pre-conversation toggle is held pending
- * until the first send creates the row.
+ * until the first send creates the row. Every grounded turn carries the
+ * always-on SYSTEM_PROMPT — even with no pasted URLs — while disabled
+ * turns send the original text untouched.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatGroundingToggleTest {
@@ -74,6 +75,7 @@ class ChatGroundingToggleTest {
 
     private lateinit var chatRepository: ChatRepository
     private lateinit var multiUrlFetcher: com.warped.data.grounding.MultiUrlFetcher
+    private lateinit var lastHelper: LlmModelHelper
 
     private fun buildViewModel(modelPath: String): ChatViewModel {
         chatRepository = mockk()
@@ -134,6 +136,7 @@ class ChatGroundingToggleTest {
             emit(StreamToken.Delta("hola"))
             emit(StreamToken.Done())
         }
+        lastHelper = helper
         return helper
     }
 
@@ -157,21 +160,43 @@ class ChatGroundingToggleTest {
     )
 
     @Test
-    fun `skipWebOnce skips fetch and resets after send`() = runTest {
+    fun `grounded turn with no urls still sends system-prompt-prefixed text`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
         val vm = buildViewModel(modelFile.absolutePath)
         runCurrent()
-        coEvery { multiUrlFetcher.fetchAll(any(), any(), any()) } returns fusedResult()
 
-        vm.toggleSkipWebOnce()
-        assertThat(vm.inputState.value.skipWebOnce).isTrue()
+        vm.sendMessage("hola sin urls")
+        advanceUntilIdle()
 
-        vm.sendMessage("mira https://a.example/uno")
+        // No URLs pasted, so no fetch runs — but the outgoing request still
+        // carries the always-on SYSTEM_PROMPT.
+        coVerify(exactly = 0) { multiUrlFetcher.fetchAll(any(), any(), any()) }
+        val requestSlot = slot<com.warped.domain.model.ChatRequest>()
+        coVerify(exactly = 1) { lastHelper.runInference(capture(requestSlot), any()) }
+        assertThat(requestSlot.captured.messages.last().content).isEqualTo(
+            "${com.warped.data.grounding.GroundingPrompt.SYSTEM_PROMPT}\n\nhola sin urls",
+        )
+        assertThat(
+            vm.transcriptState.value.messages.any { it.role == Role.ASSISTANT && it.content == "hola" },
+        ).isTrue()
+    }
+
+    @Test
+    fun `disabled turn sends original text untouched`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
+        val vm = buildViewModel(modelFile.absolutePath)
+        runCurrent()
+        coEvery { chatRepository.getWebOverride(any()) } returns false
+
+        vm.sendMessage("hola sin urls")
         advanceUntilIdle()
 
         coVerify(exactly = 0) { multiUrlFetcher.fetchAll(any(), any(), any()) }
-        assertThat(vm.inputState.value.skipWebOnce).isFalse()
+        val requestSlot = slot<com.warped.domain.model.ChatRequest>()
+        coVerify(exactly = 1) { lastHelper.runInference(capture(requestSlot), any()) }
+        assertThat(requestSlot.captured.messages.last().content).isEqualTo("hola sin urls")
         assertThat(
             vm.transcriptState.value.messages.any { it.role == Role.ASSISTANT && it.content == "hola" },
         ).isTrue()

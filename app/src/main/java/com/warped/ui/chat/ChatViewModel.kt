@@ -416,7 +416,11 @@ class ChatViewModel @Inject constructor(
                                 )
                             ) {
                                 is MultiUrlResult.Fused -> {
-                                    requestUserText = GroundingPrompt.augment(requestUserText, result.block)
+                                    requestUserText = GroundingPrompt.augment(
+                                        requestUserText,
+                                        result.block,
+                                        groundingEnabled = doGround,
+                                    )
                                     groundedSources = result.okUrls
                                     // Phase 53 (SRC-02): CR-01 — persist the fusion-time
                                     // details union directly (resolved URLs + text
@@ -465,6 +469,15 @@ class ChatViewModel @Inject constructor(
                         } finally {
                             updateInput { it.copy(isFetchingWeb = false, webFetchProgress = null) }
                         }
+                    } else {
+                        // Always-on web instruction: a grounded turn with no
+                        // pasted URLs still carries SYSTEM_PROMPT so the
+                        // model knows web search is available.
+                        requestUserText = GroundingPrompt.augment(
+                            requestUserText,
+                            null,
+                            groundingEnabled = doGround,
+                        )
                     }
                 }
 
@@ -544,9 +557,12 @@ class ChatViewModel @Inject constructor(
 
                 // Phase 50: the persisted history keeps original text; the
                 // outgoing request's current message carries the augmented
-                // text for BOTH local and remote paths.
+                // text for BOTH local and remote paths — including the
+                // always-on SYSTEM_PROMPT on grounded turns with no pasted
+                // URLs (groundedSources is empty there, so the gate is
+                // doGround, not source count).
                 val historyMessages = _transcript.value.messages
-                val requestMessages = if (groundedSources.isNotEmpty() && historyMessages.isNotEmpty()) {
+                val requestMessages = if (doGround && historyMessages.isNotEmpty()) {
                     historyMessages.dropLast(1) + historyMessages.last().copy(content = requestUserText)
                 } else {
                     historyMessages

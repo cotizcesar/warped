@@ -16,7 +16,7 @@ class GroundingPromptTest {
     @Test
     fun `augment order is prompt then block then original`() {
         val block = GroundingPrompt.buildBlock("https://a.com", "contenido")
-        val out = GroundingPrompt.augment("pregunta original", block)
+        val out = GroundingPrompt.augment("pregunta original", block, groundingEnabled = true)
 
         val promptIdx = out.indexOf(GroundingPrompt.SYSTEM_PROMPT)
         val blockIdx = out.indexOf("[WEB CONTEXT")
@@ -27,8 +27,18 @@ class GroundingPromptTest {
     }
 
     @Test
-    fun `null block returns original untouched`() {
-        assertThat(GroundingPrompt.augment("pregunta", null)).isEqualTo("pregunta")
+    fun `null block with grounding disabled returns original untouched`() {
+        assertThat(GroundingPrompt.augment("pregunta", null, groundingEnabled = false))
+            .isEqualTo("pregunta")
+    }
+
+    @Test
+    fun `null block with grounding enabled prepends system prompt`() {
+        val out = GroundingPrompt.augment("pregunta", null, groundingEnabled = true)
+
+        assertThat(out).isEqualTo("${GroundingPrompt.SYSTEM_PROMPT}\n\npregunta")
+        assertThat(out.indexOf(GroundingPrompt.SYSTEM_PROMPT)).isEqualTo(0)
+        assertThat(out.indexOf("pregunta")).isGreaterThan(0)
     }
 
     @Test

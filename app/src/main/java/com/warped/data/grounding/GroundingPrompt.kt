@@ -30,9 +30,17 @@ object GroundingPrompt {
         }.joinToString("\n\n")
 
     /**
-     * Returns "$SYSTEM_PROMPT\n\n$block\n\n$original" when [block] is
-     * non-null, [original] untouched otherwise (toggle OFF / model-only path).
+     * Contract: [block] non-null → "$SYSTEM_PROMPT\n\n$block\n\n$original"
+     * ([WEB CONTEXT] behavior, unchanged); [block] null +
+     * [groundingEnabled] true → "$SYSTEM_PROMPT\n\n$original" (a grounded
+     * turn with no pasted URLs still tells the model web search is
+     * available); [block] null + [groundingEnabled] false → [original]
+     * untouched (grounding disabled / model-only path).
      */
-    fun augment(original: String, block: String?): String =
-        if (block != null) "$SYSTEM_PROMPT\n\n$block\n\n$original" else original
+    fun augment(original: String, block: String?, groundingEnabled: Boolean = true): String =
+        when {
+            block != null -> "$SYSTEM_PROMPT\n\n$block\n\n$original"
+            groundingEnabled -> "$SYSTEM_PROMPT\n\n$original"
+            else -> original
+        }
 }
