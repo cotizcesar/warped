@@ -94,9 +94,13 @@ class ChatViewModel @Inject constructor(
     /**
      * Phase 54 (RETRY-01): foreground retry scope, sibling to
      * [generationJob]. A second tap while a retry is in flight is a no-op
-     * (guarded on `isFetchingWeb`); cancelled on new send (same pre-cancel
-     * position as [generationJob]) and in [stopGeneration]. Stop-during-retry
-     * leaves the transcript untouched — the queued OFFLINE banner survives.
+     * (WR-02: synchronous `retryJob.isActive` guard on the caller thread —
+     * the `isFetchingWeb` flag is set inside the coroutine and races).
+     * Cancelled on new send (same pre-cancel position as [generationJob])
+     * and in [stopGeneration]; the retry `finally` clears state only when
+     * it still owns the job (stale-finally guard) so Stop/new-send state
+     * is never clobbered. Stop-during-retry leaves the transcript
+     * untouched — the queued OFFLINE banner survives.
      */
     private var retryJob: Job? = null
 
@@ -734,12 +738,19 @@ class ChatViewModel @Inject constructor(
         // streaming. Mirrored in the banner gate (ModelOnlyBanner).
         if (_input.value.isFetchingWeb || _input.value.isGenerating) return
         if (_transcript.value.isStreaming) return
+        // WR-02: synchronous overlap guard — checked on the caller
+        // thread before launch. isFetchingWeb is set inside the
+        // coroutine (async dispatch), so rapid double-taps both observed
+        // false and raced; retryJob.isActive closes that window. A
+        // completed job needs no cancel, so the pre-cancel is gone —
+        // an active job no-ops above instead of racing startup.
+        if (retryJob?.isActive == true) return
         if (!fetcher.hasValidatedInternet()) {
             refreshConnectivity()
             return
         }
-        retryJob?.cancel()
-        retryJob = viewModelScope.launch(coroutineExceptionHandler) {
+        var myJob: Job? = null
+        myJob = viewModelScope.launch(coroutineExceptionHandler) {
             val msgs = _transcript.value.messages
             val idx = msgs.indexOfFirst {
                 it.id == assistantMessageId && it.modelOnlyNotice == ModelOnlyNotice.OFFLINE
@@ -820,10 +831,18 @@ class ChatViewModel @Inject constructor(
                     is MultiUrlResult.AllFailed -> Unit
                 }
             } finally {
-                updateInput { it.copy(isFetchingWeb = false, webFetchProgress = null) }
-                refreshConnectivity()
+                // WR-02: stale-finally guard — only the owning job clears
+                // state and refreshes. A cancelled job (Stop / new send,
+                // which null retryJob first) must not clobber flags a newer
+                // turn or retry set after it.
+                if (retryJob === myJob) {
+                    retryJob = null
+                    updateInput { it.copy(isFetchingWeb = false, webFetchProgress = null) }
+                    refreshConnectivity()
+                }
             }
         }
+        retryJob = myJob
     }
 
     /**
