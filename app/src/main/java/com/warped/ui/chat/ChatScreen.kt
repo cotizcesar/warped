@@ -46,6 +46,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.R
@@ -229,7 +230,37 @@ fun ChatScreen(
             // and the parent NavHost provides the drawer gesture.
         },
         bottomBar = {
-            ChatInputBar(
+            Column {
+                // Phase 50 (WEB-06): transient fetch status chip — never a
+                // transcript message, never persisted. Unmounts on
+                // completion/failure/Stop; the existing Stop covers cancel
+                // (isGenerating stays true during fetch).
+                if (input.isFetchingWeb) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .semantics {
+                                contentDescription =
+                                    "Leyendo página. Pulsa Detener para cancelar la lectura."
+                            },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "Leyendo página…",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                ChatInputBar(
                 text = input.inputText,
                 isGenerating = input.isGenerating,
                 canSend = (connection.selectedLocalModelId ?: connection.selectedRemoteModelId) != null,
@@ -252,6 +283,7 @@ fun ChatScreen(
                 onAudioRecorded = { bytes -> audioBytes = bytes },
                 onAudioRecordingChanged = { isRecording = it },
             )
+            }
         }
     ) { padding ->
         Column(

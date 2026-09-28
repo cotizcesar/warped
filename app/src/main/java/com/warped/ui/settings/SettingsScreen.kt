@@ -27,6 +27,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -153,6 +155,42 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
                         Text("Presets", style = MaterialTheme.typography.bodyLarge)
                         Text("${uiState.presetCount}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                }
+            }
+        }
+
+        // Web section
+        item {
+            Text("Web", style = MaterialTheme.typography.titleMedium)
+        }
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Grounding web", style = MaterialTheme.typography.bodyLarge)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Lee el contenido de los enlaces que pegues en el chat.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Switch(
+                        checked = uiState.webGroundingEnabled,
+                        onCheckedChange = viewModel::setWebGroundingEnabled,
+                        modifier = Modifier.semantics {
+                            contentDescription = "Grounding web"
+                        }
+                    )
                 }
             }
         }

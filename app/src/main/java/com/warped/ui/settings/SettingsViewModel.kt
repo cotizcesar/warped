@@ -69,6 +69,11 @@ class SettingsViewModel @Inject constructor(
                 _uiState.update { it.copy(codeFontScale = scale) }
             }
         }
+        viewModelScope.launch(coroutineExceptionHandler) {
+            advancedPreferences.webGroundingEnabled.collect { enabled ->
+                _uiState.update { it.copy(webGroundingEnabled = enabled) }
+            }
+        }
     }
 
     fun selectTab(tab: SettingsTab) {
@@ -84,6 +89,12 @@ class SettingsViewModel @Inject constructor(
     fun setCodeFontScale(scale: Float) {
         viewModelScope.launch(coroutineExceptionHandler) {
             advancedPreferences.setCodeFontScale(scale)
+        }
+    }
+
+    fun setWebGroundingEnabled(enabled: Boolean) {
+        viewModelScope.launch(coroutineExceptionHandler) {
+            advancedPreferences.setWebGroundingEnabled(enabled)
         }
     }
 

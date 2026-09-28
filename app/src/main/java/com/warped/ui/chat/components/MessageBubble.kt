@@ -24,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import com.warped.ui.components.WarpedAlertDialog
 import androidx.compose.runtime.*
@@ -41,7 +42,9 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.warped.domain.model.ChatMessage
+import com.warped.domain.model.ModelOnlyNotice
 import com.warped.domain.model.Role
 import com.warped.domain.model.SyntaxTheme
 import com.warped.domain.model.parseToolRow
@@ -85,6 +88,13 @@ fun MessageBubble(
             ),
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
     ) {
+        // Phase 50 (WEB-06): UI-rendered model-only banner — never model
+        // text, never error text as context. 4dp above the qualified
+        // assistant message; grounded answers render no banner.
+        if (!isUser && message.modelOnlyNotice != null) {
+            ModelOnlyBanner(notice = message.modelOnlyNotice)
+            Spacer(Modifier.height(4.dp))
+        }
         Surface(
             color = if (isUser) Color(0xFF121212) else Color.Transparent,
             shape = RoundedCornerShape(12.dp),
@@ -189,6 +199,28 @@ fun MessageBubble(
             }
         }
 
+        // Phase 50 (WEB-06): numbered Fuentes list 4dp below a grounded
+        // answer. Zero sources renders no block at all. Citation markers in
+        // the answer body stay plain transcript text; only fuente items use
+        // the accent link color. Long URLs wrap, never truncate.
+        if (!isUser && message.groundedSources.isNotEmpty()) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "Fuentes",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            message.groundedSources.forEachIndexed { i, url ->
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "[${i + 1}] $url",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
         // Stats below the bubble
         if (!isUser && !message.stats.isNullOrBlank()) {
             Text(
@@ -199,6 +231,34 @@ fun MessageBubble(
                 modifier = Modifier.padding(bottom = 4.dp)
             )
         }
+    }
+}
+
+/**
+ * Phase 50 (WEB-06): model-only notice banner. UI-rendered from ephemeral
+ * state (never model-generated, never a Snackbar, not dismissible) — scrolls
+ * with its message inside MessageBubble.
+ */
+@Composable
+private fun ModelOnlyBanner(notice: ModelOnlyNotice) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = Icons.Filled.Info,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = when (notice) {
+                ModelOnlyNotice.OFFLINE ->
+                    "Sin conexión. Respuesta solo del modelo, sin contenido de la página."
+                ModelOnlyNotice.FETCH_FAILED ->
+                    "No se pudo leer la página. Respuesta solo del modelo — revisa tu conexión o pega otro enlace."
+            },
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
