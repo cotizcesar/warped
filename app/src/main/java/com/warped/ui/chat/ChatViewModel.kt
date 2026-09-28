@@ -728,7 +728,12 @@ class ChatViewModel @Inject constructor(
      * connectivity re-checked synchronously (stale flag → hide, no fetch).
      */
     fun retryGrounding(assistantMessageId: String) {
-        if (_input.value.isFetchingWeb) return
+        // WR-03: never run a network fan-out concurrently with token
+        // streaming — the send path is strictly sequential
+        // (fetch-then-infer), so retry refuses while generating or
+        // streaming. Mirrored in the banner gate (ModelOnlyBanner).
+        if (_input.value.isFetchingWeb || _input.value.isGenerating) return
+        if (_transcript.value.isStreaming) return
         if (!fetcher.hasValidatedInternet()) {
             refreshConnectivity()
             return

@@ -411,6 +411,7 @@ fun ChatScreen(
                                 codeFontScale = connection.codeFontScale,
                                 isValidatedOnline = input.isValidatedOnline,
                                 isFetchingWeb = input.isFetchingWeb,
+                                isGenerating = input.isGenerating,
                                 onRetry = { viewModel.retryGrounding(it) }
                             )
                         }

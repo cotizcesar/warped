@@ -66,6 +66,7 @@ fun MessageBubble(
     codeFontScale: Float = 1.0f,
     isValidatedOnline: Boolean = false,
     isFetchingWeb: Boolean = false,
+    isGenerating: Boolean = false,
     onRetry: (messageId: String) -> Unit = {},
 ) {
     val isUser = message.role == Role.USER
@@ -106,6 +107,7 @@ fun MessageBubble(
                 totalSources = message.modelOnlySourceCount,
                 isValidatedOnline = isValidatedOnline,
                 isFetchingWeb = isFetchingWeb,
+                isGenerating = isGenerating,
                 onRetry = { onRetry(message.id) }
             )
             Spacer(Modifier.height(4.dp))
@@ -358,6 +360,7 @@ private fun ModelOnlyBanner(
     totalSources: Int = 1,
     isValidatedOnline: Boolean = false,
     isFetchingWeb: Boolean = false,
+    isGenerating: Boolean = false,
     onRetry: () -> Unit = {},
 ) {
     // Phase 54 (RETRY-01): queued OFFLINE row — existing v2.2 copy + the
@@ -389,7 +392,10 @@ private fun ModelOnlyBanner(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f, fill = false)
         )
-        if (notice == ModelOnlyNotice.OFFLINE && isValidatedOnline && !isFetchingWeb) {
+        // WR-03: hidden while a retry fetch is in flight AND while
+        // inference is streaming — mirrors the retryGrounding VM guard
+        // so the button is never visible-but-dead.
+        if (notice == ModelOnlyNotice.OFFLINE && isValidatedOnline && !isFetchingWeb && !isGenerating) {
             TextButton(
                 onClick = onRetry,
                 modifier = Modifier
