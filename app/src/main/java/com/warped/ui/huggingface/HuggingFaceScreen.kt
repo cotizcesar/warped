@@ -70,6 +70,7 @@ fun HuggingFaceScreen(
     onNavigateToModels: () -> Unit = {}
 ) {
     val downloadStates by viewModel.downloadStates.collectAsStateWithLifecycle()
+    val downloadedFileNames by viewModel.downloadedFileNames.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -112,6 +113,7 @@ fun HuggingFaceScreen(
                     CatalogModelCard(
                         entry = entry,
                         downloadState = downloadStates[downloadId],
+                        isOnDevice = entry.modelFile in downloadedFileNames,
                         onDownload = { viewModel.startDownload(entry) },
                         onPause = { viewModel.pauseDownload(downloadId) },
                         onResume = { viewModel.resumeDownload(downloadId) },
@@ -136,10 +138,25 @@ fun expandedText(entry: AllowlistedModel): String? {
     return if (parts.isEmpty()) null else parts.joinToString(separator = "\n")
 }
 
+/**
+ * Pure on-device/session downloaded rule: true when the in-session
+ * WorkManager state is terminal-complete (non-null, not active, no error,
+ * progress >= 1f) OR the file is already on-device. JVM-testable.
+ */
+fun isEffectivelyDownloaded(downloadState: DownloadState?, isOnDevice: Boolean): Boolean {
+    val active = downloadState != null &&
+        (downloadState.isDownloading || downloadState.isPaused) &&
+        downloadState.error != "Cancelled"
+    val sessionDownloaded = downloadState != null && !active &&
+        downloadState.error == null && downloadState.progress >= 1f
+    return sessionDownloaded || isOnDevice
+}
+
 @Composable
 private fun CatalogModelCard(
     entry: AllowlistedModel,
     downloadState: DownloadState?,
+    isOnDevice: Boolean = false,
     onDownload: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
@@ -150,8 +167,7 @@ private fun CatalogModelCard(
     val active = downloadState != null &&
         (downloadState.isDownloading || downloadState.isPaused) &&
         downloadState.error != "Cancelled"
-    val downloaded = downloadState != null && !active &&
-        downloadState.error == null && downloadState.progress >= 1f
+    val downloaded = isEffectivelyDownloaded(downloadState, isOnDevice)
     val failed = !active && !downloaded &&
         downloadState?.error != null && downloadState.error != "Cancelled"
     var showCancelConfirm by remember { mutableStateOf(false) }
@@ -203,7 +219,7 @@ private fun CatalogModelCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(4.dp))
                 CatalogDownloadActions(
                     downloadState = downloadState,
                     active = active,
@@ -215,7 +231,7 @@ private fun CatalogModelCard(
                     onCancelClick = { showCancelConfirm = true }
                 )
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
             // Collapsed row 2: capability icons + size.
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -348,7 +364,7 @@ private fun CatalogDownloadActions(
  */
 @Composable
 private fun CatalogCapabilityIcons(entry: AllowlistedModel) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         if (entry.capabilities.vision) {
             CapabilityIconBadge(
                 icon = Icons.Filled.Visibility,
