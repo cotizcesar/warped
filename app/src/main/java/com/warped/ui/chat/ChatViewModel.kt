@@ -22,6 +22,7 @@ import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.LocalModelRepository
 import com.warped.domain.skills.SkillIds
 import com.warped.domain.skills.SkillRepository
+import com.warped.ui.chat.components.toolResultContent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -230,7 +231,7 @@ class ChatViewModel @Inject constructor(
 
         val imageDataUrls = images.mapNotNull { uriToBase64(it) }
         val userMessage = ChatMessage(role = Role.USER, content = text.trim(), imageUris = imageDataUrls)
-        _uiState.update { it.copy(messages = it.messages + userMessage, inputText = "", isStreaming = true, toolCallActive = null, showNoToolSupportNotice = false) }
+        _uiState.update { it.copy(messages = it.messages + userMessage, inputText = "", isStreaming = true, toolCallActive = null, activeToolError = null, showNoToolSupportNotice = false) }
 
         // CR-02: cancel any in-flight turn before starting a new one — otherwise
         // two collectors interleave tokens into one bubble and activeHelper is
@@ -339,6 +340,27 @@ class ChatViewModel @Inject constructor(
                         _uiState.update { it.copy(showNoToolSupportNotice = true) }
                     }
                 }
+                // 47-03 UI-SPEC §6 (remote parity): same notice contract for
+                // LM Studio endpoints — shared ToolGating truth with
+                // LmStudioHelper routing (allowlist OR trained_for_tool_use).
+                // Exact string lives in ToolCopy.NO_TOOL_SUPPORT_NOTICE and
+                // renders once per turn; zero enabled → silent plain chat.
+                if (selectedProvider == ProviderType.LM_STUDIO) {
+                    val enabledIds = SkillIds.TOOL_IDS.filter {
+                        _uiState.value.skillEnabled[it] == true
+                    }
+                    val gate = ToolGating.decide(
+                        enabledIds,
+                        ToolGating.supportsRemoteTools(modelAllowlistRepository, modelId)
+                    )
+                    if (gate is ToolGateDecision.NoSupportFallback) {
+                        _uiState.update { it.copy(showNoToolSupportNotice = true) }
+                    }
+                }
+                // 47-03 (D-06): per-turn tool records from the remote loop.
+                // Persisted as role=TOOL rows on Done; failures also raise
+                // the transient "{Display} failed: …" error row.
+                val toolRecords = mutableListOf<StreamToken.ToolCompleted>()
                 val tokenBuffer = mutableListOf<String>()
                 var lastEmitTime = System.currentTimeMillis()
 
@@ -388,14 +410,44 @@ class ChatViewModel @Inject constructor(
                             // path below stays untouched.
                             _uiState.update { it.copy(toolCallActive = token.toolName) }
                         }
-                        // 47-03 (Task 2): ToolCompleted persistence + error rows.
-                        // Placeholder keeps the Task 1 commit compiling.
-                        is StreamToken.ToolCompleted -> Unit
+                        // 47-03: remote-loop completion record — collect for
+                        // the Done-time role:tool persistence; failures raise
+                        // the error row (rendered as "{Display} failed: …"
+                        // via formatToolError). Status clearing stays on
+                        // ToolStatus(null)/Done; a completion never clears
+                        // the row out from under the next round's status.
+                        is StreamToken.ToolCompleted -> {
+                            toolRecords.add(token)
+                            if (token.errorReason != null) {
+                                _uiState.update {
+                                    it.copy(
+                                        activeToolError = ActiveToolError(
+                                            toolId = token.toolId,
+                                            reason = token.errorReason,
+                                        ),
+                                    )
+                                }
+                            }
+                        }
                         is StreamToken.Done -> {
                             _uiState.update { it.copy(toolCallActive = null) }
                             rawBuffer.append(tokenBuffer.joinToString(""))
                             val (finalClean, finalReasoning) = parseThinkBlocks(rawBuffer.toString(), reasoningActive, modelMayThink)
                             val content = if (finalClean.isBlank()) finalClean else finalClean.trimStart()
+                            // 47-03 (D-06, SKILLS-11): one messages row per
+                            // executed tool, persisted alongside the answer.
+                            // Encoding follows the 47-01 ToolCopy contract
+                            // ("<toolId>\n<summary>" — the "Used {Display}"
+                            // header renders, never stored, so history reload
+                            // shows the collapsed rows and resume re-sends
+                            // summaries as context). Causal order: tool rows
+                            // first, then the assistant message they produced.
+                            val toolMessages = toolRecords.map { record ->
+                                ChatMessage(
+                                    role = Role.TOOL,
+                                    content = toolResultContent(record.toolId, record.summary),
+                                )
+                            }
                             if (content.isNotBlank() || finalReasoning.isNotBlank()) {
                                 val assistantMessage = ChatMessage(
                                     role = Role.ASSISTANT,
@@ -406,20 +458,41 @@ class ChatViewModel @Inject constructor(
                                 )
                                 _uiState.update {
                                     it.copy(
-                                        messages = it.messages + assistantMessage,
+                                        messages = it.messages + toolMessages + assistantMessage,
                                         streamingContent = "",
                                         streamingReasoning = "",
                                         isStreaming = false
                                     )
                                 }
+                                for (toolMessage in toolMessages) {
+                                    chatRepository.saveMessage(conversationId, toolMessage)
+                                }
                                 chatRepository.saveMessage(conversationId, assistantMessage)
                             } else {
-                                _uiState.update {
-                                    it.copy(
-                                        streamingContent = "",
-                                        streamingReasoning = "",
-                                        isStreaming = false
-                                    )
+                                // Silent turn (loop fallback already attempted
+                                // a no-tools re-POST): tool rows still persist
+                                // so the turn stays auditable; the error row
+                                // (if any) keeps the bubble non-empty.
+                                if (toolMessages.isNotEmpty()) {
+                                    _uiState.update {
+                                        it.copy(
+                                            messages = it.messages + toolMessages,
+                                            streamingContent = "",
+                                            streamingReasoning = "",
+                                            isStreaming = false
+                                        )
+                                    }
+                                    for (toolMessage in toolMessages) {
+                                        chatRepository.saveMessage(conversationId, toolMessage)
+                                    }
+                                } else {
+                                    _uiState.update {
+                                        it.copy(
+                                            streamingContent = "",
+                                            streamingReasoning = "",
+                                            isStreaming = false
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -478,7 +551,8 @@ class ChatViewModel @Inject constructor(
             isStreaming = false,
             streamingContent = "",
             streamingReasoning = "",
-            toolCallActive = null
+            toolCallActive = null,
+            activeToolError = null
         ) }
     }
 
@@ -558,6 +632,7 @@ class ChatViewModel @Inject constructor(
                 conversationProviderType = null,
                 modelUnavailable = false,
                 showNoToolSupportNotice = false,
+                activeToolError = null,
                 toolCallActive = null
             )
         }
