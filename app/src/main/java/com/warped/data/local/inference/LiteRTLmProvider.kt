@@ -110,6 +110,11 @@ class LiteRTLmProvider @Inject constructor(
     /**
      * Reset the active conversation. Called when the engine is reloaded or the model changes.
      * The next chat() call will lazily create a new conversation.
+     *
+     * NOTE: this deliberately does NOT clear [toolsDegraded] — the wedge
+     * path sets the flag and then resets the conversation for its no-tools
+     * retry. Use [clearToolsDegraded] at session boundaries (model switch,
+     * fresh conversation) where the (model, engine) verdict no longer applies.
      */
     fun resetConversation() {
         synchronized(this) {
@@ -119,6 +124,15 @@ class LiteRTLmProvider @Inject constructor(
             activeConversation = null
             activeConversationConfig = null
         }
+    }
+
+    /**
+     * WR-01: clear the T-47-09 wedge verdict. The verdict belongs to a
+     * (model, engine) pair — a model switch or a fresh conversation is a
+     * new session, so engine tools may be re-armed there.
+     */
+    fun clearToolsDegraded() {
+        toolsDegraded = false
     }
 
     override fun chat(request: ChatRequest): Flow<StreamToken> {

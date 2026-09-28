@@ -621,6 +621,9 @@ class ChatViewModel @Inject constructor(
 
     fun newConversation() {
         unloadLocalModels()
+        // WR-01: fresh conversation is a new session — drop the wedge
+        // verdict so a verified tool-supporting model re-arms engine tools.
+        try { liteRTLmProvider.clearToolsDegraded() } catch (e: Exception) { Timber.e(e, "Chat: clearToolsDegraded failed") }
         _uiState.update {
             it.copy(
                 conversationId = null,
