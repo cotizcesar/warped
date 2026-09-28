@@ -1,20 +1,16 @@
 ---
 gsd_state_version: "1.0"
-milestone: v2.2
-milestone_name: Simplificación + Web Grounding (SHIPPED 2026-09-28)
-current_phase: —
-current_phase_name: Milestone shipped — run /gsd-new-milestone for next
-status: shipped
-last_updated: "2026-09-28T14:30:00.000Z"
+milestone: v2.3
+milestone_name: Web Grounding v2
+status: planning
+last_updated: "2026-09-28T15:03:59.730Z"
 last_activity: 2026-09-28
-last_activity_desc: v2.2 milestone archived (override closeout, 4 device smokes accepted)
-state_head: 7b98278docs
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 5
-  completed_plans: 5
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State: Warped
@@ -31,12 +27,10 @@ See: .planning/PROJECT.md (updated 2026-09-28 after v2.2 milestone close)
 
 ## Current Position
 
-Phase: — (v2.2 shipped: Phases 49–51 complete)
+Phase: Not started (defining requirements)
 Plan: —
-Status: Shipped, ready for next milestone
-Last activity: 2026-09-28 — v2.2 archived: 3 phases, 5 plans, 10/14 MET + 4 accepted partials
-
-Progress: [██████████] 100%
+Status: Defining requirements
+Last activity: 2026-09-28 — Milestone v2.3 started
 
 ## Phase Structure (v2.2 — SHIPPED)
 

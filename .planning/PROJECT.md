@@ -64,16 +64,16 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 **Known deferred:** 4 release-UAT device smokes (DEL-06 release smoke, WEB-05 banner visual, WEB-06 chip/Fuentes/E2E, THEME-01 per-preset visual light+dark). Orphaned Keystore `huggingface_token` entry on upgrades (harmless).
 
-## Current Milestone: (planning next — run `/gsd-new-milestone`)
+## Current Milestone: v2.3 Web Grounding v2
 
-**Goal:** TBD in next milestone definition. v2.2 closed with 4 accepted device-smoke partials (DEL-06, WEB-05, WEB-06, THEME-01) queued for release UAT.
+**Goal:** Pasted URLs ground answers with multi-page context, previewable sources, and offline resilience.
 
-**Shipped in v2.2 (2026-09-28):**
-- Removed skills surface (Calculator, CurrentTime, JsonFormatter + chips, prefs, repo, gating, local/remote tool loops) — legacy TOOL rows still render read-only
-- Removed Hugging Face access token (settings field, download auth headers, encrypted prefs entry, gated models)
-- Removed model search — static `model_allowlist.json` catalog + direct token-free downloads only
-- Heuristic web grounding: URL detect → bounded fetch → `[WEB CONTEXT]` injection with hijack sanitization, offline model-only fallback, default-ON toggle
-- Fixed chat code themes (all 4 presets apply; was Monokai-only)
+**Target features:**
+- Multi-URL fetch (2–5 URLs per message, fused context)
+- Sources preview UI (tap a source to preview extracted text without leaving chat)
+- Per-chat web toggle (per-conversation/per-message override of the global default-ON)
+- Offline retry queue (retry fetch automatically when back online)
+- Extraction quality decided by research (extend heuristic vs robust HTML→text)
 
 ## Requirements
 
@@ -122,7 +122,7 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 ### Active
 
-- [ ] Next milestone requirements — TBD via `/gsd-new-milestone` (REQUIREMENTS.md archived for v2.2; define fresh)
+- [ ] Next milestone requirements — v2.3 Web Grounding v2 (multi-URL fetch, sources preview, per-chat toggle, offline retry)
 
 ### Out of Scope
 
@@ -210,4 +210,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-28 after v2.2 Simplificación + Web Grounding milestone close*
+*Last updated: 2026-09-28 — v2.3 Web Grounding v2 milestone started*
