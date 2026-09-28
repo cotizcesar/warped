@@ -106,6 +106,7 @@ None — v2.2 phases shipped with accepted deferrals recorded above. Next milest
 | 20260928-catalog-repo-url-fix | 2026-09-28 | Complete ✓ | Explicit repo field (fixes 404 on all catalog downloads) + E4B entry; 297 green; 3n modelFile/size swap deferred |
 | 20260928-catalog-card-redesign | 2026-09-28 | Complete ✓ | Dense card (title + download icon, feature icons + size, tap expands RAM + uso); 7 download states preserved; visual check on-device pending |
 | 20260928-catalog-downloaded-spacing | 2026-09-28 | Complete ✓ | On-device downloaded check (disco, no solo sesión) + espaciado iconos/título a la mitad; 309 green |
+| 20260928-kill-purple-theme | 2026-09-28 | Complete ✓ | Morado eliminado (5 puntos → neutro 2B2B29 + coral, visión a azul claro); grep gate limpio; 309 green |
 
 ## Session Continuity
 
