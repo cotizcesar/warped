@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-09-28T15:03:59.730Z"
 last_activity: 2026-09-28
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -16,32 +16,33 @@ progress:
 # Project State: Warped
 
 **Last updated:** 2026-09-28
-**Last activity:** 2026-09-28 — v2.2 milestone archived (override closeout, 4 device smokes accepted)
+**Last activity:** 2026-09-28 — v2.3 roadmap created (Phases 52–54, 12 requirements mapped)
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-09-28 after v2.2 milestone close)
 
 **Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** Planning next milestone — run `/gsd-new-milestone` (REQUIREMENTS.md archived; define fresh; numbering continues from Phase 51)
+**Current focus:** v2.3 Web Grounding v2 — Phase 52 Multi-URL Fetch Foundation (ready to plan)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 52 of 54 (Multi-URL Fetch Foundation)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-09-28 — Milestone v2.3 started
+Status: Ready to plan
+Last activity: 2026-09-28 — Roadmap created
 
-## Phase Structure (v2.2 — SHIPPED)
+Progress: [░░░░░░░░░░] 0%
+
+## Phase Structure (v2.3 — PLANNED)
 
 | Phase | Name | Requirements | Status | Depends On |
 |-------|------|--------------|--------|------------|
-| 49 | Surface Removal | DEL-01..06 (6) | Shipped (DEL-06 smoke deferred) | Phase 48 |
-| 50 | Web Grounding | WEB-01..06 (6) | Shipped (WEB-05/06 smoke deferred) | Phase 49 |
-| 51 | Syntax-Theme Fix | THEME-01..02 (2) | Shipped (THEME-01 smoke deferred) | Phase 50 |
+| 52 | Multi-URL Fetch Foundation | FETCH-01..03, EXTRACT-01..02 (5) | Not started | Phase 51 |
+| 53 | Sources Preview + Per-Chat Toggle | SRC-01..03, TOGGLE-01..03 (6) | Not started | Phase 52 |
+| 54 | Offline Retry | RETRY-01 (1) | Not started | Phase 53 |
 
-**Total v2.2:** 3 phases, 5 plans, 14 requirements — 10 MET, 4 PARTIAL (accepted) ✓
-**Archive:** `.planning/milestones/v2.2-ROADMAP.md` · phases in `milestones/v2.2-phases/` · audit `milestones/v2.2-MILESTONE-AUDIT.md`
+**Total v2.3:** 3 phases, 12 requirements mapped (12/12 ✓). Coarse granularity.
 
 ## Performance Metrics
 
@@ -55,9 +56,9 @@ Last activity: 2026-09-28 — Milestone v2.3 started
 
 ### Decisions
 
-- [v2.2]: 3 phases, not 4 — trust-boundary hardening folded into Phase 50 as exit criteria (single-req WEB-05 phase would be a thin anti-pattern). Coarse granularity.
-- [v2.2]: Removals-first ordering (DEL before WEB) — grounding hooks into post-removal transcript shape. Theme fix last, parallelizable with Phase 49.
-- [v2.2]: Zero new dependencies — grounding over existing OkHttp + ConnectivityManager; hand-rolled HTML→text (STACK over FEATURES Jsoup).
+- [v2.3]: 3 phases per research — fetch+budget+Jsoup foundation first (budget/adversarial baseline depends on extraction density), preview+toggle second (one Room migration v15), retry last (orchestrates all three). Coarse granularity.
+- [v2.3]: Message-scoped foreground retry first; WorkManager only as explicit opt-in (FEATURES+PITFALLS over STACK default).
+- [v2.2]: Zero new dependencies — v2.3 adds exactly one: Jsoup 1.23.2 (parse-only, never `Jsoup.connect()`) + desugar NIO build config.
 - [v2.1]: LiteRT-LM target 0.17.1; Summarize stays PromptTemplate (persona, not function).
 
 ### Pending Todos
@@ -68,6 +69,8 @@ None yet.
 
 - Pixel 7 reference-device numbers (PERF-16 + PERF-12/13) stay CI-gated — unchanged, carried forward
 - Release-UAT device smokes (DEL-06, WEB-05, WEB-06, THEME-01) must run on hardware before release
+- Phase 52 exit gates: multi-page adversarial suite + 5×max-size budget assertion (later extractor changes must re-pass)
+- Budget numbers per model window are LOW-confidence estimates — validate on device in Phase 52
 
 ## Deferred Items
 
@@ -89,6 +92,6 @@ None — v2.2 phases shipped with accepted deferrals recorded above. Next milest
 
 **Resume file:** —
 
-Last session: 2026-09-28T14:30:00.000Z
-Stopped at: v2.2 milestone archived
-Resume: `/gsd-new-milestone` (fresh REQUIREMENTS.md, numbering continues from Phase 51)
+Last session: 2026-09-28T15:03:59.730Z
+Stopped at: v2.3 roadmap created (Phases 52–54)
+Resume: `/gsd-plan-phase 52`

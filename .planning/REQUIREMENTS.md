@@ -58,23 +58,23 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FETCH-01 | TBD | Pending |
-| FETCH-02 | TBD | Pending |
-| FETCH-03 | TBD | Pending |
-| SRC-01 | TBD | Pending |
-| SRC-02 | TBD | Pending |
-| SRC-03 | TBD | Pending |
-| TOGGLE-01 | TBD | Pending |
-| TOGGLE-02 | TBD | Pending |
-| TOGGLE-03 | TBD | Pending |
-| RETRY-01 | TBD | Pending |
-| EXTRACT-01 | TBD | Pending |
-| EXTRACT-02 | TBD | Pending |
+| FETCH-01 | Phase 52 | Pending |
+| FETCH-02 | Phase 52 | Pending |
+| FETCH-03 | Phase 52 | Pending |
+| SRC-01 | Phase 53 | Pending |
+| SRC-02 | Phase 53 | Pending |
+| SRC-03 | Phase 53 | Pending |
+| TOGGLE-01 | Phase 53 | Pending |
+| TOGGLE-02 | Phase 53 | Pending |
+| TOGGLE-03 | Phase 53 | Pending |
+| RETRY-01 | Phase 54 | Pending |
+| EXTRACT-01 | Phase 52 | Pending |
+| EXTRACT-02 | Phase 52 | Pending |
 
 **Coverage:**
 - v2.3 requirements: 12 total
-- Mapped to phases: 0
-- Unmapped: 12 ⚠️
+- Mapped to phases: 12
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-09-28*
