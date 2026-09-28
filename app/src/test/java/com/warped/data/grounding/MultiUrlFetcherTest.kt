@@ -32,7 +32,7 @@ class MultiUrlFetcherTest {
 
     private fun grounded(url: String, text: String = "Texto de $url."): GroundingResult.Grounded =
         GroundingResult.Grounded(
-            block = "[WEB CONTEXT — fuente [1]: $url]\n$text\n[FIN WEB CONTEXT]",
+            block = "[WEB CONTEXT — source [1]: $url]\n$text\n[END WEB CONTEXT]",
             url = url,
             text = text,
         )
@@ -54,8 +54,8 @@ class MultiUrlFetcherTest {
         val fused = result as MultiUrlResult.Fused
         assertThat(fused.okUrls).containsExactlyElementsIn(urls).inOrder()
         assertThat(fused.skippedUrls).isEmpty()
-        assertThat(fused.block).contains("[WEB CONTEXT 1 — fuente [1]: https://a.example/uno]")
-        assertThat(fused.block).contains("[WEB CONTEXT 3 — fuente [3]: https://c.example/tres]")
+        assertThat(fused.block).contains("[WEB CONTEXT 1 — source [1]: https://a.example/uno]")
+        assertThat(fused.block).contains("[WEB CONTEXT 3 — source [3]: https://c.example/tres]")
         assertThat(fused.block.indexOf("https://a.example/uno"))
             .isLessThan(fused.block.indexOf("https://c.example/tres"))
     }

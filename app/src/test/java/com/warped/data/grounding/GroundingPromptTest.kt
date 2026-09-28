@@ -10,7 +10,7 @@ class GroundingPromptTest {
 
     @Test
     fun `system prompt never invents urls`() {
-        assertThat(GroundingPrompt.SYSTEM_PROMPT).contains("Nunca inventes URLs")
+        assertThat(GroundingPrompt.SYSTEM_PROMPT).contains("Never invent URLs")
     }
 
     @Test
@@ -46,7 +46,7 @@ class GroundingPromptTest {
         val block = GroundingPrompt.buildBlock("https://a.com/x", "texto")
 
         assertThat(block).isEqualTo(
-            "[WEB CONTEXT — fuente [1]: https://a.com/x]\ntexto\n[FIN WEB CONTEXT]"
+            "[WEB CONTEXT — source [1]: https://a.com/x]\ntexto\n[END WEB CONTEXT]"
         )
     }
 }

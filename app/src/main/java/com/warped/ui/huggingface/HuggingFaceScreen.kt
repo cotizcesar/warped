@@ -205,7 +205,7 @@ private fun CatalogModelCard(
                 if (expandable) {
                     Modifier.clickable(
                         role = Role.Button,
-                        onClickLabel = if (expanded) "Contraer detalles" else "Expandir detalles"
+                        onClickLabel = if (expanded) "Collapse details" else "Expand details"
                     ) { expanded = !expanded }
                 } else {
                     Modifier
@@ -333,14 +333,14 @@ private fun CatalogDownloadActions(
                     IconButton(onClick = onPause) {
                         Icon(
                             imageVector = Icons.Filled.Pause,
-                            contentDescription = "Pausar descarga"
+                            contentDescription = "Pause download"
                         )
                     }
                 } else {
                     IconButton(onClick = onResume) {
                         Icon(
                             imageVector = Icons.Filled.PlayArrow,
-                            contentDescription = "Reanudar descarga"
+                            contentDescription = "Resume download"
                         )
                     }
                 }
@@ -348,7 +348,7 @@ private fun CatalogDownloadActions(
                 IconButton(onClick = onCancelClick) {
                     Icon(
                         imageVector = Icons.Filled.Close,
-                        contentDescription = "Cancelar descarga",
+                        contentDescription = "Cancel download",
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
@@ -360,7 +360,7 @@ private fun CatalogDownloadActions(
         ) {
             Icon(
                 imageVector = Icons.Filled.CheckCircle,
-                contentDescription = "Descargado",
+                contentDescription = "Downloaded",
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp)
             )
@@ -368,7 +368,7 @@ private fun CatalogDownloadActions(
         else -> IconButton(onClick = onDownload) {
             Icon(
                 imageVector = Icons.Filled.Download,
-                contentDescription = "Descargar modelo",
+                contentDescription = "Download model",
                 tint = if (failed) {
                     MaterialTheme.colorScheme.error
                 } else {
@@ -389,7 +389,7 @@ private fun CatalogCapabilityIcons(entry: AllowlistedModel) {
         if (entry.capabilities.vision) {
             CapabilityIconBadge(
                 icon = Icons.Filled.Visibility,
-                contentDescription = "Visión",
+                contentDescription = "Vision",
                 color = Color(0xFF64B5F6)
             )
         }
@@ -403,7 +403,7 @@ private fun CatalogCapabilityIcons(entry: AllowlistedModel) {
         if (entry.capabilities.supportsThinking) {
             CapabilityIconBadge(
                 icon = Icons.Filled.Psychology,
-                contentDescription = "Razonamiento",
+                contentDescription = "Reasoning",
                 color = Color(0xFFFF9800)
             )
         }
@@ -415,7 +415,7 @@ private fun CatalogInlineProgress(state: DownloadState) {
     val progressInt = (state.progress * 100).toInt().coerceIn(0, 100)
     Column {
         Text(
-            text = "${if (state.isPaused) "En pausa" else "Descargando"}: " +
+            text = "${if (state.isPaused) "Paused" else "Downloading"}: " +
                 "${state.fileName.substringAfterLast('/')} ($progressInt%)",
             style = MaterialTheme.typography.bodySmall
         )

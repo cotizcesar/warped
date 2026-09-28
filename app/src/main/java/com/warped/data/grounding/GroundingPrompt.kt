@@ -10,14 +10,14 @@ package com.warped.data.grounding
 object GroundingPrompt {
 
     const val SYSTEM_PROMPT =
-        "Responde usando el bloque [WEB CONTEXT] cuando sea relevante. " +
-            "Cita las fuentes con marcadores [1]/[2]. " +
-            "Si necesitas información fresca y no hay bloque de contexto, " +
-            "pide al usuario que pegue un enlace. " +
-            "Nunca inventes URLs: solo cita las URLs del bloque o las que el usuario pegó."
+        "Answer using the [WEB CONTEXT] block when relevant. " +
+            "Cite sources with [1]/[2] markers. " +
+            "If you need fresh information and there is no context block, " +
+            "ask the user to paste a link. " +
+            "Never invent URLs: only cite URLs from the block or pasted by the user."
 
     fun buildBlock(url: String, text: String): String =
-        "[WEB CONTEXT — fuente [1]: $url]\n$text\n[FIN WEB CONTEXT]"
+        "[WEB CONTEXT — source [1]: $url]\n$text\n[END WEB CONTEXT]"
 
     /**
      * Phase 52 (FETCH-01): numbered fusion of N pages in paste order.
@@ -26,7 +26,7 @@ object GroundingPrompt {
      */
     fun buildFusedBlock(pages: List<Pair<String, String>>): String =
         pages.mapIndexed { i, (url, text) ->
-            "[WEB CONTEXT ${i + 1} — fuente [${i + 1}]: $url]\n$text\n[FIN WEB CONTEXT ${i + 1}]"
+            "[WEB CONTEXT ${i + 1} — source [${i + 1}]: $url]\n$text\n[END WEB CONTEXT ${i + 1}]"
         }.joinToString("\n\n")
 
     /**

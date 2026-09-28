@@ -70,22 +70,22 @@ class ModelAllowlistTest {
     }
 
     @Test
-    fun `shipped asset ramNote and blurb match locked Spanish strings`() {
+    fun `shipped asset ramNote and blurb match locked English strings`() {
         val models = parseModelAllowlist(shippedAssetText())
         val byName = models.associateBy { it.name }
 
-        assertThat(byName["gemma-4-E2B-it"]?.ramNote).isEqualTo("Desde ~4 GB de RAM")
-        assertThat(byName["gemma-4-E2B-it"]?.blurb).isEqualTo("Chat general y multimodal ligero.")
-        assertThat(byName["gemma-4-E4B-it"]?.ramNote).isEqualTo("Recomendado 6 GB o más")
+        assertThat(byName["gemma-4-E2B-it"]?.ramNote).isEqualTo("From ~4 GB RAM")
+        assertThat(byName["gemma-4-E2B-it"]?.blurb).isEqualTo("Light general chat and multimodal.")
+        assertThat(byName["gemma-4-E4B-it"]?.ramNote).isEqualTo("6 GB or more recommended")
         assertThat(byName["gemma-4-E4B-it"]?.blurb)
-            .isEqualTo("Más calidad en razonamiento y código, multimodal.")
+            .isEqualTo("Better reasoning and code quality, multimodal.")
         assertThat(byName["gemma-3n-E2B-it-int4"]?.ramNote)
-            .isEqualTo("Desde ~6 GB de RAM (aprox.)")
+            .isEqualTo("From ~6 GB RAM (approx.)")
         assertThat(byName["gemma-3n-E2B-it-int4"]?.blurb)
-            .isEqualTo("Chat con visión y audio eficiente.")
+            .isEqualTo("Efficient chat with vision and audio.")
         assertThat(byName["gemma-3n-E4B-it-int4"]?.ramNote)
-            .isEqualTo("Recomendado 8 GB o más (aprox.)")
-        assertThat(byName["gemma-3n-E4B-it-int4"]?.blurb).isEqualTo("Mayor calidad multimodal.")
+            .isEqualTo("8 GB or more recommended (approx.)")
+        assertThat(byName["gemma-3n-E4B-it-int4"]?.blurb).isEqualTo("Higher multimodal quality.")
     }
 
     @Test

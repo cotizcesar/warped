@@ -234,7 +234,7 @@ fun MessageBubble(
         if (!isUser && fuenteList.any { it.clickable }) {
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "Fuentes",
+                text = "Sources",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -268,12 +268,12 @@ fun MessageBubble(
                             )
                             .semantics {
                                 contentDescription =
-                                    "Vista previa de la fuente ${item.number}"
+                                    "Source preview ${item.number}"
                             }
                     )
                 } else {
                     Text(
-                        text = "[${item.number}] ${item.url} — omitida",
+                        text = "[${item.number}] ${item.url} — skipped",
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textDecoration = TextDecoration.LineThrough,
@@ -306,7 +306,7 @@ fun MessageBubble(
                     if (uri.scheme != "http" && uri.scheme != "https") {
                         Toast.makeText(
                             context,
-                            "Enlace no válido.",
+                            "Invalid link.",
                             Toast.LENGTH_SHORT,
                         ).show()
                     } else {
@@ -316,13 +316,13 @@ fun MessageBubble(
                         } catch (_: ActivityNotFoundException) {
                             Toast.makeText(
                                 context,
-                                "No se encontró un navegador para abrir el enlace.",
+                                "No browser found to open the link.",
                                 Toast.LENGTH_SHORT,
                             ).show()
                         } catch (_: SecurityException) {
                             Toast.makeText(
                                 context,
-                                "No se encontró un navegador para abrir el enlace.",
+                                "No browser found to open the link.",
                                 Toast.LENGTH_SHORT,
                             ).show()
                         }
@@ -378,14 +378,14 @@ private fun ModelOnlyBanner(
         Text(
             text = when (notice) {
                 ModelOnlyNotice.OFFLINE ->
-                    "Sin conexión. Respuesta solo del modelo, sin contenido de la página. En espera."
+                    "Offline. Model-only answer, no page content. Queued."
                 ModelOnlyNotice.FETCH_FAILED ->
                     if (totalSources > 1) {
-                        "No se pudieron leer las páginas. Respuesta solo del modelo — " +
-                            "revisa tu conexión o pega otros enlaces."
+                        "Couldn't read the pages. Model-only answer — " +
+                            "check your connection or paste other links."
                     } else {
-                        "No se pudo leer la página. Respuesta solo del modelo — " +
-                            "revisa tu conexión o pega otro enlace."
+                        "Couldn't read the page. Model-only answer — " +
+                            "check your connection or paste another link."
                     }
             },
             fontSize = 14.sp,
@@ -402,11 +402,11 @@ private fun ModelOnlyBanner(
                     .heightIn(min = 44.dp)
                     .semantics {
                         contentDescription =
-                            "Reintentar la lectura de las páginas. Disponible al recuperar la conexión."
+                            "Retry reading the pages. Available when the connection recovers."
                     }
             ) {
                 Text(
-                    text = "Reintentar",
+                    text = "Retry",
                     color = MaterialTheme.colorScheme.primary
                 )
             }

@@ -63,7 +63,7 @@ fun SourcePreviewSheet(
         ) {
             // Header block: title + [N] badge + resolved URL line.
             Text(
-                text = "Fuente $number",
+                text = "Source $number",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -126,15 +126,15 @@ fun SourcePreviewSheet(
                     .padding(vertical = 16.dp)
                     .heightIn(min = 44.dp),
             ) {
-                Text(text = "Abrir en navegador")
+                Text(text = "Open in browser")
             }
         }
     }
 }
 
-/** UI-SPEC empty-extract copy (Spanish). Browser button stays available. */
+/** UI-SPEC empty-extract copy (English). Browser button stays available. */
 const val EMPTY_EXTRACT_COPY =
-    "No se pudo extraer texto de esta página. Abre la página en el navegador para ver el contenido."
+    "Couldn't extract text from this page. Open the page in the browser to view its content."
 
 /**
  * Phase 53: render item for one Fuentes row. [clickable] is true only for ok

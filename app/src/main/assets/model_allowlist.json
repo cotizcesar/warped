@@ -24,8 +24,8 @@
       },
       "llmPromptTemplates": {},
       "taskTypes": ["chat"],
-      "ramNote": "Desde ~4 GB de RAM",
-      "blurb": "Chat general y multimodal ligero."
+      "ramNote": "From ~4 GB RAM",
+      "blurb": "Light general chat and multimodal."
     },
     {
       "name": "gemma-4-E4B-it",
@@ -45,8 +45,8 @@
       },
       "llmPromptTemplates": {},
       "taskTypes": ["chat"],
-      "ramNote": "Recomendado 6 GB o más",
-      "blurb": "Más calidad en razonamiento y código, multimodal."
+      "ramNote": "6 GB or more recommended",
+      "blurb": "Better reasoning and code quality, multimodal."
     },
     {
       "name": "gemma-3n-E2B-it-int4",
@@ -66,8 +66,8 @@
       },
       "llmPromptTemplates": {},
       "taskTypes": ["chat"],
-      "ramNote": "Desde ~6 GB de RAM (aprox.)",
-      "blurb": "Chat con visión y audio eficiente."
+      "ramNote": "From ~6 GB RAM (approx.)",
+      "blurb": "Efficient chat with vision and audio."
     },
     {
       "name": "gemma-3n-E4B-it-int4",
@@ -87,8 +87,8 @@
       },
       "llmPromptTemplates": {},
       "taskTypes": ["chat"],
-      "ramNote": "Recomendado 8 GB o más (aprox.)",
-      "blurb": "Mayor calidad multimodal."
+      "ramNote": "8 GB or more recommended (approx.)",
+      "blurb": "Higher multimodal quality."
     }
   ]
 }

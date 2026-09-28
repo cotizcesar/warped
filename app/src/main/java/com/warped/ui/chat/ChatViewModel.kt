@@ -292,7 +292,7 @@ class ChatViewModel @Inject constructor(
             pendingWebOverride = override
             updateConnection { it.copy(webOverride = override) }
             _events.tryEmit(
-                ChatEvent.Snackbar("Preferencia de web actualizada. Se aplicará al próximo mensaje."),
+                ChatEvent.Snackbar("Web preference updated. Will apply to the next message."),
             )
             return
         }
@@ -301,7 +301,7 @@ class ChatViewModel @Inject constructor(
                 chatRepository.setWebOverride(conversationId, override)
                 updateConnection { it.copy(webOverride = override) }
                 _events.tryEmit(
-                    ChatEvent.Snackbar("Preferencia de web actualizada. Se aplicará al próximo mensaje."),
+                    ChatEvent.Snackbar("Web preference updated. Will apply to the next message."),
                 )
             } catch (e: Exception) {
                 Timber.e(e, "Chat: setWebOverride failed")
@@ -667,8 +667,8 @@ class ChatViewModel @Inject constructor(
                                     Timber.e(e, "Chat: failed to persist assistant sources")
                                     _events.tryEmit(
                                         ChatEvent.Snackbar(
-                                            "No se pudieron guardar las fuentes. " +
-                                                "La vista previa podría no estar disponible tras reiniciar.",
+                                            "Couldn't save the sources. " +
+                                                "Preview may be unavailable after restart.",
                                         ),
                                     )
                                 }

@@ -92,7 +92,7 @@ class SourcePreviewMappingTest {
         assertThat(isEmptyExtract(blankExtract)).isTrue()
         assertThat(isEmptyExtract(okOne)).isFalse()
         // The sheet renders this copy while keeping the browser button available.
-        assertThat(EMPTY_EXTRACT_COPY).contains("navegador")
+        assertThat(EMPTY_EXTRACT_COPY).contains("browser")
     }
 
     @Test

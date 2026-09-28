@@ -284,15 +284,15 @@ fun ChatScreen(
                     val progress = input.webFetchProgress
                     val isMulti = progress != null && progress.total > 1
                     val chipText = if (isMulti) {
-                        "Leyendo ${progress.done} de ${progress.total}…"
+                        "Reading ${progress.done} of ${progress.total}…"
                     } else {
-                        "Leyendo página…"
+                        "Reading page…"
                     }
                     val chipDescription = if (isMulti) {
-                        "Leyendo ${progress.done} de ${progress.total} páginas. " +
-                            "Pulsa Detener para cancelar la lectura."
+                        "Reading ${progress.done} of ${progress.total} pages. " +
+                            "Tap Stop to cancel reading."
                     } else {
-                        "Leyendo página. Pulsa Detener para cancelar la lectura."
+                        "Reading page. Tap Stop to cancel reading."
                     }
                     Row(
                         modifier = Modifier
@@ -702,7 +702,7 @@ private fun InlineModelSelectorBar(
 ) {
     val pillColor = if (isLocal) Color(0xFF4CAF50) else Color(0xFF2196F3)
     val pillText = if (isLocal) "Local" else "Net"
-    val inheritHint = if (globalWebEnabled) "Heredar (activado global)" else "Heredar (desactivado global)"
+    val inheritHint = if (globalWebEnabled) "Inherit (global on)" else "Inherit (global off)"
     var webMenuExpanded by remember { mutableStateOf(false) }
     val lightColor = when {
         isLoading -> Color(0xFFFFC107)
@@ -778,7 +778,7 @@ private fun InlineModelSelectorBar(
                         IconButton(onClick = { webMenuExpanded = true }) {
                             Icon(
                                 Icons.Filled.MoreVert,
-                                contentDescription = "Opciones de web",
+                                contentDescription = "Web options",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -787,7 +787,7 @@ private fun InlineModelSelectorBar(
                             onDismissRequest = { webMenuExpanded = false }
                         ) {
                             WebOverrideMenuItem(
-                                label = "Web: Sí",
+                                label = "Web: On",
                                 selected = webOverride == true,
                                 onClick = {
                                     webMenuExpanded = false
@@ -795,7 +795,7 @@ private fun InlineModelSelectorBar(
                                 }
                             )
                             WebOverrideMenuItem(
-                                label = "Web: No",
+                                label = "Web: Off",
                                 selected = webOverride == false,
                                 onClick = {
                                     webMenuExpanded = false
@@ -805,7 +805,7 @@ private fun InlineModelSelectorBar(
                             DropdownMenuItem(
                                 text = {
                                     Column {
-                                        Text("Web: Heredar")
+                                        Text("Web: Inherit")
                                         Text(
                                             text = inheritHint,
                                             style = MaterialTheme.typography.labelSmall,
@@ -860,7 +860,7 @@ private fun ThinkingRow() {
         modifier = Modifier
             .fillMaxWidth()
             .semantics {
-                contentDescription = "Pensando. Generando respuesta."
+                contentDescription = "Thinking. Generating answer."
             },
         horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically
@@ -872,7 +872,7 @@ private fun ThinkingRow() {
         )
         Spacer(Modifier.width(10.dp))
         Text(
-            text = "Pensando…",
+            text = "Thinking…",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -897,7 +897,7 @@ private fun ModelLoadingIndicator(loadingModelName: String) {
         )
         Spacer(Modifier.width(10.dp))
         Text(
-            text = "Cargando ${loadingModelName.substringAfterLast("/")}…",
+            text = "Loading ${loadingModelName.substringAfterLast("/")}…",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

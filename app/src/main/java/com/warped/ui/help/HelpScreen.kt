@@ -151,7 +151,7 @@ fun HelpScreen(onNavigateBack: () -> Unit) {
                         "Capability badges (Vision, Audio, Tools, Thinking) reflect model support only.",
                         "If a model supports thinking, enable it from the chat input bar to see its reasoning.",
                         "Example: ask \"What time is it?\" — the model answers from its own knowledge.",
-                        "Tip: enable web grounding (Web: Sí) when you need current information.",
+                        "Tip: enable web grounding (Web: On) when you need current information.",
                     )
                 )
             }
