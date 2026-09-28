@@ -816,7 +816,7 @@ class ChatViewModel @Inject constructor(
     private fun LocalModel.isLiteRtLm(): Boolean =
         modelFormat.equals("LITERTLM", ignoreCase = true) || filePath.endsWith(".litertlm", ignoreCase = true)
 
-    private fun parseThinkBlocks(raw: String, enabled: Boolean = true, modelMayThink: Boolean = false): Pair<String, String> {
+    private fun parseThinkBlocks(raw: String, enabled: Boolean = true, @Suppress("UNUSED_PARAMETER") modelMayThink: Boolean = false): Pair<String, String> {
         if (!enabled) {
             val clean = Regex("<[/]?think>|<[/]?channel\\|?>", setOf(RegexOption.IGNORE_CASE))
                 .replace(raw, "").trim()
@@ -841,11 +841,12 @@ class ChatViewModel @Inject constructor(
             clean = clean.substring(0, openIdx)
         }
 
-        // If model can think and no tags found, show everything as reasoning
-        if (reasoning.isEmpty() && modelMayThink) {
-            reasoning.append(clean.trim())
-            clean = ""
-        }
+        // Untagged output is the answer, not reasoning: without explicit
+        // <think>/<channel|> markers there is no evidence the model was thinking,
+        // and routing plain replies into the collapsed Thinking panel produces
+        // empty assistant bubbles (local-empty-response, 2026-09-28). Genuine
+        // 0.17.x thought-channel streaming stays a later-phase wire-up
+        // (LiteRTLmProvider.extractThoughtContent) — never inferred from absence.
 
         Timber.d("ChatVM: parseThinkBlocks result — clean=%d reasoning=%d", clean.length, reasoning.length)
         return Pair(clean.trim(), reasoning.toString().trim())
