@@ -1,6 +1,7 @@
 package com.warped.data.repository
 
 import com.warped.data.local.db.dao.ConversationDao
+import com.warped.data.local.db.dao.GroundedSourceDao
 import com.warped.data.local.db.dao.MessageDao
 import com.warped.data.local.db.entity.ConversationEntity
 import com.warped.data.local.db.entity.toDomain
@@ -9,16 +10,19 @@ import com.warped.domain.model.ChatMessage
 import com.warped.domain.model.Conversation
 import com.warped.domain.model.GroundedSource
 import com.warped.domain.model.ProviderType
+import com.warped.domain.model.Role
 import com.warped.domain.repository.ChatRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class ChatRepositoryImpl @Inject constructor(
     private val conversationDao: ConversationDao,
-    private val messageDao: MessageDao
+    private val messageDao: MessageDao,
+    private val groundedSourceDao: GroundedSourceDao,
 ) : ChatRepository {
 
     override fun observeConversations(): Flow<List<Conversation>> =
@@ -26,7 +30,23 @@ class ChatRepositoryImpl @Inject constructor(
 
     override suspend fun loadConversation(conversationId: Long): Pair<Conversation, List<ChatMessage>>? {
         val conv = conversationDao.getById(conversationId) ?: return null
-        val msgs = messageDao.getByConversation(conversationId).map { it.toDomain() }
+        val entities = messageDao.getByConversation(conversationId)
+        // Phase 53 (SRC-02): hydrate assistant messages with groundedSources
+        // urls (ok AND omitida — fixing the okUrls-only drop) plus
+        // groundedSourceDetails in source_index order. Only assistant rows
+        // carry source rows, so user rows skip the extra query.
+        val msgs = entities.map { entity ->
+            val base = entity.toDomain()
+            if (base.role != Role.ASSISTANT) {
+                base
+            } else {
+                val details = groundedSourceDao.getByMessage(entity.id).map { it.toDomain() }
+                base.copy(
+                    groundedSources = details.map { it.url },
+                    groundedSourceDetails = details,
+                )
+            }
+        }
         return conv.toDomain() to msgs
     }
 
@@ -67,21 +87,45 @@ class ChatRepositoryImpl @Inject constructor(
         messageDao.deleteById(messageId)
     }
 
-    // Phase 53 (53-01 scaffolding): full source/override implementation lands in
-    // 53-02. These stubs keep the interface-first contracts compiling.
+    // Phase 53 (SRC-02/TOGGLE-01): row-id save plus override read/write.
+    //
+    // WARNING for Phase 54 retry: MessageDao.insert uses REPLACE — re-saving
+    // an already-persisted assistant message CASCADE-wipes its source rows.
+    // Retry must READ rows via getSourcesByMessage, never re-save the message.
+    //
+    // Source rows key on the MessageDao.insert Long return — never on
+    // ChatMessage.id, which is a UUID string unrelated to the DB row id
+    // (toEntity drops it). Rows insert strictly AFTER the assistant insert.
+    // Source-insert failure is Timber-logged and rethrown so the ViewModel
+    // hook can surface the UI-SPEC persistence-failure Snackbar; the send
+    // itself continues (transcript already updated).
     override suspend fun saveMessageWithSources(
         conversationId: Long,
         message: ChatMessage,
         sources: List<GroundedSource>,
-    ): Long = throw NotImplementedError("53-02 implements source persistence")
+    ): Long {
+        val rowId = messageDao.insert(message.toEntity(conversationId))
+        if (sources.isNotEmpty()) {
+            try {
+                groundedSourceDao.insertAll(
+                    sources.mapIndexed { index, source -> source.toEntity(rowId, index) },
+                )
+            } catch (e: Exception) {
+                Timber.e(e, "ChatRepository: failed to persist %d grounded sources for message %d", sources.size, rowId)
+                throw e
+            }
+        }
+        conversationDao.updateTimestamp(conversationId, System.currentTimeMillis())
+        return rowId
+    }
 
     override suspend fun getSourcesByMessage(messageId: Long): List<GroundedSource> =
-        throw NotImplementedError("53-02 implements source hydration")
+        groundedSourceDao.getByMessage(messageId).map { it.toDomain() }
 
     override suspend fun getWebOverride(conversationId: Long): Boolean? =
-        throw NotImplementedError("53-02 implements override read")
+        conversationDao.getWebOverride(conversationId)
 
     override suspend fun setWebOverride(conversationId: Long, override: Boolean?) {
-        throw NotImplementedError("53-02 implements override write")
+        conversationDao.setWebOverride(conversationId, override, System.currentTimeMillis())
     }
 }

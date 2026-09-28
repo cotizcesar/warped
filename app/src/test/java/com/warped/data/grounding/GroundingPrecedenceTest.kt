@@ -1,6 +1,7 @@
 package com.warped.data.grounding
 
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.jupiter.api.Test
 
 /**
@@ -39,14 +40,17 @@ class GroundingPrecedenceTest {
         )
 
         for (row in rows) {
-            assertThat(
+            assertWithMessage(
+                "shouldGround(skipOnce=%s, perChat=%s, global=%s)",
+                row.skipOnce,
+                row.perChat,
+                row.global,
+            ).that(
                 GroundingPrecedence.shouldGround(
                     skipOnce = row.skipOnce,
                     perChat = row.perChat,
                     global = row.global,
                 ),
-            ).named(
-                "shouldGround(skipOnce=${row.skipOnce}, perChat=${row.perChat}, global=${row.global})",
             ).isEqualTo(row.expected)
         }
     }

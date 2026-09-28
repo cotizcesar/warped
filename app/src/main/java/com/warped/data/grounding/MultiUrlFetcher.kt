@@ -36,6 +36,13 @@ sealed interface MultiUrlResult {
         val block: String,
         val okUrls: List<String>,
         val skippedUrls: List<String>,
+        /**
+         * Phase 53 (SRC-02): per-page extracted texts keyed by resolved URL,
+         * covering exactly [okUrls] in the same order. Threaded through so
+         * the repository can persist ok rows with text alongside omitida rows
+         * (null text) in fetch-block order. Defaults empty for pre-53 callers.
+         */
+        val pageTexts: Map<String, String> = emptyMap(),
     ) : MultiUrlResult
 
     data class AllFailed(
@@ -97,6 +104,7 @@ class MultiUrlFetcher @Inject constructor(
                 block = GroundingPrompt.buildFusedBlock(okPages),
                 okUrls = okPages.map { (url, _) -> url },
                 skippedUrls = skipped,
+                pageTexts = okPages.toMap(),
             )
         }
     }
