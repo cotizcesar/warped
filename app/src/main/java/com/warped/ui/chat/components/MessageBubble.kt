@@ -1,6 +1,9 @@
 package com.warped.ui.chat.components
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.util.Base64
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
@@ -37,13 +40,16 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role as SemanticsRole
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.warped.domain.model.ChatMessage
+import com.warped.domain.model.GroundedSource
 import com.warped.domain.model.ModelOnlyNotice
 import com.warped.domain.model.Role
 import com.warped.domain.model.SyntaxTheme
@@ -199,11 +205,22 @@ fun MessageBubble(
             }
         }
 
-        // Phase 50 (WEB-06): numbered Fuentes list 4dp below a grounded
-        // answer. Zero sources renders no block at all. Citation markers in
-        // the answer body stay plain transcript text; only fuente items use
-        // the accent link color. Long URLs wrap, never truncate.
-        if (!isUser && message.groundedSources.isNotEmpty()) {
+        // Phase 53 (SRC-01/02/03): clickable numbered Fuentes list in
+        // fetch-block order covering all N sources (ok + omitida from
+        // hydrated details). Ok items open the SourcePreviewSheet without
+        // leaving chat; omitida rows render struck/disabled with no preview
+        // so no source is silently dropped. Zero ok sources renders no
+        // block at all (unchanged Phase 50 behavior).
+        val sourceDetails = message.groundedSourceDetails
+        val fuenteList = remember(sourceDetails, message.groundedSources) {
+            fuenteItems(details = sourceDetails, legacyUrls = message.groundedSources)
+        }
+        // Local sheet state only — never the hydrated data itself, so
+        // recomposition always re-resolves from the message param. Never
+        // lifted into the ViewModel.
+        var previewSource by remember { mutableStateOf<GroundedSource?>(null) }
+        var previewNumber by remember { mutableStateOf(1) }
+        if (!isUser && fuenteList.any { it.clickable }) {
             Spacer(Modifier.height(4.dp))
             Text(
                 text = "Fuentes",
@@ -211,14 +228,76 @@ fun MessageBubble(
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            message.groundedSources.forEachIndexed { i, url ->
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "[${i + 1}] $url",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.primary
-                )
+            fuenteList.forEachIndexed { index, item ->
+                if (item.clickable) {
+                    Text(
+                        text = "[${item.number}] ${item.url}",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            // 12dp vertical padding on ~20dp text ≈ 44dp
+                            // touch target; absorbs the old 4dp gaps.
+                            .padding(vertical = 12.dp)
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable(
+                                role = SemanticsRole.Button,
+                                onClick = {
+                                    previewSource = if (sourceDetails.isNotEmpty()) {
+                                        previewForTap(sourceDetails, index)
+                                    } else {
+                                        // Legacy ok-only rows predate
+                                        // hydrated details: sheet shows the
+                                        // empty-extract copy with the browser
+                                        // button available.
+                                        GroundedSource(url = item.url)
+                                    } ?: return@clickable
+                                    previewNumber = item.number
+                                }
+                            )
+                            .semantics {
+                                contentDescription =
+                                    "Vista previa de la fuente ${item.number}"
+                            }
+                    )
+                } else {
+                    Text(
+                        text = "[${item.number}] ${item.url} — omitida",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textDecoration = TextDecoration.LineThrough,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
+                    )
+                }
             }
+        }
+        // Sheet host: tap an ok item sets previewSource, dismiss nulls it.
+        // Reads the sheet props from local state resolved above — zero I/O.
+        val currentPreview = previewSource
+        if (currentPreview != null) {
+            SourcePreviewSheet(
+                source = currentPreview,
+                number = previewNumber,
+                onDismiss = { previewSource = null },
+                onOpenBrowser = { url ->
+                    // T-53-09/T-53-10: ACTION_VIEW carries the
+                    // fetcher-resolved url only — never raw pasted text,
+                    // never extracted text. T-53-11: bare emulators without
+                    // a browser must not crash chat.
+                    try {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        previewSource = null
+                    } catch (_: ActivityNotFoundException) {
+                        Toast.makeText(
+                            context,
+                            "No se encontró un navegador para abrir el enlace.",
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                }
+            )
         }
 
         // Stats below the bubble
