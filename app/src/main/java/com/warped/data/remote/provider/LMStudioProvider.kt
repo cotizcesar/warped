@@ -104,7 +104,16 @@ class LMStudioProvider(
     @Volatile
     private var currentCall: Call? = null
 
-    /** Belt-and-braces teardown of the in-flight SSE call, if any. Safe when idle. */
+    /**
+     * Belt-and-braces teardown of the in-flight SSE call, if any. Safe when idle.
+     *
+     * WR-02: the canonical cancel path is the helper-owned handle — the helper
+     * retains the live [Call] via the `onCallCreated` hook into its own
+     * `activeCall` and cancels it from `stopResponse()`. This method only covers
+     * the same [currentCall] retained on this instance; prefer the helper path
+     * when cancelling a turn (a fresh provider is created per turn, so this
+     * handle must never be confused with another turn's call).
+     */
     fun cancelChat() {
         currentCall?.cancel()
     }
@@ -164,13 +173,14 @@ class LMStudioProvider(
                     val errorBody = try {
                         response.body?.string()
                     } catch (e: Exception) {
+                        Timber.w(e, "LMStudio: error-body read failed")
                         response.message
                     } ?: response.message
-                    send(StreamToken.Error("HTTP ${response.code}: $errorBody"))
+                    trySend(StreamToken.Error("HTTP ${response.code}: $errorBody"))
                 } else {
                     val responseBody = response.body
                     if (responseBody == null) {
-                        send(StreamToken.Error("Empty response"))
+                        trySend(StreamToken.Error("Empty response"))
                     } else {
                         val source = responseBody.source()
                         var currentEvent = ""
@@ -224,8 +234,11 @@ class LMStudioProvider(
                             }
                         } catch (e: IOException) { Timber.e(e, "LMStudio: SSE stream read failed") }
 
-                        // Fallback: non-streaming JSON response
-                        if (!sawSse || !hasTokens) {
+                        // WR-06: only attempt the non-streaming decode for a true JSON
+                        // body (never saw SSE framing). When SSE events arrived but
+                        // carried no tokens (e.g. only progress events), decoding the
+                        // SSE-framed accumulator as JSON always fails — emit Done.
+                        if (!sawSse && !hasTokens) {
                             val rawBody = bodyAccumulator.toString()
                             try {
                                 val event = json.decodeFromString<LmStudioSseEvent>(rawBody)
@@ -237,11 +250,11 @@ class LMStudioProvider(
                                 out?.forEach { item ->
                                     when (item.type) {
                                         "reasoning" -> if (item.content.isNotEmpty()) {
-                                            send(StreamToken.Delta("<think>${item.content}</think>"))
+                                            trySend(StreamToken.Delta("<think>${item.content}</think>"))
                                             hasTokens = true
                                         }
                                         "message" -> if (item.content.isNotEmpty()) {
-                                            send(StreamToken.Delta(item.content))
+                                            trySend(StreamToken.Delta(item.content))
                                             hasTokens = true
                                         }
                                     }
@@ -249,7 +262,7 @@ class LMStudioProvider(
                             } catch (e: Exception) { Timber.e(e, "LMStudio: non-streaming JSON parse failed") }
                         }
                         if (currentCoroutineContext().isActive) {
-                            send(StreamToken.Done(statsText, null))
+                            trySend(StreamToken.Done(statsText, null))
                         }
                     }
                 }
