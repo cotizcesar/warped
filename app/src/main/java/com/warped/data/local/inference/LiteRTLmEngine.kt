@@ -36,6 +36,18 @@ class LiteRTLmEngine @Inject constructor(
     @Volatile
     private var loadedModelPath: String? = null
 
+    /**
+     * Sessions handed out by [createConversation], tracked so [close] can release
+     * them before destroying the engine. The native layer errors
+     * ("EngineAdvancedImpl destructed with N living sessions", "Execution manager
+     * is not available") when the engine dies with live sessions — and a stale
+     * session handle is the same family as the 0.12.0 SIGSEGV (see
+     * .planning/debug/crash-2nd-msg-reasoning.md). Guarded by the same monitor
+     * as createConversation/close (both @Synchronized); stale entries are harmless
+     * (skipped via isAlive, set cleared on every close).
+     */
+    private val openSessions = mutableSetOf<Conversation>()
+
     /** Returns true if the engine is initialized and ready. */
     @Synchronized
     fun isInitialized(): Boolean = engine?.isInitialized() == true
@@ -146,10 +158,15 @@ class LiteRTLmEngine @Inject constructor(
         maxOutputToken: Int? = null
     ): Conversation {
         val e = engine ?: error("LiteRTLmEngine is not initialized. Call init() first.")
-        if (thinkingConfig == null && maxOutputToken == null) return e.createConversation(config)
-        return e.createConversation(
-            config.copy(thinkingConfig = thinkingConfig, maxOutputToken = maxOutputToken)
-        )
+        val conversation = if (thinkingConfig == null && maxOutputToken == null) {
+            e.createConversation(config)
+        } else {
+            e.createConversation(
+                config.copy(thinkingConfig = thinkingConfig, maxOutputToken = maxOutputToken)
+            )
+        }
+        openSessions.add(conversation)
+        return conversation
     }
 
     /**
@@ -158,6 +175,18 @@ class LiteRTLmEngine @Inject constructor(
      */
     @Synchronized
     fun close() {
+        // Release live sessions BEFORE destroying the engine — otherwise the native
+        // layer logs "destructed with N living sessions" and later session calls fail
+        // with "Execution manager is not available" (device log 2026-09-27).
+        val sessions = openSessions.toList()
+        openSessions.clear()
+        for (session in sessions) {
+            try {
+                if (session.isAlive) session.close()
+            } catch (e: Exception) {
+                Timber.w(e, "LiteRTLmEngine: error closing conversation during engine close")
+            }
+        }
         try {
             engine?.close()
             Timber.d("LiteRTLmEngine: closed successfully")
