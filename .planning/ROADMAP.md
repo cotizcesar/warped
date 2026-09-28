@@ -81,7 +81,10 @@ v2.2 Simplificación + Web Grounding shipped 2026-09-28 (Phases 49–51): dead s
   2. Retry fetches the URLs again through the same grounding entry point — history is never rewritten and inference never re-runs silently
   3. Retry results land in the same persisted source rows the preview sheet reads
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+- [ ] 54-01-PLAN.md — replaceSources row-reuse, retryGrounding + guards, exit-gate tests
+- [ ] 54-02-PLAN.md — queued banner + Reintentar button, resume refresh + wiring
 **UI hint**: yes
 
 ## Progress
