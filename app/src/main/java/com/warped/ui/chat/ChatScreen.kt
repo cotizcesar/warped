@@ -241,7 +241,7 @@ fun ChatScreen(
         if (snapToBottomOnNextContent || isAtBottom) {
             snapToBottomOnNextContent = false
             hasNewContentBelow = false
-            listState.scrollToItem(totalItems - 1)
+            listState.pinLastItemEnd(totalItems - 1)
         } else {
             hasNewContentBelow = true
         }
@@ -471,7 +471,19 @@ fun ChatScreen(
                             snapToBottomOnNextContent = false
                             hasNewContentBelow = false
                             scope.launch {
-                                if (totalItems > 0) listState.animateScrollToItem(totalItems - 1)
+                                if (totalItems > 0) {
+                                    listState.animateScrollToItem(totalItems - 1)
+                                    val info = listState.layoutInfo
+                                    val item = info.visibleItemsInfo
+                                        .firstOrNull { it.index == totalItems - 1 }
+                                    if (item != null) {
+                                        val overflow = item.offset + item.size -
+                                            info.viewportEndOffset
+                                        if (overflow > 0) {
+                                            listState.animateScrollBy(overflow.toFloat())
+                                        }
+                                    }
+                                }
                             }
                         },
                         modifier = Modifier
