@@ -72,6 +72,12 @@ class TavilySearchRepository @Inject constructor(
         maxResults: Int = DEFAULT_MAX_RESULTS,
         contextSize: Int = 4096,
     ): TavilySearchOutcome = withContext(ioDispatcher) {
+        val trimmedQuery = query.take(MAX_QUERY_CHARS)
+        if (trimmedQuery.isBlank()) {
+            return@withContext TavilySearchOutcome.ModelOnly(
+                MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
+            )
+        }
         val keyChars = apiKeyStore.getTavilyKey()
         if (keyChars == null || keyChars.isEmpty()) {
             keyChars?.fill('0')
@@ -80,12 +86,6 @@ class TavilySearchRepository @Inject constructor(
         val key = keyChars.concatToString()
         keyChars.fill('0')
 
-        val trimmedQuery = query.take(MAX_QUERY_CHARS)
-        if (trimmedQuery.isBlank()) {
-            return@withContext TavilySearchOutcome.ModelOnly(
-                MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
-            )
-        }
         val count = maxResults.coerceIn(1, MAX_RESULTS_CAP)
         try {
             val request = TavilySearchRequest(
