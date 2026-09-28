@@ -108,3 +108,28 @@ val MIGRATION_13_14 = object : Migration(13, 14) {
         )
     }
 }
+
+// Phase 53 (SRC-01/TOGGLE-01/TOGGLE-03): ONE migration carrying both DDLs —
+// no multi-step, no second migration. web_override stays nullable with no
+// default so existing rows read NULL (= inherit global default-ON); a non-null
+// default would destroy the inherit leg of the tri-state.
+val MIGRATION_14_15 = object : Migration(14, 15) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE conversations ADD COLUMN web_override INTEGER")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `grounded_sources` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`message_id` INTEGER NOT NULL, " +
+                "`source_index` INTEGER NOT NULL, " +
+                "`resolved_url` TEXT NOT NULL, " +
+                "`extracted_text` TEXT, " +
+                "`status` TEXT NOT NULL, " +
+                "FOREIGN KEY(`message_id`) REFERENCES `messages`(`id`) " +
+                "ON UPDATE NO ACTION ON DELETE CASCADE)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_grounded_sources_message_id` " +
+                "ON `grounded_sources` (`message_id`)"
+        )
+    }
+}
