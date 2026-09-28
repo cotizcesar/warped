@@ -96,6 +96,12 @@ None yet.
 
 None — v2.2 phases shipped with accepted deferrals recorded above. Next milestone starts clean.
 
+## Quick Tasks Completed
+
+| Slug | Date | Status | Notes |
+|------|------|--------|-------|
+| 20260928-chat-scroll-follow-fix | 2026-09-28 | Complete ✓ | End-pin follow + Latest pill fix (single root cause: item-top pinning); 300/300 unit green; on-device scroll confirmation pending |
+
 ## Session Continuity
 
 **Resume file:** —
