@@ -11,6 +11,7 @@ import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.preferences.AdvancedPreferences
 import com.warped.data.remote.provider.ProviderRouter
+import com.warped.domain.llm.LlmModelHelper
 import com.warped.domain.model.*
 import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
@@ -47,6 +48,19 @@ class ChatViewModel @Inject constructor(
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
     private var generationJob: Job? = null
+
+    /**
+     * 46-01 RUNTIME-13/14: the helper serving the current turn, retained at
+     * provider-resolution time so [stopGeneration] can reach `stopResponse()`
+     * (transport-level halt). Nulled on stop and on turn completion (sequence-guarded
+     * so a stale turn's `finally` never clears a follow-up turn's helper).
+     */
+    @Volatile
+    private var activeHelper: LlmModelHelper? = null
+
+    /** Monotonic turn counter backing the [activeHelper] stale-finally guard. */
+    @Volatile
+    private var generationSeq = 0L
 
     private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         timber.log.Timber.e(throwable, "Unhandled coroutine exception")
@@ -179,6 +193,8 @@ class ChatViewModel @Inject constructor(
         val userMessage = ChatMessage(role = Role.USER, content = text.trim(), imageUris = imageDataUrls)
         _uiState.update { it.copy(messages = it.messages + userMessage, inputText = "", isStreaming = true, toolCallActive = null) }
 
+        // 46-01 RUNTIME-13: per-turn identity for the single shared inference Flow.
+        val turnId = ++generationSeq
         generationJob = viewModelScope.launch(coroutineExceptionHandler) {
             try {
                 val conversationId = ensureConversation(text, hasMedia = images.isNotEmpty() || audioBytes != null)
@@ -245,6 +261,10 @@ class ChatViewModel @Inject constructor(
                 // RUNTIME-04: initialize() is idempotent on the helper — if the helper
                 // already serves this model, it is a no-op. We call it from sendMessage
                 // so the unified chat path is self-contained.
+                //
+                // 46-01 RUNTIME-14: retain the serving helper so stopGeneration() can
+                // reach stopResponse() (transport-level halt).
+                activeHelper = helper
                 helper.initialize(modelId)
 
                 val request = ChatRequest(
@@ -263,10 +283,16 @@ class ChatViewModel @Inject constructor(
                 val modelMayThink = state.localModels.firstOrNull { it.filePath == modelId }?.capabilities?.reasoning == true
                 Timber.d("ChatVM: sendMessage reasoningActive=%b modelMayThink=%b", reasoningActive, modelMayThink)
 
+                // 46-01 RUNTIME-13: the ONE real collection — the helper's cold flow is
+                // shared per-turn (shareIn replay=1 scoped to the generation job
+                // itself, never in @Singleton helpers/Router) and the accumulator
+                // below is the single collector. Rotation-safe: collection lives in
+                // the ViewModel (survives config change); replay covers UI
+                // re-subscription with no duplicate upstream work.
                 helper.runInference(
                     request = request,
                     enableThinking = state.enableThinking && state.supportsThinking,
-                ).collect { token ->
+                ).shareIn(this, SharingStarted.Eagerly, replay = 1).collect { token ->
 
                     when (token) {
                         is StreamToken.Delta -> {
@@ -343,13 +369,30 @@ class ChatViewModel @Inject constructor(
                         isStreaming = false
                     )
                 }
+            } finally {
+                // 46-01: clear the serving helper on turn end — but only if no newer
+                // turn has started since (stale-finally guard via turnId/seq).
+                if (turnId == generationSeq) activeHelper = null
             }
         }
     }
 
+    /**
+     * 46-01 RUNTIME-14: Stop means stop. Transport-stop FIRST (socket/native halt
+     * via the serving helper — no trailing tokens, no fake Error), then
+     * scope-cancel (shareIn upstream), then streaming-state reset. Both handles
+     * are nulled so an immediate follow-up sendMessage resolves a fresh helper
+     * with no stale handle (pitfall 2). Safe when idle.
+     */
     fun stopGeneration() {
+        try {
+            activeHelper?.stopResponse()
+        } catch (e: Exception) {
+            Timber.e(e, "Chat: stopResponse failed")
+        }
         generationJob?.cancel()
         generationJob = null
+        activeHelper = null
         _uiState.update { it.copy(
             isStreaming = false,
             streamingContent = "",
