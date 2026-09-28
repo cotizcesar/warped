@@ -7,6 +7,7 @@ import com.warped.data.local.download.ModelDownloadManager
 import com.warped.data.repository.AllowlistedModel
 import com.warped.data.repository.ModelAllowlistRepository
 import com.warped.data.repository.parseModelAllowlist
+import com.warped.domain.repository.LocalModelRepository
 import io.mockk.Runs
 import io.mockk.every
 import io.mockk.just
@@ -71,6 +72,8 @@ class CatalogDownloadUrlTest {
     ): Pair<CatalogViewModel, MutableList<CapturedDownload>> {
         val downloadManager = mockk<ModelDownloadManager>()
         every { downloadManager.downloadStates } returns MutableStateFlow(emptyMap())
+        val localRepo = mockk<LocalModelRepository>(relaxed = true)
+        every { localRepo.observeModels() } returns MutableStateFlow(emptyList())
         val captured = mutableListOf<CapturedDownload>()
         every {
             downloadManager.startDownload(any(), any(), any(), any(), any())
@@ -85,7 +88,7 @@ class CatalogDownloadUrlTest {
                 )
             )
         }
-        return CatalogViewModel(repository, downloadManager) to captured
+        return CatalogViewModel(repository, downloadManager, localRepo) to captured
     }
 
     @Test
@@ -138,6 +141,8 @@ class CatalogDownloadUrlTest {
         val repository = ModelAllowlistRepository(context)
         val downloadManager = mockk<ModelDownloadManager>()
         every { downloadManager.downloadStates } returns MutableStateFlow(emptyMap())
+        val localRepo = mockk<LocalModelRepository>(relaxed = true)
+        every { localRepo.observeModels() } returns MutableStateFlow(emptyList())
         val fileUrlSlot = slot<String>()
         val modelIdSlot = slot<String>()
         every {
@@ -145,7 +150,7 @@ class CatalogDownloadUrlTest {
                 capture(modelIdSlot), any(), capture(fileUrlSlot), any(), any()
             )
         } just Runs
-        val viewModel = CatalogViewModel(repository, downloadManager)
+        val viewModel = CatalogViewModel(repository, downloadManager, localRepo)
 
         viewModel.startDownload(legacy)
 
