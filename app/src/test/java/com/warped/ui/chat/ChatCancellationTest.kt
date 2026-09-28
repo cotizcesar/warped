@@ -303,6 +303,7 @@ class ChatCancellationTest {
             advancedPreferences = advancedPreferences,
             fetcher = fetcher,
             multiUrlFetcher = multiUrlFetcher,
+            tavilySearchRepository = mockk(),
             context = context,
         )
     }

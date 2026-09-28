@@ -11,6 +11,8 @@ import com.warped.data.grounding.GroundingPrompt
 import com.warped.data.grounding.GroundingResult
 import com.warped.data.grounding.MultiUrlFetcher
 import com.warped.data.grounding.MultiUrlResult
+import com.warped.data.grounding.TavilySearchOutcome
+import com.warped.data.grounding.TavilySearchRepository
 import com.warped.data.grounding.UrlDetector
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.inference.BackendType
@@ -52,6 +54,7 @@ class ChatViewModel @Inject constructor(
     private val advancedPreferences: AdvancedPreferences,
     private val fetcher: WebPageFetcher,
     private val multiUrlFetcher: MultiUrlFetcher,
+    private val tavilySearchRepository: TavilySearchRepository,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -470,14 +473,121 @@ class ChatViewModel @Inject constructor(
                             updateInput { it.copy(isFetchingWeb = false, webFetchProgress = null) }
                         }
                     } else {
-                        // Always-on web instruction: a grounded turn with no
-                        // pasted URLs still carries SYSTEM_PROMPT so the
-                        // model knows web search is available.
-                        requestUserText = GroundingPrompt.augment(
-                            requestUserText,
-                            null,
-                            groundingEnabled = doGround,
-                        )
+                        // Phase 55 (TAV-02/TAV-03): Tavily search branch. Runs
+                        // ONLY when all hold — doGround (the once-per-send
+                        // GroundingPrecedence.shouldGround read above, same
+                        // precedence as fetch, never re-read mid-turn),
+                        // validated internet (offline yields the existing
+                        // OFFLINE model-only path with no socket opened and
+                        // no search attempt), and a stored Tavily key
+                        // (MissingKey yields the actionable notice, no
+                        // socket — the repository checks the key first).
+                        // Success fuses through the IDENTICAL downstream
+                        // path as URL grounding: GroundingPrompt.augment of
+                        // requestUserText, groundedSources/okUrls, the
+                        // details-union persist below, per-source OK/OMITIDA
+                        // progress snapshot, Fuentes/preview/citations
+                        // untouched. Runs on Dispatchers.IO inside the
+                        // repository (same as fetchAll) — never the UI
+                        // thread (T-55-06/T-55-07).
+                        val online = try {
+                            fetcher.hasValidatedInternet()
+                        } catch (e: Exception) {
+                            Timber.w(e, "Chat: connectivity check failed, treating as offline")
+                            false
+                        }
+                        if (!online) {
+                            modelOnlyNotice = ModelOnlyNotice.OFFLINE
+                            requestUserText = GroundingPrompt.augment(
+                                requestUserText,
+                                null,
+                                groundingEnabled = doGround,
+                            )
+                        } else {
+                            val searchCount = TavilySearchRepository.DEFAULT_MAX_RESULTS
+                            updateInput {
+                                it.copy(
+                                    isFetchingWeb = true,
+                                    webFetchProgress = WebFetchProgress(
+                                        done = 0,
+                                        total = searchCount,
+                                        perSource = emptyList(),
+                                    ),
+                                )
+                            }
+                            try {
+                                val contextSize = state.generationParameters.contextSize
+                                when (
+                                    val outcome = tavilySearchRepository.search(
+                                        query = userMessage.content,
+                                        maxResults = searchCount,
+                                        contextSize = contextSize,
+                                    )
+                                ) {
+                                    is TavilySearchOutcome.Grounded -> {
+                                        val fused = outcome.fused
+                                        requestUserText = GroundingPrompt.augment(
+                                            requestUserText,
+                                            fused.block,
+                                            groundingEnabled = doGround,
+                                        )
+                                        groundedSources = fused.okUrls
+                                        groundedSourceDetails = fused.details
+                                        val total =
+                                            fused.okUrls.size + fused.skippedUrls.size
+                                        updateInput { s ->
+                                            s.copy(
+                                                webFetchProgress = s.webFetchProgress?.copy(
+                                                    done = total,
+                                                    perSource = fused.okUrls.map { url ->
+                                                        SourceFetchState(url, PerSourceStatus.OK)
+                                                    } + fused.skippedUrls.map { url ->
+                                                        SourceFetchState(url, PerSourceStatus.OMITIDA)
+                                                    },
+                                                ),
+                                            )
+                                        }
+                                    }
+                                    is TavilySearchOutcome.ModelOnly -> {
+                                        modelOnlyNotice = when (outcome.failed.reason) {
+                                            GroundingResult.Reason.OFFLINE -> ModelOnlyNotice.OFFLINE
+                                            GroundingResult.Reason.FETCH_FAILED -> ModelOnlyNotice.FETCH_FAILED
+                                        }
+                                        requestUserText = GroundingPrompt.augment(
+                                            requestUserText,
+                                            null,
+                                            groundingEnabled = doGround,
+                                        )
+                                    }
+                                    TavilySearchOutcome.MissingKey -> {
+                                        modelOnlyNotice = ModelOnlyNotice.TAVILY_MISSING_KEY
+                                        requestUserText = GroundingPrompt.augment(
+                                            requestUserText,
+                                            null,
+                                            groundingEnabled = doGround,
+                                        )
+                                    }
+                                    TavilySearchOutcome.InvalidKey -> {
+                                        modelOnlyNotice = ModelOnlyNotice.TAVILY_INVALID_KEY
+                                        requestUserText = GroundingPrompt.augment(
+                                            requestUserText,
+                                            null,
+                                            groundingEnabled = doGround,
+                                        )
+                                    }
+                                    TavilySearchOutcome.UsageLimit -> {
+                                        modelOnlyNotice = ModelOnlyNotice.TAVILY_LIMIT
+                                        requestUserText = GroundingPrompt.augment(
+                                            requestUserText,
+                                            null,
+                                            groundingEnabled = doGround,
+                                        )
+                                    }
+                                }
+                            } finally {
+                                updateInput { it.copy(isFetchingWeb = false, webFetchProgress = null) }
+                            }
+                        }
                     }
                 }
 

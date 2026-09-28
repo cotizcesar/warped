@@ -29,4 +29,10 @@ data class ChatMessage(
 enum class ModelOnlyNotice {
     OFFLINE,
     FETCH_FAILED,
+    /** Phase 55 (TAV-03): search gated — no key stored (actionable copy). */
+    TAVILY_MISSING_KEY,
+    /** Phase 55 (TAV-03): search gated — stored key rejected (401). */
+    TAVILY_INVALID_KEY,
+    /** Phase 55 (TAV-03): search gated — plan usage exhausted (429). */
+    TAVILY_LIMIT,
 }

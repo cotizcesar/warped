@@ -387,6 +387,18 @@ private fun ModelOnlyBanner(
                         "Couldn't read the page. Model-only answer — " +
                             "check your connection or paste another link."
                     }
+                // Phase 55 (TAV-03): distinct actionable copy per search
+                // gate — all English, all naming the Settings path. None is
+                // OFFLINE so retryGrounding stays OFFLINE-only.
+                ModelOnlyNotice.TAVILY_MISSING_KEY ->
+                    "No Tavily key saved. Model-only answer — get a key at " +
+                        "tavily.com and paste it in Settings > Web Search."
+                ModelOnlyNotice.TAVILY_INVALID_KEY ->
+                    "Invalid Tavily key. Model-only answer — check the key " +
+                        "in Settings > Web Search."
+                ModelOnlyNotice.TAVILY_LIMIT ->
+                    "Tavily usage limit reached. Model-only answer — check " +
+                        "your plan usage and try again later."
             },
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
