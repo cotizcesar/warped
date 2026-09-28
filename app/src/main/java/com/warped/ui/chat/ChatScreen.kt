@@ -17,10 +17,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.animation.core.animateFloat
@@ -150,6 +152,17 @@ fun ChatScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Phase 53 (TOGGLE-01/SRC-02): one-shot ViewModel events (toggle
+    // feedback, persist-failure notice) rendered as non-blocking Snackbars.
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is ChatEvent.Snackbar ->
+                    snackbarHostState.showSnackbar(event.message, duration = SnackbarDuration.Short)
+            }
+        }
+    }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
@@ -297,6 +310,8 @@ fun ChatScreen(
                 modelHasAudio = connection.localModels.firstOrNull { it.filePath == connection.selectedLocalModelId }?.capabilities?.audio == true,
                 onAudioRecorded = { bytes -> audioBytes = bytes },
                 onAudioRecordingChanged = { isRecording = it },
+                skipWebOnce = input.skipWebOnce,
+                onToggleSkipWeb = { viewModel.toggleSkipWebOnce() },
             )
             }
         }
@@ -326,7 +341,10 @@ fun ChatScreen(
                     showModelPicker = true
                     viewModel.fetchAllEndpointModels()
                 },
-                onOpenDrawer = onOpenDrawer
+                onOpenDrawer = onOpenDrawer,
+                webOverride = connection.webOverride,
+                globalWebEnabled = connection.webGroundingEnabled,
+                onWebOverrideSelected = { viewModel.setWebOverride(it) }
             )
 
             // CHAT-07: Model loading indicator
@@ -604,10 +622,17 @@ private fun InlineModelSelectorBar(
     loadingModelName: String,
     trafficLight: TrafficLightState,
     onClick: () -> Unit,
-    onOpenDrawer: () -> Unit
+    onOpenDrawer: () -> Unit,
+    // Phase 53 (TOGGLE-01): tri-state per-chat web control via the overflow
+    // menu (cheapest consistent surface — no TopAppBar exists by design).
+    webOverride: Boolean?,
+    globalWebEnabled: Boolean,
+    onWebOverrideSelected: (Boolean?) -> Unit
 ) {
     val pillColor = if (isLocal) Color(0xFF4CAF50) else Color(0xFF2196F3)
     val pillText = if (isLocal) "Local" else "Net"
+    val inheritHint = if (globalWebEnabled) "Heredar (activado global)" else "Heredar (desactivado global)"
+    var webMenuExpanded by remember { mutableStateOf(false) }
     val lightColor = when {
         isLoading -> Color(0xFFFFC107)
         trafficLight == TrafficLightState.GREEN -> Color(0xFF4CAF50)
@@ -675,10 +700,81 @@ private fun InlineModelSelectorBar(
                         modifier = Modifier.size(20.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    // Phase 53 (TOGGLE-01): tri-state Web Sí/No/Heredar menu.
+                    // Toggle applies to the next send only, never refetches
+                    // history. Spanish labels per UI-SPEC.
+                    Box {
+                        IconButton(onClick = { webMenuExpanded = true }) {
+                            Icon(
+                                Icons.Filled.MoreVert,
+                                contentDescription = "Opciones de web",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = webMenuExpanded,
+                            onDismissRequest = { webMenuExpanded = false }
+                        ) {
+                            WebOverrideMenuItem(
+                                label = "Web: Sí",
+                                selected = webOverride == true,
+                                onClick = {
+                                    webMenuExpanded = false
+                                    onWebOverrideSelected(true)
+                                }
+                            )
+                            WebOverrideMenuItem(
+                                label = "Web: No",
+                                selected = webOverride == false,
+                                onClick = {
+                                    webMenuExpanded = false
+                                    onWebOverrideSelected(false)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text("Web: Heredar")
+                                        Text(
+                                            text = inheritHint,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                },
+                                trailingIcon = if (webOverride == null) {
+                                    { Icon(Icons.Filled.Check, contentDescription = null) }
+                                } else null,
+                                onClick = {
+                                    webMenuExpanded = false
+                                    onWebOverrideSelected(null)
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
     }
+}
+
+/**
+ * Phase 53 (TOGGLE-01): one tri-state menu row with a check mark for the
+ * active value. Heredar carries the live global hint instead (own item above).
+ */
+@Composable
+private fun WebOverrideMenuItem(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    DropdownMenuItem(
+        text = { Text(label) },
+        trailingIcon = if (selected) {
+            { Icon(Icons.Filled.Check, contentDescription = null) }
+        } else null,
+        onClick = onClick
+    )
 }
 
 /**

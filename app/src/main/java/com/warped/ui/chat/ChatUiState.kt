@@ -48,7 +48,10 @@ data class ChatInputState(
     val isGenerating: Boolean = false,
     // Phase 50 (WEB-06): true while the grounding fetch is in flight.
     // Owner: send/stop turn code, mirrors isGenerating.
-    val isFetchingWeb: Boolean = false,
+    val isFetchingWeb: Boolean = false,    // Phase 53 (TOGGLE-03): one-shot composer "Sin web" flag. Set by the
+    // composer chip, consumed once at send start, reset after every send
+    // regardless of outcome. Never persisted, never changes the toggle.
+    val skipWebOnce: Boolean = false,
     // Phase 52 (FETCH-03): N-de-M fan-out progress. Nullable: present only
     // while fetching; cleared on completion/failure/Stop (transient, never
     // persisted, never a transcript message). The Phase 52 chip renders
@@ -122,6 +125,14 @@ data class ChatConnectionState(
     val pendingModelSwitch: ModelSwitchRequest? = null,
     val conversationModelId: String? = null,
     val conversationProviderType: ProviderType? = null,
+    // Phase 53 (TOGGLE-01): per-conversation tri-state web override
+    // (null = Heredar, inherit the global default-ON). Loaded once per
+    // selectConversation; written via setWebOverride. Never hot-observed
+    // in the turn path (RESEARCH pitfall 6).
+    val webOverride: Boolean? = null,
+    // Phase 53 (TOGGLE-01): live global default for the Heredar hint
+    // ("Heredar (activado/desactivado global)"). Mirrors DataStore.
+    val webGroundingEnabled: Boolean = true,
 )
 
 /**
@@ -183,6 +194,8 @@ data class ChatUiState(
     val pendingModelSwitch: ModelSwitchRequest? = null,
     val conversationModelId: String? = null,
     val conversationProviderType: ProviderType? = null,
+    val webOverride: Boolean? = null,
+    val webGroundingEnabled: Boolean = true,
 )
 
 /** 48-01: the single derivation point monolith-shim ← sub-states. */
@@ -230,6 +243,8 @@ fun combineSnapshot(
     pendingModelSwitch = connection.pendingModelSwitch,
     conversationModelId = connection.conversationModelId,
     conversationProviderType = connection.conversationProviderType,
+    webOverride = connection.webOverride,
+    webGroundingEnabled = connection.webGroundingEnabled,
 )
 
 enum class TrafficLightState {
@@ -252,6 +267,15 @@ data class ModelSwitchRequest(
     val providerType: ProviderType,
     val endpointId: Long? = null,
 )
+
+/**
+ * Phase 53 (TOGGLE-01/SRC-02): one-shot UI events from ChatViewModel to
+ * ChatScreen. Emitted with tryEmit (never suspends the turn); the screen
+ * renders them as Snackbars. Chat continues regardless (non-blocking).
+ */
+sealed interface ChatEvent {
+    data class Snackbar(val message: String) : ChatEvent
+}
 
 /**
  * 48-01: traffic-light derivation over the split states (PERF-04 precedent:

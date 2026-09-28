@@ -6,6 +6,7 @@ import android.util.Base64
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.warped.data.grounding.GroundingPrecedence
 import com.warped.data.grounding.GroundingPrompt
 import com.warped.data.grounding.GroundingResult
 import com.warped.data.grounding.MultiUrlFetcher
@@ -109,6 +110,23 @@ class ChatViewModel @Inject constructor(
      */
     @Volatile
     private var webGroundingEnabled = true
+
+    /**
+     * Phase 53 (TOGGLE-01/SRC-02): one-shot Snackbar events for ChatScreen.
+     * tryEmit only — the turn never suspends waiting for a collector.
+     */
+    private val _events = MutableSharedFlow<ChatEvent>(extraBufferCapacity = 4)
+    val events: SharedFlow<ChatEvent> = _events.asSharedFlow()
+
+    /**
+     * Phase 53 (TOGGLE-01): override chosen before the first send (no
+     * conversation row yet). Applied once in [ensureConversation], then
+     * cleared. Either this or hiding the control pre-conversation satisfies
+     * RESEARCH open question 3 — holding pending keeps the control always
+     * visible with zero new surfaces.
+     */
+    @Volatile
+    private var pendingWebOverride: Boolean? = null
 
     private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         timber.log.Timber.e(throwable, "Unhandled coroutine exception")
@@ -224,6 +242,44 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch(coroutineExceptionHandler) {
             advancedPreferences.webGroundingEnabled.collect { enabled ->
                 webGroundingEnabled = enabled
+                updateConnection { it.copy(webGroundingEnabled = enabled) }
+            }
+        }
+    }
+
+    /**
+     * Phase 53 (TOGGLE-03): flip the one-shot composer "Sin web" chip.
+     * Consumed once at the next send; never touches the toggle.
+     */
+    fun toggleSkipWebOnce() {
+        updateInput { it.copy(skipWebOnce = !it.skipWebOnce) }
+    }
+
+    /**
+     * Phase 53 (TOGGLE-01): tri-state per-chat override write. Applies to the
+     * next send only — history is never refetched. Before the first send
+     * (no conversation row yet) the value is held as [pendingWebOverride]
+     * and applied at [ensureConversation].
+     */
+    fun setWebOverride(override: Boolean?) {
+        val conversationId = _transcript.value.conversationId
+        if (conversationId == null) {
+            pendingWebOverride = override
+            updateConnection { it.copy(webOverride = override) }
+            _events.tryEmit(
+                ChatEvent.Snackbar("Preferencia de web actualizada. Se aplicará al próximo mensaje."),
+            )
+            return
+        }
+        viewModelScope.launch(coroutineExceptionHandler) {
+            try {
+                chatRepository.setWebOverride(conversationId, override)
+                updateConnection { it.copy(webOverride = override) }
+                _events.tryEmit(
+                    ChatEvent.Snackbar("Preferencia de web actualizada. Se aplicará al próximo mensaje."),
+                )
+            } catch (e: Exception) {
+                Timber.e(e, "Chat: setWebOverride failed")
             }
         }
     }
@@ -248,8 +304,12 @@ class ChatViewModel @Inject constructor(
 
         val imageDataUrls = images.mapNotNull { uriToBase64(it) }
         val userMessage = ChatMessage(role = Role.USER, content = text.trim(), imageUris = imageDataUrls)
+        // Phase 53 (TOGGLE-03): consume the one-shot Sin web flag synchronously
+        // at send start and reset it immediately — every send consumes it
+        // regardless of outcome, and the turn closure below sees a stable value.
+        val skipWebOnce = _input.value.skipWebOnce
         updateTranscript { it.copy(messages = it.messages + userMessage, isStreaming = true) }
-        updateInput { it.copy(inputText = "", isGenerating = true) }
+        updateInput { it.copy(inputText = "", isGenerating = true, skipWebOnce = false) }
 
         // CR-02: cancel any in-flight turn before starting a new one — otherwise
         // two collectors interleave tokens into one bubble and activeHelper is
@@ -277,9 +337,27 @@ class ChatViewModel @Inject constructor(
                 // untouched (prompt-prefix augmentation only).
                 var requestUserText = userMessage.content
                 var groundedSources: List<String> = emptyList()
+                var groundedSourceDetails: List<GroundedSource> = emptyList()
                 var modelOnlyNotice: ModelOnlyNotice? = null
                 var modelOnlySourceCount: Int = 1
-                if (webGroundingEnabled) {
+                // Phase 53 (TOGGLE-02/threat T-53-05): single precedence
+                // decision at the top of the hook — one-off Sin web first,
+                // then the per-chat override read ONCE for this send (never a
+                // hot Flow: avoids mid-turn flips and recomposition storms),
+                // then the global default-ON. False skips fetch entirely with
+                // the existing v2.2 model-only behavior unchanged.
+                val perChatOverride = try {
+                    chatRepository.getWebOverride(conversationId)
+                } catch (e: Exception) {
+                    Timber.w(e, "Chat: override read failed, falling back to global")
+                    null
+                }
+                val doGround = GroundingPrecedence.shouldGround(
+                    skipOnce = skipWebOnce,
+                    perChat = perChatOverride,
+                    global = webGroundingEnabled,
+                )
+                if (doGround) {
                     val groundedUrls = UrlDetector.allUrls(userMessage.content)
                     if (groundedUrls.isNotEmpty()) {
                         updateInput {
@@ -315,6 +393,11 @@ class ChatViewModel @Inject constructor(
                                 is MultiUrlResult.Fused -> {
                                     requestUserText = GroundingPrompt.augment(requestUserText, result.block)
                                     groundedSources = result.okUrls
+                                    // Phase 53 (SRC-02): retain the union of all N
+                                    // fetched sources in fetch-block order for the
+                                    // post-inference persist (ok rows with text,
+                                    // omitida rows with null text).
+                                    groundedSourceDetails = buildSourceDetails(groundedUrls, result)
                                     val skipped = result.skippedUrls.toSet()
                                     // Terminal per-source snapshot: records OK/OMITIDA
                                     // into progress state (FETCH-02 no-silent-drops
@@ -506,6 +589,7 @@ class ChatViewModel @Inject constructor(
                                     reasoning = finalReasoning.ifEmpty { token.reasoning },
                                     stats = token.stats,
                                     groundedSources = groundedSources,
+                                    groundedSourceDetails = groundedSourceDetails,
                                     modelOnlyNotice = modelOnlyNotice,
                                     modelOnlySourceCount = modelOnlySourceCount,
                                 )
@@ -518,7 +602,30 @@ class ChatViewModel @Inject constructor(
                                     )
                                 }
                                 updateInput { it.copy(isGenerating = false) }
-                                chatRepository.saveMessage(conversationId, assistantMessage)
+                                // Phase 53 (SRC-02/threat T-53-07): persist rows
+                                // post-fetch, pre-inference-visibility. Failure
+                                // is non-blocking — Timber plus the UI-SPEC
+                                // Snackbar, chat continues, preview may degrade
+                                // post-restart only.
+                                try {
+                                    if (groundedSourceDetails.isNotEmpty()) {
+                                        chatRepository.saveMessageWithSources(
+                                            conversationId,
+                                            assistantMessage,
+                                            groundedSourceDetails,
+                                        )
+                                    } else {
+                                        chatRepository.saveMessage(conversationId, assistantMessage)
+                                    }
+                                } catch (e: Exception) {
+                                    Timber.e(e, "Chat: failed to persist assistant sources")
+                                    _events.tryEmit(
+                                        ChatEvent.Snackbar(
+                                            "No se pudieron guardar las fuentes. " +
+                                                "La vista previa podría no estar disponible tras reiniciar.",
+                                        ),
+                                    )
+                                }
                             } else {
                                 // Silent turn: clear streaming state so the
                                 // bubble does not hang.
@@ -614,6 +721,15 @@ class ChatViewModel @Inject constructor(
                 }
 
                 val modelMissing = conversation.modelId != null && !isModelAvailable(conversation.modelId, conversation.providerType)
+                // Phase 53 (TOGGLE-01): per-conversation override read once per
+                // open (never hot-observed). Missing rows / DB failure fall
+                // back to inherit (null) without breaking the open.
+                val webOverride = try {
+                    chatRepository.getWebOverride(conversation.id)
+                } catch (e: Exception) {
+                    Timber.w(e, "Chat: override read failed on open, using inherit")
+                    null
+                }
                 updateTranscript {
                     it.copy(
                         conversationId = conversation.id,
@@ -631,7 +747,8 @@ class ChatViewModel @Inject constructor(
                         selectedRemoteProvider = if (!isLocalConv) conversation.providerType else null,
                         conversationModelId = conversation.modelId,
                         conversationProviderType = conversation.providerType,
-                        modelUnavailable = modelMissing
+                        modelUnavailable = modelMissing,
+                        webOverride = webOverride,
                     )
                 }
                 if (conversation.modelId != null && !modelMissing) {
@@ -665,6 +782,7 @@ class ChatViewModel @Inject constructor(
 
     fun newConversation() {
         unloadLocalModels()
+        pendingWebOverride = null
         updateTranscript {
             it.copy(
                 conversationId = null,
@@ -678,7 +796,8 @@ class ChatViewModel @Inject constructor(
             it.copy(
                 conversationModelId = null,
                 conversationProviderType = null,
-                modelUnavailable = false
+                modelUnavailable = false,
+                webOverride = null,
             )
         }
     }
@@ -1063,6 +1182,25 @@ class ChatViewModel @Inject constructor(
         return Pair(clean.trim(), reasoning.toString().trim())
     }
 
+    /**
+     * Phase 53 (SRC-02): union of all N fetched sources in fetch-block order
+     * from the terminal per-source snapshot. OK rows carry their extracted
+     * text; skipped rows carry null text with OMITIDA status. 6th+ ignored
+     * URLs never entered progress state and stay excluded.
+     */
+    private fun buildSourceDetails(
+        blockOrder: List<String>,
+        fused: MultiUrlResult.Fused,
+    ): List<GroundedSource> =
+        blockOrder.distinct().take(MultiUrlFetcher.MAX_URLS).map { url ->
+            val text = fused.pageTexts[url]
+            if (text != null) {
+                GroundedSource(url = url, extractedText = text, status = GroundedSourceStatus.OK)
+            } else {
+                GroundedSource(url = url, extractedText = null, status = GroundedSourceStatus.OMITIDA)
+            }
+        }
+
     private suspend fun ensureConversation(firstMessage: String, hasMedia: Boolean = false): Long {
         val state = snapshot()
         if (state.conversationId != null) return state.conversationId
@@ -1092,6 +1230,17 @@ class ChatViewModel @Inject constructor(
                 conversationModelId = effectiveModelId,
                 conversationProviderType = effectiveProvider
             )
+        }
+        // Phase 53 (TOGGLE-01): apply a pre-first-send override held as
+        // pending, then clear it — subsequent reads hit the row.
+        pendingWebOverride?.let { pending ->
+            try {
+                chatRepository.setWebOverride(conversationId, pending)
+                updateConnection { it.copy(webOverride = pending) }
+            } catch (e: Exception) {
+                Timber.e(e, "Chat: applying pending web override failed")
+            }
+            pendingWebOverride = null
         }
         activeModelSelection.saveLastConversation(conversationId)
         return conversationId
