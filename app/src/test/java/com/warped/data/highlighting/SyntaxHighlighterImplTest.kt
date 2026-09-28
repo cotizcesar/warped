@@ -2,6 +2,7 @@ package com.warped.data.highlighting
 
 import com.google.common.truth.Truth.assertThat
 import com.warped.domain.highlighting.LanguageDetector
+import com.warped.domain.model.SyntaxTheme
 import com.warped.domain.model.TokenType
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
@@ -143,5 +144,28 @@ class SyntaxHighlighterImplTest {
     fun `handles empty code`() = runTest {
         val tokens = highlighter.highlight("", "python")
         assertThat(tokens).isEmpty()
+    }
+
+    // === Theme Threading Regression (THEME-02) ===
+
+    @Test
+    fun `highlights python guide snippet under all 4 presets with KEYWORD each`() = runTest {
+        val code = "def hello():\n    return 'world'"
+        for (theme in SyntaxTheme.all()) {
+            val tokens = highlighter.highlight(code, "python", theme)
+            assertThat(tokens).isNotEmpty()
+            assertThat(tokens.any { it.type == TokenType.KEYWORD }).isTrue()
+        }
+    }
+
+    @Test
+    fun `cache separates entries per theme`() = runTest {
+        val code = "def theme_sep():\n    return 1"
+        val monokaiTokens = highlighter.highlight(code, "python", SyntaxTheme.MONOKAI)
+        val oneDarkTokens = highlighter.highlight(code, "python", SyntaxTheme.ONE_DARK)
+        assertThat(oneDarkTokens).isNotSameInstanceAs(monokaiTokens)
+        // Same theme hits the cache again
+        val monokaiAgain = highlighter.highlight(code, "python", SyntaxTheme.MONOKAI)
+        assertThat(monokaiAgain).isSameInstanceAs(monokaiTokens)
     }
 }

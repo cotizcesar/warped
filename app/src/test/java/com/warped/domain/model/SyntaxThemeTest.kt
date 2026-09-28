@@ -243,6 +243,46 @@ class SyntaxThemeTest {
     }
 
     @Nested
+    inner class PresetDistinctness {
+
+        @Test
+        fun `all 4 presets have distinct dark KEYWORD argb`() {
+            val values = SyntaxTheme.all().map { it.darkVariant[TokenType.KEYWORD]!!.argb }
+            assertThat(values.toSet()).hasSize(4)
+        }
+
+        @Test
+        fun `all 4 presets have distinct dark BACKGROUND argb`() {
+            val values = SyntaxTheme.all().map { it.darkVariant[TokenType.BACKGROUND]!!.argb }
+            assertThat(values.toSet()).hasSize(4)
+        }
+
+        @Test
+        fun `all 4 presets have mutually distinct dark variants`() {
+            val variants = SyntaxTheme.all().map { it.darkVariant }
+            assertThat(variants.toSet()).hasSize(4)
+        }
+
+        @Test
+        fun `all 4 presets have mutually distinct light variants`() {
+            val variants = SyntaxTheme.all().map { it.lightVariant }
+            assertThat(variants.toSet()).hasSize(4)
+        }
+
+        @Test
+        fun `fromKey round-trips all 4 preset keys`() {
+            for (theme in SyntaxTheme.all()) {
+                assertThat(SyntaxTheme.fromKey(theme.key)).isEqualTo(theme)
+            }
+        }
+
+        @Test
+        fun `fromKey unknown key falls back to MONOKAI`() {
+            assertThat(SyntaxTheme.fromKey("solarized")).isEqualTo(SyntaxTheme.MONOKAI)
+        }
+    }
+
+    @Nested
     inner class CodeThemeMigration {
 
         private fun migrateCodeTheme(oldName: String): SyntaxTheme = when (oldName) {
