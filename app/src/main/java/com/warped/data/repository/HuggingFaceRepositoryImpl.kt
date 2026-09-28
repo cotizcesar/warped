@@ -43,7 +43,7 @@ class HuggingFaceRepositoryImpl @Inject constructor(
                 val body = response.body() ?: emptyList()
                 Result.success(body)
             } else {
-                val errorBody = response.errorBody()?.string() ?: "unknown error"
+                val errorBody = response.errorBody()?.string()?.take(500) ?: "unknown error"
                 Timber.e("HF API error: HTTP ${response.code()} — $errorBody")
                 Result.failure(Exception("Search failed: HTTP ${response.code()}"))
             }

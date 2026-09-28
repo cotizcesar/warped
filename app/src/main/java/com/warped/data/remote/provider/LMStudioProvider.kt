@@ -378,9 +378,9 @@ class LMStudioProvider(
         for (path in candidates) {
             try {
                 val url = "${baseUrl}$path"
-                Timber.d("LMStudioProvider.listModels: GET $url")
+                Timber.d("LMStudioProvider.listModels: GET $path")
                 val response = api.listModelsByPath(path)
-                Timber.d("LMStudioProvider.listModels: $url -> HTTP ${response.code()}")
+                Timber.d("LMStudioProvider.listModels: $path -> HTTP ${response.code()}")
                 if (response.isSuccessful) {
                     val body = response.body()
                     val lmDtos = body?.models.orEmpty()
@@ -407,12 +407,12 @@ class LMStudioProvider(
                         )
                     } }
                     com.warped.data.repository.LmStudioModelCache.lastData = dtos
-                    Timber.d("LMStudioProvider.listModels: $url parsed ${models.size} models (lmV1=${lmModels.size} openAi=${openAiModels.size})")
+                    Timber.d("LMStudioProvider.listModels: $path parsed ${models.size} models (lmV1=${lmModels.size} openAi=${openAiModels.size})")
                     if (models.isNotEmpty()) return Result.success(models)
                     // 200 OK with empty list — try next endpoint before giving up
-                    lastError = IllegalStateException("$url returned empty list")
+                    lastError = IllegalStateException("$path returned empty list")
                 } else {
-                    lastError = Exception("$url -> HTTP ${response.code()} ${response.message()}")
+                    lastError = Exception("$path -> HTTP ${response.code()} ${response.message()}")
                 }
             } catch (e: Exception) {
                 Timber.w(e, "LMStudioProvider.listModels: $path failed")

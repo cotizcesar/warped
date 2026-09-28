@@ -62,7 +62,7 @@ class EngineManager @Inject constructor(
             error("EngineManager: model file does not exist at $modelPath")
         }
 
-        Timber.d("EngineManager: initializing LiteRT-LM with backend=${target.backend} path=$modelPath (mmap, no copy)")
+        Timber.d("EngineManager: initializing LiteRT-LM with backend=${target.backend} model=${modelPath.substringAfterLast("/")} (mmap, no copy)")
         try {
             initWith(target)
             activeEngine = target

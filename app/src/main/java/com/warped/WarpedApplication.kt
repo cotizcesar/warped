@@ -103,6 +103,11 @@ class RedactingTree : Timber.DebugTree() {
                 "${match.groupValues[1]}=[REDACTED]"
             }
             .replace(Regex("Bearer\\s+\\S+", RegexOption.IGNORE_CASE)) { "Bearer [REDACTED]" }
+            // 48 (WR-07): strip credentials in URL query strings
+            // (?hf_token=…&…) while preserving host/path for debuggability.
+            .replace(Regex("([?&](hf_token|access_token|token|api_key)=)[^&\\s]+", RegexOption.IGNORE_CASE)) { match ->
+                "${match.groupValues[1]}[REDACTED]"
+            }
         super.log(priority, tag, redacted, t)
     }
 }
