@@ -265,6 +265,7 @@ class ChatCancellationTest {
         val engineManager = mockk<EngineManager>()
         val memoryChecker = mockk<MemoryChecker>()
         val advancedPreferences = mockk<AdvancedPreferences>()
+        val skillRepository = mockk<com.warped.domain.skills.SkillRepository>()
         val context = mockk<Context>()
 
         every { chatRepository.observeConversations() } returns MutableStateFlow(emptyList())
@@ -280,6 +281,8 @@ class ChatCancellationTest {
         every { advancedPreferences.syntaxTheme } returns flowOf(SyntaxTheme.MONOKAI)
         every { advancedPreferences.codeFontScale } returns flowOf(1.0f)
         every { advancedPreferences.thinkingEnabled } returns flowOf(false)
+        every { skillRepository.enabledMap } returns
+            MutableStateFlow(com.warped.domain.skills.SkillIds.TOOL_IDS.associateWith { true })
         every { providerRouter.resolveLocalHelper(any(), any()) } returns helper
 
         return ChatViewModel(
@@ -293,6 +296,7 @@ class ChatCancellationTest {
             engineManager = engineManager,
             memoryChecker = memoryChecker,
             advancedPreferences = advancedPreferences,
+            skillRepository = skillRepository,
             context = context,
         )
     }
