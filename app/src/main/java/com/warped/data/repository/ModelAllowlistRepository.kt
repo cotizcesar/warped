@@ -29,6 +29,11 @@ import javax.inject.Singleton
  * badge would promise a missing feature. supportsThinking=true enables the
  * toggle + badge + think-tag parse/display only — ThinkingConfig engine
  * wiring is a recorded tech-debt follow-up.
+ *
+ * gemma-4-E4B-it (2026-09-28): same docs-verified treatment as E2B —
+ * text/vision/audio/supportsThinking true, supportsFunctionCalling false per
+ * Phase 49 DEL-01. Speculative decoding true (Gemma 4 docs). File size
+ * verified via Hugging Face CDN HEAD (3659530240 bytes).
  */
 @Serializable
 data class AllowlistCapabilities(
@@ -50,8 +55,26 @@ data class AllowlistedModel(
     val sizeInBytes: Long,
     val capabilities: AllowlistCapabilities = AllowlistCapabilities(),
     val llmPromptTemplates: Map<String, String> = emptyMap(),
-    val taskTypes: List<String> = emptyList()
-)
+    val taskTypes: List<String> = emptyList(),
+    /**
+     * Full Hugging Face repo slug including org, e.g.
+     * `warped-community/gemma-4-E2B-it-litert-lm`.
+     *
+     * Back-compat rule: explicit `repo` wins; when absent or blank (old
+     * assets, tests constructing the model by hand), the legacy
+     * `warped-community/${name}` slug applies. The `name` is a
+     * short-stable display/lookup key — never the URL source.
+     */
+    val repo: String? = null
+) {
+    /**
+     * Effective repo slug for download URL construction.
+     * Explicit [repo] wins; legacy `warped-community/$name` applies ONLY
+     * when the field is absent/blank.
+     */
+    val repoSlug: String
+        get() = repo?.takeIf { it.isNotBlank() } ?: "warped-community/$name"
+}
 
 @Serializable
 private data class ModelAllowlistFile(
