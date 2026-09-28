@@ -9,9 +9,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -560,6 +563,24 @@ fun ChatScreen(
             }
         )
     }
+}
+
+/**
+ * End-pinning follow helper. The list is NOT reversed, so scrollToItem(index)
+ * pins the item TOP to the viewport top — as the trailing streaming bubble
+ * grows downward, fresh tokens land below the fold. After the instant
+ * scrollToItem, shift by the item's overflow past the viewport end so the
+ * newest content stays visible. Pure list-state math, no new dependencies.
+ * Instant (non-animated) — used by the per-token follow path (48-01 PERF-15).
+ */
+private suspend fun LazyListState.pinLastItemEnd(index: Int) {
+    if (index < 0 || layoutInfo.totalItemsCount == 0) return
+    scrollToItem(index)
+    val info = layoutInfo
+    val item = info.visibleItemsInfo.firstOrNull { it.index == index } ?: return
+    if (item.index != info.visibleItemsInfo.lastOrNull()?.index) return
+    val overflow = item.offset + item.size - info.viewportEndOffset
+    if (overflow > 0) scrollBy(overflow.toFloat())
 }
 
 /**
