@@ -11,6 +11,7 @@ import com.warped.data.remote.dto.OpenAiStreamChunk
 import com.warped.data.remote.dto.OpenAiTool
 import com.warped.data.skills.skillDescriptor
 import com.warped.data.skills.isJsonTooDeep
+import com.warped.data.skills.sanitizeToolOutput
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.Role
 import com.warped.domain.model.StreamToken
@@ -230,7 +231,12 @@ class LmStudioToolLoop(
     private fun mapResult(result: ToolResult): Triple<String, String?, String> =
         when (result) {
             is ToolResult.Success ->
-                Triple(result.summary, null, result.text.take(TOOL_REPLY_MAX_CHARS))
+                // WR-09: belt-and-braces hygiene at the re-POST boundary —
+                // never trust the executor (an interface any future
+                // implementation backs) to strip control chars before
+                // model context. sanitizeToolOutput is module-internal, so
+                // no layer inversion.
+                Triple(result.summary, null, sanitizeToolOutput(result.text, TOOL_REPLY_MAX_CHARS))
             is ToolResult.Failure ->
                 // Error-string role:tool reply (T-47-10); summary persists
                 // the short reason for the transcript row.
