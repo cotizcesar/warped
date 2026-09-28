@@ -1,3 +1,3 @@
 package com.warped.domain.model
 
-enum class Role { SYSTEM, USER, ASSISTANT }
+enum class Role { SYSTEM, USER, ASSISTANT, TOOL }

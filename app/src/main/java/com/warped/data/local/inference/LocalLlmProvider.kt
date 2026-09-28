@@ -36,6 +36,8 @@ class LocalLlmProvider @Inject constructor() : LlmProvider {
                 Role.SYSTEM -> "<|system|>\n${msg.content}\n"
                 Role.USER -> "<|user|>\n${msg.content}\n"
                 Role.ASSISTANT -> "<|assistant|>\n${msg.content}\n"
+                // 47-01: tool rows render assistant-adjacent, never crash.
+                Role.TOOL -> "<|assistant|>\n${msg.content}\n"
             }
         } + "<|assistant|>\n"
     }

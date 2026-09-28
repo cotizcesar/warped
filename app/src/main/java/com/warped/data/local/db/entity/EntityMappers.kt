@@ -11,9 +11,22 @@ import java.time.Instant
 
 private val mapperJson = Json
 
+/**
+ * 47-01 (threat T-47-02): the role column is untrusted stored text hitting
+ * [Role.valueOf]. Unknown values (old DBs, future roles) map to a safe
+ * default instead of throwing into history load. `tool` (any case) maps to
+ * [Role.TOOL]; anything else unrecognized degrades to ASSISTANT-adjacent
+ * rendering, never a crash.
+ */
+fun String.toRoleSafe(): Role = try {
+    Role.valueOf(this)
+} catch (_: IllegalArgumentException) {
+    if (equals("tool", ignoreCase = true)) Role.TOOL else Role.ASSISTANT
+}
+
 fun MessageEntity.toDomain(): ChatMessage = ChatMessage(
     id = id.toString(),
-    role = Role.valueOf(role),
+    role = role.toRoleSafe(),
     content = content,
     tokenCount = tokenCount,
     createdAt = Instant.ofEpochMilli(createdAt),

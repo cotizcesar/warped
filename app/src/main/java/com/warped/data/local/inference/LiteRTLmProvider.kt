@@ -115,6 +115,10 @@ class LiteRTLmProvider @Inject constructor(
                 Role.SYSTEM -> Message.system(msg.content)
                 Role.USER -> Message.user(msg.content)
                 Role.ASSISTANT -> Message.model(msg.content)
+                // 47-01: tool summaries resume as model-side context. The
+                // dedicated Message.tool(ToolResponse) mapping lands with the
+                // local executor (Plan 02); never crash here.
+                Role.TOOL -> Message.model(msg.content)
             }
         }.dropLast(1) // exclude current message from history
 
