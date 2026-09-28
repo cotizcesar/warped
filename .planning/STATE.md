@@ -112,6 +112,7 @@ None — v2.2 phases shipped with accepted deferrals recorded above. Next milest
 | 20260928-catalog-3n-litertlm-swap | 2026-09-28 | Complete ✓ | 3n a .litertlm + tamaños reales (3.41/4.58 GiB); 311 green; E2E en dispositivo pendiente |
 | 20260928-active-cluster-overlap | 2026-09-28 | Complete ✓ | Cluster descarga en Row + padding dinámico + colores explícitos; 313 green; captura pendiente |
 | 20260928-cluster-spacing-english-sweep | 2026-09-28 | Complete ✓ | Aire en cluster (8dp) + UI 100% inglés (values-es eliminado, sanitizer ajustado al delimitador); 313 green |
+| 20260928-honest-delete-unified-download | 2026-09-28 | Complete ✓ | Borrado honesto (por ruta, con errores visibles) + descarga idéntica en catálogo y Models; 321 green; E2E en dispositivo pendiente |
 
 ## Session Continuity
 
