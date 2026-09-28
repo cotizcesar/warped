@@ -2,13 +2,14 @@
   "meta": {
     "engine": "litertlm-android",
     "engineVersion": "0.17.1",
-    "verifiedOn": "2026-09-27",
-    "note": "Capability flags reflect ONLY features verified against 0.17.x on Android (45-02 LRT-09, D-allowlist). Unverified 0.17.0 features (MTP, extended context) and per-model function-calling are explicitly false until device-verified. gemma-4-E2B-it vision/audio/thinking are docs-verified from Google official Gemma 4 docs (2026-09-28); device confirmation pending — user validates on hardware. File sizes verified via Hugging Face CDN HEAD on verified date."
+    "verifiedOn": "2026-09-28",
+    "note": "Capability flags reflect ONLY features verified against 0.17.x on Android (45-02 LRT-09, D-allowlist). Unverified 0.17.0 features (MTP, extended context) and per-model function-calling are explicitly false until device-verified. gemma-4-E2B-it and gemma-4-E4B-it vision/audio/thinking are docs-verified from Google official Gemma 4 docs (2026-09-28); device confirmation pending — user validates on hardware. E4B file size verified via Hugging Face CDN HEAD on 2026-09-28."
   },
   "models": [
     {
       "name": "gemma-4-E2B-it",
       "displayName": "Gemma 4 E2B IT",
+      "repo": "warped-community/gemma-4-E2B-it-litert-lm",
       "modelFile": "gemma-4-E2B-it.litertlm",
       "sizeInBytes": 2588147712,
       "capabilities": {
@@ -27,6 +28,7 @@
     {
       "name": "gemma-3n-E2B-it-int4",
       "displayName": "Gemma 3n E2B IT (int4)",
+      "repo": "warped-community/gemma-3n-E2B-it-litert-lm",
       "modelFile": "gemma-3n-E2B-it-int4.task",
       "sizeInBytes": 3136226711,
       "capabilities": {
@@ -45,6 +47,7 @@
     {
       "name": "gemma-3n-E4B-it-int4",
       "displayName": "Gemma 3n E4B IT (int4)",
+      "repo": "warped-community/gemma-3n-E4B-it-litert-lm",
       "modelFile": "gemma-3n-E4B-it-int4.task",
       "sizeInBytes": 4405655031,
       "capabilities": {
@@ -52,6 +55,25 @@
         "vision": true,
         "audio": true,
         "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": true,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"]
+    },
+    {
+      "name": "gemma-4-E4B-it",
+      "displayName": "Gemma 4 E4B IT",
+      "repo": "warped-community/gemma-4-E4B-it-litert-lm",
+      "modelFile": "gemma-4-E4B-it.litertlm",
+      "sizeInBytes": 3659530240,
+      "capabilities": {
+        "text": true,
+        "vision": true,
+        "audio": true,
+        "supportsThinking": true,
         "supportsFunctionCalling": false,
         "speculativeDecoding": true,
         "extendedContext": false,
