@@ -77,3 +77,9 @@
 
 # Keep attributes for reflective access
 -keepattributes InnerClasses,EnclosingMethod
+
+# 47-01 SKILLS (threat T-47-04): keep the Skills Lite surface so release
+# minification cannot strip the domain/data skill classes that Plan 02's
+# @Tool reflection targets depend on. Existing ToolSet/@Tool keeps above stay untouched.
+-keep class com.warped.domain.skills.** { *; }
+-keep class com.warped.data.skills.** { *; }
