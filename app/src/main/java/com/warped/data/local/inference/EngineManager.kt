@@ -2,6 +2,7 @@ package com.warped.data.local.inference
 
 import android.content.Context
 import com.google.ai.edge.litertlm.ConversationConfig
+import com.warped.data.repository.ModelAllowlistRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +29,7 @@ class EngineManager @Inject constructor(
     private val backendDetector: BackendDetector,
     @param:ApplicationContext private val context: Context,
     private val cacheManager: LiteRtLmCacheManager,
+    private val allowlist: ModelAllowlistRepository,
 ) {
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var activeEngine: ActiveEngine? = null
@@ -125,11 +127,18 @@ class EngineManager @Inject constructor(
 
     /** Single init attempt for a resolved target (no retry). */
     private fun initWith(target: ActiveEngine) {
+        // Speculative decoding is allowlist opt-in: the GPU flag demands a
+        // TF_LITE_MTP_DRAFTER in the model file, and unlisted/unverified models
+        // (e.g. gemma-4-12B-it) fail engine creation with it on.
+        val specDecoding = allowlist
+            .findByModelFile(target.modelPath.substringAfterLast("/"))
+            ?.capabilities?.speculativeDecoding == true
         liteRTLmEngine.init(
             modelPath = target.modelPath,
             backend = target.backend!!,
             visionBackend = BackendType.CPU,
-            audioBackend = BackendType.CPU
+            audioBackend = BackendType.CPU,
+            enableSpeculativeDecoding = specDecoding
         )
     }
 

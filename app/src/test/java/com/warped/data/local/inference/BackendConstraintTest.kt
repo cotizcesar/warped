@@ -16,7 +16,8 @@ class BackendConstraintTest {
         liteRTLmEngine = mockk(relaxed = true),
         backendDetector = mockk(relaxed = true),
         context = mockk<Context>(relaxed = true),
-        cacheManager = mockk(relaxed = true)
+        cacheManager = mockk(relaxed = true),
+        allowlist = mockk(relaxed = true)
     )
 
     @Test

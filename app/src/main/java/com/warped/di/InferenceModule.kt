@@ -9,6 +9,7 @@ import com.warped.data.local.inference.LiteRTLmEngine
 import com.warped.data.local.inference.LiteRtLmCacheManager
 import com.warped.data.local.inference.ModelImportManager
 import com.warped.data.repository.LocalModelRepositoryImpl
+import com.warped.data.repository.ModelAllowlistRepository
 import com.warped.domain.repository.LocalModelRepository
 import dagger.Binds
 import dagger.Module
@@ -33,7 +34,8 @@ object InferenceModule {
         backendDetector: BackendDetector,
         @ApplicationContext context: Context,
         cacheManager: LiteRtLmCacheManager,
-    ): EngineManager = EngineManager(liteRTLmEngine, backendDetector, context, cacheManager)
+        allowlist: ModelAllowlistRepository,
+    ): EngineManager = EngineManager(liteRTLmEngine, backendDetector, context, cacheManager, allowlist)
 
     @Provides
     @Singleton

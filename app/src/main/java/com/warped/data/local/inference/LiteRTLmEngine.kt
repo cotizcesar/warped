@@ -67,15 +67,20 @@ class LiteRTLmEngine @Inject constructor(
         modelPath: String,
         backend: BackendType,
         visionBackend: BackendType? = null,
-        audioBackend: BackendType? = null
+        audioBackend: BackendType? = null,
+        enableSpeculativeDecoding: Boolean = true
     ) {
         require(!isInitialized()) { "LiteRTLmEngine is already initialized. Call close() first." }
 
         val litertlmBackend = when (backend) {
             BackendType.CPU -> Backend.CPU()
             BackendType.GPU -> {
+                // Speculative decoding demands a TF_LITE_MTP_DRAFTER in the model
+                // file — GPU-only models without one (e.g. gemma-4-12B-it) fail
+                // engine creation when the flag is forced on. Caller (EngineManager)
+                // passes the allowlist-verified value; default preserves legacy.
                 @OptIn(ExperimentalApi::class)
-                ExperimentalFlags.enableSpeculativeDecoding = true
+                ExperimentalFlags.enableSpeculativeDecoding = enableSpeculativeDecoding
                 Backend.GPU()
             }
             // 45-02 LRT-09 (0.17.x re-verification): Backend.NPU(nativeLibraryDir) is a
