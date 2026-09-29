@@ -78,15 +78,20 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 **Known deferred:** 3 release-UAT device smokes (MIG-01 on-device MigrationTest, WEB-07 grounding visuals both themes, WEB-08 offline→retry live E2E). UI polish trio + budget on-device validation (TUNE-01/02 triggers). Pre-existing carry-overs: Pixel 7 reference numbers, v2.2 smokes, orphaned Keystore entry.
 
-## Current Milestone: v2.4 Agentic Web
+## Previous Milestone: v2.4 Agentic Web — COMPLETE ✅
 
-**Goal:** The model itself searches (Tavily) and fetches the web via tool calling — local (LiteRT-LM function calling) and remote (OpenAI-compatible tools[]) — with OpenGraph thumbnail cards per source.
+**Shipped:** 2026-09-29 | [Archive →](.planning/milestones/v2.4-ROADMAP.md) · [Audit →](milestones/v2.4-MILESTONE-AUDIT.md) (gaps_found, accepted)
 
-**Target features:**
-- Tavily search backend (user API key in Keystore, search→ground fusion through the existing pipeline)
-- Local agentic loop (web_search/web_fetch ToolSets, step cap, channel hygiene, trust boundary)
-- Remote agentic loop (native tools[] with capability gating)
-- OpenGraph thumbnails (Coil cards + sheet header, Room v16)
+4 phases (55–58), 9 plans, 10 requirements — 10/10 verified:
+- Tavily search: Keystore key + test-connection, dedicated Bearer client, search→fused producer (live key HTTP 200)
+- Local agentic loop: manual runToolLoop, 5-call cap, Stop-cancels-all, transient Using rows, KV-channel hygiene (real ToolCalls device-confirmed on E2B)
+- Remote agentic loop: shared SSE accumulator + capability matrix + one-retry classifier (OpenAI/Anthropic/Ollama/LMStudio/Custom), secret isolation proven
+- OG thumbnails: parse-only scrape, Room v16, Coil 3.4.0 singleton + disk cache, per-source cards + sheet header per user mock
+- 494/494 unit green; SECURED all phases; integration 5/5 flows wired
+
+**Known deferred:** 3 release-UAT device follow-ups (WEB-09 live Tavily E2E, WEB-10 LM Studio smoke + matrix + Stop, WEB-11 Coil images + ellipsis). Tech debt: budget floor, static matrix, ThinkingConfig enablement, Coil 3.4.0 ceiling. Pre-existing carry-overs: v2.3 smokes, UI polish trio, TUNE-01/02, Pixel 7 numbers, v2.2 smokes, Keystore orphan.
+
+## Current Milestone: (next — define scope first)
 
 ## Requirements
 
@@ -137,6 +142,10 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 - ✓ User previews each source in a bottom sheet (extracted text, `Abrir en navegador`) from a numbered Fuentes list covering all N sources — v2.3
 - ✓ User overrides web grounding per conversation (Sí/No/Heredar) and sends one-off model-only messages (`Sin web`); preferences + sources survive restarts (Room v15) — v2.3
 - ✓ User offline at send time retries grounding on reconnect (`Reintentar`, message-scoped foreground, same rows, history untouched, inference never re-run) — v2.3
+- ✓ User stores a Tavily key (Keystore) and grounds answers in search results with numbered citations — v2.4
+- ✓ Local models search/fetch autonomously via function calling (5-call cap, Stop, transient rows, channel hygiene) — v2.4
+- ✓ Remote models use the same tools via native tools[] loop with capability gating + fallback notice — v2.4
+- ✓ Every grounded source renders an OpenGraph thumbnail card (Coil, tap → sheet with OG header) — v2.4
 
 ### Active
 
@@ -228,4 +237,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-28 — v2.3 Web Grounding v2 milestone started*
+*Last updated: 2026-09-29 — v2.4 Agentic Web milestone complete*

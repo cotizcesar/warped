@@ -1,5 +1,31 @@
 # Milestones
 
+## v2.4 Agentic Web (Shipped: 2026-09-29)
+
+**Phases completed:** 4 phases (55-58), 9 plans, 10 requirements
+**Requirements:** 10 defined, 10 verified (automatable evidence 100%; 3 device follow-ups accepted as release-UAT, user-approved)
+**Known verification overrides:** 0 partials — all phases passed verification (55: 3/3 live-key, 56: 3/3 + device checkpoint, 57: 9/9, 58: 3/3); 494/494 unit green; SECURED all phases
+**Audit:** [`.planning/milestones/v2.4-MILESTONE-AUDIT.md`](milestones/v2.4-MILESTONE-AUDIT.md) → status: **gaps_found** (accepted)
+**Archived roadmap:** [`.planning/milestones/v2.4-ROADMAP.md`](milestones/v2.4-ROADMAP.md)
+**Archived requirements:** [`.planning/milestones/v2.4-REQUIREMENTS.md`](milestones/v2.4-REQUIREMENTS.md)
+**Closeout type:** override_closeout
+
+**Key accomplishments:**
+
+1. **Tavily foundation** — Keystore key + test-connection, dedicated Bearer client, search→fused producer through the identical pipeline; live key HTTP 200
+2. **Local agentic loop** — Manual runToolLoop (SDK execute is sync), 5-call cap, Stop-cancels-all, transient Using rows, thinking/KV hygiene; device-confirmed ToolCalls on E2B
+3. **Remote agentic loop** — Shared SSE accumulator + capability matrix + one-retry classifier across OpenAI/Anthropic/Ollama/LMStudio/Custom; secret isolation proven; 2 critical review catches fixed (dead-code wiring, skip mirror)
+4. **OG thumbnails** — Parse-only OG scrape, Room v16, Coil 3.4.0 singleton with disk cache, per-source cards + sheet header matching user mock
+
+### Known Gaps (accepted, release-UAT device follow-ups)
+- **WEB-09:** live Tavily E2E on device beyond key check
+- **WEB-10:** LM Studio live smoke + matrix confidence + Stop finger-test
+- **WEB-11:** on-device Coil images + long-text ellipsis pixels
+
+### Tech debt
+- Small-window budget floor; GC key copies; tool-failure affordance; static matrix; ThinkingConfig enablement; Coil 3.4.0 ceiling; hostOf divergence
+- Nyquist: no `VALIDATION.md` in any v2.4 phase — coverage TODO (same as v2.2/v2.3)
+
 ## v2.3 Web Grounding v2 (Shipped: 2026-09-28)
 
 **Phases completed:** 3 phases (52-54), 8 plans, 12 requirements

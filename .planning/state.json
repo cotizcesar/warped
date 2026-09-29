@@ -1,7 +1,7 @@
 {
   "contract": "1.0.0",
   "flavor": "core",
-  "milestone": "v2.3 — Web Grounding v2",
+  "milestone": "v2.4 — Agentic Web",
   "phases": [
     {
       "number": "49",
@@ -36,8 +36,8 @@
   ],
   "next": {
     "command": "/gsd:progress --next",
-    "label": "Advance to the next step (plan phase 53)",
-    "reason": "Phase 53 of 3 — needs a plan"
+    "label": "Advance to the next step (plan phase 55)",
+    "reason": "Phase 55 of 4 — needs a plan"
   },
-  "updated_at": "2026-09-28T18:07:56.180Z"
+  "updated_at": "2026-09-29T17:31:54.128Z"
 }
