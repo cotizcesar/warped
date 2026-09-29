@@ -238,6 +238,7 @@ fun ogHostOf(url: String): String {
 fun gatedHttpImageUrl(raw: String?): String? {
     val value = raw?.trim().orEmpty()
     if (value.isEmpty()) return null
-    val scheme = value.substringBefore(':').lowercase()
-    return if (scheme == "http" || scheme == "https") value else null
+    return if (value.startsWith("http://", ignoreCase = true) ||
+        value.startsWith("https://", ignoreCase = true)
+    ) value else null
 }
