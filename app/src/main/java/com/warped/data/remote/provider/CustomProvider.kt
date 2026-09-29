@@ -17,6 +17,7 @@ import com.warped.data.grounding.GroundingPrecedence
 import com.warped.data.grounding.MultiUrlFetcher
 import com.warped.data.grounding.TavilySearchRepository
 import com.warped.data.grounding.WebPageFetcher
+import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.local.preferences.AdvancedPreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
@@ -40,6 +41,12 @@ class CustomProvider(
     private val chatPath: String = "v1/chat/completions",
     private val modelsPath: String = "v1/models",
     apiKey: String? = null,
+    /**
+     * Phase 57 (CR-01 fix): sanitizer wired from [ProviderRouter] like
+     * every sibling provider. Stored here; applied to USER content on
+     * both the armed mapping and the plain path (WR-02).
+     */
+    private val inputSanitizer: InputSanitizer? = null,
     /**
      * Phase 57 (57-02): tool-loop collaborators (Phase 55/52 singletons).
      * All-null by default so the legacy `resolve()` path behaves exactly

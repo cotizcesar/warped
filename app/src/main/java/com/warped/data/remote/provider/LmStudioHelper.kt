@@ -2,6 +2,10 @@ package com.warped.data.remote.provider
 
 import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.local.security.ApiKeyStore
+import com.warped.data.grounding.MultiUrlFetcher
+import com.warped.data.grounding.TavilySearchRepository
+import com.warped.data.grounding.WebPageFetcher
+import com.warped.data.local.preferences.AdvancedPreferences
 import com.warped.domain.llm.LlmModelHelper
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.Endpoint
@@ -44,6 +48,16 @@ import javax.inject.Singleton
 class LmStudioHelper @Inject constructor(
     private val inputSanitizer: InputSanitizer,
     private val apiKeyStore: ApiKeyStore,
+    /**
+     * Phase 57 (57-02, CR-01 fix): tool-loop collaborators (Phase 55/52
+     * singletons) forwarded in [createProvider] so the compat loop arms
+     * on the live chat path. Nullable with null defaults so legacy
+     * manual call sites keep compiling; Hilt always provides bindings.
+     */
+    private val tavily: TavilySearchRepository? = null,
+    private val multiUrlFetcher: MultiUrlFetcher? = null,
+    private val webPageFetcher: WebPageFetcher? = null,
+    private val advancedPreferences: AdvancedPreferences? = null,
 ) : LlmModelHelper {
 
     override val type: ProviderType = ProviderType.LM_STUDIO
@@ -164,6 +178,10 @@ class LmStudioHelper @Inject constructor(
             modelId = modelId,
             apiKey = keyStr,
             inputSanitizer = inputSanitizer,
+            tavily = tavily,
+            multiUrlFetcher = multiUrlFetcher,
+            webPageFetcher = webPageFetcher,
+            advancedPreferences = advancedPreferences,
         )
     }
 

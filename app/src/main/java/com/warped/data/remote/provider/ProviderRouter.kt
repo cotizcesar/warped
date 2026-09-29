@@ -3,6 +3,10 @@ package com.warped.data.remote.provider
 import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.local.inference.LiteRTLmProvider
 import com.warped.data.local.security.ApiKeyStore
+import com.warped.data.grounding.MultiUrlFetcher
+import com.warped.data.grounding.TavilySearchRepository
+import com.warped.data.grounding.WebPageFetcher
+import com.warped.data.local.preferences.AdvancedPreferences
 import com.warped.di.LlmHelperQualifiers
 import com.warped.domain.llm.LlmModelHelper
 import com.warped.domain.model.Endpoint
@@ -22,6 +26,17 @@ class ProviderRouter @Inject constructor(
     private val liteRtLmHelper: dagger.Lazy<LlmModelHelper>,
     @Named(LlmHelperQualifiers.LM_STUDIO)
     private val lmStudioHelper: dagger.Lazy<LmStudioHelper>,
+    /**
+     * Phase 57 (57-02, CR-01 fix): tool-loop collaborators (Phase 55/52
+     * singletons) so `resolve()` constructs ARMED providers — the loop
+     * actually executes in production instead of staying dead code behind
+     * null collaborators. Nullable with null defaults so legacy manual
+     * call sites keep compiling; Hilt always provides real bindings.
+     */
+    private val tavily: TavilySearchRepository? = null,
+    private val multiUrlFetcher: MultiUrlFetcher? = null,
+    private val webPageFetcher: WebPageFetcher? = null,
+    private val advancedPreferences: AdvancedPreferences? = null,
 ) {
     /**
      * Legacy RPC path: returns the per-endpoint [LlmProvider] used for
@@ -37,29 +52,50 @@ class ProviderRouter @Inject constructor(
                 modelId = modelId,
                 endpointId = endpoint.id,
                 apiKey = keyStr,
-                inputSanitizer = inputSanitizer
+                inputSanitizer = inputSanitizer,
+                tavily = tavily,
+                multiUrlFetcher = multiUrlFetcher,
+                webPageFetcher = webPageFetcher,
+                advancedPreferences = advancedPreferences
             )
             ProviderType.ANTHROPIC -> AnthropicProvider(
                 baseUrl = endpoint.url,
                 modelId = modelId,
                 apiKey = keyStr,
-                inputSanitizer = inputSanitizer
+                inputSanitizer = inputSanitizer,
+                tavily = tavily,
+                multiUrlFetcher = multiUrlFetcher,
+                webPageFetcher = webPageFetcher,
+                advancedPreferences = advancedPreferences
             )
             ProviderType.OLLAMA -> OllamaProvider(
                 baseUrl = endpoint.url,
                 modelId = modelId,
-                inputSanitizer = inputSanitizer
+                inputSanitizer = inputSanitizer,
+                tavily = tavily,
+                multiUrlFetcher = multiUrlFetcher,
+                webPageFetcher = webPageFetcher,
+                advancedPreferences = advancedPreferences
             )
             ProviderType.LM_STUDIO -> LMStudioProvider(
                 baseUrl = endpoint.url,
                 modelId = modelId,
                 apiKey = keyStr,
-                inputSanitizer = inputSanitizer
+                inputSanitizer = inputSanitizer,
+                tavily = tavily,
+                multiUrlFetcher = multiUrlFetcher,
+                webPageFetcher = webPageFetcher,
+                advancedPreferences = advancedPreferences
             )
             ProviderType.CUSTOM -> CustomProvider(
                 baseUrl = endpoint.url,
                 modelId = modelId,
-                apiKey = keyStr
+                apiKey = keyStr,
+                inputSanitizer = inputSanitizer,
+                tavily = tavily,
+                multiUrlFetcher = multiUrlFetcher,
+                webPageFetcher = webPageFetcher,
+                advancedPreferences = advancedPreferences
             )
             ProviderType.LOCAL, ProviderType.LITE_RT_LM -> liteRTLmProvider.get()
         }
