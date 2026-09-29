@@ -195,14 +195,25 @@ class LiteRTLmLoopTest {
     // ------------------------------------------------------------------
 
     @Test
-    fun `status display shows query and URL`() {
+    fun `status display uses user copy never raw tool names`() {
         assertThat(
             LocalToolLoop.statusDisplay("web_search", mapOf("query" to "android release"))
-        ).isEqualTo("web_search: android release")
+        ).isEqualTo("Searching for \"android release\"…")
         assertThat(
-            LocalToolLoop.statusDisplay("web_fetch", mapOf("url" to "https://example.com/x"))
-        ).isEqualTo("web_fetch: https://example.com/x")
+            LocalToolLoop.statusDisplay("web_fetch", mapOf("url" to "https://example.com/x?token=abc"))
+        ).isEqualTo("Reading example.com…")
         assertThat(LocalToolLoop.statusDisplay("rm_rf", emptyMap())).isNull()
+    }
+
+    @Test
+    fun `status display falls back on blank args and caps long text`() {
+        assertThat(LocalToolLoop.statusDisplay("web_search", mapOf("query" to "   ")))
+            .isEqualTo("Searching…")
+        assertThat(LocalToolLoop.statusDisplay("web_fetch", mapOf("url" to "  ")))
+            .isEqualTo("Reading…")
+        val longQuery = "q".repeat(200)
+        assertThat(LocalToolLoop.statusDisplay("web_search", mapOf("query" to longQuery)))
+            .isEqualTo("Searching for \"${"q".repeat(80)}\"…")
     }
 
     // ------------------------------------------------------------------
@@ -356,9 +367,9 @@ class LiteRTLmLoopTest {
         val tokens = flow<StreamToken> { drive(transport) }.toList()
 
         assertThat(tokens).containsExactly(
-            StreamToken.ToolStatus("web_search: q"),
+            StreamToken.ToolStatus("Searching for \"q\"…"),
             StreamToken.ToolStatus(null),
-            StreamToken.ToolStatus("web_fetch: https://f"),
+            StreamToken.ToolStatus("Reading f…"),
             StreamToken.ToolStatus(null),
             StreamToken.Delta("Final answer"),
             StreamToken.Done(reasoning = "need fresh info"),

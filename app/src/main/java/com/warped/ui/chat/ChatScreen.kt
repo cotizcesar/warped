@@ -320,10 +320,13 @@ fun ChatScreen(
                     Spacer(Modifier.height(8.dp))
                 }
                 // Phase 56 (56-02): transient tool-call status row — the
-                // provider posts "web_search: <query>" / "web_fetch: <url>"
-                // while a tool runs, null when done. Same transient slot as
-                // the fetch chip above: never a transcript message, never
-                // persisted; unmounts on Done/Error/Stop/new send.
+                // provider posts user copy ("Searching for …" /
+                // "Reading <host>…") while a tool runs, null when done.
+                // Same transient slot as the fetch chip above: never a
+                // transcript message, never persisted; unmounts on
+                // Done/Error/Stop/new send. Single-line with ellipsis
+                // (UI-REVIEW fix #2) so long queries/hosts can't push the
+                // input bar.
                 input.toolCallActive?.let { status ->
                     Row(
                         modifier = Modifier
@@ -342,9 +345,11 @@ fun ChatScreen(
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = "Using $status",
+                            text = status,
                             fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                     Spacer(Modifier.height(8.dp))

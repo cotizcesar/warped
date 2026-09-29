@@ -101,8 +101,12 @@ object LocalToolLoop {
 
     /**
      * Phase 56 (56-02): transient status-row display string for a tool call
-     * (Loop Visibility decision). Search shows the query text, fetch shows
-     * the URL — `"<tool>: <arg>"`. Null for unknown names (the driver falls
+     * (Loop Visibility decision). User-facing copy only — never the raw
+     * tool identifiers: search shows `Searching for "<query>"…`, fetch shows
+     * `Reading <host>…` (host-only, never the full URL which may carry
+     * tracking params or tokens). Display args are capped at
+     * [MAX_STATUS_ARG_CHARS]; blank args fall back to the bare verb
+     * ("Searching…"/"Reading…"). Null for unknown names (the driver falls
      * back to the raw name and the executor returns the unknown-tool error
      * without executing). Carries model-authored text only, never history.
      */
@@ -110,14 +114,28 @@ object LocalToolLoop {
         when (mapToolCallName(toolName)) {
             TOOL_WEB_SEARCH -> {
                 val query = (args["query"] as? String)?.trim().orEmpty()
-                "$TOOL_WEB_SEARCH: ${query.ifEmpty { "…" }}"
+                if (query.isEmpty()) "Searching…"
+                else "Searching for \"${query.take(MAX_STATUS_ARG_CHARS)}\"…"
             }
             TOOL_WEB_FETCH -> {
                 val url = (args["url"] as? String)?.trim().orEmpty()
-                "$TOOL_WEB_FETCH: ${url.ifEmpty { "…" }}"
+                if (url.isEmpty()) "Reading…" else "Reading ${urlHost(url)}…"
             }
             else -> null
         }
+
+    /**
+     * Host-only display for fetch URLs (UI-REVIEW fix #1). Never throws —
+     * unparseable input falls back to a scheme-stripped, delimiter-cut
+     * prefix so the row can never leak a full URL.
+     */
+    private fun urlHost(url: String): String {
+        val parsed = runCatching { java.net.URI(url).host }.getOrNull()
+        if (!parsed.isNullOrBlank()) return parsed.take(MAX_STATUS_ARG_CHARS)
+        val noScheme = url.substringAfter("://", url)
+        val host = noScheme.split('/', '?', '#').firstOrNull().orEmpty()
+        return host.ifEmpty { url }.take(MAX_STATUS_ARG_CHARS)
+    }
 
     /** Calls left in the budget; floors at 0 for over-cap inputs. */
     fun callsRemaining(callsUsed: Int): Int = (MAX_TOOL_CALLS - callsUsed).coerceAtLeast(0)
@@ -212,5 +230,6 @@ object LocalToolLoop {
 
     private const val MAX_URL_IN_ERROR = 200
     private const val MAX_FAILURE_CHARS = 300
+    private const val MAX_STATUS_ARG_CHARS = 80
     private val FAILURE_WHITESPACE = Regex("\\s+")
 }

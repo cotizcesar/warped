@@ -405,7 +405,7 @@ class ChatCancellationTest {
         coEvery { helper.initialize(any()) } returns Unit
         coEvery { helper.stopResponse() } returns Unit
         every { helper.runInference(any(), any()) } returns flow {
-            emit(StreamToken.ToolStatus("web_search: android release"))
+            emit(StreamToken.ToolStatus("Searching for \"android release\"…"))
             delay(100)
             emit(StreamToken.ToolStatus(null))
             emit(StreamToken.Delta("hi"))
@@ -418,7 +418,7 @@ class ChatCancellationTest {
         vm.sendMessage("fresh news?")
         runCurrent()
         // Transient row shows the query while the tool runs.
-        assertThat(vm.uiState.value.toolCallActive).isEqualTo("web_search: android release")
+        assertThat(vm.uiState.value.toolCallActive).isEqualTo("Searching for \"android release\"…")
 
         advanceUntilIdle()
         // Cleared on completion; never persisted to the transcript.

@@ -67,8 +67,8 @@ data class ChatInputState(
     // retry — never a live observer (no auto-retry by lock). Default false;
     // init calls refreshConnectivity() for the real value.
     val isValidatedOnline: Boolean = false,
-    // Phase 56 (56-02): transient tool-call status ("web_search: <query>" /
-    // "web_fetch: <url>"). Set by the StreamToken.ToolStatus collector,
+    // Phase 56 (56-02): transient tool-call status ("Searching for …" /
+    // "Reading <host>…"). Set by the StreamToken.ToolStatus collector,
     // cleared on null ToolStatus / ToolCompleted / Done / Error / Stop /
     // new send. Rendered as a transient row ONLY — never written to
     // ChatMessage history, Room, or the persisted transcript (T-56-09).
