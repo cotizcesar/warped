@@ -12,10 +12,13 @@ import java.io.ByteArrayInputStream
  * 45-02 LRT-09: allowlist asset + repository verification.
  *
  * The shipped asset is parsed directly (not a copy) so this test guards the file
- * RUNTIME-05 requires to ship. Verified-only rule: MTP / extended-context /
- * function-calling must stay false until device-verified on 0.17.x.
- * gemma-4-E2B-it vision/audio/thinking are docs-verified (Google official
- * Gemma 4 docs 2026-09-28, device confirmation pending).
+ * RUNTIME-05 requires to ship. Verified-only rule: MTP / extended-context
+ * must stay false until device-verified on 0.17.x; function-calling is true
+ * for the gemma-4 pair ONLY per the 56-01 FLAG DECISION (docs basis, device
+ * confirmation pending — reverts if no ToolCall emission on-device) and
+ * false for both 3n entries. gemma-4-E2B-it vision/audio/thinking are
+ * docs-verified (Google official Gemma 4 docs 2026-09-28, device
+ * confirmation pending).
  */
 class ModelAllowlistTest {
 
@@ -173,6 +176,18 @@ class ModelAllowlistTest {
             "gemma-4-E2B-it" to true,
             "gemma-4-E4B-it" to true
         )
+        // 56-01 FLAG DECISION: supportsFunctionCalling true for the gemma-4
+        // pair ONLY (docs basis: Gemma 4 model card built-in function
+        // calling + E4B chat_template <|tool|> blocks + LiteRT-LM docs
+        // Gemma 4 tool support; device confirmation pending — reverts if
+        // no ToolCall emission on-device). 3n pair stays false (no
+        // evidence either way, verified-only defaults closed).
+        val expectedFunctionCalling = mapOf(
+            "gemma-3n-E2B-it-int4" to false,
+            "gemma-3n-E4B-it-int4" to false,
+            "gemma-4-E2B-it" to true,
+            "gemma-4-E4B-it" to true
+        )
         for (model in models) {
             val caps = model.capabilities
             assertThat(caps.text).isEqualTo(expectedTextModality[model.name] == true)
@@ -180,7 +195,7 @@ class ModelAllowlistTest {
             assertThat(caps.audio).isEqualTo(expectedVisionAudio[model.name] == true)
             assertThat(caps.speculativeDecoding).isEqualTo(expectedSpeculativeDecoding[model.name] == true)
             assertThat(caps.supportsThinking).isEqualTo(expectedThinking[model.name] == true)
-            assertThat(caps.supportsFunctionCalling).isFalse()
+            assertThat(caps.supportsFunctionCalling).isEqualTo(expectedFunctionCalling[model.name] == true)
             assertThat(caps.extendedContext).isFalse()
             assertThat(caps.mtpSupport).isFalse()
         }
@@ -196,10 +211,12 @@ class ModelAllowlistTest {
         assertThat(repo.findByModelFile("gemma-4-E4B-it.litertlm")?.name)
             .isEqualTo("gemma-4-E4B-it")
         assertThat(repo.supportsThinking("gemma-4-E4B-it")).isTrue()
-        assertThat(repo.supportsFunctionCalling("gemma-4-E4B-it")).isFalse()
+        assertThat(repo.supportsFunctionCalling("gemma-4-E4B-it")).isTrue()
+        assertThat(repo.supportsFunctionCalling("gemma-4-E2B-it")).isTrue()
         assertThat(repo.supportsSpeculativeDecoding("gemma-4-E4B-it")).isTrue()
         assertThat(repo.supportsThinking("gemma-3n-E2B-it-int4")).isFalse()
         assertThat(repo.supportsFunctionCalling("gemma-3n-E2B-it-int4")).isFalse()
+        assertThat(repo.supportsFunctionCalling("gemma-3n-E4B-it-int4")).isFalse()
         assertThat(repo.supportsSpeculativeDecoding("gemma-3n-E2B-it-int4")).isTrue()
         assertThat(repo.supportsExtendedContext("gemma-3n-E2B-it-int4")).isFalse()
         assertThat(repo.supportsMtp("gemma-3n-E2B-it-int4")).isFalse()
@@ -246,24 +263,26 @@ class ModelAllowlistTest {
 
         // Allowlisted gemma-4-E2B-it: docs-verified vision/audio/thinking
         // (Google official Gemma 4 docs 2026-09-28, device confirmation
-        // pending); function-calling stays false (tool execution removed,
-        // Phase 49 DEL-01).
+        // pending); function-calling true per the 56-01 FLAG DECISION
+        // (docs basis, device confirmation pending) so the Tools badge
+        // shows and the plan-02 loop arms on this model.
         val e2b = repo.effectiveCapabilities(local("gemma-4-E2B-it", "gemma-4-E2B-it.litertlm"))
         assertThat(e2b.reasoning).isTrue()
         assertThat(e2b.vision).isTrue()
-        assertThat(e2b.tools).isFalse()
+        assertThat(e2b.tools).isTrue()
 
         // Allowlisted 3n keeps its verified vision/audio.
         val n3 = repo.effectiveCapabilities(local("gemma-3n-E2B-it-int4", "gemma-3n-E2B-it-int4.litertlm"))
         assertThat(n3.vision).isTrue()
         assertThat(n3.reasoning).isFalse()
 
-        // Allowlisted E4B: docs-verified vision/audio/thinking; no Tools badge.
+        // Allowlisted E4B: docs-verified vision/audio/thinking +
+        // function-calling (56-01 FLAG DECISION) — Tools badge on.
         val e4b = repo.effectiveCapabilities(local("gemma-4-E4B-it", "gemma-4-E4B-it.litertlm"))
         assertThat(e4b.reasoning).isTrue()
         assertThat(e4b.vision).isTrue()
         assertThat(e4b.audio).isTrue()
-        assertThat(e4b.tools).isFalse()
+        assertThat(e4b.tools).isTrue()
 
         // Unlisted model: stored caps except thinking (opt-in only).
         val other = repo.effectiveCapabilities(local("some-future-model", "some-future-model.litertlm"))

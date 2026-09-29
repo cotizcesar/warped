@@ -94,6 +94,16 @@ class LiteRTLmEngine @Inject constructor(
 
         ensureNativeLoaded()
 
+        // 56-01 (layer 1 channel hygiene): exclude thinking-channel content
+        // from the KV cache. VERIFIED present in the 0.17.1 AAR bytecode
+        // (get/setFilterChannelContentFromKvCache, nullable Boolean) — the
+        // CONTEXT "if the SDK exposes it" conditional resolves YES. Set
+        // unconditionally (backend-independent) next to the speculative
+        // decoding flag below, which stays GPU-only. Layer 2
+        // (thought-channel routing to the Thinking panel) is plan 02.
+        @OptIn(ExperimentalApi::class)
+        ExperimentalFlags.filterChannelContentFromKvCache = true
+
         val litertlmBackend = when (backend) {
             BackendType.CPU -> Backend.CPU()
             BackendType.GPU -> {

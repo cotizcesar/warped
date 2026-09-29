@@ -34,6 +34,17 @@ import javax.inject.Singleton
  * text/vision/audio/supportsThinking true, supportsFunctionCalling false per
  * Phase 49 DEL-01. Speculative decoding true (Gemma 4 docs). File size
  * verified via Hugging Face CDN HEAD (3659530240 bytes).
+ *
+ * 56-01 FLAG DECISION (2026-09-29): supportsFunctionCalling flips to true
+ * for the gemma-4 pair ONLY, on the same docs-evidence standard the user
+ * approved for thinking flags — Gemma 4 model card documents built-in
+ * function calling, the E4B chat_template.jinja ships <|tool|> blocks,
+ * LiteRT-LM docs list Gemma 4 under models with tool support. Device
+ * confirmation is PENDING (plan 02 on-device smoke must see real ToolCall
+ * emission; if a Gemma 4 model never emits ToolCalls, its flag reverts).
+ * Both 3n entries stay false — no evidence either way, verified-only
+ * defaults closed. The loop executes only when the active model's flag is
+ * true (capability gate in plan 02).
  */
 @Serializable
 data class AllowlistCapabilities(
