@@ -35,49 +35,61 @@ v2.2 Simplificación + Web Grounding shipped 2026-09-28 (Phases 49–51): dead s
 **Milestone Goal:** The model itself searches (Tavily) and fetches the web via tool calling — local and remote — with OpenGraph thumbnail cards per source.
 
 ### Phase 55: Tavily Search Foundation
+
 **Goal**: Users ground answers in Tavily search results with a stored API key
 **Depends on**: Phase 54
 **Requirements**: TAV-01, TAV-02, TAV-03
 **Success Criteria** (what must be TRUE):
+
   1. User stores a Tavily key in Settings (Keystore-encrypted) with a working test-connection
   2. User gets answers grounded in top-N Tavily results with numbered citations through the same Fuentes/preview pipeline
   3. Search never runs when grounding is off or offline, with a clear missing/invalid-key message
+
 **Plans**: 2 plans
 
-- [ ] 55-01-PLAN.md — Tavily key alias + search-to-fused producer (tracer backbone)
-- [ ] 55-02-PLAN.md — Settings key UI + ChatViewModel search branch with gates
+- [x] 55-01-PLAN.md — Tavily key alias + search-to-fused producer (tracer backbone)
+- [x] 55-02-PLAN.md — Settings key UI + ChatViewModel search branch with gates
+
 **UI hint**: yes
 
 ### Phase 56: Local Agentic Loop
+
 **Goal**: Local models invoke web_search/web_fetch autonomously via LiteRT-LM function calling
 **Depends on**: Phase 55
 **Requirements**: AGENT-01, AGENT-02, AGENT-04
 **Success Criteria** (what must be TRUE):
+
   1. User sees the model search and fetch on its own (multi-turn loop, step cap, Stop cancels) when the question needs fresh info
   2. Tool outputs pass the same trust boundary as fetched pages (sanitized, no hijack, no breakout)
   3. Only web_search/web_fetch are ever exposed — no file/system tools, no local-context leaks
+
 **Plans**: TBD
 
 ### Phase 57: Remote Agentic Loop
+
 **Goal**: Remote OpenAI-compatible models use the same tools via native tools[] loop
 **Depends on**: Phase 56
 **Requirements**: AGENT-03
 **Success Criteria** (what must be TRUE):
+
   1. User on a remote endpoint gets agentic search/fetch with per-provider capability gating (graceful fallback where tools[] unsupported)
   2. Tool-call streaming renders progress honestly (no silent loops); Stop cancels mid-loop
+
 **Plans**: TBD
 
 ### Phase 58: OpenGraph Thumbnails
+
 **Goal**: Every grounded source renders a rich thumbnail card with its OpenGraph data
 **Depends on**: Phase 57
 **Requirements**: OG-01, OG-02, OG-03
 **Success Criteria** (what must be TRUE):
+
   1. Fetch captures og:title/description/image persisted with source rows (single Room migration v16)
   2. User sees a Coil-loaded thumbnail card per source (tap → preview); text-only fallback without image
   3. Preview sheet shows the OG header above extracted text
+
 **Plans**: TBD
 **UI hint**: yes
-
 
 ## Progress
 
