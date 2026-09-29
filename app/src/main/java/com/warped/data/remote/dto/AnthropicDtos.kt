@@ -1,9 +1,22 @@
 package com.warped.data.remote.dto
 
+import com.warped.data.agentic.LocalToolLoop
+import com.warped.data.agentic.WEB_FETCH_TOOL_DESCRIPTION
+import com.warped.data.agentic.WEB_FETCH_URL_DESCRIPTION
+import com.warped.data.agentic.WEB_SEARCH_QUERY_DESCRIPTION
+import com.warped.data.agentic.WEB_SEARCH_TOOL_DESCRIPTION
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
@@ -16,7 +29,67 @@ data class AnthropicChatRequest(
     val temperature: Float? = null,
     @SerialName("top_p") val topP: Float? = null,
     @SerialName("top_k") val topK: Int? = null,
-    val thinking: AnthropicThinking? = null
+    val thinking: AnthropicThinking? = null,
+    /**
+     * Phase 57 (57-02): native Anthropic `tools` (name + description +
+     * `input_schema` — no `strict` flag, no `tool_choice` equivalent ever
+     * sent). `NEVER`-encoded so unarmed turns omit the key entirely and
+     * stay byte-identical to the pre-57 request shape.
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val tools: List<AnthropicTool>? = null
+)
+
+/**
+ * Phase 57 (57-02): one native Anthropic tool entry. Schemas mirror the
+ * 57-01 OpenAI `parameters` verbatim (single-required-string
+ * `query`/`url`, descriptions copied from the local `@Tool` constants) —
+ * only the envelope key differs (`input_schema`, no `type:"function"`
+ * wrapper).
+ */
+@Serializable
+data class AnthropicTool(
+    /** Exact snake_case contract: `web_search` | `web_fetch`. */
+    val name: String,
+    val description: String,
+    /** `{type:object, properties:{…}, required:[…]}`. */
+    @SerialName("input_schema") val inputSchema: JsonObject,
+)
+
+/**
+ * Phase 57 (57-02): the two-tool `tools` list for an armed round, built
+ * once per turn. Same provider-neutral surface as [defaultRemoteTools].
+ */
+fun defaultAnthropicTools(): List<AnthropicTool> = listOf(
+    AnthropicTool(
+        name = LocalToolLoop.TOOL_WEB_SEARCH,
+        description = WEB_SEARCH_TOOL_DESCRIPTION,
+        inputSchema = buildJsonObject {
+            put("type", "object")
+            putJsonObject("properties") {
+                putJsonObject("query") {
+                    put("type", "string")
+                    put("description", WEB_SEARCH_QUERY_DESCRIPTION)
+                }
+            }
+            putJsonArray("required") { add(JsonPrimitive("query")) }
+            put("additionalProperties", false)
+        },
+    ),
+    AnthropicTool(
+        name = LocalToolLoop.TOOL_WEB_FETCH,
+        description = WEB_FETCH_TOOL_DESCRIPTION,
+        inputSchema = buildJsonObject {
+            put("type", "object")
+            putJsonObject("properties") {
+                putJsonObject("url") {
+                    put("type", "string")
+                    put("description", WEB_FETCH_URL_DESCRIPTION)
+                }
+            }
+            putJsonArray("required") { add(JsonPrimitive("url")) }
+            put("additionalProperties", false)
+        },
+    ),
 )
 
 @Serializable
@@ -25,11 +98,87 @@ data class AnthropicThinking(
     @SerialName("budget_tokens") val budgetTokens: Int
 )
 
+/**
+ * Phase 57 (57-02): message content upgraded from `String` to
+ * [JsonElement] so tool rounds can carry `tool_use`/`tool_result` content
+ * blocks. Plain-text turns encode [JsonPrimitive] and serialize
+ * byte-identically to the pre-57 string shape — use [text] for those.
+ */
 @Serializable
 data class AnthropicMessage(
     val role: String,
-    val content: String
-)
+    val content: JsonElement
+) {
+    companion object {
+        /** Plain-text turn message — the exact pre-57 wire shape. */
+        fun text(role: String, text: String): AnthropicMessage =
+            AnthropicMessage(role, JsonPrimitive(text))
+
+        /**
+         * Assistant echo carrying the completed `tool_use` blocks for one
+         * round ([PendingToolCall.id]/name plus the complete reassembled
+         * input object). In-memory loop echo only — never persisted.
+         */
+        fun toolUseEcho(
+            textParts: List<String>,
+            calls: List<com.warped.data.agentic.PendingToolCall>,
+            json: kotlinx.serialization.json.Json,
+        ): AnthropicMessage {
+            val blocks = buildJsonArray {
+                textParts.forEach { part ->
+                    add(buildJsonObject {
+                        put("type", "text")
+                        put("text", part)
+                    })
+                }
+                calls.forEach { call ->
+                    add(buildJsonObject {
+                        put("type", "tool_use")
+                        put("id", call.id)
+                        put("name", call.name.orEmpty())
+                        put("input", coerceInputObject(call.argumentsJson, json))
+                    })
+                }
+            }
+            return AnthropicMessage("assistant", blocks)
+        }
+
+        /**
+         * User turn carrying one `tool_result` block per executed call
+         * (fused-block content verbatim). In-memory only — never persisted.
+         */
+        fun toolResults(results: List<Pair<String, String>>): AnthropicMessage {
+            val blocks = buildJsonArray {
+                results.forEach { (toolUseId, content) ->
+                    add(buildJsonObject {
+                        put("type", "tool_result")
+                        put("tool_use_id", toolUseId)
+                        put("content", content)
+                    })
+                }
+            }
+            return AnthropicMessage("user", blocks)
+        }
+
+        /**
+         * The `tool_use.input` must be a JSON object. Reassembled arguments
+         * that fail to parse (or parse to a non-object) coerce to `{}` —
+         * the call itself already short-circuited via `validateArgs`, so
+         * the echo only needs to stay well-formed. Never throws.
+         */
+        private fun coerceInputObject(
+            raw: String,
+            json: kotlinx.serialization.json.Json,
+        ): JsonElement = try {
+            when (val element = json.parseToJsonElement(raw)) {
+                is JsonObject -> element
+                else -> buildJsonObject { }
+            }
+        } catch (_: Exception) {
+            buildJsonObject { }
+        }
+    }
+}
 
 @Serializable
 data class AnthropicSseEvent(
@@ -64,4 +213,17 @@ data class AnthropicSseMessage(
     val id: String = "",
     val model: String = "",
     val role: String = ""
+)
+
+/**
+ * Phase 57 (57-02): non-streaming `POST /v1/messages` response shape
+ * (Pitfall-3 parity with the OpenAI dialect: servers that ignore
+ * `stream:true` return one JSON body). `content` reuses
+ * [AnthropicContentBlock] (`text` blocks + `tool_use` blocks with
+ * complete `input`); [stopReason] `"tool_use"` marks a tool round.
+ */
+@Serializable
+data class AnthropicNonStreamingResponse(
+    val content: List<AnthropicContentBlock> = emptyList(),
+    @SerialName("stop_reason") val stopReason: String? = null,
 )
