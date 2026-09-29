@@ -104,11 +104,17 @@ fun OgSourceCard(
                 .height(IntrinsicSize.Min),
         ) {
             if (showThumb) {
-                OgThumb(
-                    imageUrl = gatedImage,
-                    contentDescription = null,
-                    onError = { imageFailed = true },
-                )
+                Box(
+                    modifier = Modifier
+                        .clickable(role = Role.Button, onClick = { onOpenBrowser(source.url) })
+                        .semantics { contentDescription = "Open in browser" },
+                ) {
+                    OgThumb(
+                        imageUrl = gatedImage,
+                        contentDescription = null,
+                        onError = { imageFailed = true },
+                    )
+                }
                 Spacer(Modifier.width(8.dp))
             }
             Column(
