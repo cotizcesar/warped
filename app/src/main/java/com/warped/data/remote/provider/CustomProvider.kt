@@ -112,7 +112,12 @@ class CustomProvider(
                         val (role, text) = it.toProviderText()
                         OpenAiMessage(role = role, content = text)
                     } else {
-                        OpenAiMessage(role = it.role.name.lowercase(), content = it.content)
+                        // WR-02: USER content sanitized like every sibling
+                        // armed branch (Ollama/LM Studio pattern).
+                        val content = if (it.role == Role.USER) {
+                            inputSanitizer?.sanitize(it.content) ?: it.content
+                        } else it.content
+                        OpenAiMessage(role = it.role.name.lowercase(), content = content)
                     }
                 }
             val tavilyRepo = tavily
@@ -190,7 +195,11 @@ class CustomProvider(
                     val (role, text) = it.toProviderText()
                     OpenAiMessage(role = role, content = text)
                 } else {
-                    OpenAiMessage(role = it.role.name.lowercase(), content = it.content)
+                    // WR-02: USER content sanitized (Ollama/LM Studio pattern).
+                    val content = if (it.role == Role.USER) {
+                        inputSanitizer?.sanitize(it.content) ?: it.content
+                    } else it.content
+                    OpenAiMessage(role = it.role.name.lowercase(), content = content)
                 }
             }
         val body = OpenAiChatRequest(
