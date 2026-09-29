@@ -90,6 +90,26 @@ object ToolCapabilityMatrix {
     }
 
     /**
+     * Phase 57 (WR-05 fix): Anthropic thinking-shape rejection. Follow-up
+     * rounds whose echo a strict endpoint rejects for thinking/signature
+     * reasons 400 with a body naming `thinking`/`signature` — never the
+     * `tool`/`function` substring [isToolsRejection] matches. Same
+     * exactly-one retry without tools plus [TOOLS_UNSUPPORTED_NOTICE].
+     * Anthropic-scoped by convention (only the Anthropic driver calls it);
+     * total, never throws.
+     */
+    fun isAnthropicThinkingRejection(httpCode: Int, errorBody: String?): Boolean {
+        if (httpCode != 400) return false
+        if (errorBody.isNullOrEmpty()) return false
+        return try {
+            val body = errorBody.lowercase()
+            "thinking" in body || "signature" in body
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
      * Phase 57 remote-arm predicate (Pitfall 5: the plan-02 VM pre-search
      * skip mirrors this). All three inputs are ANDed — grounding off,
      * matrix refusing the OpenAI dialect, or unvalidated internet each

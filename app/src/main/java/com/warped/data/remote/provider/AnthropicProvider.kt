@@ -447,7 +447,14 @@ class AnthropicProvider(
                         ""
                     }
                     val code = okHttpResponse.code
-                    if (tools != null && ToolCapabilityMatrix.isToolsRejection(code, snippet)) {
+                    // WR-05: thinking-shape 400s (naming `thinking` /
+                    // `signature`, never `tool`) ride the same exactly-one
+                    // graceful fallback as tools[] rejections.
+                    if (tools != null && (
+                        ToolCapabilityMatrix.isToolsRejection(code, snippet) ||
+                            ToolCapabilityMatrix.isAnthropicThinkingRejection(code, snippet)
+                        )
+                    ) {
                         return AnthropicRoundResult(toolsRejected = true)
                     }
                     return AnthropicRoundResult(error = "HTTP $code: ${okHttpResponse.message}")
@@ -498,32 +505,42 @@ class AnthropicProvider(
                             }
                             "content_block_delta" -> {
                                 val delta = event.delta ?: return false
+                                // WR-05: provider-synthesized thinking is UI
+                                // signal only — it must never enter
+                                // `textParts` (the in-memory assistant echo).
+                                // Flattened `<think>` markers replayed as
+                                // plain `text` blocks make strict endpoints
+                                // 400 the follow-up round; the echo carries
+                                // user-visible text + `tool_use` only.
                                 if (!delta.thinking.isNullOrEmpty()) {
                                     if (!thinkingOpen) {
                                         emit(StreamToken.Delta("<think>"))
-                                        textParts += "<think>"
                                         thinkingOpen = true
                                     }
                                     emit(StreamToken.Delta(delta.thinking))
-                                    textParts += delta.thinking
                                     hasTokens = true
                                 } else if (delta.text != null) {
                                     if (thinkingOpen) {
                                         emit(StreamToken.Delta("</think>"))
-                                        textParts += "</think>"
                                         thinkingOpen = false
                                     }
                                     emit(StreamToken.Delta(delta.text))
                                     textParts += delta.text
                                     hasTokens = true
                                 }
-                                delta.partialJson?.let { fragment ->
-                                    accumulator.feed(
-                                        index = event.index ?: 0,
-                                        id = null,
-                                        name = null,
-                                        argumentsFragment = fragment,
-                                    )
+                                // IN-04: only `input_json_delta` fragments
+                                // feed tool reassembly — a text-block index
+                                // colliding with a tool-use index must never
+                                // poison the accumulator.
+                                if (delta.type == INPUT_JSON_DELTA_TYPE) {
+                                    delta.partialJson?.let { fragment ->
+                                        accumulator.feed(
+                                            index = event.index ?: 0,
+                                            id = null,
+                                            name = null,
+                                            argumentsFragment = fragment,
+                                        )
+                                    }
                                 }
                             }
                             "message_delta" -> {
@@ -567,7 +584,6 @@ class AnthropicProvider(
                     pendingError?.let { return AnthropicRoundResult(error = it) }
                     if (thinkingOpen) {
                         emit(StreamToken.Delta("</think>"))
-                        textParts += "</think>"
                     }
                     val toolCalls =
                         if (stopReason == TOOL_USE_STOP_REASON) accumulator.complete()
@@ -593,9 +609,10 @@ class AnthropicProvider(
                                     }
                                 }
                                 "thinking" -> {
+                                    // WR-05: thinking blocks stay UI-only —
+                                    // never echoed (see content_block_delta).
                                     block.thinking?.let {
                                         emit(StreamToken.Delta("<think>$it</think>"))
-                                        textParts += "<think>$it</think>"
                                         hasTokens = true
                                     }
                                 }
@@ -672,6 +689,9 @@ class AnthropicProvider(
     companion object {
         /** `stop_reason` value signaling a complete `tool_use` round. */
         private const val TOOL_USE_STOP_REASON = "tool_use"
+
+        /** `content_block_delta` type carrying tool-input fragments. */
+        private const val INPUT_JSON_DELTA_TYPE = "input_json_delta"
 
         /** Error-body window fed to the `tools`-rejection classifier. */
         private const val ERROR_BODY_SNIPPET_CHARS = 2000
