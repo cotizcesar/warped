@@ -80,3 +80,9 @@
 
 # Phase 49 (DEL-02/DEL-06): the com.warped skills surface is deleted — no
 # keeps reference deleted classes. LiteRT-LM SDK keeps above stay intact.
+
+# Phase 56 (56-01): keep the data.agentic ToolSet surface for LiteRT-LM
+# @Tool reflection (mirrors the deleted data.skills keeps, 47 precedent —
+# R8 must never strip the web_search/web_fetch schemas).
+-keep class com.warped.data.agentic.** { *; }
+-keepclassmembers class com.warped.data.agentic.** { *; }
