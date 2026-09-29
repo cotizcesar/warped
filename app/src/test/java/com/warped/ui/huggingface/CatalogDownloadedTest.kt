@@ -57,6 +57,7 @@ class CatalogDownloadedTest {
                 parameters: GenerationParameters
             ) = TODO("not needed")
             override suspend fun deleteModel(id: Long) = TODO("not needed")
+            override suspend fun deleteByFilePath(filePath: String): Int = TODO("not needed")
         }
 
     private fun onDeviceModel(filePath: String): LocalModel = LocalModel(
