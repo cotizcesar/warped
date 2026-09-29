@@ -703,13 +703,14 @@ class AnthropicProvider(
 
         private fun parseAnthropicSse(body: okhttp3.ResponseBody, json: Json): Flow<StreamToken> = flow {
             val source = body.source()
-            var currentEvent: String? = null
+            // IN-01: the `event:`-line payload was assigned but never read
+            // (the type rides inside data JSON) — lines consumed as no-ops.
             var thinkingOpen = false
             try {
                 while (!source.exhausted()) {
                     val line = source.readUtf8Line() ?: break
                     when {
-                        line.startsWith("event: ") -> currentEvent = line.removePrefix("event: ").trim()
+                        line.startsWith("event: ") -> { /* no-op */ }
                         line.startsWith("data: ") -> {
                             val data = line.removePrefix("data: ").trim()
                             try {
@@ -746,7 +747,7 @@ class AnthropicProvider(
                                 }
                             } catch (e: Exception) { Timber.e(e, "Anthropic: SSE event parse failed") }
                         }
-                        line.isEmpty() -> currentEvent = null
+                        line.isEmpty() -> { /* frame separator */ }
                     }
                 }
                 if (thinkingOpen) emit(StreamToken.Delta("</think>"))

@@ -122,9 +122,14 @@ data class OpenAiMessage(
     /**
      * Phase 49 (DEL-01): single-turn only. Legacy `role=tool` rows never hit
      * the wire as `role:"tool"` — providers replay them as plain user text.
+     *
+     * IN-02: `NEVER`-encoded so the assistant tool_calls echo (which leaves
+     * content null) omits the key instead of sending explicit
+     * `"content":null` — strict compat servers may 400 the latter. Plain
+     * messages always carry non-null content, so they are unaffected.
      */
     val role: String,
-    val content: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val content: String? = null,
     /**
      * Phase 57 (57-01): assistant-echo `tool_calls` (exact ids + complete
      * arguments strings) and `role:"tool"` result messages
