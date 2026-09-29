@@ -862,7 +862,7 @@ class ChatViewModel @Inject constructor(
                         isStreaming = false
                     )
                 }
-                updateInput { it.copy(isGenerating = false) }
+                updateInput { it.copy(isGenerating = false, toolCallActive = null) }
             } finally {
                 // 46-01: clear the serving helper on turn end — but only if no newer
                 // turn has started since (stale-finally guard via turnId/seq).
