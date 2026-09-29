@@ -399,6 +399,14 @@ private fun ModelOnlyBanner(
                 ModelOnlyNotice.TAVILY_LIMIT ->
                     "Tavily usage limit reached. Model-only answer — check " +
                         "your plan usage and try again later."
+                // Phase 57 (57-02): tools[] rejected by the endpoint —
+                // one retry without tools, model-only answer. Copy
+                // mirrors ToolCapabilityMatrix.TOOLS_UNSUPPORTED_NOTICE
+                // (the notice channel carries the constant; this branch
+                // renders the same words in the banner slot).
+                ModelOnlyNotice.TOOLS_UNSUPPORTED ->
+                    "This endpoint doesn't support tool calling. Model-only answer — " +
+                        "no web sources this turn."
             },
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

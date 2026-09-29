@@ -12,12 +12,24 @@ import com.warped.domain.model.ProviderType
 import com.warped.domain.model.StreamToken
 import com.warped.domain.model.toProviderText
 import com.warped.domain.provider.LlmProvider
+import com.warped.data.agentic.ToolCapabilityMatrix
+import com.warped.data.grounding.GroundingPrecedence
+import com.warped.data.grounding.MultiUrlFetcher
+import com.warped.data.grounding.TavilySearchRepository
+import com.warped.data.grounding.WebPageFetcher
+import com.warped.data.local.preferences.AdvancedPreferences
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.Json
+import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import timber.log.Timber
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.util.concurrent.TimeUnit
@@ -27,7 +39,18 @@ class CustomProvider(
     private val modelId: String,
     private val chatPath: String = "v1/chat/completions",
     private val modelsPath: String = "v1/models",
-    apiKey: String? = null
+    apiKey: String? = null,
+    /**
+     * Phase 57 (57-02): tool-loop collaborators (Phase 55/52 singletons).
+     * All-null by default so the legacy `resolve()` path behaves exactly
+     * as before — the compat loop only arms when every collaborator is
+     * present (see [isLoopArmed]). The endpoint key stays on this
+     * client's interceptor ONLY; loop code never references it (T-57-07).
+     */
+    private val tavily: TavilySearchRepository? = null,
+    private val multiUrlFetcher: MultiUrlFetcher? = null,
+    private val webPageFetcher: WebPageFetcher? = null,
+    private val advancedPreferences: AdvancedPreferences? = null,
 ) : LlmProvider {
     override val type = ProviderType.CUSTOM
     private val json = Json { ignoreUnknownKeys = true }
@@ -55,7 +78,103 @@ class CustomProvider(
 
     private val api = retrofit.create(CustomApi::class.java)
 
+    /**
+     * Phase 57 (57-02): retained cancellable compat-round Call
+     * (LMStudioProvider precedent, same as the 57-01 OpenAI loop).
+     * `cancelChat()` tears down the in-flight socket; safe when idle.
+     */
+    @Volatile
+    private var currentCall: Call? = null
+
+    /** Belt-and-braces teardown of the in-flight round, if any. */
+    fun cancelChat() {
+        currentCall?.cancel()
+    }
+
     override fun chat(request: ChatRequest): Flow<StreamToken> = flow {
+        // Phase 57 (57-02): armed turns run the shared compat loop
+        // against the configured chat completions path (unknown/custom
+        // servers default to attempt-then-fallback per the locked
+        // decision); unarmed turns keep the exact Retrofit path.
+        if (isLoopArmed(request.webOverride)) {
+            val baseMessages = request.messages
+                .filter { it.content.isNotBlank() }
+                .map {
+                    // Phase 49 (DEL-01): TOOL rows replay as plain user text.
+                    if (it.role == Role.TOOL) {
+                        val (role, text) = it.toProviderText()
+                        OpenAiMessage(role = role, content = text)
+                    } else {
+                        OpenAiMessage(role = it.role.name.lowercase(), content = it.content)
+                    }
+                }
+            val tavilyRepo = tavily
+            val fetchAll = multiUrlFetcher
+            val net = webPageFetcher
+            if (tavilyRepo != null && fetchAll != null && net != null) {
+                with(CompatToolLoop) {
+                    runTurn(
+                        client = client,
+                        json = json,
+                        postUrl = baseUrl.trimEnd('/') + "/" + chatPath.trimStart('/'),
+                        modelId = modelId,
+                        baseMessages = baseMessages,
+                        request = request,
+                        tavily = tavilyRepo,
+                        multiUrlFetcher = fetchAll,
+                        webPageFetcher = net,
+                        logTag = "Custom",
+                        onCallCreated = { currentCall = it },
+                        onCallCleared = { currentCall = null },
+                    )
+                }
+                return@flow
+            }
+        }
+        postPlainTurn(request)
+    }.flowOn(Dispatchers.IO)
+
+    /**
+     * Phase 57 (57-02): provider-authoritative loop-arming. Unknown/custom
+     * servers default to attempt-then-fallback: one `tools[]` attempt,
+     * then exactly one retry without tools plus a visible notice.
+     * Grounding precedence resolves the per-chat override against the
+     * global default; internet must be validated. Missing collaborators
+     * or any gate failure reads as unarmed (plain turn), never a crash.
+     */
+    private suspend fun isLoopArmed(perChat: Boolean?): Boolean {
+        val prefs = advancedPreferences ?: return false
+        val net = webPageFetcher ?: return false
+        if (tavily == null || multiUrlFetcher == null) return false
+        if (!ToolCapabilityMatrix.attemptsTools(
+                ToolCapabilityMatrix.modeFor(ProviderType.CUSTOM),
+            )
+        ) return false
+        return try {
+            val global = try {
+                prefs.webGroundingEnabled.first()
+            } catch (e: Exception) {
+                Timber.w(e, "Custom: global grounding read failed, treating as off")
+                false
+            }
+            val online = try {
+                net.hasValidatedInternet()
+            } catch (e: Exception) {
+                Timber.w(e, "Custom: connectivity check failed, treating as offline")
+                false
+            }
+            ToolCapabilityMatrix.isRemoteLoopArmed(
+                groundingOn = GroundingPrecedence.shouldGround(perChat, global),
+                matrixAttemptsTools = true,
+                hasValidatedInternet = online,
+            )
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /** Phase 57 (57-02): the exact pre-57 Retrofit path, unchanged. */
+    private suspend fun FlowCollector<StreamToken>.postPlainTurn(request: ChatRequest) {
         val messages = request.messages
             .filter { it.content.isNotBlank() }
             .map {

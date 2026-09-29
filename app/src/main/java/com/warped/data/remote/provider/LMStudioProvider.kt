@@ -13,6 +13,7 @@ import com.warped.domain.model.ModelInfo
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.Role
 import com.warped.domain.model.StreamToken
+import com.warped.domain.model.toProviderText
 import com.warped.domain.model.toolDisplayNameCapitalized
 import com.warped.domain.provider.LlmProvider
 import kotlinx.coroutines.CancellationException
@@ -20,8 +21,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.currentCoroutineContext
+import com.warped.data.agentic.ToolCapabilityMatrix
+import com.warped.data.grounding.GroundingPrecedence
+import com.warped.data.grounding.MultiUrlFetcher
+import com.warped.data.grounding.TavilySearchRepository
+import com.warped.data.grounding.WebPageFetcher
+import com.warped.data.local.preferences.AdvancedPreferences
+import com.warped.data.remote.dto.OpenAiMessage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -44,7 +54,18 @@ class LMStudioProvider(
     private val baseUrl: String = "http://localhost:1234",
     private val modelId: String,
     apiKey: String? = null,
-    private val inputSanitizer: InputSanitizer
+    private val inputSanitizer: InputSanitizer,
+    /**
+     * Phase 57 (57-02): tool-loop collaborators (Phase 55/52 singletons).
+     * All-null by default so the helper/`resolve()` path behaves exactly
+     * as before — the compat attempt only arms when every collaborator is
+     * present (see [isLoopArmed]). The endpoint key stays on this
+     * client's interceptor ONLY; loop code never references it (T-57-07).
+     */
+    private val tavily: TavilySearchRepository? = null,
+    private val multiUrlFetcher: MultiUrlFetcher? = null,
+    private val webPageFetcher: WebPageFetcher? = null,
+    private val advancedPreferences: AdvancedPreferences? = null,
 ) : LlmProvider {
     override val type = ProviderType.LM_STUDIO
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -75,7 +96,92 @@ class LMStudioProvider(
 
     private val api = retrofit.create(LmStudioApi::class.java)
 
-    override fun chat(request: ChatRequest): Flow<StreamToken> = chat(request, emptyList())
+    override fun chat(request: ChatRequest): Flow<StreamToken> = flow {
+        // Phase 57 (57-02): armed turns attempt the OpenAI-compat `/v1`
+        // chat-completions path with the shared compat loop (model-dependent
+        // tools support — the one-retry fallback absorbs a wrong pick);
+        // unarmed turns keep the exact native `/api/v1/chat` path below
+        // (images, integrations, reasoning, stats untouched).
+        if (isLoopArmed(request.webOverride)) {
+            val baseMessages = request.messages
+                .filter { it.role != Role.SYSTEM && it.content.isNotBlank() }
+                .map {
+                    // Phase 49 (DEL-01): TOOL rows replay as plain user
+                    // text — the raw "<toolId>\n<summary>" encoding must
+                    // never hit the wire.
+                    if (it.role == Role.TOOL) {
+                        val (role, text) = it.toProviderText()
+                        OpenAiMessage(role = role, content = text)
+                    } else {
+                        val content = if (it.role == Role.USER) inputSanitizer.sanitize(it.content) else it.content
+                        OpenAiMessage(role = it.role.name.lowercase(), content = content)
+                    }
+                }
+            val tavilyRepo = tavily
+            val fetchAll = multiUrlFetcher
+            val net = webPageFetcher
+            if (tavilyRepo != null && fetchAll != null && net != null) {
+                with(CompatToolLoop) {
+                    runTurn(
+                        client = client,
+                        json = json,
+                        postUrl = baseUrl.trimEnd('/') + "/v1/chat/completions",
+                        modelId = modelId,
+                        baseMessages = baseMessages,
+                        request = request,
+                        tavily = tavilyRepo,
+                        multiUrlFetcher = fetchAll,
+                        webPageFetcher = net,
+                        logTag = "LMStudio",
+                        onCallCreated = { currentCall = it },
+                        onCallCleared = { currentCall = null },
+                    )
+                }
+                return@flow
+            }
+        }
+        chat(request, emptyList()).collect { emit(it) }
+    }.flowOn(Dispatchers.IO)
+
+    /**
+     * Phase 57 (57-02): provider-authoritative loop-arming. LM Studio
+     * serves OpenAI-compat `/v1` model-dependently — attempt once, then
+     * exactly one retry without tools plus a visible notice on a 400-class
+     * rejection. Grounding precedence resolves the per-chat override
+     * against the global default; internet must be validated. Missing
+     * collaborators or any gate failure reads as unarmed (native turn),
+     * never a crash.
+     */
+    private suspend fun isLoopArmed(perChat: Boolean?): Boolean {
+        val prefs = advancedPreferences ?: return false
+        val net = webPageFetcher ?: return false
+        if (tavily == null || multiUrlFetcher == null) return false
+        if (!ToolCapabilityMatrix.attemptsTools(
+                ToolCapabilityMatrix.modeFor(ProviderType.LM_STUDIO),
+            )
+        ) return false
+        return try {
+            val global = try {
+                prefs.webGroundingEnabled.first()
+            } catch (e: Exception) {
+                Timber.w(e, "LMStudio: global grounding read failed, treating as off")
+                false
+            }
+            val online = try {
+                net.hasValidatedInternet()
+            } catch (e: Exception) {
+                Timber.w(e, "LMStudio: connectivity check failed, treating as offline")
+                false
+            }
+            ToolCapabilityMatrix.isRemoteLoopArmed(
+                groundingOn = GroundingPrecedence.shouldGround(perChat, global),
+                matrixAttemptsTools = true,
+                hasValidatedInternet = online,
+            )
+        } catch (_: Exception) {
+            false
+        }
+    }
 
     /**
      * 46-01 RUNTIME-14: raw-OkHttp SSE chat with a retained cancellable [Call].

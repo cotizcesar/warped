@@ -1,6 +1,16 @@
 package com.warped.data.remote.provider
 
+import com.warped.data.agentic.ToolCapabilityMatrix
+import com.warped.data.grounding.GroundingPrecedence
+import com.warped.data.grounding.MultiUrlFetcher
+import com.warped.data.grounding.TavilySearchRepository
+import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.inference.InputSanitizer
+import com.warped.data.local.preferences.AdvancedPreferences
+import com.warped.data.remote.dto.OpenAiMessage
+import kotlinx.coroutines.flow.first
+import okhttp3.Call
+import timber.log.Timber
 import com.warped.data.remote.api.OllamaApi
 import com.warped.data.remote.dto.OllamaChatRequest
 import com.warped.data.remote.dto.OllamaCreateRequest
@@ -23,6 +33,7 @@ import com.warped.domain.model.toProviderText
 import com.warped.domain.provider.LlmProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
@@ -36,7 +47,18 @@ import java.util.concurrent.TimeUnit
 class OllamaProvider(
     private val baseUrl: String,
     private val modelId: String,
-    private val inputSanitizer: InputSanitizer
+    private val inputSanitizer: InputSanitizer,
+    /**
+     * Phase 57 (57-02): tool-loop collaborators (Phase 55/52 singletons).
+     * All-null by default so the legacy `resolve()` path behaves exactly
+     * as before — the compat loop only arms when every collaborator is
+     * present (see [isLoopArmed]). Ollama takes no endpoint key; loop
+     * code only ever touches the Tavily/fetch singletons (T-57-07).
+     */
+    private val tavily: TavilySearchRepository? = null,
+    private val multiUrlFetcher: MultiUrlFetcher? = null,
+    private val webPageFetcher: WebPageFetcher? = null,
+    private val advancedPreferences: AdvancedPreferences? = null,
 ) : LlmProvider {
     override val type = ProviderType.OLLAMA
     private val json = Json { ignoreUnknownKeys = true }
@@ -54,7 +76,108 @@ class OllamaProvider(
 
     private val api = retrofit.create(OllamaApi::class.java)
 
+    /**
+     * Phase 57 (57-02): retained cancellable compat-round Call
+     * (LMStudioProvider precedent, same as the 57-01 OpenAI loop).
+     * `cancelChat()` tears down the in-flight socket; safe when idle.
+     */
+    @Volatile
+    private var currentCall: Call? = null
+
+    /** Belt-and-braces teardown of the in-flight round, if any. */
+    fun cancelChat() {
+        currentCall?.cancel()
+    }
+
     override fun chat(request: ChatRequest): Flow<StreamToken> = flow {
+        // Phase 57 (57-02): armed turns ride the OpenAI-compat `/v1`
+        // chat-completions path with the shared compat loop (RESEARCH
+        // route-a); unarmed turns keep the exact native `/api/chat` path.
+        // Compat rounds use the Chat Completions envelope throughout —
+        // never the native `tool_name` envelope (Pitfall 6).
+        if (isLoopArmed(request.webOverride)) {
+            val baseMessages = request.messages
+                .filter { it.content.isNotBlank() }
+                .map {
+                    // Phase 49 (DEL-01): TOOL rows replay as plain user
+                    // text — the raw "<toolId>\n<summary>" encoding must
+                    // never hit the wire.
+                    if (it.role == Role.TOOL) {
+                        val (role, text) = it.toProviderText()
+                        OpenAiMessage(role = role, content = text)
+                    } else {
+                        val content = if (it.role == Role.USER) inputSanitizer.sanitize(it.content) else it.content
+                        OpenAiMessage(role = it.role.name.lowercase(), content = content)
+                    }
+                }
+            val tavilyRepo = tavily
+            val fetchAll = multiUrlFetcher
+            val net = webPageFetcher
+            if (tavilyRepo != null && fetchAll != null && net != null) {
+                with(CompatToolLoop) {
+                    runTurn(
+                        client = client,
+                        json = json,
+                        postUrl = baseUrl.trimEnd('/') + "/v1/chat/completions",
+                        modelId = modelId,
+                        baseMessages = baseMessages,
+                        request = request,
+                        tavily = tavilyRepo,
+                        multiUrlFetcher = fetchAll,
+                        webPageFetcher = net,
+                        logTag = "Ollama",
+                        onCallCreated = { currentCall = it },
+                        onCallCleared = { currentCall = null },
+                    )
+                }
+                return@flow
+            }
+        }
+        postNativeTurn(request)
+    }.flowOn(Dispatchers.IO)
+
+    /**
+     * Phase 57 (57-02): provider-authoritative loop-arming. The matrix
+     * must attempt the OpenAI dialect for Ollama; grounding precedence
+     * resolves the per-chat override against the global default; internet
+     * must be validated. Missing collaborators or any gate failure reads
+     * as unarmed (native turn), never a crash.
+     */
+    private suspend fun isLoopArmed(perChat: Boolean?): Boolean {
+        val prefs = advancedPreferences ?: return false
+        val net = webPageFetcher ?: return false
+        if (tavily == null || multiUrlFetcher == null) return false
+        if (!ToolCapabilityMatrix.attemptsTools(
+                ToolCapabilityMatrix.modeFor(ProviderType.OLLAMA),
+            )
+        ) return false
+        return try {
+            val global = try {
+                prefs.webGroundingEnabled.first()
+            } catch (e: Exception) {
+                Timber.w(e, "Ollama: global grounding read failed, treating as off")
+                false
+            }
+            val online = try {
+                net.hasValidatedInternet()
+            } catch (e: Exception) {
+                Timber.w(e, "Ollama: connectivity check failed, treating as offline")
+                false
+            }
+            ToolCapabilityMatrix.isRemoteLoopArmed(
+                groundingOn = GroundingPrecedence.shouldGround(perChat, global),
+                matrixAttemptsTools = true,
+                hasValidatedInternet = online,
+            )
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /** Phase 57 (57-02): the exact native `/api/chat` path, unchanged. */
+    private suspend fun FlowCollector<StreamToken>.postNativeTurn(
+        request: ChatRequest,
+    ) {
         val messages = request.messages
             .filter { it.content.isNotBlank() }
             .map {
@@ -84,7 +207,7 @@ class OllamaProvider(
         } catch (e: Exception) {
             emit(StreamToken.Error("Connection failed: ${e.message}"))
         }
-    }.flowOn(Dispatchers.IO)
+    }
 
     fun generate(prompt: String): Flow<StreamToken> = flow {
         val sanitizedPrompt = inputSanitizer.sanitize(prompt)

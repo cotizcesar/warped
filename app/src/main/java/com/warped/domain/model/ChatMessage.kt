@@ -35,4 +35,10 @@ enum class ModelOnlyNotice {
     TAVILY_INVALID_KEY,
     /** Phase 55 (TAV-03): search gated — plan usage exhausted (429). */
     TAVILY_LIMIT,
+    /**
+     * Phase 57 (57-02): the endpoint rejected `tools[]` — the loop retried
+     * once without tools and the turn completed model-only (actionable
+     * copy, English). Never OFFLINE so `retryGrounding` stays OFFLINE-only.
+     */
+    TOOLS_UNSUPPORTED,
 }

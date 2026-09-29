@@ -16,6 +16,8 @@ import com.warped.data.grounding.TavilySearchRepository
 import com.warped.data.grounding.UrlDetector
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.agentic.LocalToolLoop
+import com.warped.data.agentic.ToolCapabilityMatrix
+import com.warped.data.agentic.ToolMode
 import com.warped.data.local.inference.BackendType
 import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.MemoryChecker
@@ -515,12 +517,30 @@ class ChatViewModel @Inject constructor(
                         // Skip the branch but keep the SYSTEM_PROMPT persona
                         // via the null-block augment. Unarmed turns and
                         // non-local providers keep the exact Phase-55 path.
-                        val loopArmed = effectiveProvider == ProviderType.LITE_RT_LM &&
+                        //
+                        // Phase 57 (57-02): the skip broadens to armed
+                        // REMOTE loops — every matrix dialect that attempts
+                        // tools (ATTEMPT, ATTEMPT_FALLBACK, NATIVE_ANTHROPIC)
+                        // skips the VM pre-search so worst case stays 5
+                        // credits per message. The provider stays
+                        // authoritative (it re-checks grounding, matrix,
+                        // internet, plus its own collaborators); the VM
+                        // mirrors for the pre-search skip only.
+                        val localArmed = effectiveProvider == ProviderType.LITE_RT_LM &&
                             LocalToolLoop.isLoopArmed(
                                 groundingOn = doGround,
                                 supportsFunctionCalling = isFunctionCallingCapable(effectiveModelId),
                                 hasValidatedInternet = online,
                             )
+                        val remoteMode = ToolCapabilityMatrix.modeFor(effectiveProvider)
+                        val remoteArmed = ToolCapabilityMatrix.isRemoteLoopArmed(
+                            groundingOn = doGround,
+                            matrixAttemptsTools = remoteMode == ToolMode.ATTEMPT ||
+                                remoteMode == ToolMode.ATTEMPT_FALLBACK ||
+                                remoteMode == ToolMode.NATIVE_ANTHROPIC,
+                            hasValidatedInternet = online,
+                        )
+                        val loopArmed = localArmed || remoteArmed
                         if (loopArmed) {
                             requestUserText = GroundingPrompt.augment(
                                 requestUserText,
@@ -838,15 +858,27 @@ class ChatViewModel @Inject constructor(
                             }
                         }
                         is StreamToken.Error -> {
-                            updateTranscript {
-                                it.copy(
-                                    error = ChatError.Network(token.message),
-                                    streamingContent = "",
-                                    streamingReasoning = "",
-                                    isStreaming = false
-                                )
+                            // Phase 57 (57-02): the tools-unsupported retry
+                            // notice is informational — the turn continues
+                            // to a plain retry + Done — never a hard error.
+                            // Route the exact notice copy to the model-only
+                            // notice/banner slot instead of the error banner
+                            // (transient tool rows keep their existing
+                            // disappearance rules). Genuine errors keep the
+                            // existing path below.
+                            if (token.message == ToolCapabilityMatrix.TOOLS_UNSUPPORTED_NOTICE) {
+                                modelOnlyNotice = ModelOnlyNotice.TOOLS_UNSUPPORTED
+                            } else {
+                                updateTranscript {
+                                    it.copy(
+                                        error = ChatError.Network(token.message),
+                                        streamingContent = "",
+                                        streamingReasoning = "",
+                                        isStreaming = false
+                                    )
+                                }
+                                updateInput { it.copy(isGenerating = false, toolCallActive = null) }
                             }
-                            updateInput { it.copy(isGenerating = false, toolCallActive = null) }
                         }
                     }
                 }
