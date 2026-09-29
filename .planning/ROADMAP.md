@@ -65,8 +65,8 @@ v2.2 Simplificación + Web Grounding shipped 2026-09-28 (Phases 49–51): dead s
 
 **Plans**: 2 plans
 
-- [ ] 56-01-PLAN.md — ToolSets + loop policy, allowlist flag flips, KV-cache hygiene (tracer backbone)
-- [ ] 56-02-PLAN.md — Provider manual loop + status rows + on-device smoke checkpoint
+- [x] 56-01-PLAN.md — ToolSets + loop policy, allowlist flag flips, KV-cache hygiene (tracer backbone)
+- [x] 56-02-PLAN.md — Provider manual loop + status rows + on-device smoke checkpoint
 
 ### Phase 57: Remote Agentic Loop
 
