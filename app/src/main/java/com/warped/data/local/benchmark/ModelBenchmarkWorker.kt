@@ -95,6 +95,9 @@ class ModelBenchmarkWorker @AssistedInject constructor(
                         is StreamToken.ToolStatus -> Unit
                         // 47-03: remote-loop completion records carry no text.
                         is StreamToken.ToolCompleted -> Unit
+                        // Phase 57 UI-review: typed tools-unsupported
+                        // notice carries no text — ignored by benchmarks.
+                        is StreamToken.ToolsUnsupported -> Unit
                     }
                 }
             } catch (e: Exception) {

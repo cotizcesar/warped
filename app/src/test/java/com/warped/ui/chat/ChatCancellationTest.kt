@@ -207,6 +207,9 @@ class ChatCancellationTest {
                         is StreamToken.ToolStatus -> Unit
                         // 47-03: completion records carry no text either.
                         is StreamToken.ToolCompleted -> Unit
+                        // Phase 57 UI-review: typed tools-unsupported
+                        // notice carries no text either.
+                        is StreamToken.ToolsUnsupported -> Unit
                     }
                 }
             }

@@ -139,6 +139,10 @@ class LmStudioHelper @Inject constructor(
                         // post-DEL-01; passed through untouched.
                         is StreamToken.ToolStatus -> token
                         is StreamToken.ToolCompleted -> token
+                        // Phase 57 UI-review: typed tools-unsupported
+                        // notice passes through untouched (never
+                        // think-stripped, never filtered).
+                        is StreamToken.ToolsUnsupported -> token
                     }
                 }
             }

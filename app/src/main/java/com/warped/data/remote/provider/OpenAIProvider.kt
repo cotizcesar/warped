@@ -230,7 +230,7 @@ class OpenAIProvider(
                 attachedTools = null
                 roundMessages.clear()
                 roundMessages.addAll(baseMessages)
-                emit(StreamToken.Error(ToolCapabilityMatrix.TOOLS_UNSUPPORTED_NOTICE))
+                emit(StreamToken.ToolsUnsupported)
                 continue
             }
             val toolCalls = round.toolCalls

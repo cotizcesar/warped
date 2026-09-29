@@ -112,6 +112,9 @@ class PromptLabViewModel @Inject constructor(
                         is StreamToken.ToolStatus -> Unit
                         // 47-03: remote-loop completion records are not text either.
                         is StreamToken.ToolCompleted -> Unit
+                        // Phase 57 UI-review: typed tools-unsupported
+                        // notice carries no text — ignored by PromptLab.
+                        is StreamToken.ToolsUnsupported -> Unit
                     }
                 }
             } catch (e: Exception) {

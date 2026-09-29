@@ -79,6 +79,10 @@ class LiteRtLlmHelper @Inject constructor(
                         // 47-03: remote-loop records are local-path passthrough
                         // (local automatic mode never emits them).
                         is StreamToken.ToolCompleted -> token
+                        // Phase 57 UI-review: typed tools-unsupported
+                        // notice passes through untouched (never
+                        // think-stripped, never filtered).
+                        is StreamToken.ToolsUnsupported -> token
                     }
                 }
             }

@@ -27,4 +27,15 @@ sealed interface StreamToken {
         val summary: String,
         val errorReason: String? = null,
     ) : StreamToken
+
+    /**
+     * Phase 57 UI-review fix: typed tools-unsupported notice. The remote
+     * attempt-then-fallback drivers emit this (instead of an
+     * `Error` carrying render copy) when a server rejects `tools[]` — the
+     * turn retries once without tools and completes model-only. Routing on
+     * a type (not `Error.message == <copy>`) keeps copy edits from
+     * silently re-routing the informational notice into the hard-error
+     * banner. Passes through think-strip/passthrough maps untouched.
+     */
+    data object ToolsUnsupported : StreamToken
 }

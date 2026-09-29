@@ -864,27 +864,24 @@ class ChatViewModel @Inject constructor(
                             }
                         }
                         is StreamToken.Error -> {
-                            // Phase 57 (57-02): the tools-unsupported retry
-                            // notice is informational — the turn continues
-                            // to a plain retry + Done — never a hard error.
-                            // Route the exact notice copy to the model-only
-                            // notice/banner slot instead of the error banner
-                            // (transient tool rows keep their existing
-                            // disappearance rules). Genuine errors keep the
-                            // existing path below.
-                            if (token.message == ToolCapabilityMatrix.TOOLS_UNSUPPORTED_NOTICE) {
-                                modelOnlyNotice = ModelOnlyNotice.TOOLS_UNSUPPORTED
-                            } else {
-                                updateTranscript {
-                                    it.copy(
-                                        error = ChatError.Network(token.message),
-                                        streamingContent = "",
-                                        streamingReasoning = "",
-                                        isStreaming = false
-                                    )
-                                }
-                                updateInput { it.copy(isGenerating = false, toolCallActive = null) }
+                            updateTranscript {
+                                it.copy(
+                                    error = ChatError.Network(token.message),
+                                    streamingContent = "",
+                                    streamingReasoning = "",
+                                    isStreaming = false
+                                )
                             }
+                            updateInput { it.copy(isGenerating = false, toolCallActive = null) }
+                        }
+                        // Phase 57 UI-review fix: the tools-unsupported
+                        // retry notice routes on this typed token — never
+                        // on exact-string match of render copy, so copy
+                        // edits can't silently re-route the informational
+                        // notice into the hard-error banner above. The
+                        // turn continues to a plain retry + Done.
+                        is StreamToken.ToolsUnsupported -> {
+                            modelOnlyNotice = ModelOnlyNotice.TOOLS_UNSUPPORTED
                         }
                     }
                 }
