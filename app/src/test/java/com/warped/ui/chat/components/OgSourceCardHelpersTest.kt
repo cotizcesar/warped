@@ -53,6 +53,13 @@ class OgSourceCardHelpersTest {
     }
 
     @Test
+    fun `image gate rejects opaque non-hierarchical uris`() {
+        assertThat(gatedHttpImageUrl("https:foo")).isNull()
+        assertThat(gatedHttpImageUrl("http:evil")).isNull()
+        assertThat(gatedHttpImageUrl("https:javascript:alert(1)")).isNull()
+    }
+
+    @Test
     fun `image gate rejects null blank and schemeless`() {
         assertThat(gatedHttpImageUrl(null)).isNull()
         assertThat(gatedHttpImageUrl("   ")).isNull()
