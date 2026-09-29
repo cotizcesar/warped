@@ -63,7 +63,10 @@ v2.2 Simplificación + Web Grounding shipped 2026-09-28 (Phases 49–51): dead s
   2. Tool outputs pass the same trust boundary as fetched pages (sanitized, no hijack, no breakout)
   3. Only web_search/web_fetch are ever exposed — no file/system tools, no local-context leaks
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+- [ ] 56-01-PLAN.md — ToolSets + loop policy, allowlist flag flips, KV-cache hygiene (tracer backbone)
+- [ ] 56-02-PLAN.md — Provider manual loop + status rows + on-device smoke checkpoint
 
 ### Phase 57: Remote Agentic Loop
 
