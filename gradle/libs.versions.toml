@@ -97,6 +97,7 @@ jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
 # Coil 3 image loader (OG thumbnails; own OkHttp instance via coil-network-okhttp)
 coil3-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil3" }
 coil3-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil3" }
+coil3-test = { group = "io.coil-kt.coil3", name = "coil-test", version.ref = "coil3" }
 
 # WorkManager
 work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workmanager" }

@@ -205,6 +205,7 @@ dependencies {
     androidTestImplementation(libs.room.testing)
     androidTestImplementation(libs.benchmark.macro.junit4)
     androidTestImplementation(libs.benchmark.junit4)
+    androidTestImplementation(libs.coil3.test)
     androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
 }
 
