@@ -96,8 +96,9 @@ v2.2 Simplificación + Web Grounding shipped 2026-09-28 (Phases 49–51): dead s
 
 **Plans**: 2 plans
 
-- [ ] 58-01-PLAN.md — OG scrape + Room v16 persistence tracer (parser, threading, migration + static gate)
-- [ ] 58-02-PLAN.md — Coil singleton + OgSourceCard list + sheet OG header
+- [x] 58-01-PLAN.md — OG scrape + Room v16 persistence tracer (parser, threading, migration + static gate)
+- [x] 58-02-PLAN.md — Coil singleton + OgSourceCard list + sheet OG header
+
 **UI hint**: yes
 
 ## Progress

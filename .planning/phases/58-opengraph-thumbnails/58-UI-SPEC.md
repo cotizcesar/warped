@@ -35,7 +35,7 @@ Declared values (must be multiples of 4):
 |-------|-------|-------|
 | xs | 4dp | Icon gaps, inline padding (existing Fuentes block gap) |
 | sm | 8dp | Thumbnail-to-text gap, badge-to-icon gap, sheet header gaps |
-| md | 16dp | Card internal padding, sheet horizontal padding |
+| md | 12dp | Card internal padding (built 12dp per layout diagram), sheet horizontal padding |
 | lg | 24dp | Sheet top padding |
 | xl | 32dp | Layout gaps (not used inside card) |
 | 2xl | 48dp | Major section breaks (not used inside card) |
