@@ -117,11 +117,12 @@ None — v2.2 phases shipped with accepted deferrals recorded above. Next milest
 | 20260928-vision-backend-gpu | 2026-09-28 | Complete ✓ | Visión a GPU probada en init + reintento por slot (main/vision/audio); 328 green; cargar E2B en dispositivo pendiente |
 | 20260928-webfetch-parity | 2026-09-28 | Complete ✓ | Extracción markdown (headings/tablas/código/links), 256KB/30s, UA desktop; sanitizer anti-links maliciosos; 346 green |
 | 20260928-source-delimiter-rename | 2026-09-28 | Complete ✓ | Bloques "Source [N]" sin etiqueta filtrable + escapes viejos conservados; suite verde |
+| 20260929-og-thumb-opens-browser | 2026-09-29 | Complete ✓ | Thumb abre navegador directo (resto→sheet); tap test androidTest; unidad verde |
 
 ## Session Continuity
 
 **Resume file:** —
 
-Last session: 2026-09-28T16:06:24.315Z
-Stopped at: Phase 58 complete, ready to plan Phase 55
-Resume: `/gsd-plan-phase 52`
+Last session: 2026-09-29T00:00:00Z
+Stopped at: v2.4 complete; post-milestone quicks tracked above
+Resume: none — define next scope
