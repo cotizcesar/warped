@@ -349,14 +349,23 @@ internal object CompatToolLoop {
                 }
 
                 if (isSse) {
-                    var currentEvent = if (firstLine.startsWith("event: ")) {
-                        firstLine.removePrefix("event: ").trim()
-                    } else ""
+                    // WR-04: finish-gated reassembly — `finish_reason:
+                    // "tool_calls"` proves the accumulated fragments are
+                    // complete. A transport-truncated stream (IOException
+                    // mid-read) must never execute a partial prefix that
+                    // happens to parse as valid args (wallet + wrong-result
+                    // risk); it degrades to a transport error instead.
+                    // IN-01: the `event:`-line `currentEvent` was assigned
+                    // but never read (the type rides inside data JSON) —
+                    // removed.
+                    var toolFinishSeen = false
+                    var streamTruncated = false
                     var reasoningOpen = false
                     if (firstLine.startsWith("data: ")) {
                         val data = firstLine.removePrefix("data: ").trim()
                         try {
                             val choice = parseSseChoice(json, data)
+                            if (choice?.finishReason == TOOL_CALLS_FINISH_REASON) toolFinishSeen = true
                             val delta = choice?.delta
                             delta?.reasoningContent?.let { reasoning ->
                                 if (!reasoningOpen) {
@@ -381,7 +390,9 @@ internal object CompatToolLoop {
                         while (!source.exhausted()) {
                             val line = source.readUtf8Line() ?: break
                             when {
-                                line.startsWith("event: ") -> currentEvent = line.removePrefix("event: ").trim()
+                                // "event: " lines carry no payload — the type
+                                // rides inside each data JSON object.
+                                line.startsWith("event: ") -> { /* no-op */ }
                                 line.startsWith("data: ") -> {
                                     val data = line.removePrefix("data: ").trim()
                                     if (data == "[DONE]") {
@@ -390,6 +401,7 @@ internal object CompatToolLoop {
                                     }
                                     try {
                                         val choice = parseSseChoice(json, data)
+                                        if (choice?.finishReason == TOOL_CALLS_FINISH_REASON) toolFinishSeen = true
                                         val delta = choice?.delta
                                         delta?.reasoningContent?.let { reasoning ->
                                             if (!reasoningOpen) {
@@ -410,10 +422,17 @@ internal object CompatToolLoop {
                                         feedToolDeltas(delta)
                                     } catch (e: Exception) { Timber.e(e, "CompatLoop: SSE delta parse failed") }
                                 }
-                                line.isEmpty() -> currentEvent = ""
+                                line.isEmpty() -> { /* frame separator */ }
                             }
                         }
-                    } catch (e: IOException) { Timber.e(e, "CompatLoop: SSE stream read failed") }
+                    } catch (e: IOException) {
+                        streamTruncated = true
+                        Timber.e(e, "CompatLoop: SSE stream read failed")
+                    }
+                    // WR-04: never execute a truncated partial accumulation.
+                    if (streamTruncated && !toolFinishSeen && accumulator.hasCalls()) {
+                        return CompatRoundResult(error = "Connection failed: stream truncated")
+                    }
                     return CompatRoundResult(
                         toolCalls = accumulator.complete(),
                         hadTokens = hasTokens,
@@ -474,6 +493,9 @@ internal object CompatToolLoop {
 
     /** Error-body window fed to the `tools[]`-rejection classifier. */
     private const val ERROR_BODY_SNIPPET_CHARS = 2000
+
+    /** `finish_reason` value signaling a complete `tool_calls` round. */
+    private const val TOOL_CALLS_FINISH_REASON = "tool_calls"
 
     /** `ToolCompleted` transcript summary cap (≤200 chars). */
     private const val TRANSCRIPT_SUMMARY_MAX_CHARS = 200

@@ -462,11 +462,13 @@ class OpenAIProvider(
                 }
 
                 if (isSse) {
-                    // SSE streaming — read incrementally from source
-                    var currentEvent = if (firstLine.startsWith("event: ")) {
-                        firstLine.removePrefix("event: ").trim()
-                    } else ""
+                    // SSE streaming — read incrementally from source.
+                    // WR-04: finish-gated reassembly (see CompatToolLoop) —
+                    // a truncated partial accumulation never executes.
+                    // IN-01: the `event:`-line `currentEvent` was assigned
+                    // but never read — removed.
                     var reasoningOpen = false
+                    var streamTruncated = false
                     if (firstLine.startsWith("data: ")) {
                         val data = firstLine.removePrefix("data: ").trim()
                         try {
@@ -490,7 +492,9 @@ class OpenAIProvider(
                         while (!source.exhausted()) {
                             val line = source.readUtf8Line() ?: break
                             when {
-                                line.startsWith("event: ") -> currentEvent = line.removePrefix("event: ").trim()
+                                // "event: " lines carry no payload — the type
+                                // rides inside each data JSON object.
+                                line.startsWith("event: ") -> { /* no-op */ }
                                 line.startsWith("data: ") -> {
                                     val data = line.removePrefix("data: ").trim()
                                     if (data == "[DONE]") {
@@ -520,10 +524,17 @@ class OpenAIProvider(
                                         feedToolDeltas(delta)
                                     } catch (e: Exception) { Timber.e(e, "OpenAI: SSE delta parse failed") }
                                 }
-                                line.isEmpty() -> currentEvent = ""
+                                line.isEmpty() -> { /* frame separator */ }
                             }
                         }
-                    } catch (e: IOException) { Timber.e(e, "OpenAI: SSE stream read failed") }
+                    } catch (e: IOException) {
+                        streamTruncated = true
+                        Timber.e(e, "OpenAI: SSE stream read failed")
+                    }
+                    // WR-04: never execute a truncated partial accumulation.
+                    if (streamTruncated && !toolFinishSeen && accumulator.hasCalls()) {
+                        return RoundResult(error = "Connection failed: stream truncated")
+                    }
                     return RoundResult(
                         toolCalls = accumulator.complete(),
                         hadTokens = hasTokens,
