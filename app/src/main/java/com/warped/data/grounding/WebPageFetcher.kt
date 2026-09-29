@@ -154,6 +154,12 @@ class WebPageFetcher @Inject constructor(
                             remaining -= read
                         }
                         val raw = sink.readUtf8()
+                        // Phase 58 (OG-01): OG reads the SAME document bytes —
+                        // parse-only, zero new sockets. HtmlToMarkdown strips
+                        // meta tags internally, so parse raw afresh (in-memory).
+                        // Plain/markdown bodies skip OG (openGraph = null).
+                        val isHtml = !isMarkdown && !contentType.contains("text/plain")
+                        val og = if (isHtml) OpenGraphParser.parse(raw, currentUrl) else null
                         val extracted = if (isMarkdown) {
                             // text/markdown direct passthrough (no conversion).
                             raw.trim().takeIf { it.isNotEmpty() }
@@ -173,7 +179,7 @@ class WebPageFetcher @Inject constructor(
                         // usable and the extractor marks truncation.
                         val sanitized = WebContextSanitizer.sanitize(extracted)
                         val block = GroundingPrompt.buildBlock(currentUrl, sanitized)
-                        return@withContext GroundingResult.Grounded(block, currentUrl, sanitized)
+                        return@withContext GroundingResult.Grounded(block, currentUrl, sanitized, openGraph = og)
                     }
                 } finally {
                     activeCalls.remove(call)

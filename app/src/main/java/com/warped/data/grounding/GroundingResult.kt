@@ -18,6 +18,12 @@ sealed interface GroundingResult {
         val block: String,
         val url: String,
         val text: String,
+        /**
+         * Phase 58 (OG-01): OpenGraph data parsed from the same HTML document
+         * (parse-only, zero new sockets). Null for plain/markdown bodies,
+         * failed extracts, and ModelOnly paths.
+         */
+        val openGraph: OpenGraphData? = null,
     ) : GroundingResult
 
     enum class Reason {

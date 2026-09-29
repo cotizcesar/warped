@@ -120,6 +120,11 @@ class MultiUrlFetcher @Inject constructor(
                             url = result.url,
                             extractedText = result.text,
                             status = GroundedSourceStatus.OK,
+                            // Phase 58 (OG-01): copy OG through — retry writes
+                            // (replaceSources) carry the same row shape.
+                            ogTitle = result.openGraph?.ogTitle,
+                            ogDescription = result.openGraph?.ogDescription,
+                            ogImageUrl = result.openGraph?.ogImageUrl,
                         )
                     is GroundingResult.ModelOnly ->
                         GroundedSource(

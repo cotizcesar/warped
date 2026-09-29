@@ -13,6 +13,14 @@ data class GroundedSource(
     val url: String,
     val extractedText: String? = null,
     val status: GroundedSourceStatus = GroundedSourceStatus.OK,
+    /**
+     * Phase 58 (OG-01): OpenGraph fields threaded from [com.warped.data.grounding.OpenGraphParser]
+     * via GroundingResult.Grounded. Null means no OG captured (pre-58 rows,
+     * plain/markdown sources, Tavily rows) — renders as a text-only card.
+     */
+    val ogTitle: String? = null,
+    val ogDescription: String? = null,
+    val ogImageUrl: String? = null,
 )
 
 /** Phase 53: per-source fetch outcome. Unknown stored strings map to OMITIDA (drop-unknown). */
