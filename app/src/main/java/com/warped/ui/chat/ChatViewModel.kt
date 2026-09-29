@@ -518,14 +518,20 @@ class ChatViewModel @Inject constructor(
                         // via the null-block augment. Unarmed turns and
                         // non-local providers keep the exact Phase-55 path.
                         //
-                        // Phase 57 (57-02): the skip broadens to armed
-                        // REMOTE loops — every matrix dialect that attempts
-                        // tools (ATTEMPT, ATTEMPT_FALLBACK, NATIVE_ANTHROPIC)
-                        // skips the VM pre-search so worst case stays 5
-                        // credits per message. The provider stays
-                        // authoritative (it re-checks grounding, matrix,
-                        // internet, plus its own collaborators); the VM
-                        // mirrors for the pre-search skip only.
+                        // Phase 57 (57-02, CR-02 fixed by CR-01 wiring): the
+                        // skip broadens to armed REMOTE loops — every matrix
+                        // dialect that attempts tools (ATTEMPT/
+                        // ATTEMPT_FALLBACK/NATIVE_ANTHROPIC) skips the VM
+                        // pre-search so worst case stays 5 credits per
+                        // message. The provider stays authoritative (it
+                        // re-checks grounding, matrix, internet, plus its
+                        // own collaborators); the VM mirrors for the
+                        // pre-search skip only. The mirror is exact because
+                        // CR-01 injects the same singletons at both
+                        // production construction sites (ProviderRouter +
+                        // LmStudioHelper.createProvider), so a VM-armed
+                        // turn is provider-armed too — no silent loss of
+                        // grounding on either path.
                         val localArmed = effectiveProvider == ProviderType.LITE_RT_LM &&
                             LocalToolLoop.isLoopArmed(
                                 groundingOn = doGround,
