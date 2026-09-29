@@ -420,15 +420,23 @@ class LiteRTLmProvider @Inject constructor(
                 } else {
                     // Every dispatched call consumes budget — validation
                     // short-circuits included (Pitfall 5: no infinite
-                    // garbage loops).
+                    // garbage loops). Validation failures feed back
+                    // WITHOUT posting a transient status row (IN-02: no
+                    // flash for calls that never execute); executeToolCall
+                    // re-validates internally as the fail-closed guard.
                     callsUsed++
-                    val display = LocalToolLoop.statusDisplay(call.name, call.arguments)
-                        ?: call.name
-                    emit(StreamToken.ToolStatus(display))
-                    try {
-                        responses += Content.ToolResponse(call.name, executeToolCall(call, contextSize))
-                    } finally {
-                        emit(StreamToken.ToolStatus(null))
+                    val shortCircuit = LocalToolLoop.validateArgs(call.name, call.arguments)
+                    if (shortCircuit != null) {
+                        responses += Content.ToolResponse(call.name, shortCircuit)
+                    } else {
+                        val display = LocalToolLoop.statusDisplay(call.name, call.arguments)
+                            ?: call.name
+                        emit(StreamToken.ToolStatus(display))
+                        try {
+                            responses += Content.ToolResponse(call.name, executeToolCall(call, contextSize))
+                        } finally {
+                            emit(StreamToken.ToolStatus(null))
+                        }
                     }
                 }
             }
