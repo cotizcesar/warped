@@ -291,3 +291,7 @@ step failed and what was observed.
   full suite 425/425 zero failures, `assembleDebug` SUCCESSFUL.
 - Grep gates: no `runBlocking` in loop path (comments only); no `toolCallActive`
   writes outside UI state; `HOST_EXECUTED` never forwarded by executors.
+
+## Device Checkpoint — APPROVED (2026-09-29, user smoke on Gemma 4 E2B)
+
+Real `ToolCall` emission confirmed on hardware: Using web_search/fetch rows shown, cited answer + Fuentes, thinking confined to panel. Flags (supportsFunctionCalling E2B/E4B) STAND per verified-only rule — no revert.
