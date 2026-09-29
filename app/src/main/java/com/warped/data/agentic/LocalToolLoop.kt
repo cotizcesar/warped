@@ -83,6 +83,42 @@ object LocalToolLoop {
     /** True once the call budget is exhausted — the next tool result must be [CAP_REACHED_STRING]. */
     fun isCapReached(callsUsed: Int): Boolean = callsUsed >= MAX_TOOL_CALLS
 
+    /**
+     * Phase 56 (56-02): single loop-arming predicate shared by the provider
+     * (owns the authoritative per-turn decision) and ChatViewModel (must
+     * skip its VM-side Tavily pre-search when the loop is armed, or the
+     * model would never need to search itself and the 5-call wallet bound
+     * would stack on top of the pre-search credit). All three inputs are
+     * ANDed — grounding off, incapable model, or unvalidated internet each
+     * independently force the exact pre-56 plain-turn behavior. The provider
+     * being LiteRT-LM is structural (this object is only consumed there).
+     */
+    fun isLoopArmed(
+        groundingOn: Boolean,
+        supportsFunctionCalling: Boolean,
+        hasValidatedInternet: Boolean,
+    ): Boolean = groundingOn && supportsFunctionCalling && hasValidatedInternet
+
+    /**
+     * Phase 56 (56-02): transient status-row display string for a tool call
+     * (Loop Visibility decision). Search shows the query text, fetch shows
+     * the URL — `"<tool>: <arg>"`. Null for unknown names (the driver falls
+     * back to the raw name and the executor returns the unknown-tool error
+     * without executing). Carries model-authored text only, never history.
+     */
+    fun statusDisplay(toolName: String, args: Map<String, Any?>): String? =
+        when (mapToolCallName(toolName)) {
+            TOOL_WEB_SEARCH -> {
+                val query = (args["query"] as? String)?.trim().orEmpty()
+                "$TOOL_WEB_SEARCH: ${query.ifEmpty { "…" }}"
+            }
+            TOOL_WEB_FETCH -> {
+                val url = (args["url"] as? String)?.trim().orEmpty()
+                "$TOOL_WEB_FETCH: ${url.ifEmpty { "…" }}"
+            }
+            else -> null
+        }
+
     /** Calls left in the budget; floors at 0 for over-cap inputs. */
     fun callsRemaining(callsUsed: Int): Int = (MAX_TOOL_CALLS - callsUsed).coerceAtLeast(0)
 

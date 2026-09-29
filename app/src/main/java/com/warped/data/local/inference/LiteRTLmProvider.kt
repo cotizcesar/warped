@@ -8,6 +8,16 @@ import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.SamplerConfig
 import com.google.ai.edge.litertlm.LiteRtLmJniException
+import com.google.ai.edge.litertlm.tool
+import com.warped.data.agentic.LocalToolLoop
+import com.warped.data.agentic.WebFetchToolSet
+import com.warped.data.agentic.WebSearchToolSet
+import com.warped.data.grounding.GroundingPrecedence
+import com.warped.data.grounding.MultiUrlFetcher
+import com.warped.data.grounding.TavilySearchRepository
+import com.warped.data.grounding.WebPageFetcher
+import com.warped.data.local.preferences.AdvancedPreferences
+import com.warped.data.repository.ModelAllowlistRepository
 import com.warped.domain.model.ActiveModelSelection
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.ConnectionStatus
@@ -23,18 +33,46 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import timber.log.Timber
 import java.text.Normalizer
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.coroutineContext
+
+/**
+ * Phase 56 (56-02): one collected tool-loop turn. The streamed text/thought
+ * chunks are emitted by the transport as they arrive; [terminal] is the last
+ * message of the turn and decides the next step (empty toolCalls = final).
+ */
+internal data class AgenticTurn(val terminal: Message)
+
+/**
+ * Phase 56 (56-02): seam between the tool-loop driver and the engine.
+ * Production streams via `sendMessageAsync`; tests script terminals.
+ */
+internal interface AgenticTurnTransport {
+    val isAlive: Boolean
+    suspend fun collectTurn(
+        first: Contents?,
+        reply: Message?,
+        onText: suspend (String) -> Unit,
+        onThought: suspend (String) -> Unit,
+    ): AgenticTurn
+}
 
 @Singleton
 class LiteRTLmProvider @Inject constructor(
     private val engineManager: EngineManager,
     private val inputSanitizer: InputSanitizer,
     private val activeModelSelection: ActiveModelSelection,
+    private val tavily: TavilySearchRepository,
+    private val multiUrlFetcher: MultiUrlFetcher,
+    private val webPageFetcher: WebPageFetcher,
+    private val allowlist: ModelAllowlistRepository,
+    private val advancedPreferences: AdvancedPreferences,
 ) : LlmProvider {
 
     override val type = ProviderType.LITE_RT_LM
@@ -42,6 +80,17 @@ class LiteRTLmProvider @Inject constructor(
     companion object {
         /** 0.17.x reasoning channel name (see [extractThoughtContent]). */
         const val THOUGHT_CHANNEL = "thought"
+
+        /**
+         * Phase 56 (56-02): provider-neutral tool-use hint pinned via
+         * `systemInstruction` (survives conversation reuse, unlike a leading
+         * system message). Short on purpose — the fused Source[N] blocks do
+         * the heavy lifting. Pinned verbatim by LiteRTLmLoopTest.
+         */
+        const val TOOL_USE_SYSTEM_HINT =
+            "Use web_search when the question needs current or external facts, " +
+                "and web_fetch to read a full page from the results or the user. " +
+                "Answer with the gathered context."
     }
 
     @Volatile
@@ -49,6 +98,32 @@ class LiteRTLmProvider @Inject constructor(
 
     @Volatile
     private var activeConversationConfig: ConversationConfig? = null
+
+    /**
+     * Phase 56 (56-02, T-56-10): arming inputs baked into
+     * [activeConversationConfig] at creation. ConversationConfig.tools apply
+     * at creation only — when the snapshot differs (grounding toggle flip,
+     * per-chat override change, model switch, connectivity transition) the
+     * conversation is reset so tools can never fire with grounding off.
+     * Stored alongside the config, nulled together everywhere the config is.
+     */
+    internal data class LoopArmSnapshot(
+        val perChat: Boolean?,
+        val global: Boolean,
+        val modelPath: String?,
+        val capable: Boolean,
+        val online: Boolean,
+    ) {
+        val armed: Boolean
+            get() = LocalToolLoop.isLoopArmed(
+                groundingOn = GroundingPrecedence.shouldGround(perChat, global),
+                supportsFunctionCalling = capable,
+                hasValidatedInternet = online,
+            )
+    }
+
+    @Volatile
+    private var activeLoopArm: LoopArmSnapshot? = null
 
     /**
      * 46-01 RUNTIME-14: halt the in-flight native generation WITHOUT closing the
@@ -75,6 +150,8 @@ class LiteRTLmProvider @Inject constructor(
             }
             activeConversation = null
             activeConversationConfig = null
+            // 56-02 (T-56-10): arming snapshot dies with the config it describes.
+            activeLoopArm = null
         }
     }
 
@@ -164,16 +241,349 @@ class LiteRTLmProvider @Inject constructor(
             seed = if (params.seed != -1) params.seed else 0
         )
 
-        // Step 6: Create conversation config — plain single-turn chat.
-        // No tools, no prompt-injection fallback (Phase 49 DEL-01).
-        val conversationConfig = ConversationConfig(
-            initialMessages = historyMessages,
-            samplerConfig = samplerConfig,
-            extraContext = emptyMap()
-        )
+        // Step 6: Create conversation config — plain single-turn chat unless
+        // the 56-02 agentic loop is armed (capable model + grounding on +
+        // validated internet). Unarmed stays byte-identical to Phase 49
+        // DEL-01 (no tools, no prompt-injection fallback).
+        val armSnapshot = computeArmSnapshot(request.webOverride)
+        val conversationConfig = if (armSnapshot.armed) {
+            ConversationConfig(
+                initialMessages = historyMessages,
+                samplerConfig = samplerConfig,
+                // 47 precedent: FRESH ToolSet instances per creation — never singletons.
+                tools = listOf(tool(WebSearchToolSet()), tool(WebFetchToolSet())),
+                automaticToolCalling = false,
+                systemInstruction = Contents.of(TOOL_USE_SYSTEM_HINT),
+                extraContext = emptyMap()
+            )
+        } else {
+            ConversationConfig(
+                initialMessages = historyMessages,
+                samplerConfig = samplerConfig,
+                extraContext = emptyMap()
+            )
+        }
 
-        // Step 7: Send content with retry loop
-        sendContentsWithRetry(currentContents, conversationConfig, 0)
+        // Step 7: Send content — agentic multi-round loop when armed,
+        // single-turn with retry loop otherwise.
+        if (armSnapshot.armed) {
+            Timber.d("LiteRTLm: agentic loop armed (model=%s)", armSnapshot.modelPath?.substringAfterLast("/"))
+            sendAgenticWithRetry(currentContents, conversationConfig, armSnapshot, params.contextSize, 0)
+        } else {
+            sendContentsWithRetry(currentContents, conversationConfig, armSnapshot, 0)
+        }
+    }
+
+    /**
+     * Phase 56 (56-02): loop-arming snapshot for this turn. Grounding
+     * precedence resolves the per-chat override the VM carried on the
+     * request against the global DataStore default; capability comes from
+     * the allowlist via the LOADED engine path (never selection state, so a
+     * stale selector cannot arm tools); internet from the same validated
+     * gate the fetch path uses. Never throws — a gate failure reads as
+     * unarmed (plain turn), never a crash.
+     */
+    internal suspend fun computeArmSnapshot(perChat: Boolean?): LoopArmSnapshot {
+        val global = try {
+            advancedPreferences.webGroundingEnabled.first()
+        } catch (e: Exception) {
+            Timber.w(e, "LiteRTLm: global grounding read failed, treating as off")
+            false
+        }
+        val modelPath = try {
+            engineManager.getActiveEngine()?.modelPath
+        } catch (e: Exception) {
+            Timber.w(e, "LiteRTLm: active engine read failed")
+            null
+        }
+        // Verified-only rule: unlisted models (null entry) default CLOSED.
+        val capable = modelPath?.substringAfterLast("/")?.let { fileName ->
+            try {
+                allowlist.findByModelFile(fileName)?.capabilities?.supportsFunctionCalling == true
+            } catch (e: Exception) {
+                Timber.w(e, "LiteRTLm: allowlist read failed, treating as incapable")
+                false
+            }
+        } == true
+        val online = try {
+            webPageFetcher.hasValidatedInternet()
+        } catch (e: Exception) {
+            Timber.w(e, "LiteRTLm: connectivity check failed, treating as offline")
+            false
+        }
+        return LoopArmSnapshot(
+            perChat = perChat,
+            global = global,
+            modelPath = modelPath,
+            capable = capable,
+            online = online,
+        )
+    }
+
+    /**
+     * Phase 56 (56-02, T-56-10): single conversation-acquire point for both
+     * paths. Reuses the live conversation ONLY when the arming snapshot
+     * matches what the config was created with — any arming-input change
+     * (toggle, override, model, connectivity) resets so tools can never
+     * fire with grounding off (Pitfall 2: config applies at creation only).
+     */
+    private fun acquireConversation(
+        conversationConfig: ConversationConfig,
+        snapshot: LoopArmSnapshot,
+    ): Conversation = synchronized(this@LiteRTLmProvider) {
+        val existing = activeConversation
+        if (existing != null && existing.isAlive && activeLoopArm == snapshot) {
+            existing
+        } else {
+            if (existing != null) {
+                try { existing.close() } catch (e: Exception) { Timber.w(e, "LiteRTLm: acquire.close() failed") }
+            } else if (activeLoopArm != null && activeLoopArm != snapshot) {
+                Timber.d("LiteRTLm: arming inputs changed — rebuilding conversation")
+            }
+            engineManager.createLiteRTConversation(conversationConfig).also {
+                activeConversation = it
+                activeConversationConfig = conversationConfig
+                activeLoopArm = snapshot
+            }
+        }
+    }
+
+    /**
+     * Phase 56 (56-02): app-driven manual tool loop (AGENT-01,
+     * `automaticToolCalling=false` — SDK ReflectionTool.execute is
+     * synchronous, so network tools would need runBlocking on engine threads
+     * with no Stop propagation). Round driver, bounded by
+     * [LocalToolLoop.MAX_TOOL_CALLS] counting CALLS:
+     *
+     * - ensureActive() per round (Stop contract, 46-01 pattern).
+     * - Terminal with empty toolCalls = final answer: text Deltas were
+     *   already streamed Content.Text-only by the transport (ToolResponse
+     *   contents never reach Delta), thought accumulated separately, Done
+     *   carries it as reasoning (Thinking panel, never the answer).
+     * - Non-empty toolCalls: exact-name dispatch to [executeToolCall];
+     *   ToolStatus display posted on start, null in finally; results fed
+     *   back as Message.tool(ToolResponse) — T-56-07: only
+     *   LocalToolLoop-mapped fused strings re-enter model context.
+     * - Cap reached: the pending call's result is CAP_REACHED_STRING (answer
+     *   with gathered context, no hard error); a SECOND tool request after
+     *   the cap was fed finishes the turn instead of ping-ponging forever.
+     * - CancellationException always rethrows (never Error, never retry).
+     * - Legacy Role.TOOL history replay stays Message.model read-only at the
+     *   chatInternal build site — Message.tool is used ONLY here, for live
+     *   loop resume (T-56-12).
+     */
+    internal suspend fun FlowCollector<StreamToken>.runToolLoop(
+        transport: AgenticTurnTransport,
+        first: Contents,
+        contextSize: Int,
+    ) {
+        var callsUsed = 0
+        var capFed = false
+        var reply: Message? = null
+        var pendingFirst: Contents? = first
+        val thought = StringBuilder()
+        while (true) {
+            // Stop contract (46-01 pattern): FlowCollector is not a scope,
+            // so checkpoint against the collection context directly.
+            coroutineContext.ensureActive()
+            val terminal = transport.collectTurn(
+                first = pendingFirst,
+                reply = reply,
+                onText = { text -> if (text.isNotEmpty()) emit(StreamToken.Delta(text)) },
+                onThought = { thinking ->
+                    if (thinking.isNotEmpty()) {
+                        if (thought.isNotEmpty()) thought.append("\n")
+                        thought.append(thinking)
+                    }
+                },
+            ).terminal
+            pendingFirst = null
+            val toolCalls = terminal.toolCalls
+            if (toolCalls.isEmpty()) {
+                if (!transport.isAlive) {
+                    throw IllegalStateException("Conversation not alive after streaming")
+                }
+                emit(StreamToken.Done(reasoning = thought.toString().takeIf { it.isNotEmpty() }))
+                return
+            }
+            if (capFed) {
+                Timber.w("LiteRTLm: model requested tools after the cap string — finishing with gathered context")
+                emit(StreamToken.Done(reasoning = thought.toString().takeIf { it.isNotEmpty() }))
+                return
+            }
+            val responses = mutableListOf<Content>()
+            for (call in toolCalls) {
+                coroutineContext.ensureActive()
+                if (LocalToolLoop.isCapReached(callsUsed)) {
+                    responses += Content.ToolResponse(call.name, LocalToolLoop.CAP_REACHED_STRING)
+                    capFed = true
+                } else {
+                    // Every dispatched call consumes budget — validation
+                    // short-circuits included (Pitfall 5: no infinite
+                    // garbage loops).
+                    callsUsed++
+                    val display = LocalToolLoop.statusDisplay(call.name, call.arguments)
+                        ?: call.name
+                    emit(StreamToken.ToolStatus(display))
+                    try {
+                        responses += Content.ToolResponse(call.name, executeToolCall(call, contextSize))
+                    } finally {
+                        emit(StreamToken.ToolStatus(null))
+                    }
+                }
+            }
+            reply = Message.tool(Contents.of(responses))
+        }
+    }
+
+    /**
+     * Phase 56 (56-02): single tool-call executor. Total — never throws
+     * (47 never-throw lesson): arg validation short-circuits pre-socket,
+     * unknown names return the error string without executing, offline
+     * opens no socket, and every failure degrades to a concise English
+     * string the model continues from. CancellationException rethrows so
+     * Stop bounds residual latency to client timeouts.
+     */
+    internal suspend fun executeToolCall(call: com.google.ai.edge.litertlm.ToolCall, contextSize: Int): String {
+        // Unknown names fail closed here — the body below never runs them.
+        LocalToolLoop.validateArgs(call.name, call.arguments)?.let { return it }
+        return when (LocalToolLoop.mapToolCallName(call.name)) {
+            LocalToolLoop.TOOL_WEB_SEARCH -> {
+                if (!hasValidatedInternet()) return LocalToolLoop.OFFLINE_STRING
+                val query = (call.arguments["query"] as? String).orEmpty()
+                try {
+                    // Explicit args (no Kotlin defaults): keeps the call on the
+                    // instance method so MockK can stub it in JVM tests.
+                    LocalToolLoop.mapSearchOutcome(
+                        tavily.search(
+                            query = query,
+                            maxResults = TavilySearchRepository.DEFAULT_MAX_RESULTS,
+                            contextSize = contextSize,
+                        )
+                    )
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Timber.w(e, "LiteRTLm: web_search failed")
+                    LocalToolLoop.toolFailureMessage(e.message.orEmpty())
+                }
+            }
+            LocalToolLoop.TOOL_WEB_FETCH -> {
+                if (!hasValidatedInternet()) return LocalToolLoop.OFFLINE_STRING
+                val url = ((call.arguments["url"] as? String).orEmpty()).trim()
+                try {
+                    // Explicit onProgress=null (no Kotlin default): keeps the
+                    // call on the instance method so MockK can stub it.
+                    LocalToolLoop.mapFetchResult(
+                        multiUrlFetcher.fetchAll(
+                            urls = listOf(url),
+                            contextSize = contextSize,
+                            onProgress = null,
+                        )
+                    )
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Timber.w(e, "LiteRTLm: web_fetch failed")
+                    LocalToolLoop.toolFailureMessage(e.message.orEmpty())
+                }
+            }
+            else -> LocalToolLoop.unknownToolMessage(call.name)
+        }
+    }
+
+    private fun hasValidatedInternet(): Boolean = try {
+        webPageFetcher.hasValidatedInternet()
+    } catch (e: Exception) {
+        Timber.w(e, "LiteRTLm: connectivity check failed, treating as offline")
+        false
+    }
+
+    /**
+     * Phase 56 (56-02): production transport — streams each turn via
+     * `sendMessageAsync` (status rows still render, final answer still
+     * streams) and returns the last emission as the terminal carrying
+     * toolCalls. If the streaming Flow ever stops surfacing toolCalls with
+     * automatic=false (A1 risk), the device checkpoint step 7 catches it
+     * and this transport swaps to blocking sendMessage on
+     * Dispatchers.Default.
+     */
+    internal inner class ConversationTurnTransport(
+        private val conversation: Conversation,
+    ) : AgenticTurnTransport {
+        override val isAlive: Boolean get() = conversation.isAlive
+
+        override suspend fun collectTurn(
+            first: Contents?,
+            reply: Message?,
+            onText: suspend (String) -> Unit,
+            onThought: suspend (String) -> Unit,
+        ): AgenticTurn {
+            val flow = if (reply != null) {
+                conversation.sendMessageAsync(reply)
+            } else {
+                conversation.sendMessageAsync(
+                    first ?: error("LiteRTLm: loop turn needs initial contents or a tool reply")
+                )
+            }
+            var terminal: Message? = null
+            flow.collect { msg ->
+                terminal = msg
+                val text = extractTextContent(msg)
+                if (text.isNotEmpty()) onText(text)
+                extractThoughtContent(msg)?.let { thinking ->
+                    if (thinking.isNotEmpty()) onThought(thinking)
+                }
+            }
+            return AgenticTurn(
+                terminal ?: throw IllegalStateException("LiteRTLm: engine returned an empty turn")
+            )
+        }
+    }
+
+    private suspend fun FlowCollector<StreamToken>.sendAgenticWithRetry(
+        contents: Contents,
+        conversationConfig: ConversationConfig,
+        snapshot: LoopArmSnapshot,
+        contextSize: Int,
+        attempt: Int
+    ) {
+        val maxRetries = 2
+
+        try {
+            val engine = engineManager.getLiteRTLmEngine()
+            if (!engine.isInitialized()) {
+                throw IllegalStateException("Engine not initialized")
+            }
+
+            val conversation = acquireConversation(conversationConfig, snapshot)
+            runToolLoop(ConversationTurnTransport(conversation), contents, contextSize)
+        } catch (e: CancellationException) {
+            // Stop means stop: same contract as the plain path — terminate,
+            // never retry, never surface as Error.
+            throw e
+        } catch (e: Exception) {
+            coroutineScope { ensureActive() }
+            val isEngineError = e is IllegalStateException ||
+                e.message?.contains("not alive", ignoreCase = true) == true ||
+                e.message?.contains("not initialized", ignoreCase = true) == true
+
+            if (isEngineError && attempt < maxRetries) {
+                Timber.w(e, "LiteRTLmProvider: agentic engine error (attempt ${attempt + 1}/3), recovering...")
+                activeConversation = null
+                activeConversationConfig = null
+                activeLoopArm = null
+                recoverEngine()
+                Timber.w("LiteRTLmProvider: Engine recovered, retrying agentic turn... (attempt ${attempt + 1})")
+                sendAgenticWithRetry(contents, conversationConfig, snapshot, contextSize, attempt + 1)
+            } else if (isEngineError) {
+                Timber.e(e, "LiteRTLmProvider: agentic engine failed to recover after $maxRetries retries")
+                emit(StreamToken.Error("Engine failed to recover. Please reload the model manually."))
+            } else {
+                Timber.e(e, "LiteRTLmProvider: unexpected agentic error")
+                emit(StreamToken.Error("Chat error: ${e.message ?: "Unknown error"}"))
+            }
+        }
     }
 
     override suspend fun listModels(): Result<List<ModelInfo>> {
@@ -212,6 +622,7 @@ class LiteRTLmProvider @Inject constructor(
     private suspend fun FlowCollector<StreamToken>.sendContentsWithRetry(
         contents: Contents,
         conversationConfig: ConversationConfig,
+        snapshot: LoopArmSnapshot,
         attempt: Int
     ) {
         val maxRetries = 2
@@ -224,23 +635,12 @@ class LiteRTLmProvider @Inject constructor(
 
             // LRT-02: Reuse a single long-lived Conversation across chat() calls.
             // The conversation is only recreated when the underlying engine is reloaded
-            // (see resetConversation()) or when a fatal error invalidates the native handle
-            // (see retry path below). Initial history is set on first creation; subsequent
+            // (see resetConversation()), when a fatal error invalidates the native handle
+            // (see retry path below), or when the 56-02 arming snapshot changes
+            // (see acquireConversation — tools must never linger with grounding off).
+            // Initial history is set on first creation; subsequent
             // calls append to the conversation in-place.
-            val conversation = synchronized(this@LiteRTLmProvider) {
-                val existing = activeConversation
-                if (existing != null && existing.isAlive) {
-                    existing
-                } else {
-                    existing?.let { prev ->
-                        try { prev.close() } catch (e: Exception) { Timber.w(e, "LiteRTLm: stale.close() failed") }
-                    }
-                    engineManager.createLiteRTConversation(conversationConfig).also {
-                        activeConversation = it
-                        activeConversationConfig = conversationConfig
-                    }
-                }
-            }
+            val conversation = acquireConversation(conversationConfig, snapshot)
 
             conversation.sendMessageAsync(contents).collect { responseMsg ->
                 val content = extractTextContent(responseMsg)
@@ -277,9 +677,10 @@ class LiteRTLmProvider @Inject constructor(
                 // Null out the conversation — its native handle may be invalid after the error
                 activeConversation = null
                 activeConversationConfig = null
+                activeLoopArm = null
                 recoverEngine()
                 Timber.w("LiteRTLmProvider: Engine recovered, retrying... (attempt ${attempt + 1})")
-                sendContentsWithRetry(contents, conversationConfig, attempt + 1)
+                sendContentsWithRetry(contents, conversationConfig, snapshot, attempt + 1)
             } else if (isEngineError) {
                 Timber.e(e, "LiteRTLmProvider: engine failed to recover after $maxRetries retries")
                 emit(StreamToken.Error("Engine failed to recover. Please reload the model manually."))
@@ -318,7 +719,7 @@ class LiteRTLmProvider @Inject constructor(
         }
     }
 
-    private fun extractTextContent(message: Message): String {
+    internal fun extractTextContent(message: Message): String {
         val raw = try {
             message.contents.contents
                 .filterIsInstance<Content.Text>()

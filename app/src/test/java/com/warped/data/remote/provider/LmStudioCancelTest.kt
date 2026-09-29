@@ -11,6 +11,11 @@ import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.local.inference.LiteRTLmEngine
 import com.warped.data.local.inference.LiteRTLmProvider
 import com.warped.data.local.inference.LiteRtLlmHelper
+import com.warped.data.local.preferences.AdvancedPreferences
+import com.warped.data.repository.ModelAllowlistRepository
+import com.warped.data.grounding.MultiUrlFetcher
+import com.warped.data.grounding.TavilySearchRepository
+import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.domain.model.ActiveModelSelection
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -263,6 +268,11 @@ class LmStudioCancelTest {
             engineManager,
             InputSanitizer(),
             activeSelection,
+            mockk<TavilySearchRepository>(relaxed = true),
+            mockk<MultiUrlFetcher>(relaxed = true),
+            mockk<WebPageFetcher>(relaxed = true),
+            mockk<ModelAllowlistRepository>(relaxed = true),
+            mockk<AdvancedPreferences>(relaxed = true),
         )
         LiteRTLmProvider::class.java.getDeclaredField("activeConversation").apply {
             isAccessible = true
@@ -310,6 +320,11 @@ class LmStudioCancelTest {
             engineManager,
             InputSanitizer(),
             activeSelection,
+            mockk<TavilySearchRepository>(relaxed = true),
+            mockk<MultiUrlFetcher>(relaxed = true),
+            mockk<WebPageFetcher>(relaxed = true),
+            mockk<ModelAllowlistRepository>(relaxed = true),
+            mockk<AdvancedPreferences>(relaxed = true),
         )
         collectJob = launch {
             provider.chat(chatRequest()).collect { }
