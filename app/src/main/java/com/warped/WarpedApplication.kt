@@ -4,20 +4,29 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.ComponentCallbacks2
+import android.content.Context
 import android.os.Build
 import android.os.Process
 import android.os.StrictMode
 
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import coil3.ImageLoader
+import coil3.SingletonImageLoader
+import coil3.disk.DiskCache
+import coil3.memory.MemoryCache
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import coil3.request.crossfade
 import com.warped.BuildConfig
 import com.warped.data.local.inference.EngineManager
 import dagger.hilt.android.HiltAndroidApp
+import okhttp3.OkHttpClient
+import okio.Path.Companion.toOkioPath
 import timber.log.Timber
 import javax.inject.Inject
 
 @HiltAndroidApp
-class WarpedApplication : Application(), Configuration.Provider {
+class WarpedApplication : Application(), Configuration.Provider, SingletonImageLoader.Factory {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var engineManager: EngineManager
@@ -29,6 +38,38 @@ class WarpedApplication : Application(), Configuration.Provider {
                 if (BuildConfig.DEBUG) android.util.Log.DEBUG else android.util.Log.INFO
             )
             .build()
+
+    /**
+     * Phase 58 (OG-02, T-58-05): Coil singleton ImageLoader for OG
+     * thumbnails. Coil uses its OWN bare OkHttp instance — the app authed
+     * client (AuthInterceptor + body logging) is never shared, so endpoint
+     * Authorization headers cannot reach image CDNs. Memory 25% of app
+     * budget; disk fixed 50MB cap in cacheDir/og_thumbnails (fixed cap, not
+     * percent — 2% of 128GB storage would be ~2.5GB beside GGUF models;
+     * 50MB holds ~500-1000 64dp thumbs).
+     */
+    override fun newImageLoader(context: Context): ImageLoader {
+        val coilHttp = OkHttpClient.Builder()
+            .followRedirects(true)
+            .build()
+        return ImageLoader.Builder(context)
+            .memoryCache {
+                MemoryCache.Builder()
+                    .maxSizePercent(context, 0.25)
+                    .build()
+            }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(context.cacheDir.resolve("og_thumbnails").toOkioPath())
+                    .maxSizeBytes(50L * 1024 * 1024)
+                    .build()
+            }
+            .components {
+                add(OkHttpNetworkFetcherFactory(callFactory = { coilHttp }))
+            }
+            .crossfade(true)
+            .build()
+    }
 
     override fun onCreate() {
         super.onCreate()

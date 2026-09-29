@@ -15,6 +15,10 @@ kotlinx-serialization = "1.11.0"
 kotlinx-serialization-converter = "3.0.0"  # match retrofit 3.x (Gradle already resolved 1.0.0 -> 3.0.0 via conflict)
 coroutines = "1.11.0"
 jsoup = "1.23.2"
+coil3 = "3.4.0"  # Phase 58 (OG-02): Coil image loader for OG thumbnails (Maven Central verified in RESEARCH.md)
+  # CEILING: 3.4.0 is the newest line compiling against compileSdk 35 —
+  # 3.5.0 raised compile SDK to 36, 3.6.x to 37 (changelog-confirmed 2026-09-29);
+  # repo holds compileSdk 35 (android-37 platform unavailable stable).
 datastore = "1.2.1"
 workmanager = "2.12.0"
 security-crypto = "1.1.0"  # latest stable
@@ -89,6 +93,10 @@ kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 
 # HTML parsing (parse-only; never Jsoup.connect())
 jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
+
+# Coil 3 image loader (OG thumbnails; own OkHttp instance via coil-network-okhttp)
+coil3-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil3" }
+coil3-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil3" }
 
 # WorkManager
 work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workmanager" }

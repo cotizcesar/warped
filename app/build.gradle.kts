@@ -161,6 +161,10 @@ dependencies {
     // HTML parsing (parse-only; never Jsoup.connect())
     implementation(libs.jsoup)
 
+    // Coil 3 (OG thumbnails; disk cache = offline story; own OkHttp instance)
+    implementation(libs.coil3.compose)
+    implementation(libs.coil3.network.okhttp)
+
     // DataStore
     implementation(libs.datastore.preferences)
 
