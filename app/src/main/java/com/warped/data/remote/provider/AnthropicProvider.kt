@@ -464,11 +464,19 @@ class AnthropicProvider(
 
                 if (isSse) {
                     var thinkingOpen = false
+                    // WR-03: transport-level "error" events are data, never
+                    // mid-round emits — a mid-round Error token would drive
+                    // the VM into the error terminal state while the driver
+                    // keeps running, and the driver would then emit a second
+                    // terminal Error. Collected here, returned as
+                    // AnthropicRoundResult.error below (emitted exactly once
+                    // by the caller).
+                    var pendingError: String? = null
                     // Single-event feeder. Suspend so emits stay direct
                     // (same-coroutine backpressure); total — decode
                     // failures log and continue, unknown types ignored,
                     // fragment reassembly tolerates missing ids via the
-                    // accumulator. Returns true on `message_stop`.
+                    // accumulator. Returns true on `message_stop`/`error`.
                     suspend fun feedEvent(data: String): Boolean {
                         val event = try {
                             json.decodeFromString<AnthropicSseEvent>(data)
@@ -523,9 +531,8 @@ class AnthropicProvider(
                             }
                             "message_stop" -> return true
                             "error" -> {
-                                val errorText =
+                                pendingError =
                                     event.delta?.text ?: event.delta?.thinking ?: "Anthropic error"
-                                emit(StreamToken.Error(errorText))
                                 return true
                             }
                         }
@@ -534,6 +541,7 @@ class AnthropicProvider(
                     if (firstLine.startsWith("data: ")) {
                         if (feedEvent(firstLine.removePrefix("data: ").trim())) {
                             // A single-line `message_stop`/`error` ends the round.
+                            pendingError?.let { return AnthropicRoundResult(error = it) }
                             return AnthropicRoundResult(
                                 textParts = textParts.toList(),
                                 hadTokens = hasTokens,
@@ -556,6 +564,7 @@ class AnthropicProvider(
                     } catch (e: IOException) {
                         Timber.e(e, "Anthropic: SSE stream read failed")
                     }
+                    pendingError?.let { return AnthropicRoundResult(error = it) }
                     if (thinkingOpen) {
                         emit(StreamToken.Delta("</think>"))
                         textParts += "</think>"
