@@ -95,6 +95,14 @@ class ToolCapabilityMatrixTest {
         assertThat(notice).contains("Model-only")
     }
 
+    @Test
+    fun `retry notice names the next step`() {
+        // UI-review fix: the banner must never be a dead end — the copy
+        // tells the user to switch to a tool-capable endpoint.
+        assertThat(ToolCapabilityMatrix.TOOLS_UNSUPPORTED_NOTICE)
+            .contains("Switch to a tool-capable endpoint to restore search.")
+    }
+
     // Remote-arm predicate (Pitfall 5: VM pre-search skip mirrors this).
 
     @Test

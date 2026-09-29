@@ -402,11 +402,15 @@ private fun ModelOnlyBanner(
                 // Phase 57 (57-02): tools[] rejected by the endpoint —
                 // one retry without tools, model-only answer. Copy
                 // mirrors ToolCapabilityMatrix.TOOLS_UNSUPPORTED_NOTICE
-                // (the notice channel carries the constant; this branch
-                // renders the same words in the banner slot).
+                // (routing keys on the typed StreamToken.ToolsUnsupported
+                // token, never on this string; this branch renders the
+                // same words in the banner slot). Ends with the next
+                // step — retrying the same endpoint cannot help, so no
+                // Retry button (OFFLINE-only gate below untouched).
                 ModelOnlyNotice.TOOLS_UNSUPPORTED ->
                     "This endpoint doesn't support tool calling. Model-only answer — " +
-                        "no web sources this turn."
+                        "no web sources this turn. Switch to a tool-capable endpoint " +
+                        "to restore search."
             },
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

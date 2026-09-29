@@ -39,12 +39,17 @@ object ToolCapabilityMatrix {
 
     /**
      * Retry-without-tools notice (RESEARCH Pattern 5 draft, locked: English,
-     * actionable). Emitted through the existing error/notice token path when
-     * a server rejects `tools[]`; the turn otherwise completes normally.
+     * actionable). Emitted as render copy for the `TOOLS_UNSUPPORTED`
+     * banner slot when a server rejects `tools[]`; the turn otherwise
+     * completes normally. Routing keys on the typed
+     * `StreamToken.ToolsUnsupported` token — never on this string — so
+     * copy edits stay render-only. Ends with the next step (switch to a
+     * tool-capable endpoint) so the banner is never a dead end.
      */
     const val TOOLS_UNSUPPORTED_NOTICE =
         "This endpoint doesn't support tool calling. Model-only answer — " +
-            "no web sources this turn."
+            "no web sources this turn. Switch to a tool-capable endpoint " +
+            "to restore search."
 
     /**
      * Static map `ProviderType` → [ToolMode]. Ollama rides the OpenAI-compat
