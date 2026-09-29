@@ -80,8 +80,8 @@ v2.2 Simplificación + Web Grounding shipped 2026-09-28 (Phases 49–51): dead s
 
 **Plans**: 2 plans
 
-- [ ] 57-01-PLAN.md — Shared pure core (accumulator + matrix + classifier + tools DTOs) + OpenAI tools[] loop tracer
-- [ ] 57-02-PLAN.md — Anthropic native dialect + Ollama/LMStudio/Custom fallback + VM skip + secret proof
+- [x] 57-01-PLAN.md — Shared pure core (accumulator + matrix + classifier + tools DTOs) + OpenAI tools[] loop tracer
+- [x] 57-02-PLAN.md — Anthropic native dialect + Ollama/LMStudio/Custom fallback + VM skip + secret proof
 
 ### Phase 58: OpenGraph Thumbnails
 
