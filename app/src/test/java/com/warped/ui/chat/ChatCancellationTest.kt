@@ -304,6 +304,7 @@ class ChatCancellationTest {
             fetcher = fetcher,
             multiUrlFetcher = multiUrlFetcher,
             tavilySearchRepository = mockk(),
+            modelAllowlistRepository = mockk<com.warped.data.repository.ModelAllowlistRepository>(),
             context = context,
         )
     }
@@ -388,5 +389,43 @@ class ChatCancellationTest {
             assertThat(awaitItem()).isEqualTo(StreamToken.Delta("tok1"))
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    // ------------------------------------------------------------------
+    // 56-02: ToolStatus rows are transient — shown while running, cleared
+    // on completion, never persisted to the transcript.
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `tool status rows are transient - set shown cleared never persisted`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
+        val helper = mockk<LlmModelHelper>()
+        every { helper.type } returns ProviderType.LITE_RT_LM
+        coEvery { helper.initialize(any()) } returns Unit
+        coEvery { helper.stopResponse() } returns Unit
+        every { helper.runInference(any(), any()) } returns flow {
+            emit(StreamToken.ToolStatus("web_search: android release"))
+            delay(100)
+            emit(StreamToken.ToolStatus(null))
+            emit(StreamToken.Delta("hi"))
+            emit(StreamToken.Done())
+        }
+
+        val vm = buildViewModel(helper, modelFile.absolutePath)
+        runCurrent()
+
+        vm.sendMessage("fresh news?")
+        runCurrent()
+        // Transient row shows the query while the tool runs.
+        assertThat(vm.uiState.value.toolCallActive).isEqualTo("web_search: android release")
+
+        advanceUntilIdle()
+        // Cleared on completion; never persisted to the transcript.
+        assertThat(vm.uiState.value.toolCallActive).isNull()
+        assertThat(vm.uiState.value.isStreaming).isFalse()
+        assertThat(vm.uiState.value.messages.map { it.role })
+            .containsExactly(Role.USER, Role.ASSISTANT)
+        assertThat(vm.uiState.value.messages.last().content).isEqualTo("hi")
     }
 }

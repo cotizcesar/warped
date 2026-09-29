@@ -366,6 +366,7 @@ class SettingsTavilyTest {
             fetcher = chatFetcher,
             multiUrlFetcher = chatMultiUrlFetcher,
             tavilySearchRepository = chatTavilyRepo,
+            modelAllowlistRepository = mockk<com.warped.data.repository.ModelAllowlistRepository>(),
             context = context,
         )
     }

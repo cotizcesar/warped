@@ -237,7 +237,9 @@ fun ChatScreen(
     val showThinkingRow = transcript.isStreaming &&
         transcript.streamingContent.isEmpty() &&
         transcript.streamingReasoning.isEmpty() &&
-        !input.isFetchingWeb
+        !input.isFetchingWeb &&
+        // 56-02: the tool row already covers the gap during tool calls.
+        input.toolCallActive == null
     val trailingCount = if (showStreamingBubble || showThinkingRow) 1 else 0
     val totalItems = transcript.messages.size + trailingCount
     LaunchedEffect(
@@ -311,6 +313,36 @@ fun ChatScreen(
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = chipText,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                // Phase 56 (56-02): transient tool-call status row — the
+                // provider posts "web_search: <query>" / "web_fetch: <url>"
+                // while a tool runs, null when done. Same transient slot as
+                // the fetch chip above: never a transcript message, never
+                // persisted; unmounts on Done/Error/Stop/new send.
+                input.toolCallActive?.let { status ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .semantics {
+                                contentDescription = "Running tool: $status. " +
+                                    "Tap Stop to cancel."
+                            },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "Using $status",
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )

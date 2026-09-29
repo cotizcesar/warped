@@ -112,6 +112,7 @@ class ChatSubStateTest {
             fetcher = fetcher,
             multiUrlFetcher = multiUrlFetcher,
             tavilySearchRepository = mockk(),
+            modelAllowlistRepository = mockk<com.warped.data.repository.ModelAllowlistRepository>(),
             context = context,
         )
     }

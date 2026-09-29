@@ -15,11 +15,13 @@ import com.warped.data.grounding.TavilySearchOutcome
 import com.warped.data.grounding.TavilySearchRepository
 import com.warped.data.grounding.UrlDetector
 import com.warped.data.grounding.WebPageFetcher
+import com.warped.data.agentic.LocalToolLoop
 import com.warped.data.local.inference.BackendType
 import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.preferences.AdvancedPreferences
 import com.warped.data.remote.provider.ProviderRouter
+import com.warped.data.repository.ModelAllowlistRepository
 import com.warped.domain.llm.LlmModelHelper
 import com.warped.domain.model.*
 import com.warped.domain.repository.ChatRepository
@@ -55,6 +57,12 @@ class ChatViewModel @Inject constructor(
     private val fetcher: WebPageFetcher,
     private val multiUrlFetcher: MultiUrlFetcher,
     private val tavilySearchRepository: TavilySearchRepository,
+    /**
+     * Phase 56 (56-02): allowlist capability read for the VM-side
+     * loop-arming check (skip VM pre-search when the provider loop will
+     * fire). Verified-only semantics live in the repository.
+     */
+    private val modelAllowlistRepository: ModelAllowlistRepository,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -333,7 +341,9 @@ class ChatViewModel @Inject constructor(
         val imageDataUrls = images.mapNotNull { uriToBase64(it) }
         val userMessage = ChatMessage(role = Role.USER, content = text.trim(), imageUris = imageDataUrls)
         updateTranscript { it.copy(messages = it.messages + userMessage, isStreaming = true) }
-        updateInput { it.copy(inputText = "", isGenerating = true) }
+        // 56-02: fresh turn clears any stale tool row (same position as the
+        // 47 toolCallActive reset).
+        updateInput { it.copy(inputText = "", isGenerating = true, toolCallActive = null) }
 
         // CR-02: cancel any in-flight turn before starting a new one — otherwise
         // two collectors interleave tokens into one bubble and activeHelper is
@@ -496,7 +506,28 @@ class ChatViewModel @Inject constructor(
                             Timber.w(e, "Chat: connectivity check failed, treating as offline")
                             false
                         }
-                        if (!online) {
+                        // Phase 56 (56-02): when the local agentic loop is
+                        // armed, the MODEL searches for itself — VM
+                        // pre-search would burn a Tavily credit AND starve
+                        // the loop (the model would never need web_search, so
+                        // no status row would ever render and the 5-call
+                        // wallet bound would stack on the pre-search credit).
+                        // Skip the branch but keep the SYSTEM_PROMPT persona
+                        // via the null-block augment. Unarmed turns and
+                        // non-local providers keep the exact Phase-55 path.
+                        val loopArmed = effectiveProvider == ProviderType.LITE_RT_LM &&
+                            LocalToolLoop.isLoopArmed(
+                                groundingOn = doGround,
+                                supportsFunctionCalling = isFunctionCallingCapable(effectiveModelId),
+                                hasValidatedInternet = online,
+                            )
+                        if (loopArmed) {
+                            requestUserText = GroundingPrompt.augment(
+                                requestUserText,
+                                null,
+                                groundingEnabled = doGround,
+                            )
+                        } else if (!online) {
                             modelOnlyNotice = ModelOnlyNotice.OFFLINE
                             requestUserText = GroundingPrompt.augment(
                                 requestUserText,
@@ -683,7 +714,11 @@ class ChatViewModel @Inject constructor(
                         reasoningEnabled = _input.value.reasoningEnabled
                     ),
                     images = imageDataUrls,
-                    audioBytes = audioBytes
+                    audioBytes = audioBytes,
+                    // 56-02: per-chat override travels so the provider
+                    // computes its own loop-arming (it has no
+                    // conversationId to read the row itself).
+                    webOverride = perChatOverride,
                 )
                 // Phase 49 (DEL-01): single-turn chat — no skills, no tool
                 // loop, no no-tool-support notice. Legacy Role.TOOL history
@@ -708,10 +743,16 @@ class ChatViewModel @Inject constructor(
                 ).shareIn(this, SharingStarted.Eagerly, replay = 1).collect { token ->
 
                     when (token) {
-                        // Phase 49 (DEL-01): legacy tool tokens have no
-                        // producer and carry no text — ignored single-turn.
-                        is StreamToken.ToolStatus -> Unit
-                        is StreamToken.ToolCompleted -> Unit
+                        // Phase 56 (56-02): live tool-execution rows from the
+                        // local manual loop. Non-null ToolStatus sets the
+                        // transient row (query/URL display, provider
+                        // formatted); null clears it. ToolCompleted clears
+                        // (local path never emits it — contract only).
+                        // Rows NEVER reach ChatMessage/Room/transcript
+                        // (T-56-09). Delta/parseThinkBlocks accumulation
+                        // below stays untouched.
+                        is StreamToken.ToolStatus -> updateInput { it.copy(toolCallActive = token.toolName) }
+                        is StreamToken.ToolCompleted -> updateInput { it.copy(toolCallActive = null) }
                         is StreamToken.Delta -> {
                             tokenBuffer.add(token.content)
                             val now = System.currentTimeMillis()
@@ -757,7 +798,8 @@ class ChatViewModel @Inject constructor(
                                         isStreaming = false
                                     )
                                 }
-                                updateInput { it.copy(isGenerating = false) }
+                                // 56-02: turn Done clears the transient tool row.
+                                updateInput { it.copy(isGenerating = false, toolCallActive = null) }
                                 // Phase 53 (SRC-02/threat T-53-07): persist rows
                                 // post-fetch, pre-inference-visibility. Failure
                                 // is non-blocking — Timber plus the UI-SPEC
@@ -792,7 +834,7 @@ class ChatViewModel @Inject constructor(
                                         isStreaming = false
                                     )
                                 }
-                                updateInput { it.copy(isGenerating = false) }
+                                updateInput { it.copy(isGenerating = false, toolCallActive = null) }
                             }
                         }
                         is StreamToken.Error -> {
@@ -804,7 +846,7 @@ class ChatViewModel @Inject constructor(
                                     isStreaming = false
                                 )
                             }
-                            updateInput { it.copy(isGenerating = false) }
+                            updateInput { it.copy(isGenerating = false, toolCallActive = null) }
                         }
                     }
                 }
@@ -995,7 +1037,10 @@ class ChatViewModel @Inject constructor(
             streamingContent = "",
             streamingReasoning = ""
         ) }
-        updateInput { it.copy(isGenerating = false, isFetchingWeb = false, webFetchProgress = null) }
+        // 56-02: Stop clears the transient tool row (single-cancel-path:
+        // generationJob cancel + fetcher.cancel() above already reach the
+        // provider loop and in-flight sockets; this only drops the row).
+        updateInput { it.copy(isGenerating = false, isFetchingWeb = false, webFetchProgress = null, toolCallActive = null) }
     }
 
     fun selectConversation(conversationId: Long) {
@@ -1306,6 +1351,24 @@ class ChatViewModel @Inject constructor(
             return models.firstOrNull { it.filePath == localId }?.capabilities?.reasoning == true
         }
         return remoteId != null
+    }
+
+    /**
+     * Phase 56 (56-02): VM-side loop-arming capability read. Verified-only:
+     * unlisted models default CLOSED. Reads the allowlist (same source as
+     * the provider gate) — LocalModel.capabilities is a hardcoded all-true
+     * lazy and is NEVER consulted here. Never throws: a failed read arms
+     * nothing (plain Phase-55 turn).
+     */
+    private fun isFunctionCallingCapable(modelId: String?): Boolean {
+        if (modelId == null) return false
+        return try {
+            modelAllowlistRepository.findByModelFile(modelId.substringAfterLast("/"))
+                ?.capabilities?.supportsFunctionCalling == true
+        } catch (e: Exception) {
+            Timber.w(e, "Chat: allowlist read failed, treating as incapable")
+            false
+        }
     }
 
     /**
