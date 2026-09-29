@@ -1,14 +1,30 @@
 package com.warped.data.remote.provider
 
+import com.warped.data.agentic.LocalToolLoop
+import com.warped.data.agentic.PendingToolCall
+import com.warped.data.agentic.ToolCallAccumulator
+import com.warped.data.agentic.ToolCapabilityMatrix
+import com.warped.data.agentic.parseToolArgs
+import com.warped.data.grounding.GroundingPrecedence
+import com.warped.data.grounding.MultiUrlFetcher
+import com.warped.data.grounding.TavilySearchRepository
+import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.inference.InputSanitizer
+import com.warped.data.local.preferences.AdvancedPreferences
 import com.warped.data.remote.api.OpenAiApi
 import com.warped.data.remote.dto.OpenAiChatRequest
+import com.warped.data.remote.dto.OpenAiCompletedToolCall
 import com.warped.data.remote.dto.OpenAiCompletionsRequest
 import com.warped.data.remote.dto.OpenAiEmbeddingsRequest
+import com.warped.data.remote.dto.OpenAiFunctionCall
 import com.warped.data.remote.dto.OpenAiMessage
 import com.warped.data.remote.dto.OpenAiNonStreamingResponse
 import com.warped.data.remote.dto.OpenAiResponsesRequest
+import com.warped.data.remote.dto.OpenAiStreamChoice
 import com.warped.data.remote.dto.OpenAiStreamChunk
+import com.warped.data.remote.dto.OpenAiStreamDelta
+import com.warped.data.remote.dto.OpenAiTool
+import com.warped.data.remote.dto.defaultRemoteTools
 import com.warped.data.remote.network.asCompletionsSseFlow
 import com.warped.data.remote.network.asResponsesSseFlow
 import com.warped.data.remote.network.asSseFlow
@@ -20,11 +36,17 @@ import com.warped.domain.model.ProviderType
 import com.warped.domain.model.StreamToken
 import com.warped.domain.model.toProviderText
 import com.warped.domain.provider.LlmProvider
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -34,13 +56,25 @@ import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import timber.log.Timber
+import kotlin.coroutines.coroutineContext
 
 class OpenAIProvider(
     private val baseUrl: String,
     private val modelId: String,
     endpointId: Long,
     apiKey: String? = null,
-    private val inputSanitizer: InputSanitizer
+    private val inputSanitizer: InputSanitizer,
+    /**
+     * Phase 57 (57-01): tool-loop collaborators (Phase 55/52 singletons).
+     * All-null by default so the legacy `resolve()` path (listModels /
+     * testConnection / unarmed turns) behaves exactly as before — the loop
+     * only arms when every collaborator is present (see [isLoopArmed]).
+     * ONLY; loop code never references it (T-57-02).
+     */
+    private val tavily: TavilySearchRepository? = null,
+    private val multiUrlFetcher: MultiUrlFetcher? = null,
+    private val webPageFetcher: WebPageFetcher? = null,
+    private val advancedPreferences: AdvancedPreferences? = null,
 ) : LlmProvider {
     override val type = ProviderType.OPENAI
     private val json = Json { ignoreUnknownKeys = true }
@@ -68,6 +102,21 @@ class OpenAIProvider(
 
     private val api = retrofit.create(OpenAiApi::class.java)
 
+    /**
+     * Phase 57 (57-01): retained cancellable round Call (LMStudioProvider
+     * precedent). `cancelChat()` tears down the in-flight socket; the read
+     * loop exits silently with no trailing tokens and no fake Error bubble.
+     * Safe when idle (no-op). Single-round handle: rounds run sequentially
+     * per turn, and a fresh provider is created per turn upstream.
+     */
+    @Volatile
+    private var currentCall: Call? = null
+
+    /** Belt-and-braces teardown of the in-flight round, if any. */
+    fun cancelChat() {
+        currentCall?.cancel()
+    }
+
     override fun chat(request: ChatRequest): Flow<StreamToken> = flow {
         val messages = request.messages
             .filter { it.role != Role.SYSTEM && it.content.isNotBlank() }
@@ -84,30 +133,333 @@ class OpenAIProvider(
                     OpenAiMessage(role = it.role.name.lowercase(), content = content)
                 }
             }
+        // Phase 57 (57-01): unarmed turns keep the exact pre-57 plain path;
+        // armed turns run the tools[] round driver below.
+        if (!isLoopArmed(request.webOverride)) {
+            postPlainTurn(messages, request)
+            return@flow
+        }
+        runTooledLoop(messages, request)
+    }.flowOn(Dispatchers.IO)
+
+    /**
+     * Phase 57 (57-01): provider-authoritative loop-arming (mirrors the
+     * 56-02 `isLoopArmed` shape with the matrix added). Grounding precedence
+     * resolves the per-chat override against the global default; the matrix
+     * must send the OpenAI dialect; internet must be validated. Missing
+     * collaborators or any gate failure reads as unarmed (plain turn),
+     * never a crash.
+     */
+    private suspend fun isLoopArmed(perChat: Boolean?): Boolean {
+        val prefs = advancedPreferences ?: return false
+        val net = webPageFetcher ?: return false
+        if (tavily == null || multiUrlFetcher == null) return false
+        return try {
+            val global = try {
+                prefs.webGroundingEnabled.first()
+            } catch (e: Exception) {
+                Timber.w(e, "OpenAI: global grounding read failed, treating as off")
+                false
+            }
+            val online = try {
+                net.hasValidatedInternet()
+            } catch (e: Exception) {
+                Timber.w(e, "OpenAI: connectivity check failed, treating as offline")
+                false
+            }
+            ToolCapabilityMatrix.isRemoteLoopArmed(
+                groundingOn = GroundingPrecedence.shouldGround(perChat, global),
+                matrixAttemptsTools = ToolCapabilityMatrix.attemptsTools(
+                    ToolCapabilityMatrix.modeFor(ProviderType.OPENAI),
+                ),
+                hasValidatedInternet = online,
+            )
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /** Phase 57 (57-01): the exact pre-57 single-turn path, unchanged. */
+    private suspend fun FlowCollector<StreamToken>.postPlainTurn(
+        messages: List<OpenAiMessage>,
+        request: ChatRequest,
+    ) {
+        val round = postRound(messages, tools = null, request = request)
+        if (round.aborted) return
+        if (round.error != null) {
+            emit(StreamToken.Error(round.error))
+            return
+        }
+        if (round.hadTokens) emit(StreamToken.Done())
+        else emit(StreamToken.Error("No content in response"))
+    }
+
+    /**
+     * Phase 57 (57-01): agentic round driver — mirrors
+     * `LiteRTLmProvider.runToolLoop` over HTTP rounds (RESEARCH skeleton).
+     * `LocalToolLoop` owns every provider-neutral decision (cap, dispatch,
+     * validation, outcome mapping, status copy); this driver only owns the
+     * wire (rounds, echoes, retry). Round echoes stay in-memory only, never
+     * persisted to Room (T-57-05).
+     */
+    private suspend fun FlowCollector<StreamToken>.runTooledLoop(
+        baseMessages: List<OpenAiMessage>,
+        request: ChatRequest,
+    ) {
+        var attachedTools: List<OpenAiTool>? = defaultRemoteTools()
+        val roundMessages = baseMessages.toMutableList()
+        var callsUsed = 0
+        var capFed = false
+        var fallbackDone = false
+        val contextSize = request.parameters.contextSize
+        while (true) {
+            coroutineContext.ensureActive()
+            val round = postRound(roundMessages, attachedTools, request)
+            if (round.aborted) return
+            if (round.error != null) {
+                emit(StreamToken.Error(round.error))
+                return
+            }
+            if (round.toolsRejected && attachedTools != null && !fallbackDone) {
+                // Locked: exactly one retry of the same turn with tools
+                // null and a clean plain-message replay (partial echoes
+                // dropped — strict servers reject unpaired role:tool),
+                // plus the visible notice through the error/notice token
+                // path. The turn otherwise completes normally.
+                fallbackDone = true
+                attachedTools = null
+                roundMessages.clear()
+                roundMessages.addAll(baseMessages)
+                emit(StreamToken.Error(ToolCapabilityMatrix.TOOLS_UNSUPPORTED_NOTICE))
+                continue
+            }
+            val toolCalls = round.toolCalls
+            if (toolCalls.isEmpty()) {
+                if (round.hadTokens) emit(StreamToken.Done())
+                else emit(StreamToken.Error("No content in response"))
+                return
+            }
+            if (capFed) {
+                Timber.w("OpenAI: model requested tools after the cap string — finishing with gathered context")
+                emit(StreamToken.Done())
+                return
+            }
+            val assistantEcho = mutableListOf<OpenAiCompletedToolCall>()
+            val toolResults = mutableListOf<OpenAiMessage>()
+            for (call in toolCalls) {
+                coroutineContext.ensureActive()
+                val result: String
+                if (LocalToolLoop.isCapReached(callsUsed)) {
+                    result = LocalToolLoop.CAP_REACHED_STRING
+                    capFed = true
+                } else {
+                    // Calls counted in CALLS, not rounds (locked credit
+                    // bound) — validation short-circuits included, so
+                    // garbage args cannot spin forever.
+                    callsUsed++
+                    val argsMap = parseToolArgs(call.argumentsJson)
+                    val shortCircuit = if (argsMap == null) {
+                        LocalToolLoop.toolFailureMessage(call.argumentsJson)
+                    } else {
+                        LocalToolLoop.validateArgs(call.name.orEmpty(), argsMap)
+                    }
+                    result = if (shortCircuit != null) {
+                        // 56-02 IN-02 precedent: no transient status row
+                        // for calls that never execute.
+                        shortCircuit
+                    } else {
+                        val canonical = LocalToolLoop.mapToolCallName(call.name.orEmpty())
+                            ?: call.name.orEmpty()
+                        val display = LocalToolLoop.statusDisplay(canonical, argsMap!!)
+                            ?: canonical
+                        emit(StreamToken.ToolStatus(display))
+                        try {
+                            val outcome = executeRemoteTool(canonical, argsMap, contextSize)
+                            emit(StreamToken.ToolCompleted(call.id, summarizeForTranscript(outcome)))
+                            outcome
+                        } finally {
+                            emit(StreamToken.ToolStatus(null))
+                        }
+                    }
+                }
+                // Pairing (Pitfall 2): the echo carries the EXACT id and
+                // the complete arguments string; every echo gets its
+                // role:tool answer in the same round.
+                assistantEcho += OpenAiCompletedToolCall(
+                    id = call.id,
+                    function = OpenAiFunctionCall(
+                        name = call.name.orEmpty(),
+                        arguments = call.argumentsJson,
+                    ),
+                )
+                toolResults += OpenAiMessage(
+                    role = "tool",
+                    content = result,
+                    toolCallId = call.id,
+                )
+            }
+            // The cap string answers from gathered context — the answer
+            // round needs no tools[].
+            if (capFed) attachedTools = null
+            roundMessages += OpenAiMessage(role = "assistant", toolCalls = assistantEcho)
+            roundMessages += toolResults
+        }
+    }
+
+    /**
+     * Phase 57 (57-01): single tool-call executor. Total — never throws (47
+     * never-throw lesson): arg validation short-circuits pre-socket,
+     * unknown names return the error string without executing, offline
+     * opens no socket, and every failure degrades to a concise English
+     * string the model continues from. CancellationException rethrows so
+     * Stop bounds residual latency.
+     *
+     * T-57-02: executors are the Phase 55/52 singletons ONLY — the endpoint
+     * client (and its Authorization key) is never in scope here.
+     */
+    private suspend fun executeRemoteTool(
+        toolName: String,
+        args: Map<String, Any?>,
+        contextSize: Int,
+    ): String {
+        // Unknown names fail closed here — the body below never runs them.
+        LocalToolLoop.validateArgs(toolName, args)?.let { return it }
+        val online = try {
+            webPageFetcher?.hasValidatedInternet() == true
+        } catch (_: Exception) {
+            false
+        }
+        return withContext(Dispatchers.IO) {
+            when (LocalToolLoop.mapToolCallName(toolName)) {
+                LocalToolLoop.TOOL_WEB_SEARCH -> {
+                    if (!online) return@withContext LocalToolLoop.OFFLINE_STRING
+                    val query = (args["query"] as? String).orEmpty()
+                    val repo = tavily
+                        ?: return@withContext LocalToolLoop.toolFailureMessage("search unavailable")
+                    try {
+                        // Explicit args (no Kotlin defaults): keeps the call
+                        // on the instance method so MockK can stub it.
+                        LocalToolLoop.mapSearchOutcome(
+                            repo.search(
+                                query = query,
+                                maxResults = TavilySearchRepository.DEFAULT_MAX_RESULTS,
+                                contextSize = contextSize,
+                            ),
+                        )
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Timber.w(e, "OpenAI: web_search failed")
+                        LocalToolLoop.toolFailureMessage(e.message.orEmpty())
+                    }
+                }
+                LocalToolLoop.TOOL_WEB_FETCH -> {
+                    if (!online) return@withContext LocalToolLoop.OFFLINE_STRING
+                    val url = ((args["url"] as? String).orEmpty()).trim()
+                    val fetcher = multiUrlFetcher
+                        ?: return@withContext LocalToolLoop.toolFailureMessage("fetch unavailable")
+                    try {
+                        LocalToolLoop.mapFetchResult(
+                            fetcher.fetchAll(
+                                urls = listOf(url),
+                                contextSize = contextSize,
+                                onProgress = null,
+                            ),
+                        )
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Timber.w(e, "OpenAI: web_fetch failed")
+                        LocalToolLoop.toolFailureMessage(e.message.orEmpty())
+                    }
+                }
+                else -> LocalToolLoop.unknownToolMessage(toolName)
+            }
+        }
+    }
+
+    /** Phase 57 (57-01): ≤200-char single-line transcript summary. */
+    private fun summarizeForTranscript(result: String): String =
+        result.trim().replace(SUMMARY_WHITESPACE, " ").take(TRANSCRIPT_SUMMARY_MAX_CHARS)
+
+    /**
+     * Phase 57 (57-01): one POST `/v1/chat/completions` round. Emits text /
+     * reasoning deltas as they arrive (existing `<think>` handling kept);
+     * feeds `delta.tool_calls` fragments into a fresh per-round accumulator.
+     *
+     * Completeness signal is `finish_reason:"tool_calls"` (or `[DONE]`
+     * after partial `tool_calls`); non-streaming servers (Pitfall 3: first
+     * line is not SSE framing) decode `choices[].message.tool_calls`
+     * directly — same loop entry, no separate path.
+     *
+     * Cancellation contract (LMStudioProvider precedent): CE rethrown
+     * first, `IOException("Canceled")` from `Call.cancel()` silent, any
+     * other failure a fatal error string.
+     */
+    private suspend fun FlowCollector<StreamToken>.postRound(
+        messages: List<OpenAiMessage>,
+        tools: List<OpenAiTool>?,
+        request: ChatRequest,
+    ): RoundResult {
+        coroutineContext.ensureActive()
         val body = OpenAiChatRequest(
             model = modelId,
             messages = messages,
             stream = true,
             temperature = request.parameters.temperature,
             topP = request.parameters.topP,
-            maxTokens = request.parameters.maxTokens
+            maxTokens = request.parameters.maxTokens,
+            tools = tools,
         )
+        val call: Call
         try {
             val jsonBody = json.encodeToString(OpenAiChatRequest.serializer(), body)
             val okHttpRequest = Request.Builder()
                 .url(baseUrl.trimEnd('/') + "/v1/chat/completions")
                 .post(jsonBody.toRequestBody("application/json".toMediaType()))
                 .build()
-            val okHttpResponse = client.newCall(okHttpRequest).execute()
-            if (okHttpResponse.isSuccessful) {
-                val responseBody = okHttpResponse.body ?: run {
-                    emit(StreamToken.Error("Empty response"))
-                    return@flow
+            call = client.newCall(okHttpRequest)
+            currentCall = call
+        } catch (e: CancellationException) {
+            currentCall = null
+            throw e
+        } catch (e: Exception) {
+            currentCall = null
+            return RoundResult(error = "Connection failed: ${e.message}")
+        }
+        try {
+            call.execute().use { okHttpResponse ->
+                if (!okHttpResponse.isSuccessful) {
+                    val snippet = try {
+                        okHttpResponse.body?.string().orEmpty().take(ERROR_BODY_SNIPPET_CHARS)
+                    } catch (_: Exception) {
+                        ""
+                    }
+                    val code = okHttpResponse.code
+                    if (tools != null && ToolCapabilityMatrix.isToolsRejection(code, snippet)) {
+                        return RoundResult(toolsRejected = true)
+                    }
+                    return RoundResult(error = "HTTP $code: ${okHttpResponse.message}")
                 }
+                val responseBody = okHttpResponse.body
+                    ?: return RoundResult(error = "Empty response")
                 val source = responseBody.source()
                 val firstLine = source.readUtf8Line() ?: ""
                 val isSse = firstLine.startsWith("event: ") || firstLine.startsWith("data: ")
                 var hasTokens = false
+                val accumulator = ToolCallAccumulator()
+                var toolFinishSeen = false
+
+                fun feedToolDeltas(delta: OpenAiStreamDelta?) {
+                    delta?.toolCalls?.forEach { toolDelta ->
+                        accumulator.feed(
+                            index = toolDelta.index,
+                            id = toolDelta.id,
+                            name = toolDelta.function?.name,
+                            argumentsFragment = toolDelta.function?.arguments,
+                        )
+                    }
+                }
 
                 if (isSse) {
                     // SSE streaming — read incrementally from source
@@ -118,7 +470,9 @@ class OpenAIProvider(
                     if (firstLine.startsWith("data: ")) {
                         val data = firstLine.removePrefix("data: ").trim()
                         try {
-                            val delta = parseSseData(json, data)
+                            val choice = parseSseChoice(json, data)
+                            if (choice?.finishReason == TOOL_CALLS_FINISH_REASON) toolFinishSeen = true
+                            val delta = choice?.delta
                             delta?.reasoningContent?.let { reasoning ->
                                 if (!reasoningOpen) { emit(StreamToken.Delta("<think>")); reasoningOpen = true }
                                 emit(StreamToken.Delta(reasoning))
@@ -129,6 +483,7 @@ class OpenAIProvider(
                                 emit(StreamToken.Delta(content))
                                 hasTokens = true
                             }
+                            feedToolDeltas(delta)
                         } catch (e: Exception) { Timber.e(e, "OpenAI: SSE first-line delta parse failed") }
                     }
                     try {
@@ -143,7 +498,9 @@ class OpenAIProvider(
                                         break
                                     }
                                     try {
-                                        val delta = parseSseData(json, data)
+                                        val choice = parseSseChoice(json, data)
+                                        if (choice?.finishReason == TOOL_CALLS_FINISH_REASON) toolFinishSeen = true
+                                        val delta = choice?.delta
                                         delta?.reasoningContent?.let { reasoning ->
                                             if (!reasoningOpen) {
                                                 emit(StreamToken.Delta("<think>"))
@@ -160,12 +517,17 @@ class OpenAIProvider(
                                             emit(StreamToken.Delta(content))
                                             hasTokens = true
                                         }
+                                        feedToolDeltas(delta)
                                     } catch (e: Exception) { Timber.e(e, "OpenAI: SSE delta parse failed") }
                                 }
                                 line.isEmpty() -> currentEvent = ""
                             }
                         }
                     } catch (e: IOException) { Timber.e(e, "OpenAI: SSE stream read failed") }
+                    return RoundResult(
+                        toolCalls = accumulator.complete(),
+                        hadTokens = hasTokens,
+                    )
                 } else {
                     // Non-streaming JSON — read remaining + first line
                     val remaining = source.readUtf8()
@@ -181,21 +543,42 @@ class OpenAIProvider(
                             emit(StreamToken.Delta(it))
                             hasTokens = true
                         }
+                        val nonStreamingCalls = msg?.toolCalls?.mapIndexed { index, completed ->
+                            PendingToolCall(
+                                id = completed.id.ifBlank { "call_$index" },
+                                name = completed.function.name.ifBlank { null },
+                                argumentsJson = completed.function.arguments,
+                            )
+                        }.orEmpty()
+                        return RoundResult(
+                            toolCalls = nonStreamingCalls,
+                            hadTokens = hasTokens,
+                        )
                     } catch (e: Exception) { Timber.e(e, "OpenAI: non-streaming JSON parse failed") }
+                    return RoundResult(hadTokens = hasTokens)
                 }
-                if (hasTokens) emit(StreamToken.Done())
-                else emit(StreamToken.Error("No content in response"))
-            } else {
-                emit(StreamToken.Error("HTTP ${okHttpResponse.code}: ${okHttpResponse.message}"))
             }
+        } catch (e: CancellationException) {
+            // Stop means stop: never map coroutine cancellation to an Error token.
+            throw e
+        } catch (e: IOException) {
+            // Includes IOException("Canceled") from Call.cancel() teardown — silent.
+            if (e.message?.contains("Canceled", ignoreCase = true) == true) {
+                Timber.d(e, "OpenAI: round transport canceled")
+                return RoundResult(aborted = true)
+            }
+            Timber.e(e, "OpenAI: round transport failed")
+            return RoundResult(error = "Connection failed: ${e.message}")
         } catch (e: Exception) {
-            emit(StreamToken.Error("Connection failed: ${e.message}"))
+            return RoundResult(error = "Connection failed: ${e.message}")
+        } finally {
+            currentCall = null
         }
-    }.flowOn(Dispatchers.IO)
+    }
 
-    private fun parseSseData(json: Json, data: String): com.warped.data.remote.dto.OpenAiStreamDelta? {
+    private fun parseSseChoice(json: Json, data: String): OpenAiStreamChoice? {
         return try {
-            json.decodeFromString<com.warped.data.remote.dto.OpenAiStreamChunk>(data).choices.firstOrNull()?.delta
+            json.decodeFromString<OpenAiStreamChunk>(data).choices.firstOrNull()
         } catch (_: Exception) { null }
     }
 
@@ -285,4 +668,31 @@ class OpenAIProvider(
             Result.success(ConnectionStatus.Disconnected)
         }
     }
+
+    companion object {
+        /** `finish_reason` value signaling a complete `tool_calls` round. */
+        private const val TOOL_CALLS_FINISH_REASON = "tool_calls"
+
+        /** Error-body window fed to the `tools[]`-rejection classifier. */
+        private const val ERROR_BODY_SNIPPET_CHARS = 2000
+
+        /** `ToolCompleted` transcript summary cap (≤200 chars). */
+        private const val TRANSCRIPT_SUMMARY_MAX_CHARS = 200
+
+        private val SUMMARY_WHITESPACE = Regex("\\s+")
+    }
 }
+
+/**
+ * Phase 57 (57-01): one POST round outcome. Fatal [error] (existing error
+ * path, unchanged) stops the turn; [toolsRejected] triggers exactly one
+ * retry without tools plus the visible notice; [aborted] (Stop) emits
+ * nothing and stops.
+ */
+private data class RoundResult(
+    val toolCalls: List<PendingToolCall> = emptyList(),
+    val hadTokens: Boolean = false,
+    val error: String? = null,
+    val toolsRejected: Boolean = false,
+    val aborted: Boolean = false,
+)
