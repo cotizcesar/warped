@@ -133,14 +133,23 @@ class LMStudioProvider(
                         multiUrlFetcher = fetchAll,
                         webPageFetcher = net,
                         logTag = "LMStudio",
-                        onCallCreated = { currentCall = it },
+                        // WR-01: forward the compat-loop socket to the
+                        // helper-owned handle as well as the provider
+                        // field, so stopResponse() reaches armed turns.
+                        onCallCreated = { currentCall = it; callHook(it) },
                         onCallCleared = { currentCall = null },
                     )
                 }
                 return@flow
             }
         }
-        chat(request, emptyList()).collect { emit(it) }
+        chat(
+            request,
+            emptyList(),
+            // WR-01: the unarmed fallback drops the hook by default —
+            // forward it too so Stop keeps working on plain turns.
+            onCallCreated = { currentCall = it; callHook(it) },
+        ).collect { emit(it) }
     }.flowOn(Dispatchers.IO)
 
     /**
@@ -205,6 +214,16 @@ class LMStudioProvider(
      */
     @Volatile
     private var currentCall: Call? = null
+
+    /**
+     * Phase 57 (WR-01 fix): helper-owned Stop handle. `LmStudioHelper`
+     * sets this per turn; both the armed compat branch and the unarmed
+     * fallback forward every created [Call] here (in addition to
+     * [currentCall]) so `stopResponse()` tears down the live socket on
+     * either path. Defaults to no-op for legacy direct uses.
+     */
+    @Volatile
+    var callHook: (Call) -> Unit = {}
 
     /**
      * Belt-and-braces teardown of the in-flight SSE call, if any. Safe when idle.

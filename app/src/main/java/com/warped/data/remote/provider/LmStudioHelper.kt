@@ -36,8 +36,10 @@ import javax.inject.Singleton
  *  - [initialize] dispatches `LMStudioProvider.loadModel` on `Dispatchers.IO` and stores
  *    the returned `instanceId`.
  *  - [runInference] creates a fresh `LMStudioProvider` per call (matching the existing
- *    per-endpoint pattern in `ProviderRouter`), retains the live OkHttp `Call` via
- *    the provider's `onCallCreated` hook, and runs `chat()` on `Dispatchers.IO`.
+ *    per-endpoint pattern in `ProviderRouter`), sets its `callHook` so the
+ *    live OkHttp `Call` is retained on EITHER path (armed compat loop or
+ *    native turn), and runs the 1-arg armed dispatcher `chat()` on
+ *    `Dispatchers.IO`.
  *  - [stopResponse] calls `Call.cancel()` on the retained handle: the socket is
  *    torn down immediately and the SSE read loop exits with no trailing tokens
  *    and no fake Error bubble. Safe when idle (no-op).
@@ -116,9 +118,14 @@ class LmStudioHelper @Inject constructor(
         // Phase 49 (DEL-01): single-turn plain chat — no skills, no tool
         // loop, no prompt-injection fallback. Legacy Role.TOOL history rows
         // replay provider-side as plain text (see LMStudioProvider.chat).
-        val raw: Flow<StreamToken> = provider.chat(effectiveRequest) { call ->
-            activeCall.set(call)
-        }
+        //
+        // Phase 57 (WR-01 fix): collect the 1-arg armed dispatcher (NOT
+        // the 3-arg native overload — a trailing lambda here would bind
+        // `onCallCreated` on the native path and bypass the compat loop
+        // entirely). The socket still reaches `stopResponse()` via
+        // `callHook`, which both branches forward.
+        provider.callHook = { call -> activeCall.set(call) }
+        val raw: Flow<StreamToken> = provider.chat(effectiveRequest)
         return raw
             .onCompletion { activeCall.set(null) } // no stale handle: follow-up turns are safe (pitfall 2)
             .let { upstream ->
