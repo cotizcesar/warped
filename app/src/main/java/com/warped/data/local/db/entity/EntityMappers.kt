@@ -93,6 +93,9 @@ fun GroundedSourceEntity.toDomain(): GroundedSource = GroundedSource(
     url = resolvedUrl,
     extractedText = extractedText,
     status = status.toGroundedSourceStatusSafe(),
+    ogTitle = ogTitle,
+    ogDescription = ogDescription,
+    ogImageUrl = ogImageUrl,
 )
 
 fun GroundedSource.toEntity(messageId: Long, sourceIndex: Int): GroundedSourceEntity =
@@ -102,6 +105,9 @@ fun GroundedSource.toEntity(messageId: Long, sourceIndex: Int): GroundedSourceEn
         resolvedUrl = url,
         extractedText = extractedText,
         status = status.toStorage(),
+        ogTitle = ogTitle,
+        ogDescription = ogDescription,
+        ogImageUrl = ogImageUrl,
     )
 
 fun RemoteEndpointEntity.toDomain(): Endpoint = Endpoint(

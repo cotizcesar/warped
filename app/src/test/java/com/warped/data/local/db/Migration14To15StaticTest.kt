@@ -235,14 +235,21 @@ class Migration14To15StaticTest {
         // declared version from the AppDatabase.kt source instead (the
         // 15.json version cross-check already ran in the versions test).
         // Best-effort reflection stays: if a runtime-visible annotation ever
-        // exists, it must also read 15.
+        // exists, it must also read >= 15. (Phase 58: the annotation moves
+        // forward with each migration; this gate pins the 14→15 link, not
+        // the current head version.)
         AppDatabase::class.java.getAnnotation(Database::class.java)?.let { annotation ->
-            assertThat(annotation.version).isEqualTo(15)
+            assertWithMessage("AppDatabase version must never move below 15")
+                .that(annotation.version).isAtLeast(15)
         }
         val appDatabaseSource =
             mainSource("com/warped/data/local/db/AppDatabase.kt")
-        assertWithMessage("AppDatabase @Database annotation must declare version = 15")
-            .that(appDatabaseSource.contains("version = 15")).isTrue()
+        val declaredVersion = "version = (\\d+)".toRegex()
+            .find(appDatabaseSource)?.groupValues?.getOrNull(1)?.toIntOrNull()
+        assertWithMessage("AppDatabase @Database annotation must declare a version >= 15, source: %s", appDatabaseSource)
+            .that(declaredVersion).isNotNull()
+        assertWithMessage("AppDatabase version must never move below 15, found %s", declaredVersion)
+            .that(declaredVersion!!).isAtLeast(15)
 
         val migrationsSource =
             mainSource("com/warped/data/local/db/Migrations.kt")
