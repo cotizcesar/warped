@@ -1,9 +1,6 @@
 package com.warped.ui.chat.components
 
-import android.content.ActivityNotFoundException
-import android.content.Intent
 import android.graphics.BitmapFactory
-import android.net.Uri
 import android.util.Base64
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
@@ -40,7 +37,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.Role as SemanticsRole
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontStyle
@@ -241,35 +237,26 @@ fun MessageBubble(
             )
             fuenteList.forEachIndexed { index, item ->
                 if (item.clickable) {
-                    Text(
-                        text = "[${item.number}] ${item.url}",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            // 12dp vertical padding on ~20dp text ≈ 44dp
-                            // touch target; absorbs the old 4dp gaps.
-                            .padding(vertical = 12.dp)
-                            .clip(MaterialTheme.shapes.small)
-                            .clickable(
-                                role = SemanticsRole.Button,
-                                onClick = {
-                                    previewSource = if (sourceDetails.isNotEmpty()) {
-                                        previewForTap(sourceDetails, index)
-                                    } else {
-                                        // Legacy ok-only rows predate
-                                        // hydrated details: sheet shows the
-                                        // empty-extract copy with the browser
-                                        // button available.
-                                        GroundedSource(url = item.url)
-                                    } ?: return@clickable
-                                    previewNumber = item.number
-                                }
-                            )
-                            .semantics {
-                                contentDescription =
-                                    "Source preview ${item.number}"
-                            }
+                    // Phase 58 (OG-02): ok sources render OgSourceCard
+                    // thumbnails in fetch-block order; tap opens the sheet,
+                    // the open icon fires the guarded browser intent.
+                    val cardSource = if (sourceDetails.isNotEmpty()) {
+                        previewForTap(sourceDetails, index)
+                    } else {
+                        // Legacy ok-only rows predate hydrated details:
+                        // text-only card (title falls back to host); tap
+                        // opens the sheet with the empty-extract copy and
+                        // the browser button available.
+                        GroundedSource(url = item.url)
+                    } ?: return@forEachIndexed
+                    OgSourceCard(
+                        source = cardSource,
+                        number = item.number,
+                        onPreview = {
+                            previewSource = cardSource
+                            previewNumber = item.number
+                        },
+                        onOpenBrowser = { url -> openUrlInBrowser(context, url) },
                     )
                 } else {
                     Text(
@@ -282,6 +269,9 @@ fun MessageBubble(
                             .padding(vertical = 12.dp),
                     )
                 }
+                if (index != fuenteList.lastIndex) {
+                    Spacer(Modifier.height(8.dp))
+                }
             }
         }
         // Sheet host: tap an ok item sets previewSource, dismiss nulls it.
@@ -293,39 +283,11 @@ fun MessageBubble(
                 number = previewNumber,
                 onDismiss = { previewSource = null },
                 onOpenBrowser = { url ->
-                    // T-53-09/T-53-10: ACTION_VIEW carries the
-                    // fetcher-resolved url only — never raw pasted text,
-                    // never extracted text. WR-01: stored resolved_url is
-                    // untrusted TEXT — allowlist http/https like the
-                    // fetcher redirect gate (WebPageFetcher scheme check).
-                    // T-53-11: bare emulators without a browser must not
-                    // crash chat (ActivityNotFoundException); OEM
-                    // exported-activity enforcement can throw
-                    // SecurityException from the same tap handler.
-                    val uri = Uri.parse(url)
-                    if (uri.scheme != "http" && uri.scheme != "https") {
-                        Toast.makeText(
-                            context,
-                            "Invalid link.",
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                    } else {
-                        try {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, uri))
-                            previewSource = null
-                        } catch (_: ActivityNotFoundException) {
-                            Toast.makeText(
-                                context,
-                                "No browser found to open the link.",
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                        } catch (_: SecurityException) {
-                            Toast.makeText(
-                                context,
-                                "No browser found to open the link.",
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                        }
+                    // T-53-09/T-53-10 + T-58-08: single guarded gate in
+                    // BrowserIntents; dismiss the sheet only when the
+                    // browser intent actually launched.
+                    if (openUrlInBrowser(context, url)) {
+                        previewSource = null
                     }
                 }
             )

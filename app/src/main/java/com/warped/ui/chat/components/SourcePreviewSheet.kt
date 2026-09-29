@@ -19,6 +19,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -69,29 +73,59 @@ fun SourcePreviewSheet(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Spacer(Modifier.height(8.dp))
+            // Phase 58 (OG-02/OG-03): OG header reusing the card pieces —
+            // 64dp thumb + 16sp Semibold 1-line title + [N] badge + 14sp
+            // primary 1-line URL. Absent/failed image gives the text-only
+            // header (badge + title + URL), no placeholder box. Title and
+            // URL render as plain text; the thumb URL is re-gated to
+            // http(s) at render (T-58-06).
+            val ogTitle = ogDisplayTitle(source.ogTitle, source.url)
+            val gatedImage = gatedHttpImageUrl(source.ogImageUrl)
+            var headerImageFailed by remember(source) { mutableStateOf(false) }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    shape = MaterialTheme.shapes.extraSmall,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                    contentColor = MaterialTheme.colorScheme.primary,
-                ) {
+                if (gatedImage != null && !headerImageFailed) {
+                    OgThumb(
+                        imageUrl = gatedImage,
+                        contentDescription = null,
+                        onError = { headerImageFailed = true },
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = ogTitle,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Surface(
+                            shape = MaterialTheme.shapes.extraSmall,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                            contentColor = MaterialTheme.colorScheme.primary,
+                        ) {
+                            Text(
+                                text = "[$number]",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(2.dp))
                     Text(
-                        text = "[$number]",
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        text = source.url,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.primary,
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = source.url,
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
