@@ -78,7 +78,10 @@ v2.2 Simplificación + Web Grounding shipped 2026-09-28 (Phases 49–51): dead s
   1. User on a remote endpoint gets agentic search/fetch with per-provider capability gating (graceful fallback where tools[] unsupported)
   2. Tool-call streaming renders progress honestly (no silent loops); Stop cancels mid-loop
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+- [ ] 57-01-PLAN.md — Shared pure core (accumulator + matrix + classifier + tools DTOs) + OpenAI tools[] loop tracer
+- [ ] 57-02-PLAN.md — Anthropic native dialect + Ollama/LMStudio/Custom fallback + VM skip + secret proof
 
 ### Phase 58: OpenGraph Thumbnails
 
