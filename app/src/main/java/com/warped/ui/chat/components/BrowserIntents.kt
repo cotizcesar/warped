@@ -24,7 +24,8 @@ import android.widget.Toast
  */
 fun openUrlInBrowser(context: Context, url: String): Boolean {
     val uri = Uri.parse(url)
-    if (uri.scheme != "http" && uri.scheme != "https") {
+    if (!uri.scheme.equals("http", ignoreCase = true) &&
+        !uri.scheme.equals("https", ignoreCase = true)) {
         Toast.makeText(
             context,
             "Invalid link.",
