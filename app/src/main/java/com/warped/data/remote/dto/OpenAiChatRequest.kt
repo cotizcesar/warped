@@ -1,8 +1,19 @@
 package com.warped.data.remote.dto
 
+import com.warped.data.agentic.LocalToolLoop
+import com.warped.data.agentic.WEB_FETCH_TOOL_DESCRIPTION
+import com.warped.data.agentic.WEB_FETCH_URL_DESCRIPTION
+import com.warped.data.agentic.WEB_SEARCH_QUERY_DESCRIPTION
+import com.warped.data.agentic.WEB_SEARCH_TOOL_DESCRIPTION
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
@@ -17,7 +28,79 @@ data class OpenAiChatRequest(
     val seed: Int? = null,
     @SerialName("presence_penalty") val presencePenalty: Float? = null,
     @SerialName("frequency_penalty") val frequencyPenalty: Float? = null,
-    @SerialName("response_format") val responseFormat: OpenAiResponseFormat? = null
+    @SerialName("response_format") val responseFormat: OpenAiResponseFormat? = null,
+    /**
+     * Phase 57 (57-01): Chat Completions `tools[]` (loose schemas — NO
+     * `strict` flag, locked). `NEVER`-encoded so the plain path omits the
+     * key entirely (unarmed turns stay byte-identical on the wire); the
+     * retry-without-tools path replays with null (same omission). Never
+     * `tool_choice` — rely on default auto behavior (Ollama lists it as
+     * unsupported).
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val tools: List<OpenAiTool>? = null
+)
+
+/**
+ * Phase 57 (57-01): one `tools[]` entry — `type:"function"` wrapping the
+ * provider-neutral `web_search` / `web_fetch` schemas (descriptions copied
+ * verbatim from the local `@Tool` constants, locked identical surface).
+ */
+@Serializable
+data class OpenAiTool(
+    val type: String = "function",
+    val function: OpenAiFunctionDef,
+)
+
+/** Phase 57 (57-01): the `function` half of an [OpenAiTool] entry. */
+@Serializable
+data class OpenAiFunctionDef(
+    /** Exact snake_case contract: `web_search` | `web_fetch`. */
+    val name: String,
+    val description: String,
+    /** `{type:object, properties:{…}, required:[…], additionalProperties:false}`. */
+    val parameters: JsonObject,
+)
+
+/**
+ * Phase 57 (57-01): the two-tool `tools[]` list for an armed round, built
+ * once per turn. Single-required-string params (`query` / `url`) — strict
+ * buys nothing, loose maximizes compat-server acceptance.
+ */
+fun defaultRemoteTools(): List<OpenAiTool> = listOf(
+    OpenAiTool(
+        function = OpenAiFunctionDef(
+            name = LocalToolLoop.TOOL_WEB_SEARCH,
+            description = WEB_SEARCH_TOOL_DESCRIPTION,
+            parameters = buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") {
+                    putJsonObject("query") {
+                        put("type", "string")
+                        put("description", WEB_SEARCH_QUERY_DESCRIPTION)
+                    }
+                }
+                putJsonArray("required") { add(JsonPrimitive("query")) }
+                put("additionalProperties", false)
+            },
+        ),
+    ),
+    OpenAiTool(
+        function = OpenAiFunctionDef(
+            name = LocalToolLoop.TOOL_WEB_FETCH,
+            description = WEB_FETCH_TOOL_DESCRIPTION,
+            parameters = buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") {
+                    putJsonObject("url") {
+                        put("type", "string")
+                        put("description", WEB_FETCH_URL_DESCRIPTION)
+                    }
+                }
+                putJsonArray("required") { add(JsonPrimitive("url")) }
+                put("additionalProperties", false)
+            },
+        ),
+    ),
 )
 
 @Serializable
@@ -33,6 +116,7 @@ data class OpenAiJsonSchema(
     val schema: kotlinx.serialization.json.JsonObject? = null
 )
 
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
 data class OpenAiMessage(
     /**
@@ -40,7 +124,35 @@ data class OpenAiMessage(
      * the wire as `role:"tool"` — providers replay them as plain user text.
      */
     val role: String,
-    val content: String? = null
+    val content: String? = null,
+    /**
+     * Phase 57 (57-01): assistant-echo `tool_calls` (exact ids + complete
+     * arguments strings) and `role:"tool"` result messages
+     * (`tool_call_id`). In-memory loop echoes only — never persisted to
+     * Room. `NEVER`-encoded so plain messages stay byte-identical.
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER) @SerialName("tool_calls") val toolCalls: List<OpenAiCompletedToolCall>? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) @SerialName("tool_call_id") val toolCallId: String? = null
+)
+
+/**
+ * Phase 57 (57-01): completed-call shape for the assistant echo and for
+ * non-streaming `choices[].message.tool_calls` (Pitfall 3: servers that
+ * ignore `stream:true` return this instead of SSE deltas).
+ */
+@Serializable
+data class OpenAiCompletedToolCall(
+    val id: String = "",
+    val type: String = "function",
+    val function: OpenAiFunctionCall = OpenAiFunctionCall(),
+)
+
+/** Phase 57 (57-01): the `function` half of an [OpenAiCompletedToolCall]. */
+@Serializable
+data class OpenAiFunctionCall(
+    val name: String = "",
+    /** Complete (reassembled) arguments JSON string — exact-string echo. */
+    val arguments: String = "",
 )
 
 @Serializable
@@ -167,5 +279,10 @@ data class OpenAiNonStreamingChoice(
 @Serializable
 data class OpenAiNonStreamingMessage(
     val content: String? = null,
-    @SerialName("reasoning_content") val reasoningContent: String? = null
+    @SerialName("reasoning_content") val reasoningContent: String? = null,
+    /**
+     * Phase 57 (57-01, Pitfall 3): non-streaming servers return complete
+     * `tool_calls` on the message — same loop entry, no separate path.
+     */
+    @SerialName("tool_calls") val toolCalls: List<OpenAiCompletedToolCall>? = null
 )

@@ -18,7 +18,36 @@ data class OpenAiStreamChoice(
 data class OpenAiStreamDelta(
     val content: String? = null,
     val role: String? = null,
-    @SerialName("reasoning_content") val reasoningContent: String? = null
+    @SerialName("reasoning_content") val reasoningContent: String? = null,
+    /**
+     * Phase 57 (57-01): streaming `tool_calls` fragments, accumulated per
+     * `index` by `ToolCallAccumulator` (arguments arrive as JSON string
+     * fragments, possibly split mid-escape). Additive under the provider's
+     * `ignoreUnknownKeys` — text-only turns parse byte-identically.
+     */
+    @SerialName("tool_calls") val toolCalls: List<OpenAiToolCallDelta>? = null
+)
+
+/**
+ * Phase 57 (57-01): one streaming `tool_calls` entry. `id`/`name` typically
+ * arrive on the first fragment per index only; continuation chunks carry
+ * `arguments` fragments alone (`index` defaults to 0 for servers that omit
+ * it on single-call turns).
+ */
+@Serializable
+data class OpenAiToolCallDelta(
+    val index: Int = 0,
+    val id: String? = null,
+    val type: String? = null,
+    val function: OpenAiFunctionDelta? = null
+)
+
+/** Phase 57 (57-01): the `function` half of an [OpenAiToolCallDelta]. */
+@Serializable
+data class OpenAiFunctionDelta(
+    val name: String? = null,
+    /** JSON string fragment (not a complete object until reassembled). */
+    val arguments: String? = null
 )
 
 @Serializable
