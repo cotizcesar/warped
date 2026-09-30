@@ -120,6 +120,7 @@ None — v2.2 phases shipped with accepted deferrals recorded above. Next milest
 | 20260929-og-thumb-opens-browser | 2026-09-29 | Complete ✓ | Thumb abre navegador directo (resto→sheet); tap test androidTest; unidad verde |
 | 20260929-langmatch-i18n-paragraphs | 2026-09-29 | Complete ✓ | Regla idioma-usuario en prompts + EN/ES 459/459 + párrafos 8dp; 512 green |
 | 20260929-always-search-image-grid | 2026-09-29 | Complete ✓ | Pre-búsqueda siempre (DDG gratis aun armada) + grid imágenes/modal/descarga; 576 green |
+| 20260929-image-turn-routing-favicon | 2026-09-29 | Complete ✓ | Turnos-imagen directo a Tavily + fallback favicon S2; 599 green |
 | 20260929-langmatch-i18n-paragraphs | 2026-09-29 | Complete ✓ | Regla idioma-usuario en prompts + EN/ES 459/459 + párrafos 8dp; 512 green |
 
 ## Session Continuity
