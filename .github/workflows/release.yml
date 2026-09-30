@@ -13,5 +13,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35 platforms;android-36 build-tools;36.0.0 ndk;27.2.12479018'
+
       - name: Write local.properties
         run: echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+      - name: Cache Gradle
+        uses: gradle/actions/setup-gradle@v4
