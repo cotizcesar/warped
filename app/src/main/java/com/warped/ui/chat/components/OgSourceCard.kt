@@ -51,7 +51,8 @@ import java.net.URI
 /**
  * Phase 58 (OG-02) + quick-task two-column layout (user-locked): horizontal
  * source card with TWO columns — left favicon/thumb image, right Title (max
- * 2 lines, ellipsis) + URL (1 line, muted, ellipsis). Rounded-12dp
+ * 1 line, ellipsis) + description (max 2 lines) + URL last (1 line, dimmed,
+ * ellipsis). Rounded-12dp
  * container, 12dp internal padding, 8dp inter-card gaps applied by the
  * caller. No [N] number badges, no open/external-link icon (citations
  * `[1]`/`[2]` in answer text and the model prompt are untouched — only the
@@ -108,7 +109,7 @@ fun OgSourceCard(
             modifier = Modifier
                 .padding(12.dp)
                 .height(IntrinsicSize.Min),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
         ) {
             if (showThumb) {
                 Box(
@@ -128,22 +129,14 @@ fun OgSourceCard(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight(),
-                verticalArrangement = Arrangement.Center,
+                verticalArrangement = Arrangement.Top,
             ) {
                 Text(
                     text = displayTitle,
                     fontSize = 14.sp,
+                    lineHeight = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = source.url,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Normal,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -152,12 +145,23 @@ fun OgSourceCard(
                     Text(
                         text = desc,
                         fontSize = 12.sp,
+                        lineHeight = 12.sp,
                         fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = source.url,
+                    fontSize = 12.sp,
+                    lineHeight = 12.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
@@ -166,7 +170,7 @@ fun OgSourceCard(
 /**
  * Sources-carousel compact card (fixed 272dp width) with the same locked
  * two-column layout as [OgSourceCard]: left thumb (tap → browser), right
- * Title (max 2 lines) + URL (1 line, muted). Same container colors
+ * Title (max 1 line) + description + URL last (1 line, dimmed). Same container colors
  * ([OgCardDark] dark / M3 surfaceVariant light — zero new color constants,
  * zero purple). No [N] badge, no open icon.
  *
@@ -214,7 +218,7 @@ fun CompactSourceCard(
             modifier = Modifier
                 .padding(12.dp)
                 .height(IntrinsicSize.Min),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
         ) {
             if (showThumb) {
                 Box(
@@ -236,22 +240,14 @@ fun CompactSourceCard(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight(),
-                verticalArrangement = Arrangement.Center,
+                verticalArrangement = Arrangement.Top,
             ) {
                 Text(
                     text = displayTitle,
                     fontSize = 14.sp,
+                    lineHeight = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = source.url,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Normal,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -260,19 +256,30 @@ fun CompactSourceCard(
                     Text(
                         text = desc,
                         fontSize = 12.sp,
+                        lineHeight = 12.sp,
                         fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = source.url,
+                    fontSize = 12.sp,
+                    lineHeight = 12.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
 }
 
 /**
- * Phase 58 (OG-02): shared 64dp Coil thumb with shimmer-behind loading.
+ * Phase 58 (OG-02): shared 48dp Coil thumb with shimmer-behind loading.
  * Reused by the card and the preview-sheet OG header. Coil's AsyncImage
  * (not SubcomposeAsyncImage — the docs-flagged slow path in lists) resolves
  * the singleton ImageLoader by default; text around the thumb always
@@ -287,7 +294,7 @@ internal fun OgThumb(
 ) {
     Box(
         modifier = modifier
-            .size(64.dp)
+            .size(48.dp)
             .clip(MaterialTheme.shapes.small),
     ) {
         val pulse by rememberInfiniteTransition(label = "ogThumbShimmer").animateFloat(
