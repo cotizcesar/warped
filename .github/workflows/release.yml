@@ -57,16 +57,13 @@ jobs:
             echo "track=$BRANCH" >> "$GITHUB_OUTPUT"
           fi
 
-      # TRIAGE 2026-09-30: Play upload step temporarily disabled to
-      # isolate a scheduler-level startup_failure (bisecting action-ref
-      # resolution). Restore before any store release.
-      # - name: Upload to Google Play Store
-      #   uses: r0adkll/upload-google-play@v1
-      #   with:
-      #     serviceAccountJsonPlainText: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-      #     packageName: com.warped.app
-      #     releaseFiles: app/build/outputs/bundle/release/app-release.aab
-      #     tracks: ${{ steps.track.outputs.track }}
+      - name: Upload to Google Play Store
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          packageName: com.warped.app
+          releaseFiles: app/build/outputs/bundle/release/app-release.aab
+          tracks: ${{ steps.track.outputs.track }}
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
