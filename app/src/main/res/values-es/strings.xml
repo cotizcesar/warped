@@ -4,6 +4,8 @@
     <string name="tab_models">Modelos</string>
     <string name="settings">Ajustes</string>
     <string name="cancel">Cancelar</string>
+    <string name="pause">Pausar</string>
+    <string name="resume">Reanudar</string>
     <string name="save">Guardar</string>
     <string name="delete">Eliminar</string>
     <string name="edit">Editar</string>
@@ -171,6 +173,8 @@
     <string name="cd_logo_nav">Logo</string>
     <string name="cd_jump_latest">Ir al último mensaje</string>
     <string name="cd_open_drawer">Abrir panel</string>
+    <string name="cd_pause_download">Pausar descarga</string>
+    <string name="cd_resume_download">Reanudar descarga</string>
     <string name="cd_connection_status">Estado de conexión</string>
     <string name="cd_select_model">Seleccionar modelo</string>
     <string name="cd_web_options">Opciones web</string>

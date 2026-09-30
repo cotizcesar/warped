@@ -345,6 +345,16 @@ class ModelsViewModel @Inject constructor(
         modelDownloadManager.cancelDownload(modelId)
     }
 
+    // Quick-task (download-pause): Models-screen pause/resume exposure,
+    // mirroring CatalogViewModel — same manager APIs, same id semantics.
+    fun pauseDownload(modelId: String) {
+        modelDownloadManager.pauseDownload(modelId)
+    }
+
+    fun resumeDownload(modelId: String) {
+        modelDownloadManager.resumeDownload(modelId)
+    }
+
     fun deleteIncompleteDownload(download: DownloadState) {
         modelDownloadManager.deleteIncompleteDownload(download.modelId, download.fileName)
     }

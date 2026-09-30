@@ -6,6 +6,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -23,10 +28,12 @@ import com.warped.data.local.download.DownloadState
  * linear-bar + status-line + Cancel visual on both the Models screen
  * ([DownloadCard]) and the catalog ([CatalogModelCard] active branch).
  *
- * Per D1 the unified look is Cancel-only — pause/resume worker logic is
- * untouched but has no UI entry point. The `isPaused` branch mirrors the
- * Models paused look ("Paused · x / y" + Delete); the terminal branch
- * mirrors the Models interrupted look + Delete-partial.
+ * Quick-task (download-pause): pause/resume reuses the tested
+ * `ModelDownloadManager.pauseDownload/resumeDownload` worker APIs — this
+ * composable only adds the [onPause]/[onResume] entry points, wired
+ * identically on both screens. The downloading branch shows Pause next to
+ * Cancel; the `isPaused` branch shows Resume next to Delete; Cancel/Delete
+ * behavior is unchanged.
  *
  * Each call site keeps its own confirm UX via [onCancel]: Models cancels
  * directly, the catalog confirms first ("The partial file will be
@@ -36,7 +43,9 @@ import com.warped.data.local.download.DownloadState
 fun ActiveDownloadContent(
     download: DownloadState,
     onCancel: () -> Unit,
-    onDeleteIncomplete: () -> Unit
+    onDeleteIncomplete: () -> Unit,
+    onPause: () -> Unit = {},
+    onResume: () -> Unit = {}
 ) {
     Column(modifier = Modifier.padding(16.dp)) {
         Text(
@@ -57,7 +66,15 @@ fun ActiveDownloadContent(
                 style = MaterialTheme.typography.bodySmall
             )
             Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
+            Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
+                IconButton(onClick = onPause) {
+                    Icon(
+                        imageVector = Icons.Filled.Pause,
+                        contentDescription = stringResource(R.string.cd_pause_download)
+                    )
+                }
+            }
         } else if (download.isPaused) {
             Text(
                 stringResource(
@@ -70,6 +87,12 @@ fun ActiveDownloadContent(
             )
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                IconButton(onClick = onResume) {
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = stringResource(R.string.cd_resume_download)
+                    )
+                }
                 OutlinedButton(onClick = onDeleteIncomplete) { Text(stringResource(R.string.delete)) }
             }
         } else {

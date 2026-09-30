@@ -269,7 +269,9 @@ fun ModelsScreen(
                             DownloadCard(
                                 download = download,
                                 onCancel = { viewModel.cancelDownload(download.modelId) },
-                                onDeleteIncomplete = { viewModel.deleteIncompleteDownload(download) }
+                                onDeleteIncomplete = { viewModel.deleteIncompleteDownload(download) },
+                                onPause = { viewModel.pauseDownload(download.modelId) },
+                                onResume = { viewModel.resumeDownload(download.modelId) }
                             )
                         }
                     }
@@ -445,7 +447,9 @@ private fun ModelFormatBadge(format: String) {
 private fun DownloadCard(
     download: DownloadState,
     onCancel: () -> Unit,
-    onDeleteIncomplete: () -> Unit
+    onDeleteIncomplete: () -> Unit,
+    onPause: () -> Unit,
+    onResume: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -455,7 +459,9 @@ private fun DownloadCard(
         ActiveDownloadContent(
             download = download,
             onCancel = onCancel,
-            onDeleteIncomplete = onDeleteIncomplete
+            onDeleteIncomplete = onDeleteIncomplete,
+            onPause = onPause,
+            onResume = onResume
         )
     }
 }
