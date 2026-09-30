@@ -30,9 +30,11 @@ class GroundingPromptTest {
     }
 
     @Test
-    fun `system prompt requires replying in the user's language`() {
-        assertThat(GroundingPrompt.SYSTEM_PROMPT)
-            .contains("Always reply in the same language the user wrote in.")
+    fun `system prompt carries no generic same-language sentence`() {
+        // Explicit per-turn directive (languageDirective, last line of the
+        // augmentation) replaces the probabilistic generic rule — the
+        // generic sentence must be gone, not duplicated.
+        assertThat(GroundingPrompt.SYSTEM_PROMPT).doesNotContain("same language")
     }
 
     @Test
@@ -69,7 +71,7 @@ class GroundingPromptTest {
     fun `null block with grounding enabled prepends system prompt`() {
         val out = GroundingPrompt.augment("pregunta", null, groundingEnabled = true)
 
-        assertThat(out).isEqualTo("${GroundingPrompt.SYSTEM_PROMPT}\n\npregunta")
+        assertThat(out).isEqualTo("${GroundingPrompt.SYSTEM_PROMPT}\n\npregunta\n\nReply in English.")
         assertThat(out.indexOf(GroundingPrompt.SYSTEM_PROMPT)).isEqualTo(0)
         assertThat(out.indexOf("pregunta")).isGreaterThan(0)
     }
@@ -97,6 +99,121 @@ class GroundingPromptTest {
             assertThat(out).contains("--- Source [1]")
             assertThat(out).contains("--- End of sources ---")
             assertThat(out).doesNotContain("[END WEB CONTEXT")
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Explicit language directive (EN+ES): detection, selection, assembly.
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `isSpanish detects inverted marks`() {
+        assertThat(GroundingPrompt.isSpanish("¿Cómo estás?")).isTrue()
+        assertThat(GroundingPrompt.isSpanish("¡Hola!")).isTrue()
+    }
+
+    @Test
+    fun `isSpanish detects lowercase accents and ene`() {
+        assertThat(GroundingPrompt.isSpanish("está aquí")).isTrue()
+        assertThat(GroundingPrompt.isSpanish("niño")).isTrue()
+        assertThat(GroundingPrompt.isSpanish("pingüino")).isTrue()
+    }
+
+    @Test
+    fun `isSpanish detects uppercase markers case-insensitively`() {
+        assertThat(GroundingPrompt.isSpanish("ÁRBOL")).isTrue()
+        assertThat(GroundingPrompt.isSpanish("NIÑO")).isTrue()
+        assertThat(GroundingPrompt.isSpanish("¿QUÉ?")).isTrue()
+    }
+
+    @Test
+    fun `isSpanish rejects plain english`() {
+        assertThat(GroundingPrompt.isSpanish("What is the capital of France?")).isFalse()
+        assertThat(GroundingPrompt.isSpanish("hello world")).isFalse()
+    }
+
+    @Test
+    fun `isSpanish marker presence decides mixed text`() {
+        assertThat(GroundingPrompt.isSpanish("What is el niño?")).isTrue()
+    }
+
+    @Test
+    fun `isSpanish rejects empty and ascii punctuation`() {
+        assertThat(GroundingPrompt.isSpanish("")).isFalse()
+        assertThat(GroundingPrompt.isSpanish("Really?")).isFalse()
+        assertThat(GroundingPrompt.isSpanish("Wow!")).isFalse()
+    }
+
+    @Test
+    fun `languageDirective selects the exact directive`() {
+        assertThat(GroundingPrompt.languageDirective("¿Cómo estás?"))
+            .isEqualTo("Responde en español.")
+        assertThat(GroundingPrompt.languageDirective("What is the capital of France?"))
+            .isEqualTo("Reply in English.")
+        assertThat(GroundingPrompt.languageDirective("")).isEqualTo("Reply in English.")
+    }
+
+    @Test
+    fun `augment appends the directive exactly once as the last line - block path`() {
+        val block = GroundingPrompt.buildBlock("https://a.com", "some english source text")
+        val out = GroundingPrompt.augment("¿Qué dice la fuente?", block, groundingEnabled = true)
+
+        assertThat(countOccurrences(out, "Responde en español.")).isEqualTo(1)
+        assertThat(out).doesNotContain("Reply in English.")
+        assertThat(out.endsWith("Responde en español.")).isTrue()
+        assertThat(out.indexOf("¿Qué dice la fuente?") < out.lastIndexOf("Responde en español.")).isTrue()
+    }
+
+    @Test
+    fun `augment appends the directive exactly once as the last line - no-block path`() {
+        val out = GroundingPrompt.augment("What is the capital of France?", null, groundingEnabled = true)
+
+        assertThat(countOccurrences(out, "Reply in English.")).isEqualTo(1)
+        assertThat(out).doesNotContain("Responde en español.")
+        assertThat(out.endsWith("Reply in English.")).isTrue()
+        assertThat(out.indexOf("What is the capital of France?") < out.lastIndexOf("Reply in English.")).isTrue()
+    }
+
+    @Test
+    fun `augment derives the directive from the original text not the block`() {
+        val englishBlock = GroundingPrompt.buildBlock("https://a.com", "english source text")
+        val spanishBlock = GroundingPrompt.buildBlock("https://a.com", "texto con ñ y acentos está aquí")
+
+        val esQuestionEnBlock = GroundingPrompt.augment("¿Qué dice?", englishBlock, groundingEnabled = true)
+        assertThat(esQuestionEnBlock.endsWith("Responde en español.")).isTrue()
+
+        val enQuestionEsBlock = GroundingPrompt.augment("What does it say?", spanishBlock, groundingEnabled = true)
+        assertThat(enQuestionEsBlock.endsWith("Reply in English.")).isTrue()
+    }
+
+    @Test
+    fun `augment disabled returns original untouched with no directive`() {
+        val out = GroundingPrompt.augment("¿Cómo estás?", null, groundingEnabled = false)
+
+        assertThat(out).isEqualTo("¿Cómo estás?")
+        assertThat(out).doesNotContain("Responde en español.")
+        assertThat(out).doesNotContain("Reply in English.")
+    }
+
+    @Test
+    fun `grounded outputs carry no generic same-language sentence`() {
+        val block = GroundingPrompt.buildBlock("https://a.com", "text")
+        for (out in listOf(
+            GroundingPrompt.augment("hello", block, groundingEnabled = true),
+            GroundingPrompt.augment("hello", null, groundingEnabled = true),
+        )) {
+            assertThat(out).doesNotContain("same language")
+        }
+    }
+
+    private fun countOccurrences(haystack: String, needle: String): Int {
+        var count = 0
+        var from = 0
+        while (true) {
+            val idx = haystack.indexOf(needle, from)
+            if (idx < 0) return count
+            count++
+            from = idx + needle.length
         }
     }
 }
