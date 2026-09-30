@@ -63,6 +63,7 @@ sealed interface TavilySearchOutcome {
 class TavilySearchRepository @Inject constructor(
     private val api: TavilyApi,
     private val apiKeyStore: ApiKeyStore,
+    private val enricher: SearchOgEnricher,
 ) {
 
     /** Overridable for deterministic JVM tests; production stays on IO. */
@@ -119,7 +120,17 @@ class TavilySearchRepository @Inject constructor(
                             MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
                         )
                     }
-                    fuse(body.results.take(count), contextSize, body.images)
+                    fuse(body.results.take(count), contextSize, body.images).let { outcome ->
+                        if (outcome is TavilySearchOutcome.Grounded) {
+                            outcome.copy(
+                                fused = outcome.fused.copy(
+                                    details = enricher.enrich(outcome.fused.details),
+                                ),
+                            )
+                        } else {
+                            outcome
+                        }
+                    }
                 }
             }
         } catch (e: CancellationException) {

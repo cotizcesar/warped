@@ -69,6 +69,7 @@ class DuckDuckGoSearchRepository @Inject constructor(
     private val webPageFetcher: WebPageFetcher,
     private val apiKeyStore: ApiKeyStore,
     private val tavily: TavilySearchRepository,
+    private val enricher: SearchOgEnricher,
 ) {
 
     /** Overridable for deterministic JVM tests; production stays on IO. */
@@ -167,7 +168,13 @@ class DuckDuckGoSearchRepository @Inject constructor(
             null
         }
         if (!pairs.isNullOrEmpty()) {
-            return@withContext fuse(pairs, contextSize)
+            val outcome = fuse(pairs, contextSize)
+            if (outcome is TavilySearchOutcome.Grounded) {
+                return@withContext outcome.copy(
+                    fused = outcome.fused.copy(details = enricher.enrich(outcome.fused.details)),
+                )
+            }
+            return@withContext outcome
         }
         // DDG yielded nothing usable: Tavily fallback ONLY when keyed.
         // The key copy is zeroed after the presence check; the delegate
