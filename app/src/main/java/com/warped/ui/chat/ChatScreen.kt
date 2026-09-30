@@ -229,17 +229,19 @@ fun ChatScreen(
     // per-token animateScrollTo defect); otherwise the hasNewContentBelow
     // latch sets and the pill takes over.
     val showStreamingBubble = transcript.streamingContent.isNotEmpty() || transcript.streamingReasoning.isNotEmpty()
-    // QUICK-B: transient "Pensando…" row — streaming with no content or
-    // reasoning yet (and no web-fetch chip, which already covers that gap).
-    // Reuses the single trailing-item slot below: mutually exclusive with
-    // the streaming bubble, exactly one trailing row, same pin/pill math.
-    val showThinkingRow = transcript.isStreaming &&
+    // Unified turn status (quick-turn-status): the streaming gap (streaming
+    // with no content or reasoning yet, and no tool/fetch row covering it)
+    // renders in the bottomBar slot via TurnStatusRow — never as a trailing
+    // in-list row. Precomputed here so the gap math stays in one place;
+    // mutually exclusive with the streaming bubble, exactly one trailing
+    // row at most, same pin/pill math.
+    val isStreamingGap = transcript.isStreaming &&
         transcript.streamingContent.isEmpty() &&
         transcript.streamingReasoning.isEmpty() &&
         !input.isFetchingWeb &&
         // 56-02: the tool row already covers the gap during tool calls.
         input.toolCallActive == null
-    val trailingCount = if (showStreamingBubble || showThinkingRow) 1 else 0
+    val trailingCount = if (showStreamingBubble) 1 else 0
     val totalItems = transcript.messages.size + trailingCount
     LaunchedEffect(
         transcript.messages.size,
@@ -274,85 +276,18 @@ fun ChatScreen(
         },
         bottomBar = {
             Column {
-                // Phase 50 (WEB-06): transient fetch status chip — never a
-                // transcript message, never persisted. Unmounts on
-                // completion/failure/Stop; the existing Stop covers cancel
-                // (isGenerating stays true during fetch).
-                // Phase 52 (FETCH-03): N-source copy derives from
-                // webFetchProgress — "Leyendo N de M…" during fan-out,
-                // legacy "Leyendo página…" for the single-URL case.
-                if (input.isFetchingWeb) {
-                    val progress = input.webFetchProgress
-                    val isMulti = progress != null && progress.total > 1
-                    val chipText = if (isMulti) {
-                        stringResource(R.string.reading_multi_fmt, progress.done, progress.total)
-                    } else {
-                        stringResource(R.string.reading_page)
-                    }
-                    val chipDescription = if (isMulti) {
-                        pluralStringResource(R.plurals.reading_multi_cd_fmt, progress.total, progress.done, progress.total)
-                    } else {
-                        stringResource(R.string.reading_page_cd)
-                    }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .semantics {
-                                contentDescription = chipDescription
-                            },
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = chipText,
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                }
-                // Phase 56 (56-02): transient tool-call status row — the
-                // provider posts user copy ("Searching for …" /
-                // "Reading <host>…") while a tool runs, null when done.
-                // Same transient slot as the fetch chip above: never a
-                // transcript message, never persisted; unmounts on
-                // Done/Error/Stop/new send. Single-line with ellipsis
-                // (UI-REVIEW fix #2) so long queries/hosts can't push the
-                // input bar.
-                val toolStatus = input.toolCallActive
-                if (toolStatus != null) {
-                    val toolCd = stringResource(R.string.cd_running_tool, toolStatus)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .semantics {
-                                contentDescription = toolCd
-                            },
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = toolStatus,
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                }
+                // Unified turn status (quick-turn-status): ONE transient row
+                // above the input bar — priority tool > fetch/search >
+                // streaming gap. Never a transcript message, never
+                // persisted; unmounts on completion/failure/Stop. Null
+                // status renders nothing (and no spacer).
+                val turnStatus = resolveTurnStatus(
+                    toolCallActive = input.toolCallActive,
+                    isFetchingWeb = input.isFetchingWeb,
+                    progress = input.webFetchProgress,
+                    isStreamingGap = isStreamingGap,
+                )
+                TurnStatusRow(status = turnStatus)
                 ChatInputBar(
                 text = input.inputText,
                 isGenerating = input.isGenerating,
@@ -469,12 +404,6 @@ fun ChatScreen(
                                     codeTheme = connection.codeTheme,
                                     codeFontScale = connection.codeFontScale
                                 )
-                            }
-                        } else if (showThinkingRow) {
-                            // QUICK-B: transient processing row. Yields to the
-                            // streaming bubble on first token/reasoning.
-                            item(key = ChatListKeys.THINKING) {
-                                ThinkingRow()
                             }
                         }
                     }
@@ -822,35 +751,57 @@ internal fun webOverrideIndicator(webOverride: Boolean?): WebOverrideIndicator =
     }
 
 /**
- * QUICK-B: transient "Pensando…" processing row for the streaming gap
- * before the first token/reasoning arrives. Static string only — no user
- * content, no injection surface. Assistant-aligned (Start, transparent) to
- * match MessageBubble style; announces politely for accessibility.
+ * Unified turn status row (quick-turn-status): the single transient row in
+ * the bottomBar slot above the input bar — tool > fetch/search > streaming
+ * gap. Same slot visuals as the rows it replaces (16dp ring + 8dp gap +
+ * 14sp text, single-line ellipsis so long queries/hosts can't push the
+ * input bar, trailing 8dp spacer when non-null; null renders nothing).
+ * Single semantics contentDescription per resolved state. Copy reuse:
+ * tool text passes through, fan-out keeps reading_multi copy, single keeps
+ * reading_page copy, search uses the indeterminate searching copy (no
+ * counts), the gap reuses the old in-list thinking-row copy (thinking_ellipsis).
  */
 @Composable
-private fun ThinkingRow() {
-    val thinkingCd = stringResource(R.string.cd_thinking_generating)
+private fun TurnStatusRow(status: TurnStatus?) {
+    if (status == null) return
+    val text = when (status) {
+        is TurnStatus.Tool -> status.text
+        is TurnStatus.FetchFanout -> stringResource(R.string.reading_multi_fmt, status.done, status.total)
+        TurnStatus.FetchSingle -> stringResource(R.string.reading_page)
+        TurnStatus.Searching -> stringResource(R.string.searching)
+        TurnStatus.ThinkingGap -> stringResource(R.string.thinking_ellipsis)
+    }
+    val statusCd = when (status) {
+        is TurnStatus.Tool -> stringResource(R.string.cd_running_tool, status.text)
+        is TurnStatus.FetchFanout -> pluralStringResource(R.plurals.reading_multi_cd_fmt, status.total, status.done, status.total)
+        TurnStatus.FetchSingle -> stringResource(R.string.reading_page_cd)
+        TurnStatus.Searching -> stringResource(R.string.searching_cd)
+        TurnStatus.ThinkingGap -> stringResource(R.string.cd_thinking_generating)
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = 16.dp)
             .semantics {
-                contentDescription = thinkingCd
+                contentDescription = statusCd
             },
-        horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically
     ) {
         CircularProgressIndicator(
-            modifier = Modifier.size(14.dp),
+            modifier = Modifier.size(16.dp),
             strokeWidth = 2.dp,
             color = MaterialTheme.colorScheme.primary
         )
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(8.dp))
         Text(
-            text = stringResource(R.string.thinking_ellipsis),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            text = text,
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
+    Spacer(Modifier.height(8.dp))
 }
 
 /**

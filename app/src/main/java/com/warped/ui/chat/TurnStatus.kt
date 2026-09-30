@@ -17,7 +17,7 @@ package com.warped.ui.chat
  *   it and the done/total values never surface.
  * - null progress + `isFetchingWeb` → [FetchSingle] (legacy fallback).
  *
- * `isStreamingGap` is the old `showThinkingRow` condition verbatim,
+ * `isStreamingGap` is the old thinking-row condition verbatim,
  * precomputed by the caller so the gap math stays in one place.
  */
 sealed interface TurnStatus {
