@@ -9,7 +9,7 @@ plugins {
 
 android {
     namespace = "com.warped"
-    compileSdk = 35
+    compileSdk = 36
 
     val versionMajor = 2
     val versionMinor = 4
@@ -24,7 +24,7 @@ android {
     defaultConfig {
         applicationId = "com.warped.app"
         minSdk = 28
-        targetSdk = 35
+        targetSdk = 36
         this.versionCode = versionCode
         this.versionName = versionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
