@@ -118,6 +118,7 @@ None — v2.2 phases shipped with accepted deferrals recorded above. Next milest
 | 20260928-webfetch-parity | 2026-09-28 | Complete ✓ | Extracción markdown (headings/tablas/código/links), 256KB/30s, UA desktop; sanitizer anti-links maliciosos; 346 green |
 | 20260928-source-delimiter-rename | 2026-09-28 | Complete ✓ | Bloques "Source [N]" sin etiqueta filtrable + escapes viejos conservados; suite verde |
 | 20260929-og-thumb-opens-browser | 2026-09-29 | Complete ✓ | Thumb abre navegador directo (resto→sheet); tap test androidTest; unidad verde |
+| 20260929-langmatch-i18n-paragraphs | 2026-09-29 | Complete ✓ | Regla idioma-usuario en prompts + EN/ES 459/459 + párrafos 8dp; 512 green |
 
 ## Session Continuity
 
