@@ -20,8 +20,8 @@ object GroundingPrompt {
     /** Locked high-precision ES markers: ¿ ¡ á é í ó ú ñ ü (case-insensitive). */
     private val SPANISH_MARKERS = Regex("[¿¡áéíóúñü]", RegexOption.IGNORE_CASE)
 
-    const val SPANISH_DIRECTIVE = "Responde en español."
-    const val ENGLISH_DIRECTIVE = "Reply in English."
+    const val SPANISH_DIRECTIVE = "Responde en español, aunque las fuentes estén en inglés."
+    const val ENGLISH_DIRECTIVE = "Reply in English, even if the sources are in another language."
 
     fun isSpanish(text: String): Boolean = SPANISH_MARKERS.containsMatchIn(text)
 

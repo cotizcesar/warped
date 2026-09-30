@@ -71,7 +71,7 @@ class GroundingPromptTest {
     fun `null block with grounding enabled prepends system prompt`() {
         val out = GroundingPrompt.augment("pregunta", null, groundingEnabled = true)
 
-        assertThat(out).isEqualTo("${GroundingPrompt.SYSTEM_PROMPT}\n\npregunta\n\nReply in English.")
+        assertThat(out).isEqualTo("${GroundingPrompt.SYSTEM_PROMPT}\n\npregunta\n\nReply in English, even if the sources are in another language.")
         assertThat(out.indexOf(GroundingPrompt.SYSTEM_PROMPT)).isEqualTo(0)
         assertThat(out.indexOf("pregunta")).isGreaterThan(0)
     }
@@ -147,10 +147,10 @@ class GroundingPromptTest {
     @Test
     fun `languageDirective selects the exact directive`() {
         assertThat(GroundingPrompt.languageDirective("¿Cómo estás?"))
-            .isEqualTo("Responde en español.")
+            .isEqualTo("Responde en español, aunque las fuentes estén en inglés.")
         assertThat(GroundingPrompt.languageDirective("What is the capital of France?"))
-            .isEqualTo("Reply in English.")
-        assertThat(GroundingPrompt.languageDirective("")).isEqualTo("Reply in English.")
+            .isEqualTo("Reply in English, even if the sources are in another language.")
+        assertThat(GroundingPrompt.languageDirective("")).isEqualTo("Reply in English, even if the sources are in another language.")
     }
 
     @Test
@@ -158,20 +158,20 @@ class GroundingPromptTest {
         val block = GroundingPrompt.buildBlock("https://a.com", "some english source text")
         val out = GroundingPrompt.augment("¿Qué dice la fuente?", block, groundingEnabled = true)
 
-        assertThat(countOccurrences(out, "Responde en español.")).isEqualTo(1)
-        assertThat(out).doesNotContain("Reply in English.")
-        assertThat(out.endsWith("Responde en español.")).isTrue()
-        assertThat(out.indexOf("¿Qué dice la fuente?") < out.lastIndexOf("Responde en español.")).isTrue()
+        assertThat(countOccurrences(out, "Responde en español, aunque las fuentes estén en inglés.")).isEqualTo(1)
+        assertThat(out).doesNotContain("Reply in English, even if the sources are in another language.")
+        assertThat(out.endsWith("Responde en español, aunque las fuentes estén en inglés.")).isTrue()
+        assertThat(out.indexOf("¿Qué dice la fuente?") < out.lastIndexOf("Responde en español, aunque las fuentes estén en inglés.")).isTrue()
     }
 
     @Test
     fun `augment appends the directive exactly once as the last line - no-block path`() {
         val out = GroundingPrompt.augment("What is the capital of France?", null, groundingEnabled = true)
 
-        assertThat(countOccurrences(out, "Reply in English.")).isEqualTo(1)
-        assertThat(out).doesNotContain("Responde en español.")
-        assertThat(out.endsWith("Reply in English.")).isTrue()
-        assertThat(out.indexOf("What is the capital of France?") < out.lastIndexOf("Reply in English.")).isTrue()
+        assertThat(countOccurrences(out, "Reply in English, even if the sources are in another language.")).isEqualTo(1)
+        assertThat(out).doesNotContain("Responde en español, aunque las fuentes estén en inglés.")
+        assertThat(out.endsWith("Reply in English, even if the sources are in another language.")).isTrue()
+        assertThat(out.indexOf("What is the capital of France?") < out.lastIndexOf("Reply in English, even if the sources are in another language.")).isTrue()
     }
 
     @Test
@@ -180,10 +180,10 @@ class GroundingPromptTest {
         val spanishBlock = GroundingPrompt.buildBlock("https://a.com", "texto con ñ y acentos está aquí")
 
         val esQuestionEnBlock = GroundingPrompt.augment("¿Qué dice?", englishBlock, groundingEnabled = true)
-        assertThat(esQuestionEnBlock.endsWith("Responde en español.")).isTrue()
+        assertThat(esQuestionEnBlock.endsWith("Responde en español, aunque las fuentes estén en inglés.")).isTrue()
 
         val enQuestionEsBlock = GroundingPrompt.augment("What does it say?", spanishBlock, groundingEnabled = true)
-        assertThat(enQuestionEsBlock.endsWith("Reply in English.")).isTrue()
+        assertThat(enQuestionEsBlock.endsWith("Reply in English, even if the sources are in another language.")).isTrue()
     }
 
     @Test
@@ -191,8 +191,8 @@ class GroundingPromptTest {
         val out = GroundingPrompt.augment("¿Cómo estás?", null, groundingEnabled = false)
 
         assertThat(out).isEqualTo("¿Cómo estás?")
-        assertThat(out).doesNotContain("Responde en español.")
-        assertThat(out).doesNotContain("Reply in English.")
+        assertThat(out).doesNotContain("Responde en español, aunque las fuentes estén en inglés.")
+        assertThat(out).doesNotContain("Reply in English, even if the sources are in another language.")
     }
 
     @Test
@@ -204,6 +204,14 @@ class GroundingPromptTest {
         )) {
             assertThat(out).doesNotContain("same language")
         }
+    }
+
+    @Test
+    fun `directives explicitly override source-language mirroring`() {
+        assertThat(GroundingPrompt.SPANISH_DIRECTIVE)
+            .contains("aunque las fuentes estén en inglés")
+        assertThat(GroundingPrompt.ENGLISH_DIRECTIVE)
+            .contains("even if the sources are in another language")
     }
 
     private fun countOccurrences(haystack: String, needle: String): Int {

@@ -451,7 +451,7 @@ class SettingsTavilyTest {
         val requestSlot = slot<ChatRequest>()
         coVerify(exactly = 1) { lastHelper.runInference(capture(requestSlot), any()) }
         assertThat(requestSlot.captured.messages.last().content).isEqualTo(
-            "${GroundingPrompt.SYSTEM_PROMPT}\n\npregunta sin urls\n\nReply in English.",
+            "${GroundingPrompt.SYSTEM_PROMPT}\n\npregunta sin urls\n\nReply in English, even if the sources are in another language.",
         )
     }
 

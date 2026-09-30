@@ -184,7 +184,7 @@ class ChatGroundingToggleTest {
         val requestSlot = slot<com.warped.domain.model.ChatRequest>()
         coVerify(exactly = 1) { lastHelper.runInference(capture(requestSlot), any()) }
         assertThat(requestSlot.captured.messages.last().content).isEqualTo(
-            "${com.warped.data.grounding.GroundingPrompt.SYSTEM_PROMPT}\n\npregunta sin urls\n\nReply in English.",
+            "${com.warped.data.grounding.GroundingPrompt.SYSTEM_PROMPT}\n\npregunta sin urls\n\nReply in English, even if the sources are in another language.",
         )
         assertThat(
             vm.transcriptState.value.messages.any { it.role == Role.ASSISTANT && it.content == "hola" },
