@@ -736,4 +736,42 @@ class LiteRTLmLoopTest {
         assertThat(completed[1].images).isEmpty()
         assertThat(completed[1].sources.map { it.url }).containsExactly("https://o.example/b")
     }
+
+    // ------------------------------------------------------------------
+    // Quick-task (thinking-header-feelings): thought deltas concatenate.
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `word-per-line thought deltas accumulate with no separator`() = runTest {
+        val transport = FakeTransport(
+            listOf(
+                FakeTurn(
+                    terminal = textTerminal("Answer"),
+                    texts = listOf("Answer"),
+                    thoughts = listOf("Cómo", " te", " puedo", " ayudar"),
+                ),
+            )
+        )
+        val tokens = flow<StreamToken> { drive(transport) }.toList()
+
+        assertThat(tokens.last())
+            .isEqualTo(StreamToken.Done(reasoning = "Cómo te puedo ayudar"))
+    }
+
+    @Test
+    fun `thought delta interior newlines pass through verbatim - empties skipped`() = runTest {
+        val transport = FakeTransport(
+            listOf(
+                FakeTurn(
+                    terminal = textTerminal("Answer"),
+                    texts = listOf("Answer"),
+                    thoughts = listOf("", "línea1\nlínea2", "", " final"),
+                ),
+            )
+        )
+        val tokens = flow<StreamToken> { drive(transport) }.toList()
+
+        assertThat(tokens.last())
+            .isEqualTo(StreamToken.Done(reasoning = "línea1\nlínea2 final"))
+    }
 }

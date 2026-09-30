@@ -485,7 +485,6 @@ class LiteRTLmProvider @Inject constructor(
                 onText = { text -> if (text.isNotEmpty()) emit(StreamToken.Delta(text)) },
                 onThought = { thinking ->
                     if (thinking.isNotEmpty()) {
-                        if (thought.isNotEmpty()) thought.append("\n")
                         thought.append(thinking)
                     }
                 },
