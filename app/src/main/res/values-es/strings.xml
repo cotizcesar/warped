@@ -164,6 +164,7 @@
     <string name="cd_source_preview">Vista previa de fuente %1$d: %2$s</string>
     <string name="cd_open_source_browser">Abrir fuente %1$d en el navegador</string>
     <string name="cd_preview_source">Vista previa de fuente %1$d</string>
+    <string name="cd_view_all_sources">Ver todas las fuentes</string>
     <string name="cd_open_source_title">Abrir fuente %1$d: %2$s</string>
     <string name="cd_running_tool">Ejecutando herramienta: %1$s. Tocá Detener para cancelar.</string>
     <string name="cd_logo">Warped</string>
@@ -235,6 +236,7 @@
     <string name="bubble_show_reasoning">Mostrar razonamiento</string>
     <string name="bubble_hide_reasoning">Ocultar razonamiento</string>
     <string name="sources_title">Fuentes</string>
+    <string name="all_sources_title">Todas las fuentes</string>
     <string name="images_title">Imágenes</string>
     <string name="image_download">Descargar</string>
     <string name="image_close">Cerrar</string>

@@ -164,6 +164,7 @@
     <string name="cd_source_preview">Source preview %1$d: %2$s</string>
     <string name="cd_open_source_browser">Open source %1$d in browser</string>
     <string name="cd_preview_source">Preview source %1$d</string>
+    <string name="cd_view_all_sources">View all sources</string>
     <string name="cd_open_source_title">Open source %1$d: %2$s</string>
     <string name="cd_running_tool">Running tool: %1$s. Tap Stop to cancel.</string>
     <string name="cd_logo">Warped</string>
@@ -234,6 +235,7 @@
     <string name="bubble_show_reasoning">Show reasoning</string>
     <string name="bubble_hide_reasoning">Hide reasoning</string>
     <string name="sources_title">Sources</string>
+    <string name="all_sources_title">All sources</string>
     <string name="images_title">Images</string>
     <string name="image_download">Download</string>
     <string name="image_close">Close</string>
