@@ -20,6 +20,7 @@ import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.preferences.AdvancedPreferences
 import com.warped.data.repository.ModelAllowlistRepository
 import com.warped.domain.model.ActiveModelSelection
+import com.warped.domain.model.ChatMessage
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.GenerationParameters
@@ -109,6 +110,18 @@ class LiteRTLmProvider @Inject constructor(
         /** `ToolCompleted` transcript summary cap (≤200 chars, remote parity). */
         const val TRANSCRIPT_SUMMARY_MAX_CHARS = 200
         val SUMMARY_WHITESPACE = Regex("\\s+")
+
+        /**
+         * Quick-task (image-history-carry): max history USER messages whose
+         * images are carried into the engine history. Each carried image is
+         * a full ImageBytes payload in native context — unbounded carry
+         * risks context-window eviction of the actual conversation text and
+         * OOM on large photos. 3 covers the realistic multi-image-turn case
+         * (user attaches 1-2 images then follows up) while bounding the
+         * worst case; newest-first because recency predicts relevance for
+         * follow-ups.
+         */
+        const val HISTORY_IMAGE_CARRY_MAX = 3
     }
 
     @Volatile
@@ -211,18 +224,19 @@ class LiteRTLmProvider @Inject constructor(
             }
         }
 
-        // Step 3: Build history messages (text-only, no images)
+        // Step 3: Build history messages — text plus recent history images.
+        // Follow-up turns are blind to earlier images if history is
+        // text-only, so the last K image-bearing USER turns carry their
+        // images explicitly (see buildHistoryMessages: K newest-first,
+        // deduped, skip-on-failure). dropLast(1) lives inside the builder
+        // and excludes the current message, so the carried set NEVER
+        // includes it and Step 4 attachments are never double-sent. Both
+        // send paths consume this conversationConfig, so the single-site
+        // fix applies to fresh-create AND reused-conversation turns
+        // uniformly. SCOPE: local LiteRT-LM path only — remote providers
+        // forward current-turn request.images only (own fix, not here).
         val hasImages = request.images.isNotEmpty()
-        val historyMessages = sanitizedMessages.map { msg ->
-            when (msg.role) {
-                Role.SYSTEM -> Message.system(msg.content)
-                Role.USER -> Message.user(msg.content)
-                // Phase 49 (DEL-01): legacy tool rows map assistant-adjacent
-                // (same shape as LocalLlmProvider.buildPrompt) — read-only
-                // history, never re-executed.
-                Role.ASSISTANT, Role.TOOL -> Message.model(msg.content)
-            }
-        }.dropLast(1) // exclude current message from history
+        val historyMessages = buildHistoryMessages(sanitizedMessages)
 
         // Step 4: Build current message contents (text + images + audio)
         val currentUserText = sanitizedMessages.lastOrNull { it.role == Role.USER }?.content ?: ""
@@ -778,6 +792,73 @@ class LiteRTLmProvider @Inject constructor(
             } catch (e: Exception) {
                 Timber.e(e, "LiteRTLmProvider: engine recovery failed")
                 throw e
+            }
+        }
+    }
+
+    /**
+     * Quick-task (image-history-carry): map sanitized messages to engine
+     * history, carrying recent history images. Pure function (JVM-testable)
+     * extracted verbatim from the Step 3 inline mapping plus the carry.
+     *
+     * - The current message (last element) is excluded via dropLast(1).
+     * - Among history USER turns with non-empty imageUris, the K most
+     *   recent (K = HISTORY_IMAGE_CARRY_MAX, newest-first) carry their
+     *   images as Content.ImageBytes via the Message.user(Contents)
+     *   overload; that turn's text rides along as Content.Text.
+     * - Identical data-URL strings are deduped within the carried set
+     *   (newest occurrence wins; same image attached twice counts once).
+     * - Each URL is decoded via decodeImage; null (malformed payload) is
+     *   skipped silently — a bad history image never throws, never Errors
+     *   the turn. A turn whose images all fail (or all dedupe away) keeps
+     *   the exact pre-fix shape Message.user(String).
+     * - SYSTEM/ASSISTANT/TOOL mapping is untouched (Phase 49 DEL-01:
+     *   legacy tool rows map assistant-adjacent, read-only history).
+     */
+    internal fun buildHistoryMessages(sanitized: List<ChatMessage>): List<Message> {
+        val history = sanitized.dropLast(1)
+        // K newest image-bearing USER turns, by history index.
+        val carryIndexes = history
+            .mapIndexedNotNull { index, msg ->
+                if (msg.role == Role.USER && msg.imageUris.isNotEmpty()) index else null
+            }
+            .takeLast(HISTORY_IMAGE_CARRY_MAX)
+            .toSet()
+        // Newest-first pass: decide which data URLs each carried turn
+        // keeps. A repeated image is carried only on its newest turn.
+        val keptByIndex = mutableMapOf<Int, List<String>>()
+        val seenUrls = mutableSetOf<String>()
+        for (index in carryIndexes.sortedDescending()) {
+            val kept = history[index].imageUris.distinct().filter { seenUrls.add(it) }
+            if (kept.isNotEmpty()) keptByIndex[index] = kept
+        }
+        return history.mapIndexed { index, msg ->
+            when (msg.role) {
+                Role.SYSTEM -> Message.system(msg.content)
+                // Phase 49 (DEL-01): legacy tool rows map assistant-adjacent
+                // (same shape as LocalLlmProvider.buildPrompt) — read-only
+                // history, never re-executed.
+                Role.ASSISTANT, Role.TOOL -> Message.model(msg.content)
+                Role.USER -> {
+                    val urls = keptByIndex[index]
+                    if (urls.isNullOrEmpty()) {
+                        Message.user(msg.content)
+                    } else {
+                        val imageContents = mutableListOf<Content>()
+                        urls.forEach { dataUrl ->
+                            decodeImage(dataUrl)?.let { imageContents.add(Content.ImageBytes(it)) }
+                        }
+                        if (imageContents.isEmpty()) {
+                            Message.user(msg.content)
+                        } else {
+                            // Image-only history turns carry no empty text
+                            // part (LiteRT-LM rejects empty text), same
+                            // guard as the Step 4 current-turn block.
+                            if (msg.content.isNotBlank()) imageContents.add(Content.Text(msg.content))
+                            Message.user(Contents.of(imageContents))
+                        }
+                    }
+                }
             }
         }
     }
