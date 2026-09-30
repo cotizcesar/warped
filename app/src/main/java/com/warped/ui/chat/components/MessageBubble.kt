@@ -392,7 +392,10 @@ fun MessageBubble(
         // numbering matches fetch-block order: hydrated details when
         // present (omitida rows pass through for struck rendering),
         // legacy text-only rows otherwise. Dismiss-only-on-launch, same
-        // as the single-source sheet.
+        // as the single-source sheet. Drawer rows are the same
+        // CompactSourceCard as the carousel (full-width): card tap opens
+        // the preview sheet (drawer dismissed first — no stacked sheets),
+        // thumb tap fires the guarded browser intent.
         if (showAllSources) {
             val allSheetSources = if (sourceDetails.isNotEmpty()) {
                 sourceDetails
@@ -406,7 +409,12 @@ fun MessageBubble(
                     if (openUrlInBrowser(context, url)) {
                         showAllSources = false
                     }
-                }
+                },
+                onPreview = { src, n ->
+                    showAllSources = false
+                    previewSource = src
+                    previewNumber = n
+                },
             )
         }
 
