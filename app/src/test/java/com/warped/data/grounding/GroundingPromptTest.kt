@@ -20,6 +20,17 @@ class GroundingPromptTest {
     }
 
     @Test
+    fun `system prompt carries the per-turn re-search rule`() {
+        // Quick-task (agentic-rows): tool-neutral wording (the pre-search
+        // path has no tools — the VM re-searches every turn) that also
+        // reaches every armed loop via the augmented user message.
+        assertThat(GroundingPrompt.SYSTEM_PROMPT)
+            .contains("Treat each new question on its own")
+        assertThat(GroundingPrompt.SYSTEM_PROMPT)
+            .contains("never answer from earlier sources alone")
+    }
+
+    @Test
     fun `augment order is prompt then block then original`() {
         val block = GroundingPrompt.buildBlock("https://a.com", "contenido")
         val out = GroundingPrompt.augment("pregunta original", block, groundingEnabled = true)

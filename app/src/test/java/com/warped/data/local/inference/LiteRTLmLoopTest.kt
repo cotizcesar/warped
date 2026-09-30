@@ -130,12 +130,25 @@ class LiteRTLmLoopTest {
             "Use web_search when the question needs current or external facts, " +
                 "and web_fetch to read a full page from the results or the user. " +
                 "Answer with the gathered context. " +
+                "Treat each new user message on its own: if it needs facts not covered " +
+                "by earlier tool results, call web_search again instead of answering " +
+                "from stale results. " +
                 "Always reply in the same language the user wrote in."
         )
         assertThat(LiteRTLmProvider.TOOL_USE_SYSTEM_HINT).contains("web_search")
         assertThat(LiteRTLmProvider.TOOL_USE_SYSTEM_HINT).contains("web_fetch")
         assertThat(LiteRTLmProvider.TOOL_USE_SYSTEM_HINT)
             .contains("Always reply in the same language the user wrote in.")
+    }
+
+    @Test
+    fun `system hint carries the per-turn re-search rule`() {
+        // Quick-task (agentic-rows): follow-ups needing new facts must
+        // re-search instead of answering from stale turn-1 sources.
+        assertThat(LiteRTLmProvider.TOOL_USE_SYSTEM_HINT)
+            .contains("Treat each new user message on its own")
+        assertThat(LiteRTLmProvider.TOOL_USE_SYSTEM_HINT)
+            .contains("call web_search again instead of answering from stale results")
     }
 
     // ------------------------------------------------------------------

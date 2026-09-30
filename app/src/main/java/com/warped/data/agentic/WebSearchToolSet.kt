@@ -29,6 +29,8 @@ import com.google.ai.edge.litertlm.ToolSet
 const val WEB_SEARCH_TOOL_DESCRIPTION =
     "Search the web for current or external facts. " +
         "Call when the user's question needs information beyond the model's knowledge. " +
+        "If a new question needs facts not covered by earlier results, " +
+        "call again instead of answering from stale results. " +
         "Returns numbered sources."
 
 const val WEB_SEARCH_QUERY_DESCRIPTION =

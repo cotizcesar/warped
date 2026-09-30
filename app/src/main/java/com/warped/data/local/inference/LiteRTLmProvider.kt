@@ -92,11 +92,19 @@ class LiteRTLmProvider @Inject constructor(
          * `systemInstruction` (survives conversation reuse, unlike a leading
          * system message). Short on purpose — the fused Source[N] blocks do
          * the heavy lifting. Pinned verbatim by LiteRTLmLoopTest.
+         *
+         * Quick-task (agentic-rows): per-turn-independence rule — each new
+         * user message is judged on its own; facts not covered by earlier
+         * tool results trigger a fresh `web_search`, never an answer from
+         * stale results/prior-turn citations alone.
          */
         const val TOOL_USE_SYSTEM_HINT =
             "Use web_search when the question needs current or external facts, " +
                 "and web_fetch to read a full page from the results or the user. " +
                 "Answer with the gathered context. " +
+                "Treat each new user message on its own: if it needs facts not covered " +
+                "by earlier tool results, call web_search again instead of answering " +
+                "from stale results. " +
                 "Always reply in the same language the user wrote in."
 
         /** `ToolCompleted` transcript summary cap (≤200 chars, remote parity). */

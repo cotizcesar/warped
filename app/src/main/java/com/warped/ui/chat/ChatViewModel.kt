@@ -751,6 +751,25 @@ class ChatViewModel @Inject constructor(
                 // always-on SYSTEM_PROMPT on grounded turns with no pasted
                 // URLs (groundedSources is empty there, so the gate is
                 // doGround, not source count).
+                //
+                // Quick-task (agentic-rows) HISTORY-SEMANTICS DECISION
+                // (explicit — no silent choice): KEEP-AS-IS. Room keeps the
+                // ORIGINAL user text (saved at send time) and only the
+                // outgoing request's current message carries augmented text.
+                // Trade-off: (a) history stays clean and remote replay stays
+                // token-lean — no stale fused blocks are ever re-sent or
+                // persisted; (b) the local native conversation DOES reuse
+                // Message.tool results engine-side across turns (acquire),
+                // so stale context can linger there, and stateless remote
+                // replays see prior-turn citations without blocks; (c)
+                // per-turn conversation resets would buy freshness at the
+                // cost of multi-turn coherence + reload latency, and history
+                // rewrites are forbidden. The re-search prompt rule
+                // (TOOL_USE_SYSTEM_HINT + SYSTEM_PROMPT + web_search tool
+                // description) is therefore the freshness mechanism: the
+                // model must treat each new message independently and
+                // re-search instead of answering from stale results.
+                // On-device multi-turn confirmation still pending.
                 val historyMessages = _transcript.value.messages
                 val requestMessages = if (doGround && historyMessages.isNotEmpty()) {
                     historyMessages.dropLast(1) + historyMessages.last().copy(content = requestUserText)

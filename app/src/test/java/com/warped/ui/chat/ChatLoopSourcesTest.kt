@@ -81,6 +81,7 @@ class ChatLoopSourcesTest {
 
     private lateinit var chatRepository: ChatRepository
     private lateinit var ddgSearchRepository: DuckDuckGoSearchRepository
+    private lateinit var lastHelper: LlmModelHelper
     private lateinit var helperTokens: List<StreamToken>
 
     private fun buildViewModel(modelPath: String): ChatViewModel {
@@ -130,6 +131,7 @@ class ChatLoopSourcesTest {
             for (token in helperTokens) emit(token)
         }
         every { providerRouter.resolveLocalHelper(any(), any()) } returns helper
+        lastHelper = helper
         val fetcher = mockk<WebPageFetcher>()
         every { fetcher.cancel() } just Runs
         every { fetcher.hasValidatedInternet() } returns true
@@ -250,8 +252,7 @@ class ChatLoopSourcesTest {
     }
 
     @Test
-    fun `zero-tool armed turn saves plain with no source calls`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+    fun `zero-tool armed turn saves plain with no source calls`() = runTest {        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
         helperTokens = listOf(
             StreamToken.Delta("plain answer"),
@@ -273,5 +274,46 @@ class ChatLoopSourcesTest {
         assertThat(saved[1].groundedSourceDetails).isEmpty()
         coVerify(exactly = 0) { chatRepository.saveMessageWithSources(any(), any(), any()) }
         coVerify(exactly = 0) { chatRepository.replaceSources(any(), any(), any()) }
+    }
+
+    @Test
+    fun `history keeps originals - only the outgoing request carries augmented text`() = runTest {
+        // HISTORY-SEMANTICS DECISION (keep-as-is): Room persists the
+        // ORIGINAL user text; augmentation (SYSTEM_PROMPT, no fused block
+        // on armed turns) lives only on the outgoing request's current
+        // message — never rewritten into history.
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
+        helperTokens = listOf(
+            StreamToken.ToolCompleted("local:web_search#1", "s", sources = loopRows),
+            StreamToken.Delta("answer"),
+            StreamToken.Done(),
+        )
+        val vm = buildViewModel(modelFile.absolutePath)
+        runCurrent()
+
+        vm.sendMessage("latest news")
+        advanceUntilIdle()
+
+        // Outgoing request: the single-turn history entry carries the
+        // augmented current message (SYSTEM_PROMPT prefix, original
+        // question preserved, no fused block on armed turns).
+        val requestSlot = slot<com.warped.domain.model.ChatRequest>()
+        coVerify(exactly = 1) { lastHelper.runInference(capture(requestSlot), any()) }
+        val sent = requestSlot.captured.messages
+        assertThat(sent).hasSize(1)
+        assertThat(sent.single().content).startsWith(
+            com.warped.data.grounding.GroundingPrompt.SYSTEM_PROMPT,
+        )
+        assertThat(sent.single().content).contains("latest news")
+        // Armed turn with no pre-search: no fused Source block injected.
+        assertThat(sent.single().content).doesNotContain("--- Source [")
+
+        // Persisted user row keeps the original — no augmentation leaks
+        // into Room history.
+        val savedUser = mutableListOf<ChatMessage>()
+        coVerify(atLeast = 1) { chatRepository.saveMessage(42L, capture(savedUser)) }
+        assertThat(savedUser.first { it.role == com.warped.domain.model.Role.USER }.content)
+            .isEqualTo("latest news")
     }
 }

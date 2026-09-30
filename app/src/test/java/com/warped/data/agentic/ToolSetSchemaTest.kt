@@ -67,4 +67,13 @@ class ToolSetSchemaTest {
         assertThat(WebSearchToolSet().web_search("anything")).isEqualTo(HOST_EXECUTED)
         assertThat(WebFetchToolSet().web_fetch("https://example.com")).isEqualTo(HOST_EXECUTED)
     }
+
+    @Test
+    fun `web_search description carries the re-search rule`() {
+        // Quick-task (agentic-rows): this description is the prompt surface
+        // every armed loop sees — local @Tool schema, OpenAI tools[], and
+        // Anthropic tools all copy it verbatim.
+        assertThat(WEB_SEARCH_TOOL_DESCRIPTION)
+            .contains("call again instead of answering from stale results")
+    }
 }
