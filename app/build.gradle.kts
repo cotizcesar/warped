@@ -82,6 +82,42 @@ android {
         jniLibs {
             useLegacyPackaging = false
         }
+        // Quick-task langdetect-library: ship ONLY the es+en profiles.
+        // language-detector-0.6.jar bundles every language under languages/
+        // and languages.shorttext/ (~1.7MB); the holder loads es+en only, so
+        // strip the rest (generated from the 0.6 jar listing; keep es + en in
+        // both dirs). Verified post-build via `unzip -l app-debug.apk |
+        // grep languages/`. If a future task loads another locale, remove
+        // its entry here — init failure is fail-safe (NULL → regex fallback).
+        resources {
+            excludes += setOf(
+                "languages/gl", "languages/cy", "languages/ast", "languages/id",
+                "languages/nl", "languages/ro", "languages/fa", "languages/pt",
+                "languages/ar", "languages/hu", "languages/te", "languages/ko",
+                "languages/ga", "languages/ta", "languages/ru", "languages/sl",
+                "languages/bg", "languages/so", "languages/eu", "languages/mt",
+                "languages/tl", "languages/th", "languages/zh-TW", "languages/sr",
+                "languages/bn", "languages/et", "languages/an", "languages/ja",
+                "languages/it", "languages/ht", "languages/fr", "languages/is",
+                "languages/pl", "languages/hi", "languages/no", "languages/mk",
+                "languages/da", "languages/hr", "languages/ml", "languages/pa",
+                "languages/gu", "languages/de", "languages/kn", "languages/vi",
+                "languages/br", "languages/af", "languages/mr", "languages/yi",
+                "languages/ms", "languages/km", "languages/sq", "languages/ca",
+                "languages/fi", "languages/oc", "languages/sw", "languages/ur",
+                "languages/ne", "languages/el", "languages/tr", "languages/sk",
+                "languages/be", "languages/zh-CN", "languages/he", "languages/cs",
+                "languages/lv", "languages/sv", "languages/lt", "languages/uk",
+                "languages.shorttext/id", "languages.shorttext/nl",
+                "languages.shorttext/ro", "languages.shorttext/pt",
+                "languages.shorttext/it", "languages.shorttext/fr",
+                "languages.shorttext/pl", "languages.shorttext/no",
+                "languages.shorttext/da", "languages.shorttext/de",
+                "languages.shorttext/vi", "languages.shorttext/fi",
+                "languages.shorttext/tr", "languages.shorttext/cs",
+                "languages.shorttext/sv",
+            )
+        }
     }
 
     // Phase 53: expose Room exported schemas (app/schemas/<db-fqn>/*.json) as
@@ -104,6 +140,15 @@ kotlin {
 tasks.configureEach {
     if (name.startsWith("check") && name.endsWith("Classpath")) {
         enabled = false
+    }
+}
+
+// Quick-task langdetect-library: drop the standalone listenablefuture ONLY
+// from the APK runtime classpaths (see the implementation-exclude comment at
+// the detector declaration). Test configurations are deliberately untouched.
+configurations.configureEach {
+    if (name == "debugRuntimeClasspath" || name == "releaseRuntimeClasspath") {
+        exclude(group = "com.google.guava", module = "listenablefuture")
     }
 }
 
@@ -186,6 +231,20 @@ dependencies {
 
     // Highlights — syntax tokenization engine for code highlighting
     implementation(libs.highlights)
+
+    // Language detection (Optimaize, offline; es+en short-text profiles only).
+    // Excludes (Rule 3, build-blocking duplicates — NOT a Task-0 gate issue):
+    // - com.intellij:annotations:12.0 duplicates org.jetbrains:annotations
+    //   23.0.0 already in the graph (same org.jetbrains.annotations FQNs win;
+    //   detector uses them as compile-only annotations, never reflectively).
+    // - standalone listenablefuture:1.0 (via androidx.concurrent) duplicates
+    //   the ListenableFuture class bundled inside guava-18.0. Dropped ONLY
+    //   from the APK runtime classpaths below (not tests): at runtime the
+    //   class resolves from guava-18 with an identical interface, and no app
+    //   source references ListenableFuture directly (grep-verified).
+    implementation(libs.langdetect.detector) {
+        exclude(group = "com.intellij", module = "annotations")
+    }
 
     // Immutable collections
     implementation(libs.kotlinx.collections.immutable)

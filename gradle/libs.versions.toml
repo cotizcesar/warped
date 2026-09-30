@@ -29,6 +29,13 @@ kotlinx-collections-immutable = "0.5.2"
 sqlcipher = "4.5.4"
 timber = "5.0.1"
 highlights = "1.1.0"
+# Quick-task langdetect-library (Task 0 verdict CLEAN 2026-09-30): Optimaize
+# language-detector, latest stable on Maven Central (0.6, released 2016-10-07;
+# no newer stable exists). Empirical releaseRuntimeClasspath diff adds ONLY:
+# language-detector itself + net.arnx:jsonic:1.2.11 + com.intellij:annotations:12.0
+# + com.google.guava:guava:18.0 + org.slf4j:slf4j-api:1.7.6 — zero banned
+# transitives, zero pre-release (all four POMs declare no dependencies).
+langdetect = "0.6"
 ksp = "2.3.12"  # VERIFIED 2026-09-27 via Maven Central plugin-marker metadata
   # (com.google.devtools.ksp.gradle.plugin): KSP uses unified bare 2.3.x versioning
   # since 2.3.0 (no <kotlin>-<ksp> suffix); 2.3.12 is the latest release in the
@@ -131,6 +138,10 @@ litertlm = { group = "com.google.ai.edge.litertlm", name = "litertlm-android", v
 
 # Highlights — syntax tokenization engine
 highlights = { group = "dev.snipme", name = "highlights", version.ref = "highlights" }
+
+# Language detection (Optimaize, offline JVM, es+en short-text profiles only).
+# Transitive JSON parser (jsonic) stays transitive — fewer direct declarations.
+langdetect-detector = { group = "com.optimaize.languagedetector", name = "language-detector", version.ref = "langdetect" }
 
 # Testing
 junit5 = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junit5" }
