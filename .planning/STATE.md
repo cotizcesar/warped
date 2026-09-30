@@ -121,6 +121,8 @@ None — v2.2 phases shipped with accepted deferrals recorded above. Next milest
 | 20260929-langmatch-i18n-paragraphs | 2026-09-29 | Complete ✓ | Regla idioma-usuario en prompts + EN/ES 459/459 + párrafos 8dp; 512 green |
 | 20260929-always-search-image-grid | 2026-09-29 | Complete ✓ | Pre-búsqueda siempre (DDG gratis aun armada) + grid imágenes/modal/descarga; 576 green |
 | 20260929-image-turn-routing-favicon | 2026-09-29 | Complete ✓ | Turnos-imagen directo a Tavily + fallback favicon S2; 599 green |
+| 20260929-search-og-enrichment | 2026-09-29 | Complete ✓ | Títulos enhebrados + enrich OG (3s/64KB/max-5) + cards 2-col sin badges; 614 green |
+| 20260929-card-description-line | 2026-09-29 | Complete ✓ | Línea descripción (og:desc, 2 líneas) en cards; 618 green |
 | 20260929-langmatch-i18n-paragraphs | 2026-09-29 | Complete ✓ | Regla idioma-usuario en prompts + EN/ES 459/459 + párrafos 8dp; 512 green |
 
 ## Session Continuity
