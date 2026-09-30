@@ -3,14 +3,27 @@ package com.warped.ui.chat
 import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import com.google.common.truth.Truth.assertThat
+import com.warped.data.grounding.DuckDuckGoSearchRepository
+import com.warped.data.grounding.GroundingPrompt
+import com.warped.data.grounding.MultiUrlFetcher
 import com.warped.data.grounding.MultiUrlResult
+import com.warped.data.grounding.TavilySearchOutcome
+import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.preferences.AdvancedPreferences
+import com.warped.data.local.security.ApiKeyStore
 import com.warped.data.remote.provider.ProviderRouter
+import com.warped.data.repository.AllowlistCapabilities
+import com.warped.data.repository.AllowlistedModel
+import com.warped.data.repository.ModelAllowlistRepository
 import com.warped.domain.llm.LlmModelHelper
+import com.warped.domain.model.ActiveModelSelection
+import com.warped.domain.model.ChatRequest
+import com.warped.domain.model.GroundedSource
 import com.warped.domain.model.GroundedSourceStatus
 import com.warped.domain.model.LocalSelection
+import com.warped.domain.model.ModelOnlyNotice
 import com.warped.domain.model.ParameterStore
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.RemoteSelection
@@ -45,18 +58,13 @@ import org.junit.jupiter.api.io.TempDir
 import java.io.File
 
 /**
- * ChatViewModel grounding-hook wiring.
- *
- * The hook evaluates shouldGround(perChat, global) at the top of the fetch
- * block: a per-chat No skips grounding despite the global ON, Heredar
- * inherits the global ON (fetch runs, ok + omitida details persist via
- * saveMessageWithSources), and a pre-conversation toggle is held pending
- * until the first send creates the row. Every grounded turn carries the
- * always-on SYSTEM_PROMPT — even with no pasted URLs — while disabled
- * turns send the original text untouched.
+ * Quick-task (needs-web-gate): social/identity turns skip the always-on
+ * pre-search (no socket, no credit, no notice — identical to
+ * grounding-off), while factual and URL turns are byte-identical to today.
+ * The agentic loop arming is untouched (provider-side backstop).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-class ChatGroundingToggleTest {
+class ChatNeedsWebGateTest {
 
     private val testDispatcher = StandardTestDispatcher()
 
@@ -74,14 +82,21 @@ class ChatGroundingToggleTest {
     lateinit var tempDir: File
 
     private lateinit var chatRepository: ChatRepository
-    private lateinit var multiUrlFetcher: com.warped.data.grounding.MultiUrlFetcher
+    private lateinit var fetcher: WebPageFetcher
+    private lateinit var multiUrlFetcher: MultiUrlFetcher
+    private lateinit var ddgSearchRepository: DuckDuckGoSearchRepository
     private lateinit var lastHelper: LlmModelHelper
 
-    private fun buildViewModel(modelPath: String): ChatViewModel {
+    private fun buildViewModel(
+        modelPath: String,
+        online: Boolean = true,
+        supportsFunctionCalling: Boolean = true,
+        tavilyKey: CharArray? = null,
+    ): ChatViewModel {
         chatRepository = mockk()
         val endpointRepository = mockk<EndpointRepository>()
         val localModelRepository = mockk<LocalModelRepository>()
-        val activeModelSelection = mockk<com.warped.domain.model.ActiveModelSelection>()
+        val activeModelSelection = mockk<ActiveModelSelection>()
         val providerRouter = mockk<ProviderRouter>()
         val engineManager = mockk<EngineManager>()
         val memoryChecker = mockk<MemoryChecker>()
@@ -108,8 +123,22 @@ class ChatGroundingToggleTest {
         every { advancedPreferences.thinkingEnabled } returns flowOf(false)
         every { advancedPreferences.webGroundingEnabled } returns flowOf(true)
         every { providerRouter.resolveLocalHelper(any(), any()) } returns answeringHelper()
-        val fetcher = mockk<com.warped.data.grounding.WebPageFetcher>()
+        fetcher = mockk()
         every { fetcher.cancel() } just Runs
+        every { fetcher.hasValidatedInternet() } returns online
+        val allowlist = mockk<ModelAllowlistRepository>()
+        every { allowlist.findByModelFile(any()) } returns AllowlistedModel(
+            name = "tiny",
+            displayName = "Tiny",
+            modelFile = "tiny.litertlm",
+            sizeInBytes = 1L,
+            capabilities = AllowlistCapabilities(
+                supportsFunctionCalling = supportsFunctionCalling,
+            ),
+        )
+        ddgSearchRepository = mockk()
+        val apiKeyStore = mockk<ApiKeyStore>()
+        every { apiKeyStore.getTavilyKey() } answers { tavilyKey?.copyOf() }
         multiUrlFetcher = mockk()
 
         return ChatViewModel(
@@ -125,11 +154,9 @@ class ChatGroundingToggleTest {
             advancedPreferences = advancedPreferences,
             fetcher = fetcher,
             multiUrlFetcher = multiUrlFetcher,
-            ddgSearchRepository = mockk(),
-            apiKeyStore = mockk<com.warped.data.local.security.ApiKeyStore>().apply {
-                every { getTavilyKey() } returns null
-            },
-            modelAllowlistRepository = mockk<com.warped.data.repository.ModelAllowlistRepository>(),
+            ddgSearchRepository = ddgSearchRepository,
+            apiKeyStore = apiKeyStore,
+            modelAllowlistRepository = allowlist,
             context = context,
         )
     }
@@ -147,128 +174,155 @@ class ChatGroundingToggleTest {
         return helper
     }
 
-    private fun fusedResult() = MultiUrlResult.Fused(
-        block = "BLOQUE",
-        okUrls = listOf("https://a.example/uno"),
-        skippedUrls = listOf("https://dead.example/x"),
-        pageTexts = mapOf("https://a.example/uno" to "Texto a."),
-        details = listOf(
-            com.warped.domain.model.GroundedSource(
-                url = "https://a.example/uno",
-                extractedText = "Texto a.",
-                status = GroundedSourceStatus.OK,
+    private fun groundedOutcome() = TavilySearchOutcome.Grounded(
+        MultiUrlResult.Fused(
+            block = "--- Source [1]: https://a.example/uno ---\nTexto a.\n--- End of sources ---",
+            okUrls = listOf("https://a.example/uno"),
+            skippedUrls = emptyList(),
+            pageTexts = mapOf("https://a.example/uno" to "Texto a."),
+            details = listOf(
+                GroundedSource(
+                    url = "https://a.example/uno",
+                    extractedText = "Texto a.",
+                    status = GroundedSourceStatus.OK,
+                ),
             ),
-            com.warped.domain.model.GroundedSource(
-                url = "https://dead.example/x",
-                extractedText = null,
-                status = GroundedSourceStatus.OMITIDA,
+        ),
+    )
+
+    private fun fusedFetch(url: String) = MultiUrlResult.Fused(
+        block = "--- Source [1]: $url ---\nPage text.\n--- End of sources ---",
+        okUrls = listOf(url),
+        skippedUrls = emptyList(),
+        pageTexts = mapOf(url to "Page text."),
+        details = listOf(
+            GroundedSource(
+                url = url,
+                extractedText = "Page text.",
+                status = GroundedSourceStatus.OK,
             ),
         ),
     )
 
     @Test
-    fun `grounded turn with no urls still sends system-prompt-prefixed text`() = runTest {
+    fun `social turn skips search with no socket and plain transcript`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
         val vm = buildViewModel(modelFile.absolutePath)
         runCurrent()
+        coEvery {
+            ddgSearchRepository.search(any(), any(), any(), any())
+        } returns groundedOutcome()
 
-        // Quick-task (needs-web-gate): non-social fixture — "hola" is a
-        // locked social token and would skip the pre-search by design.
-        vm.sendMessage("pregunta sin urls")
+        // The exact regression message from on-device evidence.
+        vm.sendMessage("hola, quien Eres")
         advanceUntilIdle()
 
-        // No URLs pasted, so no fetch runs — but the outgoing request still
-        // carries the always-on SYSTEM_PROMPT.
-        coVerify(exactly = 0) { multiUrlFetcher.fetchAll(any(), any(), any()) }
-        val requestSlot = slot<com.warped.domain.model.ChatRequest>()
-        coVerify(exactly = 1) { lastHelper.runInference(capture(requestSlot), any()) }
-        assertThat(requestSlot.captured.messages.last().content).isEqualTo(
-            "${com.warped.data.grounding.GroundingPrompt.SYSTEM_PROMPT}\n\npregunta sin urls\n\nReply in English.",
-        )
-        assertThat(
-            vm.transcriptState.value.messages.any { it.role == Role.ASSISTANT && it.content == "hola" },
-        ).isTrue()
-    }
-
-    @Test
-    fun `disabled turn sends original text untouched`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
-        val vm = buildViewModel(modelFile.absolutePath)
-        runCurrent()
-        coEvery { chatRepository.getWebOverride(any()) } returns false
-
-        vm.sendMessage("hola sin urls")
-        advanceUntilIdle()
-
-        coVerify(exactly = 0) { multiUrlFetcher.fetchAll(any(), any(), any()) }
-        val requestSlot = slot<com.warped.domain.model.ChatRequest>()
-        coVerify(exactly = 1) { lastHelper.runInference(capture(requestSlot), any()) }
-        assertThat(requestSlot.captured.messages.last().content).isEqualTo("hola sin urls")
-        assertThat(
-            vm.transcriptState.value.messages.any { it.role == Role.ASSISTANT && it.content == "hola" },
-        ).isTrue()
-    }
-
-    @Test
-    fun `per-chat No skips fetch despite global on`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
-        val vm = buildViewModel(modelFile.absolutePath)
-        runCurrent()
-        coEvery { multiUrlFetcher.fetchAll(any(), any(), any()) } returns fusedResult()
-        coEvery { chatRepository.getWebOverride(any()) } returns false
-
-        vm.sendMessage("mira https://a.example/uno")
-        advanceUntilIdle()
-
-        coVerify(exactly = 0) { multiUrlFetcher.fetchAll(any(), any(), any()) }
-        assertThat(
-            vm.transcriptState.value.messages.any { it.role == Role.ASSISTANT && it.content == "hola" },
-        ).isTrue()
-    }
-
-    @Test
-    fun `inherit with global on fetches and persists ok plus omitida details`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
-        val vm = buildViewModel(modelFile.absolutePath)
-        runCurrent()
-        coEvery { multiUrlFetcher.fetchAll(any(), any(), any()) } returns fusedResult()
-
-        vm.sendMessage("mira https://a.example/uno y https://dead.example/x")
-        advanceUntilIdle()
-
-        coVerify(exactly = 1) { multiUrlFetcher.fetchAll(any(), any(), any()) }
-        val sourcesSlot = slot<List<com.warped.domain.model.GroundedSource>>()
-        coVerify(exactly = 1) {
-            chatRepository.saveMessageWithSources(42L, any(), capture(sourcesSlot))
+        coVerify(exactly = 0) {
+            ddgSearchRepository.search(any(), any(), any(), any())
         }
-        val sources = sourcesSlot.captured
-        assertThat(sources.map { it.url }).containsExactly(
-            "https://a.example/uno",
-            "https://dead.example/x",
-        ).inOrder()
-        assertThat(sources[0].status).isEqualTo(GroundedSourceStatus.OK)
-        assertThat(sources[0].extractedText).isEqualTo("Texto a.")
-        assertThat(sources[1].status).isEqualTo(GroundedSourceStatus.OMITIDA)
-        assertThat(sources[1].extractedText).isNull()
+        // Single init-time connectivity refresh; the gated turn adds zero.
+        coVerify(exactly = 1) { fetcher.hasValidatedInternet() }
+        // No augment on gated turns: the outgoing request carries the
+        // original text byte-identical (no SYSTEM_PROMPT, no fused block).
+        val requestSlot = slot<ChatRequest>()
+        coVerify(exactly = 1) { lastHelper.runInference(capture(requestSlot), any()) }
+        assertThat(requestSlot.captured.messages.last().content).isEqualTo("hola, quien Eres")
+        assertThat(requestSlot.captured.messages.last().content).doesNotContain(GroundingPrompt.SYSTEM_PROMPT)
+        // The turn still completes: the model answers, with no notice (the
+        // skip is deliberate, not a failure) and no grounded rows.
+        assertThat(
+            vm.transcriptState.value.messages.any {
+                it.role == Role.ASSISTANT &&
+                    it.content == "hola" &&
+                    it.modelOnlyNotice == null &&
+                    it.groundedSources.isEmpty()
+            },
+        ).isTrue()
     }
 
     @Test
-    fun `toggle before first send is held pending and applied at conversation creation`() = runTest {
+    fun `english social turn skips search`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
         val vm = buildViewModel(modelFile.absolutePath)
         runCurrent()
+        coEvery {
+            ddgSearchRepository.search(any(), any(), any(), any())
+        } returns groundedOutcome()
 
-        vm.setWebOverride(true)
-        assertThat(vm.connectionState.value.webOverride).isTrue()
-
-        vm.sendMessage("hola sin urls")
+        vm.sendMessage("who are you?")
         advanceUntilIdle()
 
-        coVerify { chatRepository.setWebOverride(42L, true) }
+        coVerify(exactly = 0) {
+            ddgSearchRepository.search(any(), any(), any(), any())
+        }
+        // Single init-time connectivity refresh; the gated turn adds zero.
+        coVerify(exactly = 1) { fetcher.hasValidatedInternet() }
+        val requestSlot = slot<ChatRequest>()
+        coVerify(exactly = 1) { lastHelper.runInference(capture(requestSlot), any()) }
+        assertThat(requestSlot.captured.messages.last().content).isEqualTo("who are you?")
+        assertThat(
+            vm.transcriptState.value.messages.any {
+                it.role == Role.ASSISTANT &&
+                    it.content == "hola" &&
+                    it.modelOnlyNotice == null
+            },
+        ).isTrue()
+    }
+
+    @Test
+    fun `factual turn still runs the pre-search`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
+        val vm = buildViewModel(modelFile.absolutePath)
+        runCurrent()
+        coEvery {
+            ddgSearchRepository.search(any(), any(), any(), any())
+        } returns groundedOutcome()
+
+        vm.sendMessage("qué es la fotosíntesis?")
+        advanceUntilIdle()
+
+        // Guard against gate over-blocking: factual turns fuse as today.
+        coVerify(exactly = 1) {
+            ddgSearchRepository.search("qué es la fotosíntesis?", any(), any(), any())
+        }
+        val requestSlot = slot<ChatRequest>()
+        coVerify(exactly = 1) { lastHelper.runInference(capture(requestSlot), any()) }
+        assertThat(requestSlot.captured.messages.last().content).contains("--- Source [1]")
+        assertThat(
+            vm.transcriptState.value.messages.any {
+                it.role == Role.ASSISTANT &&
+                    it.groundedSources == listOf("https://a.example/uno")
+            },
+        ).isTrue()
+    }
+
+    @Test
+    fun `social text alongside a pasted URL still fetches`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
+        val vm = buildViewModel(modelFile.absolutePath)
+        runCurrent()
+        val url = "https://example.com/x"
+        coEvery {
+            multiUrlFetcher.fetchAll(any(), any(), any())
+        } returns fusedFetch(url)
+
+        vm.sendMessage("hola $url")
+        advanceUntilIdle()
+
+        // The gate lives in the no-URL branch only — URL turns never
+        // consult it.
+        coVerify(exactly = 1) { multiUrlFetcher.fetchAll(listOf(url), any(), any()) }
+        coVerify(exactly = 0) {
+            ddgSearchRepository.search(any(), any(), any(), any())
+        }
+        assertThat(
+            vm.transcriptState.value.messages.any {
+                it.role == Role.ASSISTANT && it.groundedSources == listOf(url)
+            },
+        ).isTrue()
     }
 }

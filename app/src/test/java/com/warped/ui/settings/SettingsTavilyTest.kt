@@ -438,7 +438,9 @@ class SettingsTavilyTest {
         val vm = buildChatViewModel(modelFile.absolutePath, online = false)
         runCurrent()
 
-        vm.sendMessage("hola sin urls")
+        // Quick-task (needs-web-gate): non-social fixture — "hola" is a
+        // locked social token and would skip the pre-search by design.
+        vm.sendMessage("pregunta sin urls")
         advanceUntilIdle()
 
         // No socket: neither the fetcher fan-out nor the search producer runs.
@@ -449,7 +451,7 @@ class SettingsTavilyTest {
         val requestSlot = slot<ChatRequest>()
         coVerify(exactly = 1) { lastHelper.runInference(capture(requestSlot), any()) }
         assertThat(requestSlot.captured.messages.last().content).isEqualTo(
-            "${GroundingPrompt.SYSTEM_PROMPT}\n\nhola sin urls\n\nReply in English.",
+            "${GroundingPrompt.SYSTEM_PROMPT}\n\npregunta sin urls\n\nReply in English.",
         )
     }
 

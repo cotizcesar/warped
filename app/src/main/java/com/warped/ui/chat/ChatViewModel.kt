@@ -12,6 +12,7 @@ import com.warped.data.grounding.GroundingPrompt
 import com.warped.data.grounding.GroundingResult
 import com.warped.data.grounding.ImageIntent
 import com.warped.data.grounding.MultiUrlFetcher
+import com.warped.data.grounding.NeedsWeb
 import com.warped.data.grounding.MultiUrlResult
 import com.warped.data.grounding.TavilySearchOutcome
 import com.warped.data.grounding.TavilySearchRepository
@@ -542,6 +543,14 @@ class ChatViewModel @Inject constructor(
                     // and the provider attach path are untouched (the model
                     // may still tool-search with full multimodal context).
                     } else if (images.isEmpty() && audioBytes == null) {
+                        // Quick-task (needs-web-gate): social/identity turns
+                        // skip the pre-search entirely — no socket, no
+                        // credit, no notice, no progress state. Identical to
+                        // grounding-off for this turn. The agentic loop stays
+                        // armed provider-side as the backstop.
+                        if (!NeedsWeb.needsWeb(userMessage.content)) {
+                            Timber.d("Chat: social turn — skipping pre-search")
+                        } else {
                         // Quick-task (DDG-default): DDG-primary search
                         // branch. Runs ONLY when all hold — doGround (the
                         // once-per-send GroundingPrecedence.shouldGround read
@@ -707,6 +716,7 @@ class ChatViewModel @Inject constructor(
                                 updateInput { it.copy(isFetchingWeb = false, webFetchProgress = null) }
                             }
                         }
+                        } // needs-web gate: social turns skip the block above
                     }
                 }
 
