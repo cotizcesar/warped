@@ -45,8 +45,8 @@ import kotlin.coroutines.coroutineContext
  * call-counted 5-call cap, same `validateArgs` pre-socket short-circuit,
  * same singleton executors on `Dispatchers.IO`, same
  * `mapSearchOutcome`/`mapFetchResult` mapping, same
- * `ToolStatus`/`ToolCompleted` rows with `finally`-clear, same in-memory
- * echoes only, same retained-`Call` cancel contract, same non-streaming
+ * `ToolStatus`/`ToolCompleted` rows with `finally`-clear, same retained-`Call`
+ * cancel contract, same non-streaming
  * `tool_calls` handling (Pitfall 3), and the same exactly-one retry
  * without tools plus `TOOLS_UNSUPPORTED_NOTICE` on a 400-class
  * `tools[]` rejection (never silent, never more than one retry). Never
@@ -56,7 +56,9 @@ import kotlin.coroutines.coroutineContext
  * base-message mapping (sanitization is per-provider), the arming gate,
  * and the `Call` retention. `LocalToolLoop` owns every provider-neutral
  * decision; this driver only owns the wire. Round echoes stay in-memory
- * only, never persisted to Room.
+ * only, never persisted to Room — but each executed tool call's
+ * structured sources ride `ToolCompleted.sources` so the VM persists
+ * Fuentes rows on Done (quick-task agentic-rows; still no Role.TOOL rows).
  *
  * Ollama envelope rule (Pitfall 6): compat-path rounds use the Chat
  * Completions envelope throughout (`tool_calls` echo +
@@ -161,12 +163,24 @@ internal object CompatToolLoop {
                             ?: canonical
                         emit(StreamToken.ToolStatus(display))
                         try {
+                            // Quick-task (agentic-rows): executed calls
+                            // surface their structured sources via
+                            // ToolCompleted so the VM persists Fuentes rows
+                            // on Done (same shape as local loop turns).
                             val outcome = executeRemoteTool(
                                 canonical, argsMap, contextSize,
                                 ddg, multiUrlFetcher, webPageFetcher, logTag,
                             )
-                            emit(StreamToken.ToolCompleted(call.id, summarizeForTranscript(outcome)))
-                            outcome
+                            if (outcome.sources.isNotEmpty()) {
+                                emit(
+                                    StreamToken.ToolCompleted(
+                                        call.id,
+                                        summarizeForTranscript(outcome.text),
+                                        sources = outcome.sources,
+                                    ),
+                                )
+                            }
+                            outcome.text
                         } finally {
                             emit(StreamToken.ToolStatus(null))
                         }
@@ -216,9 +230,9 @@ internal object CompatToolLoop {
         multiUrlFetcher: MultiUrlFetcher,
         webPageFetcher: WebPageFetcher,
         logTag: String,
-    ): String {
+    ): LocalToolLoop.ToolCallOutcome {
         // Unknown names fail closed here — the body below never runs them.
-        LocalToolLoop.validateArgs(toolName, args)?.let { return it }
+        LocalToolLoop.validateArgs(toolName, args)?.let { return LocalToolLoop.ToolCallOutcome(it) }
         val online = try {
             webPageFetcher.hasValidatedInternet()
         } catch (_: Exception) {
@@ -227,44 +241,48 @@ internal object CompatToolLoop {
         return withContext(Dispatchers.IO) {
             when (LocalToolLoop.mapToolCallName(toolName)) {
                 LocalToolLoop.TOOL_WEB_SEARCH -> {
-                    if (!online) return@withContext LocalToolLoop.OFFLINE_STRING
+                    if (!online) return@withContext LocalToolLoop.ToolCallOutcome(LocalToolLoop.OFFLINE_STRING)
                     val query = (args["query"] as? String).orEmpty()
                     try {
                         // Explicit args (no Kotlin defaults): keeps the call
                         // on the instance method so MockK can stub it.
-                        LocalToolLoop.mapSearchOutcome(
-                            ddg.search(
-                                query = query,
-                                maxResults = TavilySearchRepository.DEFAULT_MAX_RESULTS,
-                                contextSize = contextSize,
-                            ),
+                        val outcome = ddg.search(
+                            query = query,
+                            maxResults = TavilySearchRepository.DEFAULT_MAX_RESULTS,
+                            contextSize = contextSize,
+                        )
+                        LocalToolLoop.ToolCallOutcome(
+                            text = LocalToolLoop.mapSearchOutcome(outcome),
+                            sources = LocalToolLoop.searchSources(outcome),
                         )
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
                         Timber.w(e, "$logTag: web_search failed")
-                        LocalToolLoop.toolFailureMessage(e.message.orEmpty())
+                        LocalToolLoop.ToolCallOutcome(LocalToolLoop.toolFailureMessage(e.message.orEmpty()))
                     }
                 }
                 LocalToolLoop.TOOL_WEB_FETCH -> {
-                    if (!online) return@withContext LocalToolLoop.OFFLINE_STRING
+                    if (!online) return@withContext LocalToolLoop.ToolCallOutcome(LocalToolLoop.OFFLINE_STRING)
                     val url = ((args["url"] as? String).orEmpty()).trim()
                     try {
-                        LocalToolLoop.mapFetchResult(
-                            multiUrlFetcher.fetchAll(
-                                urls = listOf(url),
-                                contextSize = contextSize,
-                                onProgress = null,
-                            ),
+                        val result = multiUrlFetcher.fetchAll(
+                            urls = listOf(url),
+                            contextSize = contextSize,
+                            onProgress = null,
+                        )
+                        LocalToolLoop.ToolCallOutcome(
+                            text = LocalToolLoop.mapFetchResult(result),
+                            sources = LocalToolLoop.fetchSources(result),
                         )
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
                         Timber.w(e, "$logTag: web_fetch failed")
-                        LocalToolLoop.toolFailureMessage(e.message.orEmpty())
+                        LocalToolLoop.ToolCallOutcome(LocalToolLoop.toolFailureMessage(e.message.orEmpty()))
                     }
                 }
-                else -> LocalToolLoop.unknownToolMessage(toolName)
+                else -> LocalToolLoop.ToolCallOutcome(LocalToolLoop.unknownToolMessage(toolName))
             }
         }
     }

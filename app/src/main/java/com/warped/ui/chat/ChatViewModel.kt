@@ -388,6 +388,16 @@ class ChatViewModel @Inject constructor(
                 var requestUserText = userMessage.content
                 var groundedSources: List<String> = emptyList()
                 var groundedSourceDetails: List<GroundedSource> = emptyList()
+                // Quick-task (agentic-rows): per-turn tool-source
+                // accumulator. Loop drivers (local `runToolLoop`,
+                // `CompatToolLoop`, OpenAI/Anthropic inline loops) emit one
+                // `ToolCompleted` per executed search/fetch call carrying
+                // the call's structured rows; they union here (first-seen
+                // order, distinct by URL — same union semantics as the
+                // fetch/search branches) and merge with the pre-search
+                // details on Done below. Armed turns skip the VM
+                // pre-search, so this is normally the only source.
+                val loopSourceDetails = mutableListOf<GroundedSource>()
                 var modelOnlyNotice: ModelOnlyNotice? = null
                 var modelOnlySourceCount: Int = 1
                 // Grounding precedence (threat T-53-05): single decision
@@ -783,15 +793,26 @@ class ChatViewModel @Inject constructor(
 
                     when (token) {
                         // Phase 56 (56-02): live tool-execution rows from the
-                        // local manual loop. Non-null ToolStatus sets the
+                        // manual loops. Non-null ToolStatus sets the
                         // transient row (query/URL display, provider
-                        // formatted); null clears it. ToolCompleted clears
-                        // (local path never emits it — contract only).
-                        // Rows NEVER reach ChatMessage/Room/transcript
-                        // (T-56-09). Delta/parseThinkBlocks accumulation
-                        // below stays untouched.
+                        // formatted); null clears it. ToolCompleted carries
+                        // the call's persistable Fuentes rows
+                        // (quick-task agentic-rows) — accumulated across
+                        // the turn (union, first-seen order, distinct by
+                        // URL) for the Done save below. Transient status
+                        // handling is untouched. Rows NEVER become
+                        // Role.TOOL transcript rows (Phase 49 DEL-01);
+                        // Delta/parseThinkBlocks accumulation below stays
+                        // untouched.
                         is StreamToken.ToolStatus -> updateInput { it.copy(toolCallActive = token.toolName) }
-                        is StreamToken.ToolCompleted -> updateInput { it.copy(toolCallActive = null) }
+                        is StreamToken.ToolCompleted -> {
+                            updateInput { it.copy(toolCallActive = null) }
+                            for (source in token.sources) {
+                                if (loopSourceDetails.none { it.url == source.url }) {
+                                    loopSourceDetails += source
+                                }
+                            }
+                        }
                         is StreamToken.Delta -> {
                             tokenBuffer.add(token.content)
                             val now = System.currentTimeMillis()
@@ -818,14 +839,28 @@ class ChatViewModel @Inject constructor(
                             // Role.TOOL rows are read-only history, never
                             // produced here.
                             if (content.isNotBlank() || finalReasoning.isNotBlank()) {
+                                // Quick-task (agentic-rows): loop-turn rows
+                                // merge with the pre-search details in the
+                                // SAME shape (details union distinct by URL,
+                                // first-seen order; ok-URL list mirrors the
+                                // okUrls-only convention of the fetch/search
+                                // branches). Armed turns carry loop rows
+                                // only; pre-search turns carry pre-search
+                                // rows only; zero-tool turns stay sourceless.
+                                val loopOkUrls = loopSourceDetails
+                                    .filter { it.status == GroundedSourceStatus.OK }
+                                    .map { it.url }
+                                val allSources = (groundedSources + loopOkUrls).distinct()
+                                val allDetails = (groundedSourceDetails + loopSourceDetails)
+                                    .distinctBy { it.url }
                                 val assistantMessage = ChatMessage(
                                     role = Role.ASSISTANT,
                                     content = content,
                                     tokenCount = content.length / 4,
                                     reasoning = finalReasoning.ifEmpty { token.reasoning },
                                     stats = token.stats,
-                                    groundedSources = groundedSources,
-                                    groundedSourceDetails = groundedSourceDetails,
+                                    groundedSources = allSources,
+                                    groundedSourceDetails = allDetails,
                                     modelOnlyNotice = modelOnlyNotice,
                                     modelOnlySourceCount = modelOnlySourceCount,
                                 )
@@ -843,13 +878,19 @@ class ChatViewModel @Inject constructor(
                                 // post-fetch, pre-inference-visibility. Failure
                                 // is non-blocking — Timber plus the UI-SPEC
                                 // Snackbar, chat continues, preview may degrade
-                                // post-restart only.
+                                // post-restart only. Quick-task
+                                // (agentic-rows): the IDENTICAL path serves
+                                // loop turns — same call, same
+                                // replaceSources-safe one-shot save (the
+                                // retry path keeps owning replaceSources;
+                                // this turn never rewrites history), same
+                                // Snackbar, same post-restart preview.
                                 try {
-                                    if (groundedSourceDetails.isNotEmpty()) {
+                                    if (allDetails.isNotEmpty()) {
                                         chatRepository.saveMessageWithSources(
                                             conversationId,
                                             assistantMessage,
-                                            groundedSourceDetails,
+                                            allDetails,
                                         )
                                     } else {
                                         chatRepository.saveMessage(conversationId, assistantMessage)

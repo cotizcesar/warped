@@ -101,7 +101,6 @@ class LocalToolLoopTest {
 
         assertThat(LocalToolLoop.mapFetchResult(fusedBlock(block))).isEqualTo(block)
     }
-
     @Test
     fun `failed fetch collapses with offline distinction preserved`() {
         assertThat(
@@ -215,5 +214,80 @@ class LocalToolLoopTest {
         assertThat(LocalToolLoop.toolFailureMessage("\u0000\u0007")).isNotNull()
         assertThat(LocalToolLoop.unknownToolMessage("")).isNotNull()
         assertThat(LocalToolLoop.mapFetchResult(fusedBlock(""))).isNotNull()
+    }
+
+    // Structured source extraction (quick-task agentic-rows): the SAME
+    // outcome object yields the model-facing text AND the persistable rows
+    // — never re-parsed from the fused string.
+
+    @Test
+    fun `grounded search outcome yields fused details verbatim incl og columns`() {
+        val details = listOf(
+            com.warped.domain.model.GroundedSource(
+                url = "https://a.example/uno",
+                extractedText = "Texto a.",
+                status = com.warped.domain.model.GroundedSourceStatus.OK,
+                ogTitle = "Title A",
+                ogDescription = "Desc A",
+                ogImageUrl = "https://a.example/img.png",
+            ),
+            com.warped.domain.model.GroundedSource(
+                url = "https://dead.example/x",
+                extractedText = null,
+                status = com.warped.domain.model.GroundedSourceStatus.OMITIDA,
+            ),
+        )
+        val outcome = TavilySearchOutcome.Grounded(
+            MultiUrlResult.Fused(
+                block = "BLOQUE",
+                okUrls = listOf("https://a.example/uno"),
+                skippedUrls = listOf("https://dead.example/x"),
+                details = details,
+            ),
+        )
+
+        // Same row shape incl. OG columns, same order.
+        assertThat(LocalToolLoop.searchSources(outcome)).isEqualTo(details)
+    }
+
+    @Test
+    fun `non-grounded search outcomes yield no sources`() {
+        assertThat(
+            LocalToolLoop.searchSources(
+                TavilySearchOutcome.ModelOnly(
+                    MultiUrlResult.AllFailed(GroundingResult.Reason.OFFLINE),
+                ),
+            ),
+        ).isEmpty()
+        assertThat(LocalToolLoop.searchSources(TavilySearchOutcome.MissingKey)).isEmpty()
+        assertThat(LocalToolLoop.searchSources(TavilySearchOutcome.InvalidKey)).isEmpty()
+        assertThat(LocalToolLoop.searchSources(TavilySearchOutcome.UsageLimit)).isEmpty()
+    }
+
+    @Test
+    fun `fused fetch result yields details - failed fetch yields none`() {
+        val details = listOf(
+            com.warped.domain.model.GroundedSource(
+                url = "https://c.example/p",
+                extractedText = "Page.",
+                status = com.warped.domain.model.GroundedSourceStatus.OK,
+                ogTitle = "C",
+            ),
+        )
+        assertThat(
+            LocalToolLoop.fetchSources(
+                MultiUrlResult.Fused(
+                    block = "BLOQUE",
+                    okUrls = listOf("https://c.example/p"),
+                    skippedUrls = emptyList(),
+                    details = details,
+                ),
+            ),
+        ).isEqualTo(details)
+        assertThat(
+            LocalToolLoop.fetchSources(
+                MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
+            ),
+        ).isEmpty()
     }
 }

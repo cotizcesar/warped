@@ -3,6 +3,7 @@ package com.warped.data.agentic
 import com.warped.data.grounding.GroundingResult
 import com.warped.data.grounding.MultiUrlResult
 import com.warped.data.grounding.TavilySearchOutcome
+import com.warped.domain.model.GroundedSource
 
 /**
  * Schema-only `@Tool` bodies return this: the manual loop (plan 02)
@@ -156,6 +157,37 @@ object LocalToolLoop {
     /** Concise English error for unknown tool names — never executed, never thrown. */
     fun unknownToolMessage(name: String): String =
         "Unknown tool \"$name\". Available tools: $TOOL_WEB_SEARCH, $TOOL_WEB_FETCH."
+
+    /**
+     * Quick-task (agentic-rows): the richer tool-call record threaded from
+     * executors to the `ToolCompleted` emission. [text] is the exact string
+     * the model continues from (identical to [mapSearchOutcome]/
+     * [mapFetchResult] output); [sources] carries the structured details
+     * alongside the mapped string in the SAME row shape (incl. OG columns)
+     * as pre-search grounded turns — captured from the outcome object, never
+     * re-parsed from the fused string. Empty when the call produced no
+     * persistable rows.
+     */
+    data class ToolCallOutcome(
+        val text: String,
+        val sources: List<GroundedSource> = emptyList(),
+    )
+
+    /**
+     * Quick-task (agentic-rows): structured Fuentes details for a search
+     * outcome — the `Fused.details` union verbatim (resolved URLs + texts +
+     * OG columns, OK and OMITIDA rows), empty for every non-grounded
+     * outcome (ModelOnly/key/limit paths persist no rows).
+     */
+    fun searchSources(outcome: TavilySearchOutcome): List<GroundedSource> =
+        (outcome as? TavilySearchOutcome.Grounded)?.fused?.details.orEmpty()
+
+    /**
+     * Quick-task (agentic-rows): structured Fuentes details for a fetch
+     * result — the `Fused.details` union verbatim, empty for `AllFailed`.
+     */
+    fun fetchSources(result: MultiUrlResult): List<GroundedSource> =
+        (result as? MultiUrlResult.Fused)?.details.orEmpty()
 
     /**
      * Maps every [TavilySearchOutcome] to the model-facing result string.

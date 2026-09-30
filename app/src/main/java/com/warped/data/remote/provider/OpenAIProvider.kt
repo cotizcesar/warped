@@ -280,9 +280,21 @@ class OpenAIProvider(
                             ?: canonical
                         emit(StreamToken.ToolStatus(display))
                         try {
+                            // Quick-task (agentic-rows): executed calls
+                            // surface their structured sources via
+                            // ToolCompleted so the VM persists Fuentes rows
+                            // on Done (same shape as local loop turns).
                             val outcome = executeRemoteTool(canonical, argsMap, contextSize)
-                            emit(StreamToken.ToolCompleted(call.id, summarizeForTranscript(outcome)))
-                            outcome
+                            if (outcome.sources.isNotEmpty()) {
+                                emit(
+                                    StreamToken.ToolCompleted(
+                                        call.id,
+                                        summarizeForTranscript(outcome.text),
+                                        sources = outcome.sources,
+                                    ),
+                                )
+                            }
+                            outcome.text
                         } finally {
                             emit(StreamToken.ToolStatus(null))
                         }
@@ -327,9 +339,9 @@ class OpenAIProvider(
         toolName: String,
         args: Map<String, Any?>,
         contextSize: Int,
-    ): String {
+    ): LocalToolLoop.ToolCallOutcome {
         // Unknown names fail closed here — the body below never runs them.
-        LocalToolLoop.validateArgs(toolName, args)?.let { return it }
+        LocalToolLoop.validateArgs(toolName, args)?.let { return LocalToolLoop.ToolCallOutcome(it) }
         val online = try {
             webPageFetcher?.hasValidatedInternet() == true
         } catch (_: Exception) {
@@ -338,48 +350,56 @@ class OpenAIProvider(
         return withContext(Dispatchers.IO) {
             when (LocalToolLoop.mapToolCallName(toolName)) {
                 LocalToolLoop.TOOL_WEB_SEARCH -> {
-                    if (!online) return@withContext LocalToolLoop.OFFLINE_STRING
+                    if (!online) return@withContext LocalToolLoop.ToolCallOutcome(LocalToolLoop.OFFLINE_STRING)
                     val query = (args["query"] as? String).orEmpty()
                     val repo = ddg
-                        ?: return@withContext LocalToolLoop.toolFailureMessage("search unavailable")
+                        ?: return@withContext LocalToolLoop.ToolCallOutcome(
+                            LocalToolLoop.toolFailureMessage("search unavailable"),
+                        )
                     try {
                         // Explicit args (no Kotlin defaults): keeps the call
                         // on the instance method so MockK can stub it.
-                        LocalToolLoop.mapSearchOutcome(
-                            repo.search(
-                                query = query,
-                                maxResults = TavilySearchRepository.DEFAULT_MAX_RESULTS,
-                                contextSize = contextSize,
-                            ),
+                        val outcome = repo.search(
+                            query = query,
+                            maxResults = TavilySearchRepository.DEFAULT_MAX_RESULTS,
+                            contextSize = contextSize,
+                        )
+                        LocalToolLoop.ToolCallOutcome(
+                            text = LocalToolLoop.mapSearchOutcome(outcome),
+                            sources = LocalToolLoop.searchSources(outcome),
                         )
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
                         Timber.w(e, "OpenAI: web_search failed")
-                        LocalToolLoop.toolFailureMessage(e.message.orEmpty())
+                        LocalToolLoop.ToolCallOutcome(LocalToolLoop.toolFailureMessage(e.message.orEmpty()))
                     }
                 }
                 LocalToolLoop.TOOL_WEB_FETCH -> {
-                    if (!online) return@withContext LocalToolLoop.OFFLINE_STRING
+                    if (!online) return@withContext LocalToolLoop.ToolCallOutcome(LocalToolLoop.OFFLINE_STRING)
                     val url = ((args["url"] as? String).orEmpty()).trim()
                     val fetcher = multiUrlFetcher
-                        ?: return@withContext LocalToolLoop.toolFailureMessage("fetch unavailable")
+                        ?: return@withContext LocalToolLoop.ToolCallOutcome(
+                            LocalToolLoop.toolFailureMessage("fetch unavailable"),
+                        )
                     try {
-                        LocalToolLoop.mapFetchResult(
-                            fetcher.fetchAll(
-                                urls = listOf(url),
-                                contextSize = contextSize,
-                                onProgress = null,
-                            ),
+                        val result = fetcher.fetchAll(
+                            urls = listOf(url),
+                            contextSize = contextSize,
+                            onProgress = null,
+                        )
+                        LocalToolLoop.ToolCallOutcome(
+                            text = LocalToolLoop.mapFetchResult(result),
+                            sources = LocalToolLoop.fetchSources(result),
                         )
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
                         Timber.w(e, "OpenAI: web_fetch failed")
-                        LocalToolLoop.toolFailureMessage(e.message.orEmpty())
+                        LocalToolLoop.ToolCallOutcome(LocalToolLoop.toolFailureMessage(e.message.orEmpty()))
                     }
                 }
-                else -> LocalToolLoop.unknownToolMessage(toolName)
+                else -> LocalToolLoop.ToolCallOutcome(LocalToolLoop.unknownToolMessage(toolName))
             }
         }
     }

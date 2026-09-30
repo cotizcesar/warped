@@ -98,6 +98,10 @@ class LiteRTLmProvider @Inject constructor(
                 "and web_fetch to read a full page from the results or the user. " +
                 "Answer with the gathered context. " +
                 "Always reply in the same language the user wrote in."
+
+        /** `ToolCompleted` transcript summary cap (≤200 chars, remote parity). */
+        const val TRANSCRIPT_SUMMARY_MAX_CHARS = 200
+        val SUMMARY_WHITESPACE = Regex("\\s+")
     }
 
     @Volatile
@@ -440,7 +444,22 @@ class LiteRTLmProvider @Inject constructor(
                             ?: call.name
                         emit(StreamToken.ToolStatus(display))
                         try {
-                            responses += Content.ToolResponse(call.name, executeToolCall(call, contextSize))
+                            // Quick-task (agentic-rows): executed calls
+                            // surface their structured sources via
+                            // ToolCompleted so the VM persists Fuentes rows
+                            // on Done. Short-circuits/cap/offline carry no
+                            // rows and emit nothing (IN-02 extended).
+                            val outcome = executeToolCallDetailed(call, contextSize)
+                            if (outcome.sources.isNotEmpty()) {
+                                emit(
+                                    StreamToken.ToolCompleted(
+                                        toolId = "local:${call.name}#$callsUsed",
+                                        summary = summarizeForTranscript(outcome.text),
+                                        sources = outcome.sources,
+                                    ),
+                                )
+                            }
+                            responses += Content.ToolResponse(call.name, outcome.text)
                         } finally {
                             emit(StreamToken.ToolStatus(null))
                         }
@@ -459,51 +478,67 @@ class LiteRTLmProvider @Inject constructor(
      * string the model continues from. CancellationException rethrows so
      * Stop bounds residual latency to client timeouts.
      */
-    internal suspend fun executeToolCall(call: com.google.ai.edge.litertlm.ToolCall, contextSize: Int): String {
+    internal suspend fun executeToolCall(call: com.google.ai.edge.litertlm.ToolCall, contextSize: Int): String =
+        executeToolCallDetailed(call, contextSize).text
+
+    /**
+     * Quick-task (agentic-rows): richer [executeToolCall] capturing the
+     * structured Fuentes details alongside the mapped model-facing string
+     * (same outcome object, no fused-string re-parsing). [executeToolCall]
+     * delegates for the `.text` so existing callers/tests are untouched.
+     */
+    internal suspend fun executeToolCallDetailed(
+        call: com.google.ai.edge.litertlm.ToolCall,
+        contextSize: Int,
+    ): LocalToolLoop.ToolCallOutcome {
         // Unknown names fail closed here — the body below never runs them.
-        LocalToolLoop.validateArgs(call.name, call.arguments)?.let { return it }
+        LocalToolLoop.validateArgs(call.name, call.arguments)?.let { return LocalToolLoop.ToolCallOutcome(it) }
         return when (LocalToolLoop.mapToolCallName(call.name)) {
             LocalToolLoop.TOOL_WEB_SEARCH -> {
-                if (!hasValidatedInternet()) return LocalToolLoop.OFFLINE_STRING
+                if (!hasValidatedInternet()) return LocalToolLoop.ToolCallOutcome(LocalToolLoop.OFFLINE_STRING)
                 val query = (call.arguments["query"] as? String).orEmpty()
                 try {
                     // Explicit args (no Kotlin defaults): keeps the call on the
                     // instance method so MockK can stub it in JVM tests.
-                    LocalToolLoop.mapSearchOutcome(
-                        ddg.search(
-                            query = query,
-                            maxResults = TavilySearchRepository.DEFAULT_MAX_RESULTS,
-                            contextSize = contextSize,
-                        )
+                    val outcome = ddg.search(
+                        query = query,
+                        maxResults = TavilySearchRepository.DEFAULT_MAX_RESULTS,
+                        contextSize = contextSize,
+                    )
+                    LocalToolLoop.ToolCallOutcome(
+                        text = LocalToolLoop.mapSearchOutcome(outcome),
+                        sources = LocalToolLoop.searchSources(outcome),
                     )
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     Timber.w(e, "LiteRTLm: web_search failed")
-                    LocalToolLoop.toolFailureMessage(e.message.orEmpty())
+                    LocalToolLoop.ToolCallOutcome(LocalToolLoop.toolFailureMessage(e.message.orEmpty()))
                 }
             }
             LocalToolLoop.TOOL_WEB_FETCH -> {
-                if (!hasValidatedInternet()) return LocalToolLoop.OFFLINE_STRING
+                if (!hasValidatedInternet()) return LocalToolLoop.ToolCallOutcome(LocalToolLoop.OFFLINE_STRING)
                 val url = ((call.arguments["url"] as? String).orEmpty()).trim()
                 try {
                     // Explicit onProgress=null (no Kotlin default): keeps the
                     // call on the instance method so MockK can stub it.
-                    LocalToolLoop.mapFetchResult(
-                        multiUrlFetcher.fetchAll(
-                            urls = listOf(url),
-                            contextSize = contextSize,
-                            onProgress = null,
-                        )
+                    val result = multiUrlFetcher.fetchAll(
+                        urls = listOf(url),
+                        contextSize = contextSize,
+                        onProgress = null,
+                    )
+                    LocalToolLoop.ToolCallOutcome(
+                        text = LocalToolLoop.mapFetchResult(result),
+                        sources = LocalToolLoop.fetchSources(result),
                     )
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     Timber.w(e, "LiteRTLm: web_fetch failed")
-                    LocalToolLoop.toolFailureMessage(e.message.orEmpty())
+                    LocalToolLoop.ToolCallOutcome(LocalToolLoop.toolFailureMessage(e.message.orEmpty()))
                 }
             }
-            else -> LocalToolLoop.unknownToolMessage(call.name)
+            else -> LocalToolLoop.ToolCallOutcome(LocalToolLoop.unknownToolMessage(call.name))
         }
     }
 
@@ -513,6 +548,15 @@ class LiteRTLmProvider @Inject constructor(
         Timber.w(e, "LiteRTLm: connectivity check failed, treating as offline")
         false
     }
+
+    /**
+     * Quick-task (agentic-rows): ≤200-char single-line ToolCompleted
+     * summary — same cap/shape as the remote loops
+     * (`CompatToolLoop.summarizeForTranscript` and the OpenAI/Anthropic
+     * inline copies).
+     */
+    private fun summarizeForTranscript(result: String): String =
+        result.trim().replace(SUMMARY_WHITESPACE, " ").take(TRANSCRIPT_SUMMARY_MAX_CHARS)
 
     /**
      * Phase 56 (56-02): production transport — streams each turn via

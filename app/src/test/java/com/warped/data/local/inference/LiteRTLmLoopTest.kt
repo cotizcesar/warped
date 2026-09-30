@@ -460,4 +460,153 @@ class LiteRTLmLoopTest {
         }
         assertThat(seen).isEmpty()
     }
+
+    // ------------------------------------------------------------------
+    // Quick-task (agentic-rows): ToolCompleted sources plumbing.
+    // ------------------------------------------------------------------
+
+    private fun searchDetails() = listOf(
+        com.warped.domain.model.GroundedSource(
+            url = "https://s1.example/a",
+            extractedText = "Search text.",
+            status = com.warped.domain.model.GroundedSourceStatus.OK,
+            ogTitle = "S1",
+            ogDescription = "Desc S1",
+            ogImageUrl = "https://s1.example/img.png",
+        ),
+        com.warped.domain.model.GroundedSource(
+            url = "https://dead.example/x",
+            extractedText = null,
+            status = com.warped.domain.model.GroundedSourceStatus.OMITIDA,
+        ),
+    )
+
+    @Test
+    fun `executed search emits ToolCompleted carrying structured sources`() = runTest {
+        every { webPageFetcher.hasValidatedInternet() } returns true
+        val details = searchDetails()
+        coEvery { ddg.search(any(), any(), any()) } returns TavilySearchOutcome.Grounded(
+            MultiUrlResult.Fused(
+                block = "Source [1] search",
+                okUrls = listOf("https://s1.example/a"),
+                skippedUrls = listOf("https://dead.example/x"),
+                details = details,
+            )
+        )
+        val transport = FakeTransport(
+            listOf(
+                FakeTurn(
+                    terminal = textTerminal("", toolCalls = listOf(ToolCall("web_search", mapOf("query" to "q")))),
+                ),
+                FakeTurn(terminal = textTerminal("Final"), texts = listOf("Final")),
+            )
+        )
+        val tokens = flow<StreamToken> { drive(transport) }.toList()
+
+        val completed = tokens.filterIsInstance<StreamToken.ToolCompleted>()
+        assertThat(completed).hasSize(1)
+        // Same row shape incl. OG columns, same order; stable tool id.
+        assertThat(completed.single().sources).isEqualTo(details)
+        assertThat(completed.single().toolId).isNotEmpty()
+        // Model-facing text mapping untouched.
+        assertThat(toolResponses(transport.replies[1]).single().second)
+            .isEqualTo("Source [1] search")
+    }
+
+    @Test
+    fun `search plus fetch union emits one ToolCompleted per call`() = runTest {
+        every { webPageFetcher.hasValidatedInternet() } returns true
+        val searchRows = searchDetails()
+        val fetchRows = listOf(
+            com.warped.domain.model.GroundedSource(
+                url = "https://f.example/p",
+                extractedText = "Fetch text.",
+                status = com.warped.domain.model.GroundedSourceStatus.OK,
+            ),
+        )
+        coEvery { ddg.search(any(), any(), any()) } returns TavilySearchOutcome.Grounded(
+            MultiUrlResult.Fused(
+                block = "Source [1] search",
+                okUrls = listOf("https://s1.example/a"),
+                skippedUrls = listOf("https://dead.example/x"),
+                details = searchRows,
+            )
+        )
+        coEvery { multiUrlFetcher.fetchAll(any(), any(), any()) } returns MultiUrlResult.Fused(
+            block = "Source [1] fetch",
+            okUrls = listOf("https://f.example/p"),
+            skippedUrls = emptyList(),
+            details = fetchRows,
+        )
+        val transport = FakeTransport(
+            listOf(
+                FakeTurn(
+                    terminal = textTerminal("", toolCalls = listOf(ToolCall("web_search", mapOf("query" to "q")))),
+                ),
+                FakeTurn(
+                    terminal = textTerminal("", toolCalls = listOf(ToolCall("web_fetch", mapOf("url" to "https://f.example/p")))),
+                ),
+                FakeTurn(terminal = textTerminal("Final"), texts = listOf("Final")),
+            )
+        )
+        val tokens = flow<StreamToken> { drive(transport) }.toList()
+
+        val completed = tokens.filterIsInstance<StreamToken.ToolCompleted>()
+        assertThat(completed).hasSize(2)
+        assertThat(completed[0].sources).isEqualTo(searchRows)
+        assertThat(completed[1].sources).isEqualTo(fetchRows)
+        // Distinct tool ids per call.
+        assertThat(completed[0].toolId).isNotEqualTo(completed[1].toolId)
+    }
+
+    @Test
+    fun `zero-tool turn and short-circuits emit no ToolCompleted`() = runTest {
+        every { webPageFetcher.hasValidatedInternet() } returns true
+        // Zero-tool turn: plain answer, no tool rows at all.
+        val plain = FakeTransport(
+            listOf(FakeTurn(terminal = textTerminal("Hi"), texts = listOf("Hi")))
+        )
+        val plainTokens = flow<StreamToken> { drive(plain) }.toList()
+        assertThat(plainTokens.filterIsInstance<StreamToken.ToolCompleted>()).isEmpty()
+
+        // Short-circuit (blank query): validation feeds back with no
+        // status/completed rows and no socket.
+        val short = FakeTransport(
+            listOf(
+                FakeTurn(
+                    terminal = textTerminal("", toolCalls = listOf(ToolCall("web_search", mapOf("query" to "  ")))),
+                ),
+                FakeTurn(terminal = textTerminal("Hi"), texts = listOf("Hi")),
+            )
+        )
+        val shortTokens = flow<StreamToken> { drive(short) }.toList()
+        assertThat(shortTokens.filterIsInstance<StreamToken.ToolCompleted>()).isEmpty()
+        assertThat(shortTokens.filterIsInstance<StreamToken.ToolStatus>()).isEmpty()
+        coVerify(exactly = 0) { ddg.search(any(), any(), any()) }
+    }
+
+    @Test
+    fun `detailed executor keeps text mapping identical to the string executor`() = runTest {
+        every { webPageFetcher.hasValidatedInternet() } returns true
+        coEvery { ddg.search(any(), any(), any()) } returns TavilySearchOutcome.Grounded(
+            MultiUrlResult.Fused(
+                block = "Source [1] search",
+                okUrls = listOf("https://s"),
+                skippedUrls = emptyList(),
+                details = listOf(
+                    com.warped.domain.model.GroundedSource(
+                        url = "https://s",
+                        extractedText = "Search text.",
+                        status = com.warped.domain.model.GroundedSourceStatus.OK,
+                    ),
+                ),
+            )
+        )
+        val p = provider()
+        val call = ToolCall("web_search", mapOf("query" to "q"))
+        assertThat(p.executeToolCallDetailed(call, 4096).text)
+            .isEqualTo(p.executeToolCall(call, 4096))
+        assertThat(p.executeToolCallDetailed(call, 4096).sources.map { it.url })
+            .containsExactly("https://s")
+    }
 }

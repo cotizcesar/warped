@@ -16,16 +16,26 @@ sealed interface StreamToken {
 
     /**
      * 47-03: a remote-loop tool finished. Carries the persistable record
-     * ([toolId] + ≤200-char [summary]) so the ViewModel can write the
-     * `role=tool` transcript row on turn Done, plus the optional
-     * [errorReason] driving the `"{Display} failed: …"` error row.
-     * Local automatic-mode path does not emit this (results are
-     * engine-internal; persistence deferred per 47-02).
+     * ([toolId] + ≤200-char [summary]) plus the optional [errorReason]
+     * driving the `"{Display} failed: …"` error row.
+     *
+     * Quick-task (agentic-rows): [sources] carries the per-call Fuentes
+     * rows in the SAME row shape (incl. OG columns) as the pre-search
+     * grounded turns — the ViewModel accumulates them across the turn and
+     * persists via the identical `saveMessageWithSources` path on Done.
+     * Empty when the call produced no persistable rows (validation
+     * short-circuit, offline, cap string, key/limit outcomes). Local manual
+     * loop emits this too (one per executed search/fetch call).
+     *
+     * Explicitly NOT `role=tool` transcript rows (Phase 49 DEL-01: no
+     * Role.TOOL rows are produced; legacy ones replay read-only) — the
+     * Fuentes-rows persistence is the deliverable.
      */
     data class ToolCompleted(
         val toolId: String,
         val summary: String,
         val errorReason: String? = null,
+        val sources: List<GroundedSource> = emptyList(),
     ) : StreamToken
 
     /**
