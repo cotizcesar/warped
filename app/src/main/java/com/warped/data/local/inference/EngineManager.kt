@@ -2,6 +2,7 @@ package com.warped.data.local.inference
 
 import android.content.Context
 import com.google.ai.edge.litertlm.ConversationConfig
+import com.google.ai.edge.litertlm.ThinkingConfig
 import com.warped.data.repository.ModelAllowlistRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -268,11 +269,19 @@ class EngineManager @Inject constructor(
 
     /**
      * Create a LiteRT-LM conversation. Convenience method that delegates to the engine.
+     *
+     * Quick-task (thinking-config): optional [thinkingConfig] enables the
+     * 0.17.x reasoning channel for capable models when the Thinking toggle
+     * is on (the caller ANDs toggle + capability — null preserves engine
+     * defaults for toggle-off or incapable models).
+     *
      * @throws IllegalStateException if LiteRT-LM is not the active engine
      */
     @Synchronized
-    fun createLiteRTConversation(config: ConversationConfig = ConversationConfig()) =
-        liteRTLmEngine.createConversation(config)
+    fun createLiteRTConversation(
+        config: ConversationConfig = ConversationConfig(),
+        thinkingConfig: ThinkingConfig? = null,
+    ) = liteRTLmEngine.createConversation(config, thinkingConfig)
 
     /** Returns the LiteRT-LM engine directly for advanced usage. */
     fun getLiteRTLmEngine(): LiteRTLmEngine = liteRTLmEngine

@@ -7,6 +7,7 @@ import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.SamplerConfig
+import com.google.ai.edge.litertlm.ThinkingConfig
 import com.google.ai.edge.litertlm.LiteRtLmJniException
 import com.google.ai.edge.litertlm.tool
 import com.warped.data.agentic.LocalToolLoop
@@ -112,6 +113,16 @@ class LiteRTLmProvider @Inject constructor(
         val SUMMARY_WHITESPACE = Regex("\\s+")
 
         /**
+         * Quick-task (thinking-config): reasoning trace budget (tokens) applied
+         * when the Thinking toggle is on AND the model is capable. The SDK
+         * default budget is 0 (channel off); this bounded value keeps
+         * thinking traces short on-device while leaving the answer path
+         * untouched. No `<|think|>` manual injection — the engine owns the
+         * channel; the existing tag-strip/display path is unchanged.
+         */
+        const val THINKING_TOKEN_BUDGET = 1024
+
+        /**
          * Quick-task (image-history-carry): max history USER messages whose
          * images are carried into the engine history. Each carried image is
          * a full ImageBytes payload in native context — unbounded carry
@@ -144,6 +155,15 @@ class LiteRTLmProvider @Inject constructor(
         val modelPath: String?,
         val capable: Boolean,
         val online: Boolean,
+        /**
+         * Quick-task (thinking-config): the toggle+capability thinking state
+         * (`request.parameters.reasoningEnabled`, already AND-gated upstream
+         * by `ChatViewModel`: toggle && supportsThinking — no new gate).
+         * Part of the snapshot so a toggle flip rebuilds the conversation
+         * (config applies at creation only) instead of reusing a channel
+         * created under the other state.
+         */
+        val thinking: Boolean = false,
     ) {
         val armed: Boolean
             get() = LocalToolLoop.isLoopArmed(
@@ -277,7 +297,15 @@ class LiteRTLmProvider @Inject constructor(
         // the 56-02 agentic loop is armed (capable model + grounding on +
         // validated internet). Unarmed stays byte-identical to Phase 49
         // DEL-01 (no tools, no prompt-injection fallback).
-        val armSnapshot = computeArmSnapshot(request.webOverride)
+        val armSnapshot = computeArmSnapshot(
+            request.webOverride,
+            // Quick-task (thinking-config): reasoningEnabled arrives
+            // already AND-gated upstream (ChatViewModel passes
+            // enableThinking = toggle && supportsThinking into
+            // runInference, which copies it here) — thread it, don't
+            // re-gate it.
+            request.parameters.reasoningEnabled,
+        )
         val conversationConfig = if (armSnapshot.armed) {
             ConversationConfig(
                 initialMessages = historyMessages,
@@ -315,7 +343,10 @@ class LiteRTLmProvider @Inject constructor(
      * gate the fetch path uses. Never throws — a gate failure reads as
      * unarmed (plain turn), never a crash.
      */
-    internal suspend fun computeArmSnapshot(perChat: Boolean?): LoopArmSnapshot {
+    internal suspend fun computeArmSnapshot(
+        perChat: Boolean?,
+        thinking: Boolean = false,
+    ): LoopArmSnapshot {
         val global = try {
             advancedPreferences.webGroundingEnabled.first()
         } catch (e: Exception) {
@@ -349,8 +380,20 @@ class LiteRTLmProvider @Inject constructor(
             modelPath = modelPath,
             capable = capable,
             online = online,
+            thinking = thinking,
         )
     }
+
+    /**
+     * Quick-task (thinking-config): map the toggle+capability thinking state
+     * to the 0.17.x engine config. Non-null (channel enabled) only when the
+     * upstream-gated flag is true; null selects engine defaults (channel
+     * off) for toggle-off or incapable models. Pure function —
+     * unit-testable without the native engine. `maxOutputToken` stays null
+     * (out of scope).
+     */
+    internal fun thinkingConfigFor(reasoningEnabled: Boolean): ThinkingConfig? =
+        if (reasoningEnabled) ThinkingConfig(true, THINKING_TOKEN_BUDGET) else null
 
     /**
      * Phase 56 (56-02, T-56-10): single conversation-acquire point for both
@@ -372,7 +415,10 @@ class LiteRTLmProvider @Inject constructor(
             } else if (activeLoopArm != null && activeLoopArm != snapshot) {
                 Timber.d("LiteRTLm: arming inputs changed — rebuilding conversation")
             }
-            engineManager.createLiteRTConversation(conversationConfig).also {
+            engineManager.createLiteRTConversation(
+                conversationConfig,
+                thinkingConfigFor(snapshot.thinking),
+            ).also {
                 activeConversation = it
                 activeConversationConfig = conversationConfig
                 activeLoopArm = snapshot
@@ -889,10 +935,12 @@ class LiteRTLmProvider @Inject constructor(
      * 45-02 LRT-09 (0.17.x re-verification): read the reasoning stream from
      * `response.channels["thought"]` (verified: `Message.getChannels()` returns
      * `Map<String, String>` in litertlm-android-0.17.1). Returns null when the active
-     * conversation has no thinking enabled. NOT wired into the chat path here — thought
-     * tokens must never be interleaved into answer Deltas; thinking UX (THINK-02) and
-     * the ThinkingConfig enablement belong to a later phase. Safe by construction:
-     * with thinking disabled the channel is absent and this returns null.
+     * conversation has no thinking enabled. Quick-task (thinking-config):
+     * the channel is now enabled via [thinkingConfigFor] when the Thinking
+     * toggle is on AND the model is capable — thought tokens still never
+     * interleave into answer Deltas (thinking UX THINK-02 owns display).
+     * Safe by construction: with thinking disabled the channel is absent
+     * and this returns null.
      */
     fun extractThoughtContent(message: Message): String? {
         return try {
