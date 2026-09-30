@@ -179,6 +179,111 @@ fun OgSourceCard(
 }
 
 /**
+ * Sources-carousel compact card (fixed 272dp width) reusing the
+ * [OgSourceCard] pieces: the same [OgThumb] 64dp slot (tap → browser), the
+ * same title fallback ([ogDisplayTitle], `maxLines = 2`), the same `[N]`
+ * badge construction, and the same container colors ([OgCardDark] dark /
+ * M3 surfaceVariant light — zero new color constants, zero purple).
+ *
+ * Tap rules mirror [OgSourceCard]: whole-card tap opens the preview sheet;
+ * the thumbnail and the open icon consume their taps and fire the guarded
+ * browser intent instead. Text-only sources (null/failed thumb, legacy
+ * `GroundedSource(url)` rows) render the same card without the thumb slot —
+ * title falls back to host, tap still opens the sheet. Omitida sources
+ * never reach this composable (struck text rows stand below the carousel).
+ */
+@Composable
+fun CompactSourceCard(
+    source: GroundedSource,
+    number: Int,
+    onPreview: () -> Unit,
+    onOpenBrowser: (url: String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val displayTitle = ogDisplayTitle(source.ogTitle, source.url)
+    val gatedImage = gatedHttpImageUrl(source.ogImageUrl)
+    var imageFailed by remember(gatedImage) { mutableStateOf(false) }
+    val showThumb = gatedImage != null && !imageFailed
+    val container = if (isSystemInDarkTheme()) {
+        OgCardDark
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+
+    Surface(
+        color = container,
+        shape = MaterialTheme.shapes.medium,
+        modifier = modifier
+            .width(272.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .clickable(role = Role.Button, onClick = onPreview)
+            .semantics {
+                contentDescription = "Preview source $number"
+            },
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (showThumb) {
+                    Box(
+                        modifier = Modifier
+                            .clickable(role = Role.Button, onClick = { onOpenBrowser(source.url) })
+                            .semantics {
+                                contentDescription = "Open source $number: $displayTitle"
+                            },
+                    ) {
+                        OgThumb(
+                            imageUrl = gatedImage,
+                            contentDescription = null,
+                            onError = { imageFailed = true },
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                }
+                // [N] badge — same construction as OgSourceCard.
+                Surface(
+                    shape = MaterialTheme.shapes.extraSmall,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                    contentColor = MaterialTheme.colorScheme.primary,
+                ) {
+                    Text(
+                        text = "[$number]",
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                // 48dp hit area comes from IconButton's enforced minimum
+                // touch target; the glyph itself is 20dp.
+                IconButton(onClick = { onOpenBrowser(source.url) }) {
+                    Icon(
+                        imageVector = Icons.Outlined.OpenInNew,
+                        contentDescription = "Open source $number in browser",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = displayTitle,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/**
  * Phase 58 (OG-02): shared 64dp Coil thumb with shimmer-behind loading.
  * Reused by the card and the preview-sheet OG header. Coil's AsyncImage
  * (not SubcomposeAsyncImage — the docs-flagged slow path in lists) resolves

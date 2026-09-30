@@ -10,6 +10,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -212,12 +214,14 @@ fun MessageBubble(
             }
         }
 
-        // Phase 53 (SRC-01/02/03): clickable numbered Fuentes list in
+        // Quick-task (DDG-default + sources carousel): clickable numbered
+        // Fuentes render as a horizontal carousel of 272dp compact cards in
         // fetch-block order covering all N sources (ok + omitida from
-        // hydrated details). Ok items open the SourcePreviewSheet without
-        // leaving chat; omitida rows render struck/disabled with no preview
-        // so no source is silently dropped. Zero ok sources renders no
-        // block at all (unchanged Phase 50 behavior).
+        // hydrated details). Ok cards open the SourcePreviewSheet on body
+        // tap (thumb tap fires the guarded browser intent); omitida rows
+        // render struck/disabled below the carousel with no preview so no
+        // source is silently dropped. Zero ok sources renders no block at
+        // all (unchanged Phase 50 behavior).
         val sourceDetails = message.groundedSourceDetails
         val fuenteList = remember(sourceDetails, message.groundedSources) {
             fuenteItems(details = sourceDetails, legacyUrls = message.groundedSources)
@@ -235,11 +239,22 @@ fun MessageBubble(
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            fuenteList.forEachIndexed { index, item ->
-                if (item.clickable) {
-                    // Phase 58 (OG-02): ok sources render OgSourceCard
-                    // thumbnails in fetch-block order; tap opens the sheet,
-                    // the open icon fires the guarded browser intent.
+            Spacer(Modifier.height(8.dp))
+            // Clickable ok items first (carousel); [N] numbering stays in
+            // fetch-block order so badges match the fused Source [N] block.
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                items(
+                    items = fuenteList.mapIndexedNotNull { index, item ->
+                        if (item.clickable) index to item else null
+                    },
+                    key = { (_, item) -> item.number },
+                ) { (index, item) ->
+                    // Ok sources render compact carousel cards reusing the
+                    // OgSourceCard pieces; tap body opens the sheet, thumb
+                    // (and the open icon) fires the guarded browser intent.
                     val cardSource = if (sourceDetails.isNotEmpty()) {
                         previewForTap(sourceDetails, index)
                     } else {
@@ -248,8 +263,8 @@ fun MessageBubble(
                         // opens the sheet with the empty-extract copy and
                         // the browser button available.
                         GroundedSource(url = item.url)
-                    } ?: return@forEachIndexed
-                    OgSourceCard(
+                    } ?: return@items
+                    CompactSourceCard(
                         source = cardSource,
                         number = item.number,
                         onPreview = {
@@ -258,20 +273,20 @@ fun MessageBubble(
                         },
                         onOpenBrowser = { url -> openUrlInBrowser(context, url) },
                     )
-                } else {
-                    Text(
-                        text = "[${item.number}] ${item.url} — skipped",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textDecoration = TextDecoration.LineThrough,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 12.dp),
-                    )
                 }
-                if (index != fuenteList.lastIndex) {
-                    Spacer(Modifier.height(8.dp))
-                }
+            }
+            // Omitida rows stay as struck text below the carousel.
+            fuenteList.filter { !it.clickable }.forEach { item ->
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "[${item.number}] ${item.url} — skipped",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textDecoration = TextDecoration.LineThrough,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                )
             }
         }
         // Sheet host: tap an ok item sets previewSource, dismiss nulls it.
