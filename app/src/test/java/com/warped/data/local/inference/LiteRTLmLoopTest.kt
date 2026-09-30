@@ -132,13 +132,12 @@ class LiteRTLmLoopTest {
                 "Answer with the gathered context. " +
                 "Treat each new user message on its own: if it needs facts not covered " +
                 "by earlier tool results, call web_search again instead of answering " +
-                "from stale results. " +
-                "Always reply in the same language the user wrote in."
+                "from stale results."
         )
         assertThat(LiteRTLmProvider.TOOL_USE_SYSTEM_HINT).contains("web_search")
         assertThat(LiteRTLmProvider.TOOL_USE_SYSTEM_HINT).contains("web_fetch")
         assertThat(LiteRTLmProvider.TOOL_USE_SYSTEM_HINT)
-            .contains("Always reply in the same language the user wrote in.")
+            .doesNotContain("same language")
     }
 
     @Test

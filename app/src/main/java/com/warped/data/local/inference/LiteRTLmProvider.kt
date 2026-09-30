@@ -104,8 +104,7 @@ class LiteRTLmProvider @Inject constructor(
                 "Answer with the gathered context. " +
                 "Treat each new user message on its own: if it needs facts not covered " +
                 "by earlier tool results, call web_search again instead of answering " +
-                "from stale results. " +
-                "Always reply in the same language the user wrote in."
+                "from stale results."
 
         /** `ToolCompleted` transcript summary cap (≤200 chars, remote parity). */
         const val TRANSCRIPT_SUMMARY_MAX_CHARS = 200

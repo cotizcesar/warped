@@ -182,7 +182,7 @@ class ChatGroundingToggleTest {
         val requestSlot = slot<com.warped.domain.model.ChatRequest>()
         coVerify(exactly = 1) { lastHelper.runInference(capture(requestSlot), any()) }
         assertThat(requestSlot.captured.messages.last().content).isEqualTo(
-            "${com.warped.data.grounding.GroundingPrompt.SYSTEM_PROMPT}\n\nhola sin urls",
+            "${com.warped.data.grounding.GroundingPrompt.SYSTEM_PROMPT}\n\nhola sin urls\n\nReply in English.",
         )
         assertThat(
             vm.transcriptState.value.messages.any { it.role == Role.ASSISTANT && it.content == "hola" },
