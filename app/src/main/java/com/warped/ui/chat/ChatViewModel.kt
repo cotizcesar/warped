@@ -40,6 +40,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 import kotlinx.coroutines.withContext
+import com.warped.R
 import timber.log.Timber
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicLong
@@ -313,7 +314,7 @@ class ChatViewModel @Inject constructor(
             pendingWebOverride = override
             updateConnection { it.copy(webOverride = override) }
             _events.tryEmit(
-                ChatEvent.Snackbar("Web preference updated. Will apply to the next message."),
+                ChatEvent.Snackbar(context.getString(R.string.snack_web_pref_updated)),
             )
             return
         }
@@ -322,7 +323,7 @@ class ChatViewModel @Inject constructor(
                 chatRepository.setWebOverride(conversationId, override)
                 updateConnection { it.copy(webOverride = override) }
                 _events.tryEmit(
-                    ChatEvent.Snackbar("Web preference updated. Will apply to the next message."),
+                    ChatEvent.Snackbar(context.getString(R.string.snack_web_pref_updated)),
                 )
             } catch (e: Exception) {
                 Timber.e(e, "Chat: setWebOverride failed")
@@ -672,7 +673,7 @@ class ChatViewModel @Inject constructor(
                         if (images.isNotEmpty() && !capabilities.vision) {
                             updateTranscript {
                                 it.copy(
-                                    error = ChatError.Unknown("This model does not support images (no vision capability)."),
+                                    error = ChatError.Unknown(context.getString(R.string.error_no_vision)),
                                     isStreaming = false
                                 )
                             }
@@ -682,7 +683,7 @@ class ChatViewModel @Inject constructor(
                         if (audioBytes != null && !capabilities.audio) {
                             updateTranscript {
                                 it.copy(
-                                    error = ChatError.Unknown("This model does not support audio input."),
+                                    error = ChatError.Unknown(context.getString(R.string.error_no_audio)),
                                     isStreaming = false
                                 )
                             }
@@ -857,8 +858,7 @@ class ChatViewModel @Inject constructor(
                                     Timber.e(e, "Chat: failed to persist assistant sources")
                                     _events.tryEmit(
                                         ChatEvent.Snackbar(
-                                            "Couldn't save the sources. " +
-                                                "Preview may be unavailable after restart.",
+                                            context.getString(R.string.snack_sources_not_saved),
                                         ),
                                     )
                                 }
@@ -1519,7 +1519,7 @@ class ChatViewModel @Inject constructor(
             val availMB = memInfo.availableBytes / (1024 * 1024)
             updateConnection {
                 it.copy(
-                    modelLoadError = "Not enough memory: model needs ${modelMB} MB but only ${availMB} MB available. Free up memory or use a smaller quantization."
+                    modelLoadError = context.getString(R.string.error_no_memory_fmt, modelMB, availMB)
                 )
             }
             return

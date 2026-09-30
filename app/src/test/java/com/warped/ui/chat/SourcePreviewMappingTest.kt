@@ -3,12 +3,13 @@ package com.warped.ui.chat
 import com.google.common.truth.Truth.assertThat
 import com.warped.domain.model.GroundedSource
 import com.warped.domain.model.GroundedSourceStatus
-import com.warped.ui.chat.components.EMPTY_EXTRACT_COPY
 import com.warped.ui.chat.components.browserTarget
 import com.warped.ui.chat.components.fuenteItems
 import com.warped.ui.chat.components.isEmptyExtract
 import com.warped.ui.chat.components.previewForTap
 import org.junit.jupiter.api.Test
+import java.io.File
+import javax.xml.parsers.DocumentBuilderFactory
 
 /**
  * Phase 53 (SRC-01/02/03): JVM tests for the Fuentes → sheet mapping layer.
@@ -91,8 +92,9 @@ class SourcePreviewMappingTest {
         assertThat(isEmptyExtract(omitida)).isTrue()
         assertThat(isEmptyExtract(blankExtract)).isTrue()
         assertThat(isEmptyExtract(okOne)).isFalse()
-        // The sheet renders this copy while keeping the browser button available.
-        assertThat(EMPTY_EXTRACT_COPY).contains("browser")
+        // The sheet renders the sheet_empty_extract resource while keeping
+        // the browser button available (copy lives in values/strings.xml now).
+        assertThat(emptyExtractCopy()).contains("browser")
     }
 
     @Test
@@ -116,5 +118,20 @@ class SourcePreviewMappingTest {
 
         assertThat(items.map { it.number }).containsExactly(1, 2).inOrder()
         assertThat(items.all { it.clickable }).isTrue()
+    }
+
+    private fun emptyExtractCopy(): String {
+        val file = File("src/main/res/values/strings.xml")
+            .takeIf { it.exists() } ?: File("app/src/main/res/values/strings.xml")
+        val doc = DocumentBuilderFactory.newInstance()
+            .newDocumentBuilder().parse(file)
+        val strings = doc.getElementsByTagName("string")
+        for (i in 0 until strings.length) {
+            val node = strings.item(i)
+            if (node.attributes.getNamedItem("name").nodeValue == "sheet_empty_extract") {
+                return node.textContent
+            }
+        }
+        error("sheet_empty_extract missing from values/strings.xml")
     }
 }

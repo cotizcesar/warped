@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontStyle
@@ -35,6 +36,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import com.warped.R
 import com.warped.ui.components.WarpedAlertDialog
 import com.warped.data.local.preferences.WizardPreferences
 import com.warped.domain.repository.ChatRepository
@@ -145,7 +147,7 @@ fun WarpedNavGraph() {
                     ) {
                         Image(
                             painter = painterResource(id = com.warped.R.drawable.logo),
-                            contentDescription = "Logo",
+                            contentDescription = stringResource(R.string.cd_logo_nav),
                             modifier = Modifier.size(28.dp)
                         )
                         Spacer(Modifier.width(10.dp))
@@ -154,7 +156,7 @@ fun WarpedNavGraph() {
 
                     NavigationDrawerItem(
                         icon = { Icon(Icons.Filled.Add, null, tint = DrawerAccent, modifier = Modifier.size(24.dp)) },
-                        label = { Text("New Chat", color = DrawerAccent, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) },
+                        label = { Text(stringResource(R.string.new_chat), color = DrawerAccent, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) },
                         selected = false,
                         colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent),
                         onClick = {
@@ -166,7 +168,7 @@ fun WarpedNavGraph() {
                         }
                     )
                     HorizontalDivider(color = Color(0xFF333333), thickness = 0.5.dp)
-                    Text("Recents", color = DrawerTextSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                    Text(stringResource(R.string.recents), color = DrawerTextSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
 
                     LazyColumn(modifier = Modifier.weight(1f)) {
@@ -176,8 +178,8 @@ fun WarpedNavGraph() {
                             if (showDeleteConfirm) {
                                 WarpedAlertDialog(
                                     onDismissRequest = { showDeleteConfirm = false },
-                                    title = { Text("Delete chat") },
-                                    text = { Text("Delete \"${conv.title}\"? This cannot be undone.") },
+                                    title = { Text(stringResource(R.string.delete_chat_title)) },
+                                    text = { Text(stringResource(R.string.delete_chat_message, conv.title)) },
                                     confirmButton = {
                                         TextButton(onClick = {
                                             scope.launch {
@@ -193,9 +195,9 @@ fun WarpedNavGraph() {
                                                     }
                                                 }
                                             }
-                                        }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                                        }) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
                                     },
-                                    dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") } }
+                                    dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.cancel)) } }
                                 )
                             }
                             Row(
@@ -232,7 +234,7 @@ fun WarpedNavGraph() {
                         val isModels = isOn(Screen.Selector::class)
                         NavigationDrawerItem(
                             icon = { Icon(Icons.Filled.Memory, null, tint = if (isModels) DrawerAccent else DrawerTextSecondary, modifier = Modifier.size(20.dp)) },
-                            label = { Text("Models", color = if (isModels) DrawerAccent else DrawerTextSecondary, fontSize = 12.sp) },
+                            label = { Text(stringResource(R.string.tab_models), color = if (isModels) DrawerAccent else DrawerTextSecondary, fontSize = 12.sp) },
                             selected = isModels,
                             colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = DrawerSelectedBg, unselectedContainerColor = Color.Transparent),
                             modifier = Modifier.weight(1f),
@@ -247,7 +249,7 @@ fun WarpedNavGraph() {
                         val isHelp = isOn(Screen.Help::class)
                         NavigationDrawerItem(
                             icon = { Icon(Icons.Filled.Info, null, tint = if (isHelp) DrawerAccent else DrawerTextSecondary, modifier = Modifier.size(20.dp)) },
-                            label = { Text("Help", color = if (isHelp) DrawerAccent else DrawerTextSecondary, fontSize = 12.sp) },
+                            label = { Text(stringResource(R.string.help_title), color = if (isHelp) DrawerAccent else DrawerTextSecondary, fontSize = 12.sp) },
                             selected = isHelp,
                             colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = DrawerSelectedBg, unselectedContainerColor = Color.Transparent),
                             modifier = Modifier.weight(1f),
@@ -262,7 +264,7 @@ fun WarpedNavGraph() {
                         val isSettings = isOn(Screen.Settings::class)
                         NavigationDrawerItem(
                             icon = { Icon(Icons.Filled.Settings, null, tint = if (isSettings) DrawerAccent else DrawerTextSecondary, modifier = Modifier.size(20.dp)) },
-                            label = { Text("Settings", color = if (isSettings) DrawerAccent else DrawerTextSecondary, fontSize = 12.sp) },
+                            label = { Text(stringResource(R.string.settings), color = if (isSettings) DrawerAccent else DrawerTextSecondary, fontSize = 12.sp) },
                             selected = isSettings,
                             colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = DrawerSelectedBg, unselectedContainerColor = Color.Transparent),
                             modifier = Modifier.weight(1f),

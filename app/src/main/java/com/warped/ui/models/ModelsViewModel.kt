@@ -1,8 +1,10 @@
 package com.warped.ui.models
 
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.warped.R
 import com.warped.data.local.download.DownloadState
 import com.warped.data.local.download.ModelDownloadManager
 import com.warped.data.local.inference.MemoryChecker
@@ -20,6 +22,7 @@ import com.warped.domain.model.ProviderType
 import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.LocalModelRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,7 +44,8 @@ class ModelsViewModel @Inject constructor(
     private val apiKeyStore: ApiKeyStore,
     private val providerRouter: ProviderRouter,
     private val inputSanitizer: InputSanitizer,
-    private val allowlist: ModelAllowlistRepository
+    private val allowlist: ModelAllowlistRepository,
+    @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
     /**
@@ -153,7 +157,7 @@ class ModelsViewModel @Inject constructor(
     fun saveEndpoint() {
         val state = _uiState.value
         if (state.formName.isBlank() || state.formUrl.isBlank() || state.formModelId.isBlank()) {
-            _uiState.update { it.copy(error = "Name, URL, and Model ID are required") }
+            _uiState.update { it.copy(error = context.getString(R.string.form_error_required_model)) }
             return
         }
         var url = state.formUrl

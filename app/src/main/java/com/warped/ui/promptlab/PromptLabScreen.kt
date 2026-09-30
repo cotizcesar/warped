@@ -35,11 +35,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.warped.R
 import com.warped.domain.prompt.PromptTemplate
 import com.warped.ui.promptlab.components.TemplateDropdown
+import com.warped.ui.promptlab.components.templateDisplayDescription
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,7 +65,7 @@ fun PromptLabScreen(
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Prompt Lab") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.lab_title)) }) },
         snackbarHost = { SnackbarHost(snackbarHostState) { Snackbar(it) } },
     ) { padding ->
         Column(
@@ -80,7 +83,7 @@ fun PromptLabScreen(
             val currentTemplate = ui.templates.firstOrNull { it.id == ui.selectedTemplateId }
             if (currentTemplate != null) {
                 Text(
-                    text = currentTemplate.description,
+                    text = templateDisplayDescription(currentTemplate),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -90,7 +93,7 @@ fun PromptLabScreen(
                 OutlinedTextField(
                     value = ui.targetLanguage,
                     onValueChange = viewModel::setLanguage,
-                    label = { Text("Target language") },
+                    label = { Text(stringResource(R.string.lab_target_lang)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -147,8 +150,8 @@ private fun InputColumn(
         OutlinedTextField(
             value = ui.input,
             onValueChange = viewModel::setInput,
-            label = { Text("Prompt input") },
-            placeholder = { Text("Paste text, code, or a table…") },
+            label = { Text(stringResource(R.string.lab_prompt_input)) },
+            placeholder = { Text(stringResource(R.string.lab_prompt_hint)) },
             minLines = 8,
             maxLines = 24,
             enabled = !ui.isRunning,
@@ -168,11 +171,11 @@ private fun InputColumn(
                     strokeWidth = 2.dp,
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("Running…")
+                Text(stringResource(R.string.running_ellipsis))
             } else {
                 Icon(Icons.Filled.PlayArrow, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Run")
+                Text(stringResource(R.string.lab_run))
             }
         }
     }
@@ -194,7 +197,7 @@ private fun OutputColumn(
             .fillMaxSize()
             .padding(12.dp)) {
             Text(
-                text = "Output",
+                text = stringResource(R.string.lab_output),
                 style = MaterialTheme.typography.labelLarge,
             )
             Spacer(Modifier.height(6.dp))
@@ -204,7 +207,7 @@ private fun OutputColumn(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "Pick a template, enter input, then tap Run.",
+                        text = stringResource(R.string.lab_empty_hint),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

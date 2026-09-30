@@ -286,15 +286,14 @@ fun ChatScreen(
                     val progress = input.webFetchProgress
                     val isMulti = progress != null && progress.total > 1
                     val chipText = if (isMulti) {
-                        "Reading ${progress.done} of ${progress.total}…"
+                        stringResource(R.string.reading_multi_fmt, progress.done, progress.total)
                     } else {
-                        "Reading page…"
+                        stringResource(R.string.reading_page)
                     }
                     val chipDescription = if (isMulti) {
-                        "Reading ${progress.done} of ${progress.total} pages. " +
-                            "Tap Stop to cancel reading."
+                        stringResource(R.string.reading_multi_cd_fmt, progress.done, progress.total)
                     } else {
-                        "Reading page. Tap Stop to cancel reading."
+                        stringResource(R.string.reading_page_cd)
                     }
                     Row(
                         modifier = Modifier
@@ -327,14 +326,15 @@ fun ChatScreen(
                 // Done/Error/Stop/new send. Single-line with ellipsis
                 // (UI-REVIEW fix #2) so long queries/hosts can't push the
                 // input bar.
-                input.toolCallActive?.let { status ->
+                val toolStatus = input.toolCallActive
+                if (toolStatus != null) {
+                    val toolCd = stringResource(R.string.cd_running_tool, toolStatus)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp)
                             .semantics {
-                                contentDescription = "Running tool: $status. " +
-                                    "Tap Stop to cancel."
+                                contentDescription = toolCd
                             },
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -345,7 +345,7 @@ fun ChatScreen(
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = status,
+                            text = toolStatus,
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
@@ -427,7 +427,7 @@ fun ChatScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Image(
                             painter = painterResource(id = com.warped.R.drawable.logo),
-                            contentDescription = "Warped",
+                            contentDescription = stringResource(R.string.cd_logo),
                             modifier = Modifier.size(128.dp)
                         )
                         Spacer(Modifier.height(24.dp))
@@ -545,14 +545,14 @@ fun ChatScreen(
             if (connection.modelLoadError != null) {
                 Snackbar(
                     modifier = Modifier.padding(16.dp),
-                    action = { TextButton(onClick = { viewModel.clearModelLoadError() }) { Text("Dismiss") } }
+                    action = { TextButton(onClick = { viewModel.clearModelLoadError() }) { Text(stringResource(R.string.dismiss)) } }
                 ) { Text(connection.modelLoadError ?: "") }
             }
 
             if (transcript.error != null) {
                 Snackbar(
                     modifier = Modifier.padding(16.dp),
-                    action = { TextButton(onClick = { viewModel.clearError() }) { Text("Dismiss") } }
+                    action = { TextButton(onClick = { viewModel.clearError() }) { Text(stringResource(R.string.dismiss)) } }
                 ) {
                     Text(
                         when (val error = transcript.error) {
@@ -561,8 +561,8 @@ fun ChatScreen(
                             is ChatError.Auth -> error.message
                             is ChatError.NoModelSelected -> stringResource(R.string.no_model_selected)
                             is ChatError.DownloadModelFirst -> stringResource(R.string.download_model_first)
-                            is ChatError.ConnectionLost -> "Connection lost. Tap to retry."
-                            is ChatError.ModelUnavailable -> "This model is no longer available. Please select a different model or re-download it."
+                            is ChatError.ConnectionLost -> stringResource(R.string.connection_lost)
+                            is ChatError.ModelUnavailable -> stringResource(R.string.error_model_unavailable)
                             is ChatError.Unknown -> error.message
                             null -> ""
                         }
@@ -577,10 +577,10 @@ fun ChatScreen(
                     containerColor = MaterialTheme.colorScheme.errorContainer,
                     contentColor = MaterialTheme.colorScheme.onErrorContainer,
                     action = {
-                        TextButton(onClick = { viewModel.dismissModelUnavailable() }) { Text("Dismiss") }
+                        TextButton(onClick = { viewModel.dismissModelUnavailable() }) { Text(stringResource(R.string.dismiss)) }
                     }
                 ) {
-                    Text("The model for this conversation is no longer installed. Select a different model or re-download it.")
+                    Text(stringResource(R.string.model_no_longer_installed))
                 }
             }
 
@@ -588,22 +588,21 @@ fun ChatScreen(
             if (connection.pendingModelSwitch != null) {
                 WarpedAlertDialog(
                     onDismissRequest = { viewModel.cancelModelSwitch() },
-                    title = { Text("New model selected") },
+                    title = { Text(stringResource(R.string.model_selected_new)) },
                     text = {
                         Text(
-                            "Switching models mid-conversation is not allowed. " +
-                                "A new chat will be created with the selected model.",
+                            stringResource(R.string.dialog_model_switch_msg),
                             style = MaterialTheme.typography.bodyMedium
                         )
                     },
                     confirmButton = {
                         TextButton(onClick = { viewModel.confirmModelSwitch() }) {
-                            Text("New Chat")
+                            Text(stringResource(R.string.new_chat))
                         }
                     },
                     dismissButton = {
                         TextButton(onClick = { viewModel.cancelModelSwitch() }) {
-                            Text("Cancel")
+                            Text(stringResource(R.string.cancel))
                         }
                     }
                 )
@@ -676,6 +675,7 @@ private fun JumpToLatestPill(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val jumpCd = stringResource(R.string.cd_jump_latest)
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -683,7 +683,7 @@ private fun JumpToLatestPill(
             .clip(RoundedCornerShape(50))
             .clickable(onClick = onClick)
             .semantics {
-                contentDescription = "Jump to latest message"
+                contentDescription = jumpCd
                 liveRegion = LiveRegionMode.Polite
             }
     ) {
@@ -706,7 +706,7 @@ private fun JumpToLatestPill(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "Latest",
+                    stringResource(R.string.latest),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1
@@ -739,7 +739,7 @@ private fun InlineModelSelectorBar(
 ) {
     val pillColor = if (isLocal) Color(0xFF4CAF50) else Color(0xFF2196F3)
     val pillText = if (isLocal) "Local" else "Net"
-    val inheritHint = if (globalWebEnabled) "Inherit (global on)" else "Inherit (global off)"
+    val inheritHint = if (globalWebEnabled) stringResource(R.string.web_inherit_on) else stringResource(R.string.web_inherit_off)
     var webMenuExpanded by remember { mutableStateOf(false) }
     val lightColor = when {
         isLoading -> Color(0xFFFFC107)
@@ -760,7 +760,7 @@ private fun InlineModelSelectorBar(
             IconButton(onClick = onOpenDrawer) {
                 Icon(
                     Icons.Filled.Menu,
-                    contentDescription = "Open drawer",
+                    contentDescription = stringResource(R.string.cd_open_drawer),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -797,14 +797,14 @@ private fun InlineModelSelectorBar(
                     Spacer(Modifier.width(8.dp))
                     Icon(
                         Icons.Filled.Circle,
-                        contentDescription = "Connection status",
+                        contentDescription = stringResource(R.string.cd_connection_status),
                         tint = lightColor,
                         modifier = Modifier.size(10.dp)
                     )
                     Spacer(Modifier.width(6.dp))
                     Icon(
                         Icons.Filled.KeyboardArrowDown,
-                        contentDescription = "Select model",
+                        contentDescription = stringResource(R.string.cd_select_model),
                         modifier = Modifier.size(20.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -815,7 +815,7 @@ private fun InlineModelSelectorBar(
                         IconButton(onClick = { webMenuExpanded = true }) {
                             Icon(
                                 Icons.Filled.MoreVert,
-                                contentDescription = "Web options",
+                                contentDescription = stringResource(R.string.cd_web_options),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -824,7 +824,7 @@ private fun InlineModelSelectorBar(
                             onDismissRequest = { webMenuExpanded = false }
                         ) {
                             WebOverrideMenuItem(
-                                label = "Web: On",
+                                label = stringResource(R.string.web_on),
                                 selected = webOverride == true,
                                 onClick = {
                                     webMenuExpanded = false
@@ -832,7 +832,7 @@ private fun InlineModelSelectorBar(
                                 }
                             )
                             WebOverrideMenuItem(
-                                label = "Web: Off",
+                                label = stringResource(R.string.web_off),
                                 selected = webOverride == false,
                                 onClick = {
                                     webMenuExpanded = false
@@ -842,7 +842,7 @@ private fun InlineModelSelectorBar(
                             DropdownMenuItem(
                                 text = {
                                     Column {
-                                        Text("Web: Inherit")
+                                        Text(stringResource(R.string.web_inherit))
                                         Text(
                                             text = inheritHint,
                                             style = MaterialTheme.typography.labelSmall,
@@ -893,11 +893,12 @@ private fun WebOverrideMenuItem(
  */
 @Composable
 private fun ThinkingRow() {
+    val thinkingCd = stringResource(R.string.cd_thinking_generating)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .semantics {
-                contentDescription = "Thinking. Generating answer."
+                contentDescription = thinkingCd
             },
         horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically
@@ -909,7 +910,7 @@ private fun ThinkingRow() {
         )
         Spacer(Modifier.width(10.dp))
         Text(
-            text = "Thinking…",
+            text = stringResource(R.string.thinking_ellipsis),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -934,7 +935,7 @@ private fun ModelLoadingIndicator(loadingModelName: String) {
         )
         Spacer(Modifier.width(10.dp))
         Text(
-            text = "Loading ${loadingModelName.substringAfterLast("/")}…",
+            text = stringResource(R.string.loading_model, loadingModelName.substringAfterLast("/")),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

@@ -7,9 +7,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.warped.R
 import com.warped.ui.endpoints.components.EndpointCard
 import com.warped.ui.endpoints.components.EndpointForm
 
@@ -23,7 +25,7 @@ fun EndpointsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Endpoints") }
+                title = { Text(stringResource(R.string.endpoints_title)) }
             )
         },
         floatingActionButton = {
@@ -52,7 +54,7 @@ fun EndpointsScreen(
                     .padding(padding),
                 contentAlignment = androidx.compose.ui.Alignment.Center
             ) {
-                Text("No endpoints configured", style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.no_endpoints), style = MaterialTheme.typography.bodyLarge)
             }
         } else {
             LazyColumn(
@@ -81,7 +83,7 @@ fun EndpointsScreen(
                 modifier = Modifier.padding(16.dp),
                 action = {
                     TextButton(onClick = { viewModel.dismissForm() }) {
-                        Text("Dismiss")
+                        Text(stringResource(R.string.dismiss))
                     }
                 }
             ) {

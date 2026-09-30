@@ -15,8 +15,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.warped.R
 import com.warped.domain.model.BenchmarkResult
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -35,7 +37,7 @@ fun BenchmarkResultsViewer(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = "No benchmarks yet — run one above.",
+                text = stringResource(R.string.bench_empty),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.bodyMedium,
@@ -85,16 +87,19 @@ private fun BenchmarkResultCard(
                 )
             }
             Text(
-                text = "Init: ${result.initTimeMs} ms",
+                text = stringResource(R.string.bench_init_fmt, result.initTimeMs),
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
-                text = "Prefill: ${"%.1f".format(result.prefillTokPerSec)} tok/s  ·  " +
-                    "Decode: ${"%.1f".format(result.decodeTokPerSec)} tok/s",
+                text = stringResource(
+                    R.string.bench_speed_fmt,
+                    "%.1f".format(result.prefillTokPerSec),
+                    "%.1f".format(result.decodeTokPerSec)
+                ),
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
-                text = "Peak memory: ${formatBytes(result.peakMemoryBytes)}",
+                text = stringResource(R.string.bench_peak_fmt, formatBytes(result.peakMemoryBytes)),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

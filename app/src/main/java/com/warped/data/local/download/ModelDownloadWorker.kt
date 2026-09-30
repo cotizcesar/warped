@@ -13,6 +13,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.warped.MainActivity
+import com.warped.R
 import com.warped.WarpedApplication
 import com.warped.data.local.db.dao.DownloadCheckpointDao
 import com.warped.data.local.db.entity.DownloadCheckpointEntity
@@ -121,18 +122,18 @@ class ModelDownloadWorker @AssistedInject constructor(
                 } else null
                 Timber.e("ModelDownloadWorker: HF error body — $hfErrorBody")
                 val errorMsg = when (response.code) {
-                    401 -> "Download failed (unauthorized). The server rejected the request — check your connection and try again."
+                    401 -> applicationContext.getString(R.string.dl_err_401)
                     403 -> {
                         if (!hfErrorBody.isNullOrBlank()) {
                             val modelId = hfErrorBody.substringAfter("model ").substringBefore(" is restricted").ifBlank { null }
-                            if (modelId != null) "Access denied — visit huggingface.co/$modelId to accept terms, then retry."
-                            else "Access denied — $hfErrorBody"
+                            if (modelId != null) applicationContext.getString(R.string.dl_err_403_model_fmt, modelId)
+                            else applicationContext.getString(R.string.dl_err_403_body_fmt, hfErrorBody)
                         } else {
-                            "Access denied — visit the model page on Hugging Face to accept terms."
+                            applicationContext.getString(R.string.dl_err_403_generic)
                         }
                     }
-                    404 -> "File not found on HuggingFace."
-                    else -> "HTTP ${response.code}: ${response.message}"
+                    404 -> applicationContext.getString(R.string.dl_err_404)
+                    else -> applicationContext.getString(R.string.dl_err_http_fmt, response.code, response.message)
                 }
                 Timber.e("ModelDownloadWorker: download failed — $errorMsg")
                 return Result.failure(workDataOf("error" to errorMsg))
@@ -340,7 +341,7 @@ class ModelDownloadWorker @AssistedInject constructor(
             applicationContext,
             WarpedApplication.CHANNEL_DOWNLOADS
         )
-            .setContentTitle("Downloading model")
+            .setContentTitle(applicationContext.getString(R.string.notif_dl_title))
             .setContentText(fileName)
             .setStyle(NotificationCompat.BigTextStyle().bigText(downloadStatusText(fileName, progressPercent, downloadedBytes, totalBytes, speedBytesPerSecond)))
             .setSmallIcon(android.R.drawable.stat_sys_download)
@@ -350,7 +351,7 @@ class ModelDownloadWorker @AssistedInject constructor(
             .setOngoing(true)
             .setProgress(100, progressPercent, totalBytes <= 0)
             .setContentIntent(tapIntent)
-            .addAction(android.R.drawable.ic_media_pause, "Cancel", cancelIntent)
+            .addAction(android.R.drawable.ic_media_pause, applicationContext.getString(R.string.cancel), cancelIntent)
             .build()
 
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -374,7 +375,7 @@ class ModelDownloadWorker @AssistedInject constructor(
         val amount = if (totalBytes > 0) {
             "${formatFileSize(downloadedBytes)} / ${formatFileSize(totalBytes)} ($progressPercent%)"
         } else {
-            "${formatFileSize(downloadedBytes)} downloaded"
+            applicationContext.getString(R.string.notif_dl_unknown_fmt, formatFileSize(downloadedBytes))
         }
         val speed = if (speedBytesPerSecond > 0) " · ${formatFileSize(speedBytesPerSecond)}/s" else ""
         return "$fileName\n$amount$speed"

@@ -1,6 +1,7 @@
 package com.warped.ui.settings
 
 import android.content.Context
+import com.warped.R
 import androidx.lifecycle.SavedStateHandle
 import com.google.common.truth.Truth.assertThat
 import com.warped.data.grounding.GroundingPrompt
@@ -113,6 +114,23 @@ class SettingsTavilyTest {
         every { apiKeyStore.storeTavilyKey(any()) } just Runs
         every { apiKeyStore.deleteTavilyKey() } just Runs
         every { apiKeyStore.deleteAllKeys(any()) } just Runs
+        // Localized VM copy resolves through Context — stub the EN values so
+        // copy assertions below stay anchored to the canonical strings.
+        val context = mockk<Context>()
+        every { context.getString(R.string.tavily_paste_key) } returns "Paste a key before saving."
+        every { context.getString(R.string.tavily_key_saved) } returns "Tavily API key saved."
+        every { context.getString(R.string.tavily_save_failed) } returns "Couldn't save the key. Try again."
+        every { context.getString(R.string.tavily_key_deleted) } returns "Tavily API key deleted."
+        every { context.getString(R.string.tavily_delete_failed) } returns "Couldn't delete the key. Try again."
+        every { context.getString(R.string.tavily_testing) } returns "Testing connection..."
+        every { context.getString(R.string.tavily_ok) } returns "Connection successful. Tavily search is working."
+        every { context.getString(R.string.tavily_bad_key) } returns "Invalid API key. Check the key and try again."
+        every { context.getString(R.string.tavily_429) } returns "Usage limit reached (429). Check your Tavily plan."
+        every { context.getString(R.string.tavily_net_error) } returns "Network error. Check your connection and try again."
+        every { context.getString(R.string.tavily_no_key) } returns "No API key saved. Get one at tavily.com and paste it above."
+        every { context.getString(R.string.settings_msg_chats_deleted) } returns "All chat history deleted"
+        every { context.getString(R.string.settings_msg_keys_deleted) } returns "All API keys deleted"
+        every { context.getString(R.string.settings_msg_key_deleted) } returns "API key deleted"
 
         return SettingsViewModel(
             chatRepository = chatRepository,
@@ -122,6 +140,7 @@ class SettingsTavilyTest {
             apiKeyStore = apiKeyStore,
             advancedPreferences = advancedPreferences,
             tavilySearchRepository = tavilyRepo,
+            context = context,
         )
     }
 

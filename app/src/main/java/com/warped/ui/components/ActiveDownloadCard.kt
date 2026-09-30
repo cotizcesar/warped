@@ -13,7 +13,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.warped.R
 import com.warped.data.local.download.DownloadState
 
 /**
@@ -55,20 +57,24 @@ fun ActiveDownloadContent(
                 style = MaterialTheme.typography.bodySmall
             )
             Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = onCancel) { Text("Cancel") }
+            OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
         } else if (download.isPaused) {
             Text(
-                "Paused · ${formatFileSize(download.downloadedBytes)} / ${formatFileSize(download.totalBytes)}",
+                stringResource(
+                    R.string.dl_paused_fmt,
+                    formatFileSize(download.downloadedBytes),
+                    formatFileSize(download.totalBytes)
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = Color(0xFFFF9800)
             )
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onDeleteIncomplete) { Text("Delete") }
+                OutlinedButton(onClick = onDeleteIncomplete) { Text(stringResource(R.string.delete)) }
             }
         } else {
             Text(
-                "Interrupted · ${formatFileSize(download.downloadedBytes)} downloaded",
+                stringResource(R.string.dl_interrupted_fmt, formatFileSize(download.downloadedBytes)),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error
             )
@@ -80,7 +86,7 @@ fun ActiveDownloadContent(
                 )
             }
             Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = onDeleteIncomplete) { Text("Delete partial file") }
+            OutlinedButton(onClick = onDeleteIncomplete) { Text(stringResource(R.string.delete_partial_file)) }
         }
     }
 }

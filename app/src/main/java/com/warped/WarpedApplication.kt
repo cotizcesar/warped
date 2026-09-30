@@ -103,10 +103,10 @@ class WarpedApplication : Application(), Configuration.Provider, SingletonImageL
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_DOWNLOADS,
-                "Model Downloads",
+                getString(R.string.notif_dl_channel),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Shows progress of model file downloads"
+                description = getString(R.string.notif_dl_channel_desc)
                 setShowBadge(false)
             }
             val manager = getSystemService(NotificationManager::class.java)

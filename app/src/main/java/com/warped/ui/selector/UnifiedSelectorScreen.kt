@@ -13,11 +13,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.warped.R
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -49,7 +51,7 @@ fun UnifiedSelectorScreen(
     if (showMemoryWarning != null) {
         WarpedAlertDialog(
             onDismissRequest = { showMemoryWarning = null },
-            title = { Text("Memory Warning") },
+            title = { Text(stringResource(R.string.memory_warning_title)) },
             text = {
                 val model = showMemoryWarning!!
                 val context = LocalContext.current
@@ -57,23 +59,23 @@ fun UnifiedSelectorScreen(
                 val memInfo = checker.getMemoryInfo()
                 val neededMB = model.sizeBytes / (1024 * 1024)
                 val availableMB = memInfo.availableBytes / (1024 * 1024)
-                Text("This model needs ~$neededMB MB, your device has $availableMB MB available. Loading may cause instability.")
+                Text(stringResource(R.string.models_memory_msg_fmt, neededMB, availableMB))
             },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.connectLocal(showMemoryWarning!!)
                     showMemoryWarning = null
-                }) { Text("Continue") }
+                }) { Text(stringResource(R.string.continue_text)) }
             },
             dismissButton = {
-                TextButton(onClick = { showMemoryWarning = null }) { Text("Cancel") }
+                TextButton(onClick = { showMemoryWarning = null }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
 
     if (editingModel != null) {
         ModelParamsDialog(
-            title = "Parameters for ${editingModel!!.name}",
+            title = stringResource(R.string.params_dialog_title_fmt, editingModel!!.name),
             initial = editingModel!!.parameters,
             onDismiss = { editingModel = null },
             onSave = { newParams ->
@@ -86,7 +88,7 @@ fun UnifiedSelectorScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (isEndpointFormOpen) "Connect to an API" else "Models & Endpoints") },
+                title = { Text(if (isEndpointFormOpen) stringResource(R.string.connect_api_title) else stringResource(R.string.models_title_endpoints)) },
                 navigationIcon = {
                     IconButton(
                         onClick = {
@@ -98,7 +100,7 @@ fun UnifiedSelectorScreen(
                     ) {
                         Icon(
                             if (isEndpointFormOpen) Icons.AutoMirrored.Filled.ArrowBack else Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = stringResource(R.string.back)
                         )
                     }
                 }
@@ -132,7 +134,7 @@ fun UnifiedSelectorScreen(
             ) {
                 if (uiState.activeDownloads.isNotEmpty()) {
                     item(key = "downloads-header") {
-                        Text("Active Downloads", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp))
+                        Text(stringResource(R.string.active_downloads), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp))
                     }
                     items(uiState.activeDownloads, key = { "dl-${it.modelId}" }) { download ->
                         DownloadCard(
@@ -150,19 +152,19 @@ fun UnifiedSelectorScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Local Models", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.local_models), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.width(8.dp))
                             Text("${uiState.localModels.size}", style = MaterialTheme.typography.labelMedium, color = Color(0xFF9CA3AF))
                         }
                         IconButton(onClick = onOpenHuggingFace) {
-                            Icon(Icons.Filled.Add, "Add model", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                            Icon(Icons.Filled.Add, stringResource(R.string.cd_add_model), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
                         }
                     }
                 }
 
                 if (uiState.localModels.isEmpty()) {
                     item(key = "local-empty") {
-                        Text("No local models downloaded", style = MaterialTheme.typography.bodySmall, color = Color(0xFF6B7280), modifier = Modifier.padding(vertical = 8.dp))
+                        Text(stringResource(R.string.selector_no_local), style = MaterialTheme.typography.bodySmall, color = Color(0xFF6B7280), modifier = Modifier.padding(vertical = 8.dp))
                     }
                 }
 
@@ -198,12 +200,12 @@ fun UnifiedSelectorScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Endpoints", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.endpoints_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.width(8.dp))
                             Text("${uiState.endpoints.size}", style = MaterialTheme.typography.labelMedium, color = Color(0xFF9CA3AF))
                         }
                         IconButton(onClick = { viewModel.showEndpointForm() }) {
-                            Icon(Icons.Filled.Add, "Add endpoint", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                            Icon(Icons.Filled.Add, stringResource(R.string.cd_add_endpoint), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
                         }
                     }
                 }
@@ -227,7 +229,7 @@ fun UnifiedSelectorScreen(
             Snackbar(
                 modifier = Modifier.padding(16.dp),
                 action = {
-                    TextButton(onClick = { viewModel.clearError() }) { Text("Dismiss") }
+                    TextButton(onClick = { viewModel.clearError() }) { Text(stringResource(R.string.dismiss)) }
                 }
             ) { Text(uiState.error ?: "") }
         }
@@ -251,15 +253,15 @@ private fun LocalModelSelectorCard(
     if (showDeleteConfirm) {
         WarpedAlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete model") },
-            text = { Text("Delete ${model.name} (${formatFileSize(model.sizeBytes)}) from the device?") },
+            title = { Text(stringResource(R.string.delete_model_title)) },
+            text = { Text(stringResource(R.string.delete_model_message, model.name, formatFileSize(model.sizeBytes))) },
             confirmButton = {
                 TextButton(onClick = { onDelete(); showDeleteConfirm = false }) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+                TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -308,10 +310,10 @@ private fun LocalModelSelectorCard(
             }
 
             IconButton(onClick = onEditParams) {
-                Icon(Icons.Filled.Tune, "Parameters", tint = Color(0xFF9CA3AF), modifier = Modifier.size(18.dp))
+                Icon(Icons.Filled.Tune, stringResource(R.string.cd_parameters), tint = Color(0xFF9CA3AF), modifier = Modifier.size(18.dp))
             }
             IconButton(onClick = { showDeleteConfirm = true }) {
-                Icon(Icons.Filled.Delete, "Delete", tint = Color(0xFF6B7280), modifier = Modifier.size(18.dp))
+                Icon(Icons.Filled.Delete, stringResource(R.string.delete), tint = Color(0xFF6B7280), modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -345,16 +347,16 @@ private fun EndpointSelectorCard(
     if (showDeleteConfirm) {
         WarpedAlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete endpoint") },
-            text = { Text("Delete ${endpoint.name} (${endpoint.apiType.name})? This cannot be undone.") },
+            title = { Text(stringResource(R.string.delete_endpoint_title)) },
+            text = { Text(stringResource(R.string.delete_endpoint_message, endpoint.name, endpoint.apiType.name)) },
             confirmButton = {
                 TextButton(onClick = { onDelete(); showDeleteConfirm = false }) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
@@ -382,10 +384,10 @@ private fun EndpointSelectorCard(
                     }
                 }
                 IconButton(onClick = onEdit) {
-                    Icon(Icons.Filled.Edit, "Edit", tint = Color(0xFF9CA3AF), modifier = Modifier.size(18.dp))
+                    Icon(Icons.Filled.Edit, stringResource(R.string.edit), tint = Color(0xFF9CA3AF), modifier = Modifier.size(18.dp))
                 }
                 IconButton(onClick = { showDeleteConfirm = true }) {
-                    Icon(Icons.Filled.Delete, "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Filled.Delete, stringResource(R.string.delete), tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
                 }
             }
 
@@ -399,12 +401,12 @@ private fun EndpointSelectorCard(
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("Use in chat", color = Color.White)
+                    Text(stringResource(R.string.use_in_chat), color = Color.White)
                 }
             } else {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "No model selected. Edit this endpoint to pick one.",
+                    stringResource(R.string.selector_no_model),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color(0xFF9CA3AF)
                 )
@@ -451,17 +453,21 @@ private fun DownloadCard(
                     style = MaterialTheme.typography.bodySmall
                 )
                 Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = onCancel) { Text("Cancel") }
+                OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
             } else if (download.isPaused) {
-                Text("Paused · ${formatFileSize(download.downloadedBytes)} / ${formatFileSize(download.totalBytes)}",
+                Text(stringResource(
+                    R.string.dl_paused_fmt,
+                    formatFileSize(download.downloadedBytes),
+                    formatFileSize(download.totalBytes)
+                ),
                     style = MaterialTheme.typography.bodySmall, color = Color(0xFFFF9800))
                 Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = onDeleteIncomplete) { Text("Delete") }
+                OutlinedButton(onClick = onDeleteIncomplete) { Text(stringResource(R.string.delete)) }
             } else {
-                Text("Interrupted · ${formatFileSize(download.downloadedBytes)} downloaded",
+                Text(stringResource(R.string.dl_interrupted_fmt, formatFileSize(download.downloadedBytes)),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = onDeleteIncomplete) { Text("Delete partial file") }
+                OutlinedButton(onClick = onDeleteIncomplete) { Text(stringResource(R.string.delete_partial_file)) }
             }
         }
     }

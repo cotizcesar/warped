@@ -42,9 +42,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.warped.R
 import com.warped.domain.model.GroundedSource
 import com.warped.ui.theme.OgCardDark
 import com.warped.ui.theme.OgShimmer
@@ -86,6 +88,9 @@ fun OgSourceCard(
     } else {
         MaterialTheme.colorScheme.surfaceVariant
     }
+    val previewCd = stringResource(R.string.cd_source_preview, number, displayTitle)
+    val openBrowserCd = stringResource(R.string.cd_open_in_browser)
+    val openSourceCd = stringResource(R.string.cd_open_source_browser, number)
 
     Surface(
         color = container,
@@ -95,7 +100,7 @@ fun OgSourceCard(
             .clip(MaterialTheme.shapes.medium)
             .clickable(role = Role.Button, onClick = onPreview)
             .semantics {
-                contentDescription = "Source preview $number: $displayTitle"
+                contentDescription = previewCd
             },
     ) {
         Row(
@@ -107,7 +112,7 @@ fun OgSourceCard(
                 Box(
                     modifier = Modifier
                         .clickable(role = Role.Button, onClick = { onOpenBrowser(source.url) })
-                        .semantics { contentDescription = "Open in browser" },
+                        .semantics { contentDescription = openBrowserCd },
                 ) {
                     OgThumb(
                         imageUrl = gatedImage,
@@ -168,7 +173,7 @@ fun OgSourceCard(
                 IconButton(onClick = { onOpenBrowser(source.url) }) {
                     Icon(
                         imageVector = Icons.Outlined.OpenInNew,
-                        contentDescription = "Open source $number in browser",
+                        contentDescription = openSourceCd,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp),
                     )
@@ -209,6 +214,9 @@ fun CompactSourceCard(
     } else {
         MaterialTheme.colorScheme.surfaceVariant
     }
+    val previewCd = stringResource(R.string.cd_preview_source, number)
+    val openSourceTitleCd = stringResource(R.string.cd_open_source_title, number, displayTitle)
+    val openSourceCd = stringResource(R.string.cd_open_source_browser, number)
 
     Surface(
         color = container,
@@ -218,7 +226,7 @@ fun CompactSourceCard(
             .clip(MaterialTheme.shapes.medium)
             .clickable(role = Role.Button, onClick = onPreview)
             .semantics {
-                contentDescription = "Preview source $number"
+                contentDescription = previewCd
             },
     ) {
         Column(
@@ -233,7 +241,7 @@ fun CompactSourceCard(
                         modifier = Modifier
                             .clickable(role = Role.Button, onClick = { onOpenBrowser(source.url) })
                             .semantics {
-                                contentDescription = "Open source $number: $displayTitle"
+                                contentDescription = openSourceTitleCd
                             },
                     ) {
                         OgThumb(
@@ -264,7 +272,7 @@ fun CompactSourceCard(
                 IconButton(onClick = { onOpenBrowser(source.url) }) {
                     Icon(
                         imageVector = Icons.Outlined.OpenInNew,
-                        contentDescription = "Open source $number in browser",
+                        contentDescription = openSourceCd,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp),
                     )

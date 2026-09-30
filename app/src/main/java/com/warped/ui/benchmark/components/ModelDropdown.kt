@@ -14,6 +14,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.warped.R
 import com.warped.domain.model.LocalModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,11 +34,11 @@ fun ModelDropdown(
         modifier = modifier,
     ) {
         OutlinedTextField(
-            value = selected?.name ?: "No models downloaded",
+            value = selected?.name ?: stringResource(R.string.bench_no_models),
             onValueChange = {},
             readOnly = true,
             enabled = enabled,
-            label = { Text("Model") },
+            label = { Text(stringResource(R.string.lab_model)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .fillMaxWidth()

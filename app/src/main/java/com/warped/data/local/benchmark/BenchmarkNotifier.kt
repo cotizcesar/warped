@@ -14,7 +14,7 @@ class BenchmarkNotifier(private val context: Context) {
     fun foregroundInfo(text: String, progress: Int): ForegroundInfo {
         ensureChannel()
         val notification = NotificationCompat.Builder(context, CHANNEL_BENCHMARK)
-            .setContentTitle("Model benchmark")
+            .setContentTitle(context.getString(R.string.notif_bench_title))
             .setContentText(text)
             .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
             .setOngoing(true)
@@ -40,10 +40,10 @@ class BenchmarkNotifier(private val context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = android.app.NotificationChannel(
                 CHANNEL_BENCHMARK,
-                "Model Benchmarks",
+                context.getString(R.string.notif_bench_channel),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Shows progress of model performance benchmarks"
+                description = context.getString(R.string.notif_bench_channel_desc)
                 setShowBadge(false)
             }
             context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)

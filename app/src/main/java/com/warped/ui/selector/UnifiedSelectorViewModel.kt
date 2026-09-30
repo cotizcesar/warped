@@ -1,7 +1,9 @@
 package com.warped.ui.selector
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.warped.R
 import com.warped.data.local.download.DownloadState
 import com.warped.data.local.download.ModelDownloadManager
 import com.warped.data.local.inference.EngineManager
@@ -16,6 +18,7 @@ import com.warped.domain.model.*
 import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.LocalModelRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
@@ -40,7 +43,8 @@ class UnifiedSelectorViewModel @Inject constructor(
     private val apiKeyStore: ApiKeyStore,
     private val inputSanitizer: InputSanitizer,
     private val parameterStore: ParameterStore,
-    private val allowlist: ModelAllowlistRepository
+    private val allowlist: ModelAllowlistRepository,
+    @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
     /**
@@ -236,7 +240,7 @@ class UnifiedSelectorViewModel @Inject constructor(
                     it.copy(
                         isFetchingModels = false,
                         fetchingEndpointId = null,
-                        endpointModelErrors = it.endpointModelErrors + (endpoint.id to (e.message ?: "Unknown error"))
+                        endpointModelErrors = it.endpointModelErrors + (endpoint.id to (e.message ?: context.getString(R.string.error_unknown_short)))
                     )
                 }
             }
@@ -327,7 +331,7 @@ class UnifiedSelectorViewModel @Inject constructor(
     fun saveEndpoint() {
         val state = _uiState.value
         if (state.formName.isBlank() || state.formUrl.isBlank() || state.formModelId.isBlank()) {
-            _uiState.update { it.copy(error = "Name, URL, and Model ID are required") }
+            _uiState.update { it.copy(error = context.getString(R.string.form_error_required_model)) }
             return
         }
         var url = state.formUrl

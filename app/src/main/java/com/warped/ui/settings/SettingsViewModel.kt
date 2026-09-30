@@ -1,5 +1,6 @@
 package com.warped.ui.settings
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.warped.data.local.preferences.AdvancedPreferences
@@ -12,6 +13,7 @@ import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.LocalModelRepository
 import com.warped.domain.repository.PresetRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +23,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 
 import javax.inject.Inject
+import com.warped.R
 import timber.log.Timber
 
 @HiltViewModel
@@ -32,6 +35,7 @@ class SettingsViewModel @Inject constructor(
     private val apiKeyStore: ApiKeyStore,
     private val advancedPreferences: AdvancedPreferences,
     private val tavilySearchRepository: TavilySearchRepository,
+    @param:ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -121,7 +125,7 @@ class SettingsViewModel @Inject constructor(
                     it.copy(
                         isDeletingChats = false,
                         showDeleteChatsDialog = false,
-                        message = "All chat history deleted",
+                        message = context.getString(R.string.settings_msg_chats_deleted),
                         chatCount = 0
                     )
                 }
@@ -149,7 +153,7 @@ class SettingsViewModel @Inject constructor(
                     it.copy(
                         isDeletingKeys = false,
                         showDeleteKeysDialog = false,
-                        message = "All API keys deleted",
+                        message = context.getString(R.string.settings_msg_keys_deleted),
                         // Phase 55 (TAV-01): deleteAllKeys already wipes the
                         // Tavily alias (55-01 coverage) — reset the card state.
                         tavilyKeyInput = "",
@@ -169,7 +173,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch(coroutineExceptionHandler) {
             try {
                 apiKeyStore.deleteKey(endpointId)
-                _uiState.update { it.copy(message = "API key deleted") }
+                _uiState.update { it.copy(message = context.getString(R.string.settings_msg_key_deleted)) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message) }
             }
@@ -212,7 +216,7 @@ class SettingsViewModel @Inject constructor(
         if (input.isBlank()) {
             _uiState.update {
                 it.copy(
-                    tavilyStatus = "Paste a key before saving.",
+                    tavilyStatus = context.getString(R.string.tavily_paste_key),
                     tavilyStatusIsError = true,
                 )
             }
@@ -227,7 +231,7 @@ class SettingsViewModel @Inject constructor(
                     it.copy(
                         tavilyKeyInput = "",
                         tavilyKeyPresent = true,
-                        tavilyStatus = "Tavily API key saved.",
+                        tavilyStatus = context.getString(R.string.tavily_key_saved),
                         tavilyStatusIsError = false,
                     )
                 }
@@ -235,7 +239,7 @@ class SettingsViewModel @Inject constructor(
                 Timber.w(e, "Settings: Tavily key save failed")
                 _uiState.update {
                     it.copy(
-                        tavilyStatus = "Couldn't save the key. Try again.",
+                        tavilyStatus = context.getString(R.string.tavily_save_failed),
                         tavilyStatusIsError = true,
                     )
                 }
@@ -252,7 +256,7 @@ class SettingsViewModel @Inject constructor(
                         tavilyKeyInput = "",
                         tavilyKeyPresent = false,
                         tavilyTesting = false,
-                        tavilyStatus = "Tavily API key deleted.",
+                        tavilyStatus = context.getString(R.string.tavily_key_deleted),
                         tavilyStatusIsError = false,
                     )
                 }
@@ -260,7 +264,7 @@ class SettingsViewModel @Inject constructor(
                 Timber.w(e, "Settings: Tavily key delete failed")
                 _uiState.update {
                     it.copy(
-                        tavilyStatus = "Couldn't delete the key. Try again.",
+                        tavilyStatus = context.getString(R.string.tavily_delete_failed),
                         tavilyStatusIsError = true,
                     )
                 }
@@ -271,7 +275,7 @@ class SettingsViewModel @Inject constructor(
     /**
      * Cheapest truthful probe (T-55-08): `search("test", max_results = 1,
      * basic)` costs exactly 1 credit — the card copy discloses this. Maps
-     * the repository outcomes to distinct English states; the probe runs on
+     * the repository outcomes to distinct localized states; the probe runs on
      * Dispatchers.IO inside the repository, never the UI thread. Never logs
      * the key or payload (T-55-05).
      */
@@ -281,26 +285,26 @@ class SettingsViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     tavilyTesting = true,
-                    tavilyStatus = "Testing connection...",
+                    tavilyStatus = context.getString(R.string.tavily_testing),
                     tavilyStatusIsError = false,
                 )
             }
             val (status, isError) = try {
                 when (tavilySearchRepository.search(TEST_QUERY, maxResults = 1)) {
                     is TavilySearchOutcome.Grounded ->
-                        "Connection successful. Tavily search is working." to false
+                        context.getString(R.string.tavily_ok) to false
                     TavilySearchOutcome.InvalidKey ->
-                        "Invalid API key. Check the key and try again." to true
+                        context.getString(R.string.tavily_bad_key) to true
                     TavilySearchOutcome.UsageLimit ->
-                        "Usage limit reached (429). Check your Tavily plan." to true
+                        context.getString(R.string.tavily_429) to true
                     is TavilySearchOutcome.ModelOnly ->
-                        "Network error. Check your connection and try again." to true
+                        context.getString(R.string.tavily_net_error) to true
                     TavilySearchOutcome.MissingKey ->
-                        "No API key saved. Get one at tavily.com and paste it above." to true
+                        context.getString(R.string.tavily_no_key) to true
                 }
             } catch (e: Exception) {
                 Timber.w(e, "Settings: Tavily test-connection failed")
-                "Network error. Check your connection and try again." to true
+                context.getString(R.string.tavily_net_error) to true
             }
             _uiState.update {
                 it.copy(

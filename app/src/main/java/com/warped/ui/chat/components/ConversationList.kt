@@ -7,7 +7,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.warped.R
 import com.warped.domain.model.Conversation
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -25,7 +27,7 @@ fun ConversationList(
                 onClick = onNewChat,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("+ New Chat")
+                Text(stringResource(R.string.new_chat_plus))
             }
         }
         HorizontalDivider()

@@ -38,11 +38,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.warped.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.data.local.download.DownloadState
@@ -72,10 +74,10 @@ fun HuggingFaceScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Model catalog") },
+                title = { Text(stringResource(R.string.hf_catalog)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateToModels) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to models")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back_to_models))
                     }
                 }
             )
@@ -92,7 +94,7 @@ fun HuggingFaceScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    "Couldn't load the model catalog. Restart the app and try again.",
+                    stringResource(R.string.hf_load_failed),
                     style = MaterialTheme.typography.bodyLarge
                 )
             }
@@ -181,15 +183,15 @@ private fun CatalogModelCard(
     if (showCancelConfirm) {
         WarpedAlertDialog(
             onDismissRequest = { showCancelConfirm = false },
-            title = { Text("Cancel download?") },
-            text = { Text("The partial file will be deleted.") },
+            title = { Text(stringResource(R.string.hf_cancel_title)) },
+            text = { Text(stringResource(R.string.hf_cancel_msg)) },
             confirmButton = {
                 TextButton(
                     onClick = { showCancelConfirm = false; onCancel() },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) { Text("Cancel download") }
+                ) { Text(stringResource(R.string.hf_cancel_dl)) }
             },
-            dismissButton = { TextButton(onClick = { showCancelConfirm = false }) { Text("Keep") } }
+            dismissButton = { TextButton(onClick = { showCancelConfirm = false }) { Text(stringResource(R.string.hf_keep)) } }
         )
     }
 
@@ -199,7 +201,7 @@ private fun CatalogModelCard(
                 if (expandable) {
                     Modifier.clickable(
                         role = Role.Button,
-                        onClickLabel = if (expanded) "Collapse details" else "Expand details"
+                        onClickLabel = if (expanded) stringResource(R.string.hf_collapse) else stringResource(R.string.hf_expand)
                     ) { expanded = !expanded }
                 } else {
                     Modifier
@@ -322,7 +324,7 @@ private fun CatalogDownloadActions(
         ) {
             Icon(
                 imageVector = Icons.Filled.CheckCircle,
-                contentDescription = "Downloaded",
+                contentDescription = stringResource(R.string.hf_downloaded),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp)
             )
@@ -330,7 +332,7 @@ private fun CatalogDownloadActions(
         else -> IconButton(onClick = onDownload) {
             Icon(
                 imageVector = Icons.Filled.Download,
-                contentDescription = "Download model",
+                contentDescription = stringResource(R.string.hf_download_model),
                 tint = if (failed) {
                     MaterialTheme.colorScheme.error
                 } else {
@@ -351,21 +353,21 @@ private fun CatalogCapabilityIcons(entry: AllowlistedModel) {
         if (entry.capabilities.vision) {
             CapabilityIconBadge(
                 icon = Icons.Filled.Visibility,
-                contentDescription = "Vision",
+                contentDescription = stringResource(R.string.badge_vision),
                 color = Color(0xFF64B5F6)
             )
         }
         if (entry.capabilities.audio) {
             CapabilityIconBadge(
                 icon = Icons.Filled.Audiotrack,
-                contentDescription = "Audio",
+                contentDescription = stringResource(R.string.badge_audio),
                 color = Color(0xFF4CAF50)
             )
         }
         if (entry.capabilities.supportsThinking) {
             CapabilityIconBadge(
                 icon = Icons.Filled.Psychology,
-                contentDescription = "Reasoning",
+                contentDescription = stringResource(R.string.cap_reasoning),
                 color = Color(0xFFFF9800)
             )
         }

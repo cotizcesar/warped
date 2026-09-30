@@ -78,6 +78,8 @@ class ChatSubStateTest {
         val memoryChecker = mockk<MemoryChecker>()
         val advancedPreferences = mockk<AdvancedPreferences>()
         val context = mockk<Context>()
+        every { context.getString(any<Int>()) } returns ""
+        every { context.getString(any<Int>(), *anyVararg<Any>()) } returns ""
 
         every { chatRepository.observeConversations() } returns MutableStateFlow(emptyList())
         coEvery { chatRepository.createConversation(any(), any(), any(), any()) } returns 42L

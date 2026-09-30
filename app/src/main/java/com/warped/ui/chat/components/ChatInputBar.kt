@@ -94,7 +94,7 @@ fun ChatInputBar(
                                     .clickable { onRemoveImage(i) },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Filled.Close, "Remove", tint = Color.White, modifier = Modifier.size(12.dp))
+                                Icon(Icons.Filled.Close, stringResource(R.string.cd_remove), tint = Color.White, modifier = Modifier.size(12.dp))
                             }
                         }
                     }
@@ -142,7 +142,7 @@ fun ChatInputBar(
                 // Left group
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onAddImage, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Filled.AddPhotoAlternate, "Add image",
+                        Icon(Icons.Filled.AddPhotoAlternate, stringResource(R.string.cd_add_image),
                             tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
                     }
                     // Think toggle
@@ -172,7 +172,7 @@ fun ChatInputBar(
 
                 if (isGenerating) {
                     IconButton(onClick = onStop, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Filled.Stop, "Stop", tint = Color.White, modifier = Modifier.size(24.dp))
+                        Icon(Icons.Filled.Stop, stringResource(R.string.cd_stop), tint = Color.White, modifier = Modifier.size(24.dp))
                     }
                 } else {
                     val hasContent = text.isNotBlank() || attachedImages.isNotEmpty()
@@ -185,11 +185,11 @@ fun ChatInputBar(
                                 contentColor = Color.White
                             )
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.Send, "Send", modifier = Modifier.size(24.dp))
+                            Icon(Icons.AutoMirrored.Filled.Send, stringResource(R.string.cd_send), modifier = Modifier.size(24.dp))
                         }
                     } else {
                         IconButton(onClick = onSend, enabled = false, modifier = Modifier.size(40.dp)) {
-                            Icon(Icons.AutoMirrored.Filled.Send, "Send",
+                            Icon(Icons.AutoMirrored.Filled.Send, stringResource(R.string.cd_send),
                                 tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(24.dp))
                         }
                     }

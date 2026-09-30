@@ -1,12 +1,15 @@
 package com.warped.ui.presets
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.warped.R
 import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.domain.model.*
 import com.warped.domain.repository.PresetRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,7 +27,8 @@ class PresetsViewModel @Inject constructor(
     private val engineManager: EngineManager,
     private val memoryChecker: MemoryChecker,
     private val activeModelSelection: ActiveModelSelection,
-    private val localModelRepository: com.warped.domain.repository.LocalModelRepository
+    private val localModelRepository: com.warped.domain.repository.LocalModelRepository,
+    @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PresetsUiState())
@@ -103,7 +107,7 @@ class PresetsViewModel @Inject constructor(
             val newParams = transform(state.parameters)
             parameterStore.update(newParams)
             val isCustom = smartPresetParams == null || newParams != smartPresetParams
-            state.copy(parameters = newParams, isCustomOverride = isCustom, selectedPresetName = if (isCustom) "Custom" else state.selectedPresetName)
+            state.copy(parameters = newParams, isCustomOverride = isCustom, selectedPresetName = if (isCustom) context.getString(R.string.preset_custom_name) else state.selectedPresetName)
         }
     }
 
@@ -115,7 +119,7 @@ class PresetsViewModel @Inject constructor(
                 parameters = smart,
                 isCustomOverride = false,
                 selectedPresetId = null,
-                selectedPresetName = it.smartPresetName ?: "Smart Preset"
+                selectedPresetName = it.smartPresetName ?: context.getString(R.string.preset_smart_name)
             )
         }
     }
@@ -130,7 +134,7 @@ class PresetsViewModel @Inject constructor(
         val memInfo = memoryChecker.getMemoryInfo()
         val result = SmartPresetCalculator.calculate(memInfo, model.sizeBytes)
         smartPresetParams = result.parameters
-        val label = "Smart Preset (${"%.1f".format(result.availableGb)} GB free)"
+        val label = context.getString(R.string.preset_smart_fmt, "%.1f".format(result.availableGb))
         _uiState.update {
             it.copy(
                 smartPresetName = label,

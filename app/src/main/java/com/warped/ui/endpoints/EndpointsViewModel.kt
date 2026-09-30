@@ -1,8 +1,10 @@
 package com.warped.ui.endpoints
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.warped.R
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.data.remote.provider.ProviderRouter
 import com.warped.domain.model.ConnectionStatus
@@ -10,6 +12,7 @@ import com.warped.domain.model.Endpoint
 import com.warped.domain.model.ProviderType
 import com.warped.domain.repository.EndpointRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,7 +28,8 @@ class EndpointsViewModel @Inject constructor(
     private val endpointRepository: EndpointRepository,
     private val providerRouter: ProviderRouter,
     private val apiKeyStore: ApiKeyStore,
-    private val savedStateHandle: SavedStateHandle
+    private val savedStateHandle: SavedStateHandle,
+    @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(EndpointsUiState())
@@ -95,7 +99,7 @@ class EndpointsViewModel @Inject constructor(
     fun saveEndpoint() {
         val state = _uiState.value
         if (state.formName.isBlank() || state.formUrl.isBlank()) {
-            _uiState.update { it.copy(error = "Name and URL are required") }
+            _uiState.update { it.copy(error = context.getString(R.string.form_error_required)) }
             return
         }
         var url = state.formUrl

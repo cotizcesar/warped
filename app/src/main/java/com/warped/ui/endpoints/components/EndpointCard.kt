@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
+import com.warped.R
 import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.Endpoint
 import com.warped.domain.model.displayNameRes
@@ -55,7 +56,7 @@ fun EndpointCard(
                         Spacer(Modifier.width(8.dp))
                         Icon(
                             imageVector = Icons.Filled.FiberManualRecord,
-                            contentDescription = "Active",
+                            contentDescription = stringResource(R.string.badge_active),
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(10.dp)
                         )
@@ -70,18 +71,18 @@ fun EndpointCard(
                 OutlinedButton(onClick = onTest, modifier = Modifier.weight(1f)) {
                     Text(
                         when (connectionStatus) {
-                            ConnectionStatus.Connected -> "Connected"
-                            ConnectionStatus.Connecting -> "Testing..."
-                            ConnectionStatus.Disconnected -> "Disconnected"
-                            else -> "Test"
+                            ConnectionStatus.Connected -> stringResource(R.string.connected)
+                            ConnectionStatus.Connecting -> stringResource(R.string.endpoint_testing)
+                            ConnectionStatus.Disconnected -> stringResource(R.string.disconnected)
+                            else -> stringResource(R.string.endpoint_test)
                         }
                     )
                 }
-                TextButton(onClick = onEdit) { Text("Edit") }
-                TextButton(onClick = onActivate) { Text("Activate") }
+                TextButton(onClick = onEdit) { Text(stringResource(R.string.edit)) }
+                TextButton(onClick = onActivate) { Text(stringResource(R.string.activate)) }
                 TextButton(onClick = onDelete, colors = ButtonDefaults.textButtonColors(
                     contentColor = MaterialTheme.colorScheme.error
-                )) { Text("Delete") }
+                )) { Text(stringResource(R.string.delete)) }
             }
         }
     }

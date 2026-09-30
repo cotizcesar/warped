@@ -8,6 +8,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import com.warped.R
 import com.warped.data.local.db.dao.DownloadCheckpointDao
 import com.warped.data.local.db.entity.DownloadCheckpointEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -91,7 +92,7 @@ class ModelDownloadManager @Inject constructor(
             updateState(modelId) {
                 it.copy(
                     isDownloading = false,
-                    error = "Not enough storage. Need ${fileSizeBytes / (1024 * 1024)} MB"
+                    error = context.getString(R.string.dl_err_storage_fmt, fileSizeBytes / (1024 * 1024))
                 )
             }
             return
@@ -174,7 +175,7 @@ class ModelDownloadManager @Inject constructor(
             if (checkpoint == null) {
                 updateState(modelId) {
                     it.copy(
-                        error = "Cannot resume — no saved progress found",
+                        error = context.getString(R.string.dl_err_no_resume),
                         isPaused = false
                     )
                 }

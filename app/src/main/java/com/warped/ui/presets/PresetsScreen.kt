@@ -40,17 +40,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.warped.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.domain.model.GenerationParameters
 import com.warped.ui.components.WarpedAlertDialog
 import com.warped.domain.model.Preset
 import com.warped.domain.model.MemoryTier
-import com.warped.domain.model.SmartPresetCalculator
 import androidx.compose.foundation.layout.height
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,16 +73,16 @@ fun PresetsScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(if (uiState.selectedPresetName.isNotEmpty()) uiState.selectedPresetName else "Generation Parameters")
+                    Text(if (uiState.selectedPresetName.isNotEmpty()) uiState.selectedPresetName else stringResource(R.string.preset_params_title))
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 actions = {
-                    TextButton(onClick = { viewModel.showSaveDialog() }) { Text("Save") }
-                    TextButton(onClick = { viewModel.resetToDefaults() }) { Text("Reset") }
+                    TextButton(onClick = { viewModel.showSaveDialog() }) { Text(stringResource(R.string.save)) }
+                    TextButton(onClick = { viewModel.resetToDefaults() }) { Text(stringResource(R.string.preset_reset)) }
                 }
             )
         }
@@ -109,7 +110,7 @@ fun PresetsScreen(
 
             if (uiState.presets.isNotEmpty()) {
                 item {
-                    Text("Saved Presets", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.preset_saved_title), style = MaterialTheme.typography.titleMedium)
                 }
                 items(uiState.presets) { preset ->
                     PresetItem(
@@ -122,11 +123,11 @@ fun PresetsScreen(
                 item { HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp)) }
             }
 
-            item { Text("Parameters", style = MaterialTheme.typography.titleMedium) }
+            item { Text(stringResource(R.string.preset_section_params), style = MaterialTheme.typography.titleMedium) }
 
             item {
                 ParameterSlider(
-                    label = "Temperature",
+                    label = stringResource(R.string.param_temperature),
                     value = params.temperature,
                     range = 0f..2f,
                     onValueChange = { viewModel.updateTemperature(it) }
@@ -135,7 +136,7 @@ fun PresetsScreen(
 
             item {
                 ParameterSlider(
-                    label = "Top P",
+                    label = stringResource(R.string.param_top_p),
                     value = params.topP,
                     range = 0f..1f,
                     onValueChange = { viewModel.updateTopP(it) }
@@ -144,7 +145,7 @@ fun PresetsScreen(
 
             item {
                 ParameterIntSlider(
-                    label = "Top K",
+                    label = stringResource(R.string.param_top_k),
                     value = params.topK,
                     range = 1..100,
                     onValueChange = { viewModel.updateTopK(it) }
@@ -153,18 +154,18 @@ fun PresetsScreen(
 
             item {
                 ParameterSlider(
-                    label = "Repeat Penalty",
+                    label = stringResource(R.string.param_repeat_penalty),
                     value = params.repeatPenalty,
                     range = 1f..2f,
                     enabled = !isLiteRTActive,
-                    unsupportedLabel = if (isLiteRTActive) "Unsupported for LiteRT-LM" else null,
+                    unsupportedLabel = if (isLiteRTActive) stringResource(R.string.preset_unsupported_litertlm) else null,
                     onValueChange = { viewModel.updateRepeatPenalty(it) }
                 )
             }
 
             item {
                 ParameterIntSlider(
-                    label = "Max Tokens",
+                    label = stringResource(R.string.param_max_tokens),
                     value = params.maxTokens,
                     range = 64..8192,
                     steps = 30,
@@ -174,19 +175,19 @@ fun PresetsScreen(
 
             item {
                 ParameterIntSlider(
-                    label = "Context Size",
+                    label = stringResource(R.string.param_context_size),
                     value = params.contextSize,
                     range = 512..32768,
                     steps = 20,
                     enabled = !isLiteRTActive,
-                    unsupportedLabel = if (isLiteRTActive) "Unsupported for LiteRT-LM" else null,
+                    unsupportedLabel = if (isLiteRTActive) stringResource(R.string.preset_unsupported_litertlm) else null,
                     onValueChange = { viewModel.updateContextSize(it) }
                 )
             }
 
             item {
                 IntInputField(
-                    label = "Seed (-1 for random)",
+                    label = stringResource(R.string.param_seed_hint),
                     value = params.seed,
                     onValueChange = { viewModel.updateSeed(it) }
                 )
@@ -194,11 +195,11 @@ fun PresetsScreen(
 
             item {
                 ParameterIntSlider(
-                    label = "Threads",
+                    label = stringResource(R.string.param_threads),
                     value = params.threads,
                     range = 1..16,
                     enabled = !isLiteRTActive,
-                    unsupportedLabel = if (isLiteRTActive) "Unsupported for LiteRT-LM" else null,
+                    unsupportedLabel = if (isLiteRTActive) stringResource(R.string.preset_unsupported_litertlm) else null,
                     onValueChange = { viewModel.updateThreads(it) }
                 )
             }
@@ -208,20 +209,20 @@ fun PresetsScreen(
     if (uiState.saveDialogVisible) {
         WarpedAlertDialog(
             onDismissRequest = { viewModel.dismissSaveDialog() },
-            title = { Text("Save Preset") },
+            title = { Text(stringResource(R.string.preset_save_title)) },
             text = {
                 OutlinedTextField(
                     value = uiState.presetNameInput,
                     onValueChange = { viewModel.updatePresetName(it) },
-                    label = { Text("Preset Name") },
+                    label = { Text(stringResource(R.string.preset_name_label)) },
                     singleLine = true
                 )
             },
             confirmButton = {
-                TextButton(onClick = { viewModel.savePreset() }) { Text("Save") }
+                TextButton(onClick = { viewModel.savePreset() }) { Text(stringResource(R.string.save)) }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.dismissSaveDialog() }) { Text("Cancel") }
+                TextButton(onClick = { viewModel.dismissSaveDialog() }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -231,21 +232,20 @@ fun PresetsScreen(
         val formatLabel = if (preset.modelFormat.equals("LITERTLM", ignoreCase = true)) "LiteRT-LM" else preset.modelFormat
         WarpedAlertDialog(
             onDismissRequest = { viewModel.dismissFormatWarning() },
-            title = { Text("Format Mismatch") },
+            title = { Text(stringResource(R.string.preset_format_mismatch)) },
             text = {
                 Text(
-                    "This preset was created for $formatLabel. " +
-                    "Only compatible parameters will be applied."
+                    stringResource(R.string.preset_format_msg_fmt, formatLabel)
                 )
             },
             confirmButton = {
                 TextButton(onClick = { viewModel.confirmLoadPreset() }) {
-                    Text("Apply Compatible")
+                    Text(stringResource(R.string.preset_apply_compatible))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissFormatWarning() }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
@@ -255,7 +255,7 @@ fun PresetsScreen(
         Snackbar(
             modifier = Modifier.padding(16.dp),
             action = {
-                TextButton(onClick = { viewModel.clearError() }) { Text("Dismiss") }
+                TextButton(onClick = { viewModel.clearError() }) { Text(stringResource(R.string.dismiss)) }
             }
         ) { Text(uiState.error ?: "") }
     }
@@ -375,11 +375,11 @@ fun PresetItem(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            TextButton(onClick = onLoad) { Text("Load") }
+            TextButton(onClick = onLoad) { Text(stringResource(R.string.preset_load)) }
             TextButton(
                 onClick = onDelete,
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-            ) { Text("Del") }
+            ) { Text(stringResource(R.string.preset_delete_short)) }
         }
     }
 }
@@ -420,7 +420,15 @@ private fun SmartPresetCard(
         MemoryTier.HIGH -> Color(0xFF4CAF50)
         null -> MaterialTheme.colorScheme.primary
     }
-    val tierLabel = tier?.let { SmartPresetCalculator.tierLabel(it) } ?: ""
+    val tierLabel = tier?.let {
+        stringResource(
+            when (it) {
+                MemoryTier.LOW -> R.string.preset_tier_conservative
+                MemoryTier.MID -> R.string.preset_tier_balanced
+                MemoryTier.HIGH -> R.string.preset_tier_optimal
+            }
+        )
+    } ?: ""
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -456,7 +464,7 @@ private fun SmartPresetCard(
                             color = Color(0xFF4CAF50).copy(alpha = 0.2f)
                         ) {
                             Text(
-                                "Active",
+                                stringResource(R.string.badge_active),
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color(0xFF4CAF50)
@@ -466,7 +474,11 @@ private fun SmartPresetCard(
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "${"%.1f".format(availableGb)} GB free / ${"%.1f".format(totalGb)} GB total",
+                    stringResource(
+                        R.string.preset_mem_fmt,
+                        "%.1f".format(availableGb),
+                        "%.1f".format(totalGb)
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

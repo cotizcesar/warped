@@ -1,6 +1,8 @@
 package com.warped.ui.settings
 
 import com.google.common.truth.Truth.assertThat
+import android.content.Context
+import com.warped.R
 import com.warped.data.local.preferences.AdvancedPreferences
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.domain.model.SyntaxTheme
@@ -75,6 +77,7 @@ class SettingsGroundingToggleTest {
             apiKeyStore = apiKeyStore,
             advancedPreferences = advancedPreferences,
             tavilySearchRepository = tavilySearchRepository,
+            context = mockk(relaxed = true),
         )
     }
 

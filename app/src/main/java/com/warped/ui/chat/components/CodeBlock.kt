@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -69,6 +70,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.window.Popup
+import androidx.annotation.StringRes
+import com.warped.R
 import timber.log.Timber
 
 // ─────────────────────────────────────────────────────────────
@@ -320,7 +323,7 @@ fun CodeBlock(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "Show all $lineCount lines",
+                        text = stringResource(R.string.code_show_all_fmt, lineCount),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color.White.copy(alpha = 0.7f),
@@ -340,7 +343,7 @@ fun CodeBlock(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "Show less",
+                        text = stringResource(R.string.code_show_less),
                         fontSize = 12.sp,
                         color = Color.White.copy(alpha = 0.5f),
                     )
@@ -359,7 +362,7 @@ fun CodeBlock(
  * Detects common syntax issues for the warning indicator.
  * Returns a human-readable description string, or `null` if no issues found.
  */
-private fun detectSyntaxIssues(code: String): String? {
+private fun detectSyntaxIssues(code: String): Int? {
     if (code.isBlank()) return null
 
     // Check for unclosed string literals (odd number of quotes)
@@ -367,14 +370,14 @@ private fun detectSyntaxIssues(code: String): String? {
     val doubleQuoteCount = code.count { it == '"' }
     val singleQuoteCount = code.count { it == '\'' }
     if (doubleQuoteCount % 2 != 0 || singleQuoteCount % 2 != 0) {
-        return "Unclosed string literal"
+        return R.string.code_issue_unclosed
     }
 
     // Check for bracket mismatch
     val openBrackets = code.count { it == '(' || it == '[' || it == '{' }
     val closeBrackets = code.count { it == ')' || it == ']' || it == '}' }
     if (openBrackets != closeBrackets) {
-        return "Possible bracket mismatch"
+        return R.string.code_issue_brackets
     }
 
     return null
@@ -394,7 +397,7 @@ private fun CodeHeaderBar(
     code: String,
     bgCode: Color,
     isStreaming: Boolean,
-    syntaxIssue: String?,
+    @StringRes syntaxIssue: Int?,
 ) {
     val headerBg = Color(
         red = bgCode.red * 0.92f,
@@ -446,7 +449,7 @@ private fun CodeHeaderBar(
             ) {
                 Icon(
                     Icons.Outlined.Warning,
-                    contentDescription = "Syntax issue",
+                    contentDescription = stringResource(R.string.cd_syntax_issue),
                     modifier = Modifier.size(16.dp),
                     tint = Color(0xFFE6A817),
                 )
@@ -462,7 +465,7 @@ private fun CodeHeaderBar(
                         shape = RoundedCornerShape(4.dp),
                     ) {
                         Text(
-                            text = syntaxIssue,
+                            text = stringResource(syntaxIssue),
                             color = Color.White,
                             fontSize = 12.sp,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -475,7 +478,7 @@ private fun CodeHeaderBar(
         // Empty state
         if (code.isBlank()) {
             Text(
-                text = "(empty)",
+                text = stringResource(R.string.code_empty),
                 fontSize = 14.sp,
                 fontFamily = FontFamily.Monospace,
                 fontStyle = FontStyle.Italic,
@@ -500,13 +503,13 @@ private fun CodeHeaderBar(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             Icons.Outlined.Check,
-                            contentDescription = "Copied",
+                            contentDescription = stringResource(R.string.copied),
                             modifier = Modifier.size(16.dp),
                             tint = Color(0xFF4CAF50),
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            text = "Copied!",
+                            text = stringResource(R.string.copied),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             color = Color(0xFF4CAF50),
@@ -516,7 +519,7 @@ private fun CodeHeaderBar(
                 } else {
                     Icon(
                         Icons.Outlined.ContentCopy,
-                        contentDescription = "Copy code",
+                        contentDescription = stringResource(R.string.cd_copy_code),
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     )

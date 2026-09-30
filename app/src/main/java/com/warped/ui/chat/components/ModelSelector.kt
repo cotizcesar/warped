@@ -30,8 +30,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.warped.R
 import com.warped.domain.model.Endpoint
 import com.warped.domain.model.LocalModel
 import com.warped.domain.model.ProviderType
@@ -67,14 +69,14 @@ fun ModelSelectorSheet(
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
             Text(
-                text = "Select a model",
+                text = stringResource(R.string.select_model),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(vertical = 8.dp)
             )
 
             if (localModels.isNotEmpty()) {
-                SectionHeader("Local Models")
+                SectionHeader(stringResource(R.string.local_models))
                 LazyColumn(
                     modifier = Modifier.heightIn(max = 320.dp),
                     contentPadding = PaddingValues(vertical = 4.dp)
@@ -98,7 +100,7 @@ fun ModelSelectorSheet(
                 if (localModels.isNotEmpty()) {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 }
-                SectionHeader("Network Endpoints")
+                SectionHeader(stringResource(R.string.network_endpoints))
                 LazyColumn(
                     modifier = Modifier.heightIn(max = 320.dp),
                     contentPadding = PaddingValues(vertical = 4.dp)
@@ -135,7 +137,7 @@ fun ModelSelectorSheet(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        "No models available. Download a .litertlm model or add an endpoint.",
+                        stringResource(R.string.selector_no_models),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -219,7 +221,7 @@ private fun ModelRow(
                 Spacer(Modifier.width(8.dp))
                 Icon(
                     imageVector = Icons.Filled.Check,
-                    contentDescription = "Selected",
+                    contentDescription = stringResource(R.string.cd_selected),
                     tint = MaterialTheme.colorScheme.primary
                 )
             }

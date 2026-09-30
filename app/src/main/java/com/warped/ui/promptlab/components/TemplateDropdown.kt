@@ -14,6 +14,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.warped.R
 import com.warped.domain.prompt.PromptTemplate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,10 +34,10 @@ fun TemplateDropdown(
         modifier = modifier,
     ) {
         OutlinedTextField(
-            value = selected?.name ?: "Select a template",
+            value = selected?.let { templateDisplayName(it) } ?: stringResource(R.string.lab_select_template),
             onValueChange = {},
             readOnly = true,
-            label = { Text("Template") },
+            label = { Text(stringResource(R.string.lab_template)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .fillMaxWidth()
@@ -50,7 +52,7 @@ fun TemplateDropdown(
                 DropdownMenuItem(
                     text = {
                         Text(
-                            text = t.name,
+                            text = templateDisplayName(t),
                             style = MaterialTheme.typography.bodyLarge,
                         )
                     },

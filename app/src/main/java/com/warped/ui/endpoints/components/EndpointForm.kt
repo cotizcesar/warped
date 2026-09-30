@@ -94,7 +94,7 @@ fun EndpointForm(
             .verticalScrollIfNeeded(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Endpoint Configuration", style = MaterialTheme.typography.headlineMedium)
+        Text(stringResource(R.string.endpoint_configuration), style = MaterialTheme.typography.headlineMedium)
 
         ProviderTypeSelector(
             selected = selectedType,
@@ -110,7 +110,7 @@ fun EndpointForm(
         OutlinedTextField(
             value = name,
             onValueChange = { onFieldChange("name", it) },
-            label = { Text("Name") },
+            label = { Text(stringResource(R.string.name)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
         )
@@ -118,7 +118,7 @@ fun EndpointForm(
         OutlinedTextField(
             value = url,
             onValueChange = { onFieldChange("url", it) },
-            label = { Text("URL") },
+            label = { Text(stringResource(R.string.url)) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             placeholder = { Text(urlPlaceholder) }
@@ -164,10 +164,10 @@ fun EndpointForm(
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
             Button(onClick = onSave, modifier = Modifier.weight(1f)) {
-                Text("Save")
+                Text(stringResource(R.string.save))
             }
         }
     }
@@ -190,7 +190,7 @@ private fun ProviderTypeSelector(
             value = stringResource(selected.displayNameRes()),
             onValueChange = {},
             readOnly = true,
-            label = { Text("Provider Type") },
+            label = { Text(stringResource(R.string.provider_type)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .fillMaxWidth()
@@ -227,7 +227,7 @@ private fun LmStudioModeSelector(
             value = options.firstOrNull { it.first == current }?.second ?: "Native",
             onValueChange = {},
             readOnly = true,
-            label = { Text("Connection Type") },
+            label = { Text(stringResource(R.string.connection_type)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .fillMaxWidth()
@@ -267,12 +267,12 @@ private fun ModelIdField(
         OutlinedTextField(
             value = modelId,
             onValueChange = { onFieldChange("modelId", it) },
-            label = { Text("Model ID") },
+            label = { Text(stringResource(R.string.model_id)) },
             modifier = Modifier
                 .fillMaxWidth()
                 .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
             singleLine = true,
-            placeholder = { Text("Select or type model ID") },
+            placeholder = { Text(stringResource(R.string.select_or_type_model)) },
             trailingIcon = {
                 if (isFetching) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
@@ -296,12 +296,12 @@ private fun ModelIdField(
                             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                                 Text(model, modifier = Modifier.weight(1f))
                                 if (caps?.vision == true) {
-                                    Icon(Icons.Filled.Visibility, contentDescription = "Vision",
+                                    Icon(Icons.Filled.Visibility, contentDescription = stringResource(R.string.badge_vision),
                                         modifier = Modifier.size(14.dp), tint = Color(0xFF4CAF50))
                                     Spacer(Modifier.width(2.dp))
                                 }
                                 if (caps?.trainedForToolUse == true) {
-                                    Icon(Icons.Filled.Build, contentDescription = "Tool use",
+                                    Icon(Icons.Filled.Build, contentDescription = stringResource(R.string.cap_tool_use),
                                         modifier = Modifier.size(14.dp), tint = Color(0xFFFF9800))
                                 }
                             }
@@ -313,7 +313,7 @@ private fun ModelIdField(
                     )
                 }
                 DropdownMenuItem(
-                    text = { Text("Custom (type manually)", color = MaterialTheme.colorScheme.primary) },
+                    text = { Text(stringResource(R.string.custom_manual), color = MaterialTheme.colorScheme.primary) },
                     onClick = onModelDropdownDismiss
                 )
             }
@@ -332,14 +332,14 @@ private fun ApiKeyField(
     OutlinedTextField(
         value = apiKey,
         onValueChange = { onFieldChange("apiKey", it) },
-        label = { Text("API Key") },
+        label = { Text(stringResource(R.string.api_key)) },
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
         placeholder = { if (hasSavedKey && apiKey.isBlank()) Text("••••••••") },
         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
         trailingIcon = {
             TextButton(onClick = onToggleVisibility) {
-                Text(if (passwordVisible) "Hide" else "Show")
+                Text(if (passwordVisible) stringResource(R.string.hide) else stringResource(R.string.show))
             }
         }
     )

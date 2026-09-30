@@ -17,7 +17,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.warped.R
 import com.warped.domain.model.BenchmarkConfig
 
 @Composable
@@ -32,12 +34,12 @@ fun BenchmarkConfigCard(
     Card(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "Configuration",
+                text = stringResource(R.string.bench_config),
                 style = MaterialTheme.typography.titleMedium,
             )
             Column(modifier = Modifier.padding(top = 8.dp)) {
                 Text(
-                    text = "Temperature: ${"%.2f".format(config.temperature)}",
+                    text = stringResource(R.string.bench_temp_fmt, "%.2f".format(config.temperature)),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Slider(
@@ -48,7 +50,7 @@ fun BenchmarkConfigCard(
             }
             Column(modifier = Modifier.padding(top = 8.dp)) {
                 Text(
-                    text = "Top-K: ${config.topK}",
+                    text = stringResource(R.string.bench_topk_fmt, config.topK),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Slider(
@@ -59,7 +61,7 @@ fun BenchmarkConfigCard(
             }
             Column(modifier = Modifier.padding(top = 8.dp)) {
                 Text(
-                    text = "Max tokens: ${config.maxTokens}",
+                    text = stringResource(R.string.bench_maxtok_fmt, config.maxTokens),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Slider(
@@ -76,7 +78,7 @@ fun BenchmarkConfigCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text = "Trials: ${config.trials}",
+                    text = stringResource(R.string.bench_trials_fmt, config.trials),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Row {
@@ -84,13 +86,13 @@ fun BenchmarkConfigCard(
                         onClick = { onTrials(config.trials - 1) },
                         enabled = config.trials > 1,
                     ) {
-                        Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Fewer trials")
+                        Icon(Icons.Filled.KeyboardArrowDown, contentDescription = stringResource(R.string.bench_fewer))
                     }
                     IconButton(
                         onClick = { onTrials(config.trials + 1) },
                         enabled = config.trials < 10,
                     ) {
-                        Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "More trials")
+                        Icon(Icons.Filled.KeyboardArrowUp, contentDescription = stringResource(R.string.bench_more))
                     }
                 }
             }

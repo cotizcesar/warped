@@ -16,7 +16,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.warped.R
 import com.warped.domain.model.ModelCapabilities
 
 /**
@@ -32,22 +34,22 @@ fun CapabilityIconRow(caps: ModelCapabilities) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (caps.vision) CapabilityIconBadge(
             icon = Icons.Filled.Visibility,
-            contentDescription = "Vision",
+            contentDescription = stringResource(R.string.badge_vision),
             color = Color(0xFF64B5F6)
         )
         if (caps.audio) CapabilityIconBadge(
             icon = Icons.Filled.Audiotrack,
-            contentDescription = "Audio",
+            contentDescription = stringResource(R.string.badge_audio),
             color = Color(0xFF4CAF50)
         )
         if (caps.reasoning) CapabilityIconBadge(
             icon = Icons.Filled.Psychology,
-            contentDescription = "Thinking",
+            contentDescription = stringResource(R.string.badge_thinking),
             color = Color(0xFFFF9800)
         )
         if (caps.tools) CapabilityIconBadge(
             icon = Icons.Filled.Build,
-            contentDescription = "Tools",
+            contentDescription = stringResource(R.string.badge_tools),
             color = Color(0xFF2196F3)
         )
     }

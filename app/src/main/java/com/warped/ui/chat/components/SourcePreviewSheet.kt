@@ -27,8 +27,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.warped.R
 import com.warped.domain.model.GroundedSource
 import com.warped.domain.model.GroundedSourceStatus
 
@@ -67,7 +69,7 @@ fun SourcePreviewSheet(
         ) {
             // Header block: title + [N] badge + resolved URL line.
             Text(
-                text = "Source $number",
+                text = stringResource(R.string.sheet_source_fmt, number),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -142,7 +144,7 @@ fun SourcePreviewSheet(
             ) {
                 Text(
                     text = if (isEmptyExtract(source)) {
-                        EMPTY_EXTRACT_COPY
+                        stringResource(R.string.sheet_empty_extract)
                     } else {
                         source.extractedText.orEmpty()
                     },
@@ -160,15 +162,11 @@ fun SourcePreviewSheet(
                     .padding(vertical = 16.dp)
                     .heightIn(min = 44.dp),
             ) {
-                Text(text = "Open in browser")
+                Text(text = stringResource(R.string.cd_open_in_browser))
             }
         }
     }
 }
-
-/** UI-SPEC empty-extract copy (English). Browser button stays available. */
-const val EMPTY_EXTRACT_COPY =
-    "Couldn't extract text from this page. Open the page in the browser to view its content."
 
 /**
  * Phase 53: render item for one Fuentes row. [clickable] is true only for ok

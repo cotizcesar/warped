@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -46,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.warped.R
 import com.warped.domain.model.ChatMessage
 import com.warped.domain.model.GroundedSource
 import com.warped.domain.model.ModelOnlyNotice
@@ -91,7 +93,7 @@ fun MessageBubble(
                 onClick = {},
                 onLongClick = {
                     clipboardManager.setText(AnnotatedString(message.content))
-                    Toast.makeText(context, "Copied!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.copied), Toast.LENGTH_SHORT).show()
                 }
             ),
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
@@ -130,14 +132,14 @@ fun MessageBubble(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Thinking",
+                            text = stringResource(R.string.thinking),
                             style = MaterialTheme.typography.bodyMedium,
                             color = Color(0xFF545450)
                         )
                         Spacer(Modifier.width(4.dp))
                         Icon(
                             imageVector = if (showReasoning) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = if (showReasoning) "Hide reasoning" else "Show reasoning",
+                            contentDescription = if (showReasoning) stringResource(R.string.bubble_hide_reasoning) else stringResource(R.string.bubble_show_reasoning),
                             tint = Color(0xFF545450),
                             modifier = Modifier.size(16.dp)
                         )
@@ -234,7 +236,7 @@ fun MessageBubble(
         if (!isUser && fuenteList.any { it.clickable }) {
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "Sources",
+                text = stringResource(R.string.sources_title),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -279,7 +281,7 @@ fun MessageBubble(
             fuenteList.filter { !it.clickable }.forEach { item ->
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "[${item.number}] ${item.url} — skipped",
+                    text = stringResource(R.string.fuente_skipped_fmt, item.number, item.url),
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textDecoration = TextDecoration.LineThrough,
@@ -355,27 +357,23 @@ private fun ModelOnlyBanner(
         Text(
             text = when (notice) {
                 ModelOnlyNotice.OFFLINE ->
-                    "Offline. Model-only answer, no page content. Queued."
+                    stringResource(R.string.bubble_offline_queued)
                 ModelOnlyNotice.FETCH_FAILED ->
                     if (totalSources > 1) {
-                        "Couldn't read the pages. Model-only answer — " +
-                            "check your connection or paste other links."
+                        stringResource(R.string.bubble_fetch_failed_many)
                     } else {
-                        "Couldn't read the page. Model-only answer — " +
-                            "check your connection or paste another link."
+                        stringResource(R.string.bubble_fetch_failed_one)
                     }
                 // Phase 55 (TAV-03): distinct actionable copy per search
-                // gate — all English, all naming the Settings path. None is
-                // OFFLINE so retryGrounding stays OFFLINE-only.
+                // gate — resolved from string resources (EN/ES), all naming
+                // the Settings path. None is OFFLINE so retryGrounding stays
+                // OFFLINE-only.
                 ModelOnlyNotice.TAVILY_MISSING_KEY ->
-                    "No Tavily key saved. Model-only answer — get a key at " +
-                        "tavily.com and paste it in Settings > Web Search."
+                    stringResource(R.string.bubble_tavily_missing)
                 ModelOnlyNotice.TAVILY_INVALID_KEY ->
-                    "Invalid Tavily key. Model-only answer — check the key " +
-                        "in Settings > Web Search."
+                    stringResource(R.string.bubble_tavily_invalid)
                 ModelOnlyNotice.TAVILY_LIMIT ->
-                    "Tavily usage limit reached. Model-only answer — check " +
-                        "your plan usage and try again later."
+                    stringResource(R.string.bubble_tavily_limit)
                 // Phase 57 (57-02): tools[] rejected by the endpoint —
                 // one retry without tools, model-only answer. Copy
                 // mirrors ToolCapabilityMatrix.TOOLS_UNSUPPORTED_NOTICE
@@ -385,9 +383,7 @@ private fun ModelOnlyBanner(
                 // step — retrying the same endpoint cannot help, so no
                 // Retry button (OFFLINE-only gate below untouched).
                 ModelOnlyNotice.TOOLS_UNSUPPORTED ->
-                    "This endpoint doesn't support tool calling. Model-only answer — " +
-                        "no web sources this turn. Switch to a tool-capable endpoint " +
-                        "to restore search."
+                    stringResource(R.string.bubble_tools_unsupported)
             },
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -397,17 +393,17 @@ private fun ModelOnlyBanner(
         // inference is streaming — mirrors the retryGrounding VM guard
         // so the button is never visible-but-dead.
         if (notice == ModelOnlyNotice.OFFLINE && isValidatedOnline && !isFetchingWeb && !isGenerating) {
+            val retryHint = stringResource(R.string.bubble_retry_hint)
             TextButton(
                 onClick = onRetry,
                 modifier = Modifier
                     .heightIn(min = 44.dp)
                     .semantics {
-                        contentDescription =
-                            "Retry reading the pages. Available when the connection recovers."
+                        contentDescription = retryHint
                     }
             ) {
                 Text(
-                    text = "Retry",
+                    text = stringResource(R.string.bubble_retry),
                     color = MaterialTheme.colorScheme.primary
                 )
             }
@@ -520,7 +516,7 @@ private fun MessageImageStack(imageUris: List<String>) {    Column(verticalArran
                         TextButton(onClick = { showFullImage = false }) {
                             Icon(
                                 imageVector = Icons.Filled.Close,
-                                contentDescription = "Close",
+                                contentDescription = stringResource(R.string.cd_close),
                                 tint = androidx.compose.ui.graphics.Color.White
                             )
                         }
@@ -529,7 +525,7 @@ private fun MessageImageStack(imageUris: List<String>) {    Column(verticalArran
                         bitmap?.let {
                             Image(
                                 bitmap = it.asImageBitmap(),
-                                contentDescription = "Full image",
+                                contentDescription = stringResource(R.string.cd_full_image),
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
@@ -539,7 +535,7 @@ private fun MessageImageStack(imageUris: List<String>) {    Column(verticalArran
             bitmap?.let {
                 Image(
                     bitmap = it.asImageBitmap(),
-                    contentDescription = "Image (tap to enlarge)",
+                    contentDescription = stringResource(R.string.cd_image_tap_enlarge),
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 200.dp)

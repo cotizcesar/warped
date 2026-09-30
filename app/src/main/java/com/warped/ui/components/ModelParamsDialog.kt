@@ -24,8 +24,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.warped.R
 import com.warped.domain.model.GenerationParameters
 
 @Composable
@@ -36,6 +39,7 @@ fun ModelParamsDialog(
     onSave: (GenerationParameters) -> Unit
 ) {
     var params by remember { mutableStateOf(initial) }
+    val context = LocalContext.current
 
     WarpedAlertDialog(
         onDismissRequest = onDismiss,
@@ -48,74 +52,74 @@ fun ModelParamsDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 ParamSlider(
-                    label = "Temperature",
+                    label = stringResource(R.string.param_temperature),
                     value = params.temperature,
                     range = 0f..2f,
                     steps = 19,
-                    description = "Controls randomness. Lower = more deterministic.",
+                    description = stringResource(R.string.param_desc_temperature),
                     format = { "%.1f".format(it) }
                 ) { params = params.copy(temperature = it) }
 
                 ParamSlider(
-                    label = "Top P",
+                    label = stringResource(R.string.param_top_p),
                     value = params.topP,
                     range = 0f..1f,
                     steps = 9,
-                    description = "Nucleus sampling. Lower = more focused.",
+                    description = stringResource(R.string.param_desc_top_p),
                     format = { "%.2f".format(it) }
                 ) { params = params.copy(topP = it) }
 
                 ParamSlider(
-                    label = "Top K",
+                    label = stringResource(R.string.param_top_k),
                     value = params.topK.toFloat(),
                     range = 1f..100f,
                     steps = 9,
-                    description = "Limits token selection to top K.",
+                    description = stringResource(R.string.param_desc_top_k),
                     format = { it.toInt().toString() }
                 ) { params = params.copy(topK = it.toInt()) }
 
                 ParamSlider(
-                    label = "Repeat Penalty",
+                    label = stringResource(R.string.param_repeat_penalty),
                     value = params.repeatPenalty,
                     range = 1f..2f,
                     steps = 9,
-                    description = "Penalizes token repetition. Higher = less repetition.",
+                    description = stringResource(R.string.param_desc_repeat),
                     format = { "%.2f".format(it) }
                 ) { params = params.copy(repeatPenalty = it) }
 
                 ParamSlider(
-                    label = "Max Tokens",
+                    label = stringResource(R.string.param_max_tokens),
                     value = params.maxTokens.toFloat(),
                     range = 128f..8192f,
                     steps = 8,
-                    description = "Maximum output tokens per response.",
+                    description = stringResource(R.string.param_desc_maxtokens),
                     format = { it.toInt().toString() }
                 ) { params = params.copy(maxTokens = it.toInt()) }
 
                 ParamSlider(
-                    label = "Context Size",
+                    label = stringResource(R.string.param_context_size),
                     value = params.contextSize.toFloat(),
                     range = 512f..32768f,
                     steps = 6,
-                    description = "Maximum context window size.",
+                    description = stringResource(R.string.param_desc_context),
                     format = { it.toInt().toString() }
                 ) { params = params.copy(contextSize = it.toInt()) }
 
                 ParamSlider(
-                    label = "Seed",
+                    label = stringResource(R.string.param_seed),
                     value = params.seed.toFloat(),
                     range = -1f..100000f,
                     steps = 10,
-                    description = "Random seed. -1 = random each time.",
-                    format = { if (it.toInt() == -1) "Random" else it.toInt().toString() }
+                    description = stringResource(R.string.param_desc_seed),
+                    format = { if (it.toInt() == -1) context.getString(R.string.param_random) else it.toInt().toString() }
                 ) { params = params.copy(seed = it.toInt()) }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(params) }) { Text("Save") }
+            TextButton(onClick = { onSave(params) }) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }

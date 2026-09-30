@@ -68,7 +68,7 @@ fun ModelsScreen(
     if (showMemoryWarning != null) {
         WarpedAlertDialog(
             onDismissRequest = { showMemoryWarning = null },
-            title = { Text("Memory Warning") },
+            title = { Text(stringResource(R.string.memory_warning_title)) },
             text = {
                 val model = showMemoryWarning!!
                 val context = androidx.compose.ui.platform.LocalContext.current
@@ -77,8 +77,7 @@ fun ModelsScreen(
                 val neededMB = model.sizeBytes / (1024 * 1024)
                 val availableMB = memInfo.availableBytes / (1024 * 1024)
                 Text(
-                    "This model needs ~$neededMB MB, your device has $availableMB MB available. " +
-                    "Loading may cause instability."
+                    stringResource(R.string.models_memory_msg_fmt, neededMB, availableMB)
                 )
             },
             confirmButton = {
@@ -86,10 +85,10 @@ fun ModelsScreen(
                     viewModel.useLocalModel(showMemoryWarning!!)
                     onUseInChat()
                     showMemoryWarning = null
-                }) { Text("Continue") }
+                }) { Text(stringResource(R.string.continue_text)) }
             },
             dismissButton = {
-                TextButton(onClick = { showMemoryWarning = null }) { Text("Cancel") }
+                TextButton(onClick = { showMemoryWarning = null }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -100,7 +99,7 @@ fun ModelsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        if (isEndpointFormOpen) "Connect to an API" else "Models & Endpoints",
+                        if (isEndpointFormOpen) stringResource(R.string.connect_api_title) else stringResource(R.string.models_title_endpoints),
                         style = MaterialTheme.typography.titleMedium
                     )
                 },
@@ -116,11 +115,11 @@ fun ModelsScreen(
                                 }
                             }
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to models")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back_to_models))
                         }
                     } else {
                         IconButton(onClick = onOpenDrawer) {
-                            Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                            Icon(Icons.Filled.Menu, contentDescription = stringResource(R.string.cd_menu))
                         }
                     }
                 }
@@ -132,7 +131,7 @@ fun ModelsScreen(
                     onClick = { showAddWizard = true },
                     containerColor = MaterialTheme.colorScheme.primary
                 ) {
-                    Icon(Icons.Filled.Add, "Add", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(28.dp))
+                    Icon(Icons.Filled.Add, stringResource(R.string.cd_add), tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(28.dp))
                 }
             }
         }
@@ -140,7 +139,7 @@ fun ModelsScreen(
         if (showAddWizard) {
             WarpedAlertDialog(
                 onDismissRequest = { showAddWizard = false },
-                title = { Text("Add Model", style = MaterialTheme.typography.titleLarge) },
+                title = { Text(stringResource(R.string.add_model), style = MaterialTheme.typography.titleLarge) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         TextButton(
@@ -150,8 +149,8 @@ fun ModelsScreen(
                             Icon(Icons.Filled.Download, null, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Download model", style = MaterialTheme.typography.bodyLarge)
-                                Text("Choose from the built-in catalog", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(stringResource(R.string.hf_download_model), style = MaterialTheme.typography.bodyLarge)
+                                Text(stringResource(R.string.models_catalog_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                         HorizontalDivider()
@@ -162,7 +161,7 @@ fun ModelsScreen(
                             Icon(Icons.Filled.Storage, null, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Import Model File", style = MaterialTheme.typography.bodyLarge)
+                                Text(stringResource(R.string.import_model_file), style = MaterialTheme.typography.bodyLarge)
                                 Text(stringResource(R.string.import_model_file_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
@@ -174,14 +173,14 @@ fun ModelsScreen(
                             Icon(Icons.Filled.Dns, null, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Connect to an API", style = MaterialTheme.typography.bodyLarge)
-                                Text("Add a remote LM Studio server", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(stringResource(R.string.connect_api_title), style = MaterialTheme.typography.bodyLarge)
+                                Text(stringResource(R.string.connect_lm_studio_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
                 },
                 confirmButton = {},
-                dismissButton = { TextButton(onClick = { showAddWizard = false }) { Text("Cancel") } }
+                dismissButton = { TextButton(onClick = { showAddWizard = false }) { Text(stringResource(R.string.cancel)) } }
             )
         }
 
@@ -196,7 +195,7 @@ fun ModelsScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
                 Text(
-                    "Importing model... ${(uiState.importProgress * 100).toInt()}%",
+                    stringResource(R.string.models_importing_fmt, (uiState.importProgress * 100).toInt()),
                     modifier = Modifier.padding(16.dp)
                 )
             }
@@ -241,14 +240,14 @@ fun ModelsScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("No models or endpoints yet", style = MaterialTheme.typography.bodyLarge, color = Color(0xFF9CA3AF))
+                        Text(stringResource(R.string.no_models_endpoints_yet), style = MaterialTheme.typography.bodyLarge, color = Color(0xFF9CA3AF))
                         Spacer(Modifier.height(8.dp))
-                        Text("Tap Add Model to download one from the catalog or import a file.", style = MaterialTheme.typography.bodySmall, color = Color(0xFF9CA3AF))
+                        Text(stringResource(R.string.models_empty_hint), style = MaterialTheme.typography.bodySmall, color = Color(0xFF9CA3AF))
                         Spacer(Modifier.height(8.dp))
                         OutlinedButton(
                             onClick = { showAddWizard = true },
                             shape = RoundedCornerShape(8.dp)
-                        ) { Text("Add Model") }
+                        ) { Text(stringResource(R.string.add_model)) }
                     }
                 }
             } else {
@@ -260,7 +259,7 @@ fun ModelsScreen(
                     if (uiState.activeDownloads.isNotEmpty()) {
                         item {
                             Text(
-                                "Active Downloads",
+                                stringResource(R.string.active_downloads),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(top = 4.dp)
@@ -276,7 +275,7 @@ fun ModelsScreen(
                     }
                     item {
                         Text(
-                            "Local Models",
+                            stringResource(R.string.local_models),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(top = 4.dp)
@@ -300,7 +299,7 @@ fun ModelsScreen(
                     if (uiState.endpoints.isNotEmpty()) {
                         item {
                             Text(
-                                "Network Endpoints",
+                                stringResource(R.string.network_endpoints),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(top = 4.dp)
@@ -336,16 +335,16 @@ fun ModelCard(
     if (showDeleteConfirm) {
         WarpedAlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete model") },
-            text = { Text("Delete ${model.name} (${formatFileSize(model.sizeBytes)}) from the device?") },
+            title = { Text(stringResource(R.string.delete_model_title)) },
+            text = { Text(stringResource(R.string.delete_model_message, model.name, formatFileSize(model.sizeBytes))) },
             confirmButton = {
                 TextButton(onClick = {
                     onDelete()
                     showDeleteConfirm = false
-                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+                TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -392,7 +391,7 @@ fun ModelCard(
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97757)),
                     shape = RoundedCornerShape(8.dp)
-                ) { Text("Use in chat", color = Color.White) }
+                ) { Text(stringResource(R.string.use_in_chat), color = Color.White) }
                 OutlinedButton(
                     onClick = { showDeleteConfirm = true },
                     modifier = Modifier.weight(1f),
@@ -401,7 +400,7 @@ fun ModelCard(
                 ) {
                     Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Delete")
+                    Text(stringResource(R.string.delete))
                 }
             }
         }
@@ -473,16 +472,16 @@ private fun DeployedEndpointCard(
     if (showDeleteConfirm) {
         WarpedAlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete endpoint") },
-            text = { Text("Delete ${endpoint.name} (${endpoint.apiType.name})? This cannot be undone.") },
+            title = { Text(stringResource(R.string.delete_endpoint_title)) },
+            text = { Text(stringResource(R.string.delete_endpoint_message, endpoint.name, endpoint.apiType.name)) },
             confirmButton = {
                 TextButton(onClick = {
                     onDelete()
                     showDeleteConfirm = false
-                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+                TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -513,12 +512,12 @@ private fun DeployedEndpointCard(
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97757)),
                     shape = RoundedCornerShape(8.dp)
-                ) { Text("Use in chat", color = Color.White) }
+                ) { Text(stringResource(R.string.use_in_chat), color = Color.White) }
                 IconButton(onClick = onEdit) {
-                    Icon(Icons.Filled.Edit, "Edit", tint = Color(0xFF9CA3AF))
+                    Icon(Icons.Filled.Edit, stringResource(R.string.edit), tint = Color(0xFF9CA3AF))
                 }
                 IconButton(onClick = { showDeleteConfirm = true }) {
-                    Icon(Icons.Filled.Delete, "Delete", tint = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Filled.Delete, stringResource(R.string.delete), tint = MaterialTheme.colorScheme.error)
                 }
             }
         }

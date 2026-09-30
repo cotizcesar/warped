@@ -53,45 +53,44 @@ fun SettingsScreen(
     if (uiState.showDeleteChatsDialog) {
             WarpedAlertDialog(
             onDismissRequest = { viewModel.dismissDeleteChatsDialog() },
-            title = { Text("Delete All Chats") },
+            title = { Text(stringResource(R.string.settings_delete_chats_title)) },
             text = {
                 Text(
-                    "This will permanently delete all ${uiState.chatCount} conversations " +
-                        "and their messages. This cannot be undone."
+                    stringResource(R.string.settings_delete_chats_msg, uiState.chatCount)
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = { viewModel.deleteAllChats() },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) { Text("Delete All") }
+                ) { Text(stringResource(R.string.settings_delete_all)) }
             },
-            dismissButton = { TextButton(onClick = { viewModel.dismissDeleteChatsDialog() }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { viewModel.dismissDeleteChatsDialog() }) { Text(stringResource(R.string.cancel)) } }
         )
     }
 
     if (uiState.showDeleteKeysDialog) {
             WarpedAlertDialog(
             onDismissRequest = { viewModel.dismissDeleteKeysDialog() },
-            title = { Text("Delete All API Keys") },
-            text = { Text("This will permanently delete all stored API keys. This cannot be undone.") },
+            title = { Text(stringResource(R.string.settings_delete_keys_title)) },
+            text = { Text(stringResource(R.string.settings_delete_keys_msg)) },
             confirmButton = {
                 TextButton(
                     onClick = { viewModel.deleteAllApiKeys() },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) { Text("Delete All") }
+                ) { Text(stringResource(R.string.settings_delete_all)) }
             },
-            dismissButton = { TextButton(onClick = { viewModel.dismissDeleteKeysDialog() }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { viewModel.dismissDeleteKeysDialog() }) { Text(stringResource(R.string.cancel)) } }
         )
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = { Text(stringResource(R.string.settings)) },
                 navigationIcon = {
                     IconButton(onClick = onOpenDrawer) {
-                        Icon(Icons.Filled.Menu, contentDescription = "Menu")
+                        Icon(Icons.Filled.Menu, contentDescription = stringResource(R.string.cd_menu))
                     }
                 }
             )
@@ -123,7 +122,7 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
     ) {
         // Data section
         item {
-            Text("Data", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings_section_data), style = MaterialTheme.typography.titleMedium)
         }
         item {
             Card(
@@ -133,29 +132,29 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Chats", style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.settings_row_chats), style = MaterialTheme.typography.bodyLarge)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("${uiState.chatCount}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.width(8.dp))
                             TextButton(
                                 onClick = { viewModel.showDeleteChatsDialog() },
                                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                            ) { Text("Delete") }
+                            ) { Text(stringResource(R.string.delete)) }
                         }
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Endpoints", style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.settings_row_endpoints), style = MaterialTheme.typography.bodyLarge)
                         Text("${uiState.endpointCount}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Models", style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.settings_row_models), style = MaterialTheme.typography.bodyLarge)
                         Text("${uiState.modelCount}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Presets", style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.settings_row_presets), style = MaterialTheme.typography.bodyLarge)
                         Text("${uiState.presetCount}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -164,7 +163,7 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
 
         // Web section
         item {
-            Text("Web", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings_section_web), style = MaterialTheme.typography.titleMedium)
         }
         item {
             Card(
@@ -178,20 +177,21 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Grounding web", style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.settings_grounding_title), style = MaterialTheme.typography.bodyLarge)
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "Lee el contenido de los enlaces que pegues en el chat.",
+                            stringResource(R.string.settings_grounding_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Spacer(Modifier.width(8.dp))
+                    val groundingCd = stringResource(R.string.settings_grounding_title)
                     Switch(
                         checked = uiState.webGroundingEnabled,
                         onCheckedChange = viewModel::setWebGroundingEnabled,
                         modifier = Modifier.semantics {
-                            contentDescription = "Grounding web"
+                            contentDescription = groundingCd
                         }
                     )
                 }
@@ -200,7 +200,7 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
 
         // Display section
         item {
-            Text("Display", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings_section_display), style = MaterialTheme.typography.titleMedium)
         }
         // Code theme selector
         item {
@@ -210,10 +210,10 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Code Theme", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.settings_code_theme), style = MaterialTheme.typography.bodyLarge)
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Color scheme for code blocks in chat",
+                        stringResource(R.string.settings_code_theme_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -255,7 +255,7 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
                                         if (theme.key == uiState.codeTheme.key) {
                                             Icon(
                                                 Icons.Outlined.Check,
-                                                "Selected",
+                                                stringResource(R.string.cd_selected),
                                                 tint = MaterialTheme.colorScheme.primary,
                                                 modifier = Modifier.size(16.dp)
                                             )
@@ -276,7 +276,7 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Code font size", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.settings_code_font), style = MaterialTheme.typography.bodyLarge)
                     Spacer(Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -299,7 +299,7 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
 
         // App section
         item {
-            Text("App", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings_section_app), style = MaterialTheme.typography.titleMedium)
         }
         item {
             Card(
@@ -326,7 +326,7 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
         // Web Search section (Phase 55 TAV-01: dedicated card above
         // Security so the Security card stays untouched)
         item {
-            Text("Web Search", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings_section_websearch), style = MaterialTheme.typography.titleMedium)
         }
         item {
             TavilyKeyCard(uiState, viewModel)
@@ -334,7 +334,7 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
 
         // Security section
         item {
-            Text("Security", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings_section_security), style = MaterialTheme.typography.titleMedium)
         }
         item {
             Card(
@@ -344,14 +344,14 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        "API keys are encrypted using Android Keystore (AES-256-GCM)",
+                        stringResource(R.string.settings_security_desc),
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Spacer(Modifier.height(8.dp))
                     TextButton(
                         onClick = { viewModel.showDeleteKeysDialog() },
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                    ) { Text("Delete all keys") }
+                    ) { Text(stringResource(R.string.settings_delete_all_keys_btn)) }
                 }
             }
         }
@@ -375,16 +375,16 @@ private fun TavilyKeyCard(uiState: SettingsUiState, viewModel: SettingsViewModel
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Tavily search", style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(R.string.settings_tavily_title), style = MaterialTheme.typography.bodyLarge)
             Spacer(Modifier.height(4.dp))
             Text(
-                "Ground answers in web search results. Get a key at tavily.com.",
+                stringResource(R.string.settings_tavily_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                if (uiState.tavilyKeyPresent) "Key saved" else "No key saved",
+                if (uiState.tavilyKeyPresent) stringResource(R.string.settings_tavily_present) else stringResource(R.string.settings_tavily_absent),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -392,7 +392,7 @@ private fun TavilyKeyCard(uiState: SettingsUiState, viewModel: SettingsViewModel
             OutlinedTextField(
                 value = uiState.tavilyKeyInput,
                 onValueChange = viewModel::onTavilyKeyInputChange,
-                label = { Text("Tavily API key") },
+                label = { Text(stringResource(R.string.settings_tavily_label)) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -412,16 +412,16 @@ private fun TavilyKeyCard(uiState: SettingsUiState, viewModel: SettingsViewModel
                 TextButton(
                     onClick = { viewModel.saveTavilyKey() },
                     enabled = !uiState.tavilyTesting
-                ) { Text("Save") }
+                ) { Text(stringResource(R.string.save)) }
                 TextButton(
                     onClick = { viewModel.clearTavilyKey() },
                     enabled = !uiState.tavilyTesting,
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) { Text("Clear") }
+                ) { Text(stringResource(R.string.action_clear)) }
                 TextButton(
                     onClick = { viewModel.testTavilyConnection() },
                     enabled = !uiState.tavilyTesting
-                ) { Text(if (uiState.tavilyTesting) "Testing..." else "Test connection") }
+                ) { Text(if (uiState.tavilyTesting) stringResource(R.string.tavily_testing_short) else stringResource(R.string.tavily_test)) }
             }
             if (uiState.tavilyStatus != null) {
                 Spacer(Modifier.height(4.dp))

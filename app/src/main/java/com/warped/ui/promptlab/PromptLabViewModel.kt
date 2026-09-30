@@ -1,7 +1,9 @@
 package com.warped.ui.promptlab
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.warped.R
 import com.warped.data.local.preferences.AdvancedPreferences
 import com.warped.data.remote.provider.ProviderRouter
 import com.warped.domain.model.ActiveModelSelection
@@ -13,6 +15,7 @@ import com.warped.domain.model.StreamToken
 import com.warped.domain.model.SyntaxTheme
 import com.warped.domain.prompt.PromptTemplate
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +33,7 @@ class PromptLabViewModel @Inject constructor(
     private val providerRouter: ProviderRouter,
     private val activeModelSelection: ActiveModelSelection,
     private val advancedPreferences: AdvancedPreferences,
+    @param:ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     private val _ui = MutableStateFlow(
@@ -74,13 +78,13 @@ class PromptLabViewModel @Inject constructor(
 
         val active = activeModelSelection.activeModel.value
         if (active == null) {
-            _ui.update { it.copy(error = "Select a model first (in Models).") }
+            _ui.update { it.copy(error = context.getString(R.string.lab_error_no_model)) }
             return
         }
         val helper = try {
             providerRouter.resolveLocalHelper(active.providerType, active.modelId)
         } catch (e: Exception) {
-            _ui.update { it.copy(error = e.message ?: "Could not resolve model.") }
+            _ui.update { it.copy(error = e.message ?: context.getString(R.string.lab_error_resolve)) }
             return
         }
         val userPrompt = template.userPromptTemplate(
@@ -118,7 +122,7 @@ class PromptLabViewModel @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
-                _ui.update { it.copy(isRunning = false, error = e.message ?: "Inference failed") }
+                _ui.update { it.copy(isRunning = false, error = e.message ?: context.getString(R.string.lab_error_inference)) }
             }
         }
     }

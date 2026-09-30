@@ -1,6 +1,8 @@
 package com.warped.ui.models
 
 import com.google.common.truth.Truth.assertThat
+import android.content.Context
+import com.warped.R
 import com.warped.data.local.download.ModelDownloadManager
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.inference.ModelImportManager
@@ -88,7 +90,8 @@ class ModelsDeleteErrorTest {
             apiKeyStore = mockk(relaxed = true),
             providerRouter = mockk(relaxed = true),
             inputSanitizer = mockk(relaxed = true),
-            allowlist = mockk(relaxed = true)
+            allowlist = mockk(relaxed = true),
+            context = mockk(relaxed = true)
         )
         return viewModel to activeSelection
     }

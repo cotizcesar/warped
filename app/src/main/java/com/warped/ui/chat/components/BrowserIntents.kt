@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import com.warped.R
 
 /**
  * Phase 58 (OG-02, T-58-08): single guarded ACTION_VIEW gate shared by the
@@ -28,7 +29,7 @@ fun openUrlInBrowser(context: Context, url: String): Boolean {
         !uri.scheme.equals("https", ignoreCase = true)) {
         Toast.makeText(
             context,
-            "Invalid link.",
+            context.getString(R.string.toast_invalid_link),
             Toast.LENGTH_SHORT,
         ).show()
         return false
@@ -39,14 +40,14 @@ fun openUrlInBrowser(context: Context, url: String): Boolean {
     } catch (_: ActivityNotFoundException) {
         Toast.makeText(
             context,
-            "No browser found to open the link.",
+            context.getString(R.string.toast_no_browser),
             Toast.LENGTH_SHORT,
         ).show()
         false
     } catch (_: SecurityException) {
         Toast.makeText(
             context,
-            "No browser found to open the link.",
+            context.getString(R.string.toast_no_browser),
             Toast.LENGTH_SHORT,
         ).show()
         false

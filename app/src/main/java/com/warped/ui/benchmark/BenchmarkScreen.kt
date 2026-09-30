@@ -25,9 +25,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.warped.R
 import com.warped.ui.benchmark.components.BenchmarkConfigCard
 import com.warped.ui.benchmark.components.BenchmarkResultsViewer
 import com.warped.ui.benchmark.components.ModelDropdown
@@ -40,7 +42,7 @@ fun BenchmarkScreen(
     val ui by viewModel.uiState.collectAsStateWithLifecycle()
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Benchmark") })
+            TopAppBar(title = { Text(stringResource(R.string.bench_title)) })
         },
     ) { padding ->
         Column(
@@ -52,7 +54,7 @@ fun BenchmarkScreen(
             verticalArrangement = Arrangement.Top,
         ) {
             Text(
-                text = "Model",
+                text = stringResource(R.string.lab_model),
                 style = MaterialTheme.typography.labelLarge,
             )
             Spacer(Modifier.height(4.dp))
@@ -81,16 +83,16 @@ fun BenchmarkScreen(
                         strokeWidth = 2.dp,
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text("Running…")
+                    Text(stringResource(R.string.running_ellipsis))
                 } else {
                     Icon(Icons.Filled.PlayArrow, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Start Benchmark")
+                    Text(stringResource(R.string.bench_start))
                 }
             }
             Spacer(Modifier.height(24.dp))
             Text(
-                text = "Recent results",
+                text = stringResource(R.string.bench_recent),
                 style = MaterialTheme.typography.labelLarge,
             )
             Spacer(Modifier.height(4.dp))
