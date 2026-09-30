@@ -139,7 +139,7 @@ private fun AllSourcesRow(
     modifier: Modifier = Modifier,
 ) {
     val displayTitle = ogDisplayTitle(source.ogTitle, source.url)
-    val desc = ogDisplayDescription(source.ogDescription)
+    val desc = ogDisplayDescription(source.ogDescription, source.snippet)
     val gatedImage = gatedHttpImageUrl(source.ogImageUrl)
         ?: faviconFallbackUrl(source.url)?.let(::gatedHttpImageUrl)
     var imageFailed by remember(gatedImage) { mutableStateOf(false) }

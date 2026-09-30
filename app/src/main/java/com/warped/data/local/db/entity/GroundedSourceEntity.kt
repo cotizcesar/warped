@@ -41,4 +41,10 @@ data class GroundedSourceEntity(
     @ColumnInfo(name = "og_title") val ogTitle: String? = null,
     @ColumnInfo(name = "og_description") val ogDescription: String? = null,
     @ColumnInfo(name = "og_image_url") val ogImageUrl: String? = null,
+    /**
+     * Quick-task (card-snippet): sanitized search excerpt for the card
+     * description fallback. NULL for omitida/fetch rows and pre-snippet
+     * history (same absent-semantics as the OG columns).
+     */
+    @ColumnInfo(name = "snippet") val snippet: String? = null,
 )

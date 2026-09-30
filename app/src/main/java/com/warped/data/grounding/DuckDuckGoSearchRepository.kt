@@ -4,6 +4,7 @@ import com.warped.data.local.security.ApiKeyStore
 import com.warped.data.remote.network.AuthInterceptor
 import com.warped.domain.model.GroundedSource
 import com.warped.domain.model.GroundedSourceStatus
+import com.warped.domain.model.GROUNDED_SNIPPET_MAX_CHARS
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -345,6 +346,13 @@ class DuckDuckGoSearchRepository @Inject constructor(
                         extractedText = text,
                         status = GroundedSourceStatus.OK,
                         ogTitle = result.title.trim().take(OpenGraphParser.MAX_TITLE_CHARS)
+                            .takeIf { it.isNotEmpty() },
+                        // Quick-task (card-snippet): sanitized excerpt for
+                        // the card description fallback (same sanitizer as
+                        // the fused text above; render caps at 160).
+                        snippet = WebContextSanitizer.sanitize(result.snippet)
+                            .trim()
+                            .take(GROUNDED_SNIPPET_MAX_CHARS)
                             .takeIf { it.isNotEmpty() },
                     )
                 }

@@ -80,7 +80,7 @@ fun OgSourceCard(
     modifier: Modifier = Modifier,
 ) {
     val displayTitle = ogDisplayTitle(source.ogTitle, source.url)
-    val desc = ogDisplayDescription(source.ogDescription)
+    val desc = ogDisplayDescription(source.ogDescription, source.snippet)
     val gatedImage = gatedHttpImageUrl(source.ogImageUrl)
         ?: faviconFallbackUrl(source.url)?.let(::gatedHttpImageUrl)
     var imageFailed by remember(gatedImage) { mutableStateOf(false) }
@@ -186,7 +186,7 @@ fun CompactSourceCard(
     modifier: Modifier = Modifier,
 ) {
     val displayTitle = ogDisplayTitle(source.ogTitle, source.url)
-    val desc = ogDisplayDescription(source.ogDescription)
+    val desc = ogDisplayDescription(source.ogDescription, source.snippet)
     val gatedImage = gatedHttpImageUrl(source.ogImageUrl)
         ?: faviconFallbackUrl(source.url)?.let(::gatedHttpImageUrl)
     var imageFailed by remember(gatedImage) { mutableStateOf(false) }
@@ -321,15 +321,20 @@ fun ogDisplayTitle(ogTitle: String?, url: String): String {
 }
 
 /**
- * Card description line: render-side og:description fallback (null when
- * blank so the card stays byte-identical Title+URL). Trims and caps at 160
- * chars for card density (OpenGraphParser.MAX_DESCRIPTION_CHARS is 500, so
- * the 160-char card cap applies). Render caps at maxLines 2 + ellipsis.
+ * Card description line: render-side fallback chain `og:description` →
+ * search `snippet` → hidden (null when blank so the card stays
+ * byte-identical Title+URL). Trims and caps at 160 chars for card density
+ * (OpenGraphParser.MAX_DESCRIPTION_CHARS is 500, so the 160-char card cap
+ * applies to both legs). Render caps at maxLines 2 + ellipsis. Snippets
+ * arrive pre-sanitized from the repositories (same WebContextSanitizer as
+ * the fused text), so no render-side sanitizing here.
  */
-fun ogDisplayDescription(ogDescription: String?): String? {
+fun ogDisplayDescription(ogDescription: String?, snippet: String? = null): String? {
     val desc = ogDescription?.trim().orEmpty()
-    if (desc.isEmpty()) return null
-    return desc.take(160)
+    if (desc.isNotEmpty()) return desc.take(160)
+    val snip = snippet?.trim().orEmpty()
+    if (snip.isEmpty()) return null
+    return snip.take(160)
 }
 
 /** Phase 58 (OG-02): host fallback for untitled sources; raw URL when unparseable. */

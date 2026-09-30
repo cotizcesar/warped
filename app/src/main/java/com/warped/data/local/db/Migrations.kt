@@ -145,3 +145,13 @@ val MIGRATION_15_16 = object : Migration(15, 16) {
         db.execSQL("ALTER TABLE grounded_sources ADD COLUMN og_image_url TEXT")
     }
 }
+
+// Quick-task (card-snippet): one nullable snippet column on
+// grounded_sources. NULL means no excerpt captured (omitida rows,
+// fetch-path rows, pre-snippet history) — same absent-semantics as the
+// OG columns. No index, no backfill.
+val MIGRATION_16_17 = object : Migration(16, 17) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE grounded_sources ADD COLUMN snippet TEXT")
+    }
+}
