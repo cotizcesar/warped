@@ -1,0 +1,75 @@
+name: Release2
+
+# Workflow evaluation refresh (startup_failure triage 2026-09-30).
+
+on:
+  push:
+    branches:
+      - beta
+      - production
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35 platforms;android-36 build-tools;36.0.0 ndk;27.2.12479018'
+
+      - name: Write local.properties
+        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+      - name: Cache Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Prepare keystore
+        run: |
+          mkdir -p app/keystore
+          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > app/keystore/warped-release.jks
+
+      - name: Write signing config
+        run: |
+          echo "RELEASE_STORE_FILE=keystore/warped-release.jks" >> local.properties
+          echo "RELEASE_STORE_PASSWORD=${{ secrets.RELEASE_STORE_PASSWORD }}" >> local.properties
+          echo "RELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }}" >> local.properties
+          echo "RELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}" >> local.properties
+
+      - name: Build Release Bundle
+        run: ./gradlew bundleRelease
+
+      - name: Determine Play Store track
+        id: track
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          if [ "$BRANCH" = "production" ]; then
+            echo "track=production" >> "$GITHUB_OUTPUT"
+          else
+            echo "track=$BRANCH" >> "$GITHUB_OUTPUT"
+          fi
+
+      # TRIAGE 2026-09-30: Play upload step temporarily disabled to
+      # isolate a scheduler-level startup_failure (bisecting action-ref
+      # resolution). Restore before any store release.
+      # - name: Upload to Google Play Store
+      #   uses: r0adkll/upload-google-play@v1
+      #   with:
+      #     serviceAccountJsonPlainText: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      #     packageName: com.warped.app
+      #     releaseFiles: app/build/outputs/bundle/release/app-release.aab
+      #     tracks: ${{ steps.track.outputs.track }}
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-aab-${{ github.ref_name }}
+          path: app/build/outputs/bundle/release/app-release.aab
