@@ -60,7 +60,9 @@ import com.warped.R
 import com.warped.data.local.inference.BackendType
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.Role
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import com.warped.ui.chat.components.ChatInputBar
 import com.warped.ui.chat.components.MessageBubble
 import com.warped.ui.chat.components.ModelSelectorSheet
@@ -560,15 +562,37 @@ fun ChatScreen(
  * scrollToItem, shift by the item's overflow past the viewport end so the
  * newest content stays visible. Pure list-state math, no new dependencies.
  * Instant (non-animated) — used by the per-token follow path (48-01 PERF-15).
+ *
+ * Quick-task (scroll-hardening): pure pin-target math for [pinLastItemEnd].
+ * Layout can lag newly arrived items, so a target beyond the laid-out count
+ * pins the current end instead of throwing. Returns -1 when there is
+ * nothing to pin (empty list). Truth table: ChatPinTargetTest.
  */
+internal fun clampPinTarget(index: Int, totalItemsCount: Int): Int {
+    if (totalItemsCount <= 0) return -1
+    return index.coerceIn(0, totalItemsCount - 1)
+}
+
 private suspend fun LazyListState.pinLastItemEnd(index: Int) {
-    if (index < 0 || layoutInfo.totalItemsCount == 0) return
-    scrollToItem(index)
-    val info = layoutInfo
-    val item = info.visibleItemsInfo.firstOrNull { it.index == index } ?: return
-    if (item.index != info.visibleItemsInfo.lastOrNull()?.index) return
-    val overflow = item.offset + item.size - info.viewportEndOffset
-    if (overflow > 0) scrollBy(overflow.toFloat())
+    if (index < 0) return
+    // Clamp: the follow LaunchedEffect clears its latch flags BEFORE this
+    // call, so a throw here strands the viewport with no latch. Pinning the
+    // current end on layout lag keeps follow alive; failures log and the
+    // LaunchedEffect survives.
+    val target = clampPinTarget(index, layoutInfo.totalItemsCount)
+    if (target < 0) return
+    try {
+        scrollToItem(target)
+        val info = layoutInfo
+        val item = info.visibleItemsInfo.firstOrNull { it.index == target } ?: return
+        if (item.index != info.visibleItemsInfo.lastOrNull()?.index) return
+        val overflow = item.offset + item.size - info.viewportEndOffset
+        if (overflow > 0) scrollBy(overflow.toFloat())
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Timber.w(e, "Chat: pinLastItemEnd failed for target %d", target)
+    }
 }
 
 /**
