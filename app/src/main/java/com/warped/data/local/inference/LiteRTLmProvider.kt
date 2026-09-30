@@ -518,11 +518,21 @@ class LiteRTLmProvider @Inject constructor(
                             // on Done. Short-circuits/cap/offline carry no
                             // rows and emit nothing (IN-02 extended).
                             val outcome = executeToolCallDetailed(call, contextSize)
-                            if (outcome.sources.isNotEmpty()) {
+                            // Quick-task (tool-failure-note): executed
+                            // calls surface ToolCompleted when they carry
+                            // rows OR when they failed outright — failures
+                            // ride the transient errorReason note (never
+                            // persisted, model-fed text untouched).
+                            if (outcome.sources.isNotEmpty() || outcome.failed) {
                                 emit(
                                     StreamToken.ToolCompleted(
                                         toolId = "local:${call.name}#$callsUsed",
                                         summary = summarizeForTranscript(outcome.text),
+                                        errorReason = if (outcome.failed) {
+                                            LocalToolLoop.failureNote(call.name)
+                                        } else {
+                                            null
+                                        },
                                         sources = outcome.sources,
                                         images = outcome.images,
                                     ),
@@ -588,7 +598,7 @@ class LiteRTLmProvider @Inject constructor(
                     throw e
                 } catch (e: Exception) {
                     Timber.w(e, "LiteRTLm: web_search failed")
-                    LocalToolLoop.ToolCallOutcome(LocalToolLoop.toolFailureMessage(e.message.orEmpty()))
+                    LocalToolLoop.ToolCallOutcome(LocalToolLoop.toolFailureMessage(e.message.orEmpty()), failed = true)
                 }
             }
             LocalToolLoop.TOOL_WEB_FETCH -> {
@@ -610,7 +620,7 @@ class LiteRTLmProvider @Inject constructor(
                     throw e
                 } catch (e: Exception) {
                     Timber.w(e, "LiteRTLm: web_fetch failed")
-                    LocalToolLoop.ToolCallOutcome(LocalToolLoop.toolFailureMessage(e.message.orEmpty()))
+                    LocalToolLoop.ToolCallOutcome(LocalToolLoop.toolFailureMessage(e.message.orEmpty()), failed = true)
                 }
             }
             else -> LocalToolLoop.ToolCallOutcome(LocalToolLoop.unknownToolMessage(call.name))

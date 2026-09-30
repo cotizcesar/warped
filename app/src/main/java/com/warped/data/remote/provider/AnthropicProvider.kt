@@ -313,11 +313,19 @@ class AnthropicProvider(
                             // ToolCompleted so the VM persists Fuentes rows
                             // on Done (same shape as local loop turns).
                             val outcome = executeRemoteTool(canonical, argsMap, contextSize)
-                            if (outcome.sources.isNotEmpty()) {
+                            // Quick-task (tool-failure-note): failures ride
+                            // the transient errorReason note (never
+                            // persisted, model-fed text untouched).
+                            if (outcome.sources.isNotEmpty() || outcome.failed) {
                                 emit(
                                     StreamToken.ToolCompleted(
                                         call.id,
                                         summarizeForTranscript(outcome.text),
+                                        errorReason = if (outcome.failed) {
+                                            LocalToolLoop.failureNote(canonical)
+                                        } else {
+                                            null
+                                        },
                                         sources = outcome.sources,
                                         images = outcome.images,
                                     ),
@@ -392,7 +400,7 @@ class AnthropicProvider(
                         throw e
                     } catch (e: Exception) {
                         Timber.w(e, "Anthropic: web_search failed")
-                        LocalToolLoop.ToolCallOutcome(LocalToolLoop.toolFailureMessage(e.message.orEmpty()))
+                        LocalToolLoop.ToolCallOutcome(LocalToolLoop.toolFailureMessage(e.message.orEmpty()), failed = true)
                     }
                 }
                 LocalToolLoop.TOOL_WEB_FETCH -> {
@@ -416,7 +424,7 @@ class AnthropicProvider(
                         throw e
                     } catch (e: Exception) {
                         Timber.w(e, "Anthropic: web_fetch failed")
-                        LocalToolLoop.ToolCallOutcome(LocalToolLoop.toolFailureMessage(e.message.orEmpty()))
+                        LocalToolLoop.ToolCallOutcome(LocalToolLoop.toolFailureMessage(e.message.orEmpty()), failed = true)
                     }
                 }
                 else -> LocalToolLoop.ToolCallOutcome(LocalToolLoop.unknownToolMessage(toolName))

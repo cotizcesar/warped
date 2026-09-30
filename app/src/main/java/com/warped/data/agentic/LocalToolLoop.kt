@@ -176,6 +176,15 @@ object LocalToolLoop {
         val text: String,
         val sources: List<GroundedSource> = emptyList(),
         val images: List<String> = emptyList(),
+        /**
+         * Quick-task (tool-failure-note): true only when the tool was
+         * attempted and threw (executor catch-all → [toolFailureMessage]).
+         * Validation short-circuits, unknown names, offline, cap, and
+         * key/limit/model-only degradations are NOT failures (they never
+         * executed or carry their own surfaces) — drivers use this to
+         * decide the transient note, never the outcome text.
+         */
+        val failed: Boolean = false,
     )
 
     /**
@@ -264,6 +273,19 @@ object LocalToolLoop {
             }
             else -> unknownToolMessage(toolName)
         }
+    }
+
+    /**
+     * Quick-task (tool-failure-note): user-facing transient copy for an
+     * attempted-but-thrown tool call. The model-facing [toolFailureMessage]
+     * text may carry exception detail — never shown in UI; this note is
+     * generic, English, and auto-clearing (Snackbar one-shot, never
+     * persisted). Unknown names fall through to the generic note.
+     */
+    fun failureNote(toolName: String): String = when (mapToolCallName(toolName)) {
+        TOOL_WEB_SEARCH -> "Web search failed \u2014 answering from model knowledge."
+        TOOL_WEB_FETCH -> "Couldn't read the page \u2014 answering from model knowledge."
+        else -> "Tool call failed \u2014 answering from model knowledge."
     }
 
     /**

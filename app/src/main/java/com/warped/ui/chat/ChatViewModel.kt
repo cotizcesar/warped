@@ -869,6 +869,14 @@ class ChatViewModel @Inject constructor(
                         is StreamToken.ToolStatus -> updateInput { it.copy(toolCallActive = token.toolName) }
                         is StreamToken.ToolCompleted -> {
                             updateInput { it.copy(toolCallActive = null) }
+                            // Quick-task (tool-failure-note): a failed tool
+                            // call surfaces one transient, auto-clearing,
+                            // non-persisted note via the existing Snackbar
+                            // precedent — cleared implicitly (one-shot
+                            // event, never written to the transcript).
+                            token.errorReason?.let { reason ->
+                                _events.tryEmit(ChatEvent.Snackbar(reason))
+                            }
                             for (source in token.sources) {
                                 if (loopSourceDetails.none { it.url == source.url }) {
                                     loopSourceDetails += source
