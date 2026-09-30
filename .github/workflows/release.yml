@@ -42,29 +42,5 @@ jobs:
           echo "RELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }}" >> local.properties
           echo "RELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}" >> local.properties
 
-      - name: Build Release Bundle
-        run: ./gradlew bundleRelease
-
-      - name: Determine Play Store track
-        id: track
-        run: |
-          BRANCH="${{ github.ref_name }}"
-          if [ "$BRANCH" = "production" ]; then
-            echo "track=production" >> "$GITHUB_OUTPUT"
-          else
-            echo "track=$BRANCH" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Upload to Google Play Store
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-          packageName: com.warped.app
-          releaseFiles: app/build/outputs/bundle/release/app-release.aab
-          tracks: ${{ steps.track.outputs.track }}
-
-      - name: Upload AAB artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-aab-${{ github.ref_name }}
-          path: app/build/outputs/bundle/release/app-release.aab
+      - name: Placeholder (bisect infra half)
+        run: echo infra-half-ok
