@@ -34,10 +34,3 @@ jobs:
         run: |
           mkdir -p app/keystore
           echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > app/keystore/warped-release.jks
-
-      - name: Write signing config
-        run: |
-          echo "RELEASE_STORE_FILE=keystore/warped-release.jks" >> local.properties
-          echo "RELEASE_STORE_PASSWORD=${{ secrets.RELEASE_STORE_PASSWORD }}" >> local.properties
-          echo "RELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }}" >> local.properties
-          echo "RELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}" >> local.properties
