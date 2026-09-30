@@ -177,6 +177,8 @@ class TavilySearchRepository @Inject constructor(
                         url = url,
                         extractedText = text,
                         status = GroundedSourceStatus.OK,
+                        ogTitle = result.title.trim().take(OpenGraphParser.MAX_TITLE_CHARS)
+                            .takeIf { it.isNotEmpty() },
                     )
                 }
             }
