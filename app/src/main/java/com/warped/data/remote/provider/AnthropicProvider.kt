@@ -373,10 +373,14 @@ class AnthropicProvider(
                     try {
                         // Explicit args (no Kotlin defaults): keeps the call
                         // on the instance method so MockK can stub it.
+                        // Quick-task (loop-images): includeImages=true ALWAYS
+                        // — the DDG leg ignores it; only the keyed Tavily
+                        // fallback leg uses it (credit-capped).
                         val outcome = repo.search(
                             query = query,
                             maxResults = TavilySearchRepository.DEFAULT_MAX_RESULTS,
                             contextSize = contextSize,
+                            includeImages = true,
                         )
                         LocalToolLoop.ToolCallOutcome(
                             text = LocalToolLoop.mapSearchOutcome(outcome),
