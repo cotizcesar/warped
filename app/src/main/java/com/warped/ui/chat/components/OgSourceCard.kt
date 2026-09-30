@@ -65,10 +65,12 @@ import java.net.URI
  * icon consumes its tap and fires the guarded browser intent instead.
  * Omitida sources never reach this composable (struck text rows stand).
  *
- * Image policy (T-58-06/T-58-07): the model URL is re-gated to http(s) at
- * render (defense in depth over the parse gate); title/description render
- * via plain Compose Text only. A null URL or a failed load collapses the
- * thumb slot silently — the text-only card, no error affordance.
+ * Image policy (T-58-06/T-58-07, quick-task favicon fallback): the model
+ * URL is re-gated to http(s) at render (defense in depth over the parse
+ * gate); a null og:image falls back to the Google S2 favicon for the page
+ * host (same gate); title/description render via plain Compose Text only.
+ * A null/unusable host or a failed load collapses the thumb slot silently
+ * — the text-only card, no error affordance.
  */
 @Composable
 fun OgSourceCard(
@@ -81,6 +83,7 @@ fun OgSourceCard(
     val displayTitle = ogDisplayTitle(source.ogTitle, source.url)
     val description = source.ogDescription?.trim()?.takeIf { it.isNotEmpty() }
     val gatedImage = gatedHttpImageUrl(source.ogImageUrl)
+        ?: faviconFallbackUrl(source.url)?.let(::gatedHttpImageUrl)
     var imageFailed by remember(gatedImage) { mutableStateOf(false) }
     val showThumb = gatedImage != null && !imageFailed
     val container = if (isSystemInDarkTheme()) {
@@ -207,6 +210,7 @@ fun CompactSourceCard(
 ) {
     val displayTitle = ogDisplayTitle(source.ogTitle, source.url)
     val gatedImage = gatedHttpImageUrl(source.ogImageUrl)
+        ?: faviconFallbackUrl(source.url)?.let(::gatedHttpImageUrl)
     var imageFailed by remember(gatedImage) { mutableStateOf(false) }
     val showThumb = gatedImage != null && !imageFailed
     val container = if (isSystemInDarkTheme()) {
@@ -360,4 +364,25 @@ fun gatedHttpImageUrl(raw: String?): String? {
     return if (value.startsWith("http://", ignoreCase = true) ||
         value.startsWith("https://", ignoreCase = true)
     ) value else null
+}
+
+/**
+ * Quick-task (favicon fallback): Google S2 favicon URL for a source page
+ * whose `og:image` is null. Parses the host via [URI] (same discipline as
+ * [ogHostOf]) and returns the keyless S2 lookup
+ * (`https://www.google.com/s2/favicons?domain=<host>&sz=128`) — Google
+ * infra, not a new API dependency. Null when the host is unparseable or
+ * blank, in which case the card stays text-only. Callers gate the result
+ * through [gatedHttpImageUrl] (no-op by construction — the constant is
+ * `https`) so only `http(s)` ever reaches Coil, exactly like the og:image
+ * path. A failed favicon load collapses to the text-only card silently via
+ * the existing `onError` handling — no new error affordance.
+ */
+fun faviconFallbackUrl(pageUrl: String): String? {
+    val host = try {
+        URI(pageUrl.trim()).host
+    } catch (_: Exception) {
+        null
+    }?.takeIf { it.isNotBlank() } ?: return null
+    return "https://www.google.com/s2/favicons?domain=$host&sz=128"
 }

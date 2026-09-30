@@ -83,6 +83,7 @@ fun SourcePreviewSheet(
             // http(s) at render (T-58-06).
             val ogTitle = ogDisplayTitle(source.ogTitle, source.url)
             val gatedImage = gatedHttpImageUrl(source.ogImageUrl)
+                ?: faviconFallbackUrl(source.url)?.let(::gatedHttpImageUrl)
             var headerImageFailed by remember(source) { mutableStateOf(false) }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (gatedImage != null && !headerImageFailed) {
