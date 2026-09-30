@@ -33,4 +33,4 @@ jobs:
       - name: Prepare keystore
         run: |
           mkdir -p app/keystore
-          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > app/keystore/warped-release.jks
+          echo "ZHVtbXk=" | base64 -d > app/keystore/warped-release.jks
