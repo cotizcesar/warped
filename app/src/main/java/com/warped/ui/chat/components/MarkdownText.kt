@@ -85,7 +85,7 @@ fun MarkdownText(
         fontSize = defaultFontSize,
     )
 
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         blocks.forEach { block ->
             when (block) {
                 is MarkdownBlock.TextBlock -> {
