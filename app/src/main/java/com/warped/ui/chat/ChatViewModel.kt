@@ -12,6 +12,7 @@ import com.warped.data.grounding.GroundingPrompt
 import com.warped.data.grounding.GroundingResult
 import com.warped.data.grounding.ImageIntent
 import com.warped.data.grounding.MultiUrlFetcher
+import com.warped.data.grounding.CodeIntent
 import com.warped.data.grounding.NeedsWeb
 import com.warped.data.grounding.MultiUrlResult
 import com.warped.data.grounding.TavilySearchOutcome
@@ -543,13 +544,18 @@ class ChatViewModel @Inject constructor(
                     // and the provider attach path are untouched (the model
                     // may still tool-search with full multimodal context).
                     } else if (images.isEmpty() && audioBytes == null) {
-                        // Quick-task (needs-web-gate): social/identity turns
-                        // skip the pre-search entirely — no socket, no
-                        // credit, no notice, no progress state. Identical to
-                        // grounding-off for this turn. The agentic loop stays
-                        // armed provider-side as the backstop.
-                        if (!NeedsWeb.needsWeb(userMessage.content)) {
-                            Timber.d("Chat: social turn — skipping pre-search")
+                        // Quick-task (code-intent-gate): social/identity OR
+                        // code-generation turns skip the pre-search entirely
+                        // — no socket, no credit, no notice, no progress
+                        // state. Identical to grounding-off for this turn.
+                        // This gate touches the heuristic pre-search ONLY:
+                        // the armed loop REMAINS the model's escape hatch —
+                        // it can still web_search mid-turn for versioned or
+                        // fresh API facts the weights don't cover.
+                        if (!NeedsWeb.needsWeb(userMessage.content) ||
+                            CodeIntent.isCodeTurn(userMessage.content)
+                        ) {
+                            Timber.d("Chat: social/code turn — skipping pre-search")
                         } else {
                         // Quick-task (DDG-default): DDG-primary search
                         // branch. Runs ONLY when all hold — doGround (the

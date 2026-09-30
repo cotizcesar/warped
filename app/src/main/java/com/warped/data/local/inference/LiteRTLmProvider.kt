@@ -100,6 +100,10 @@ class LiteRTLmProvider @Inject constructor(
          * user message is judged on its own; facts not covered by earlier
          * tool results trigger a fresh `web_search`, never an answer from
          * stale results/prior-turn citations alone.
+         *
+         * Quick-task (code-intent-gate): code-from-knowledge rule — code
+         * comes from the model's own weights first; `web_search` is only
+         * for fresh or versioned API facts.
          */
         const val TOOL_USE_SYSTEM_HINT =
             "Use web_search when the question needs current or external facts, " +
@@ -108,6 +112,8 @@ class LiteRTLmProvider @Inject constructor(
                 "Treat each new user message on its own: if it needs facts not covered " +
                 "by earlier tool results, call web_search again instead of answering " +
                 "from stale results. " +
+                "Write code from your own knowledge first; call web_search only for " +
+                "fresh or versioned API facts. " +
                 "Do not call web_search/web_fetch for greetings, thanks, or " +
                 "questions about yourself."
 

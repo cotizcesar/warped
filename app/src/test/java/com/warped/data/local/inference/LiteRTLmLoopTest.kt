@@ -133,6 +133,8 @@ class LiteRTLmLoopTest {
                 "Treat each new user message on its own: if it needs facts not covered " +
                 "by earlier tool results, call web_search again instead of answering " +
                 "from stale results. " +
+                "Write code from your own knowledge first; call web_search only for " +
+                "fresh or versioned API facts. " +
                 "Do not call web_search/web_fetch for greetings, thanks, or " +
                 "questions about yourself."
         )
