@@ -257,7 +257,6 @@
     <string name="bubble_retry_hint">Retry reading the pages. Available when the connection recovers.</string>
 
     <!-- Source preview sheet -->
-    <string name="sheet_source_fmt">Source %1$d</string>
     <string name="sheet_empty_extract">Couldn\'t extract text from this page. Open the page in the browser to view its content.</string>
 
     <!-- Code block -->
@@ -394,6 +393,7 @@
     <string name="lab_select_template">Select a template</string>
     <string name="lab_empty_hint">Pick a template, enter input, then tap Run.</string>
     <string name="fuente_skipped_fmt">[%1$d] %2$s — skipped</string>
+    <string name="fuentes_all_skipped_fmt">%1$d sources skipped</string>
     <string name="thinking_ellipsis">Thinking…</string>
     <string name="error_no_memory_fmt">Not enough memory: model needs %1$d MB but only %2$d MB available. Free up memory or use a smaller quantization.</string>
 

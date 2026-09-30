@@ -812,7 +812,29 @@ private fun InlineModelSelectorBar(
                     // Phase 53 (TOGGLE-01): tri-state Web Sí/No/Heredar menu.
                     // Toggle applies to the next send only, never refetches
                     // history. Spanish labels per UI-SPEC.
-                    Box {
+                    // Quick-task (phase53-trio): override-state dot on the
+                    // bar surface — inherit/on/off distinguishable without
+                    // opening the menu. Reads the existing tri-state, no
+                    // new state; palette reuses traffic/idle dots.
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val overrideState = webOverrideIndicator(webOverride)
+                        val overrideColor = when (overrideState) {
+                            WebOverrideIndicator.ON -> Color(0xFF4CAF50)
+                            WebOverrideIndicator.OFF -> Color(0xFFFF9800)
+                            WebOverrideIndicator.INHERIT -> Color(0xFF666666)
+                        }
+                        val overrideCd = when (overrideState) {
+                            WebOverrideIndicator.ON -> stringResource(R.string.web_on)
+                            WebOverrideIndicator.OFF -> stringResource(R.string.web_off)
+                            WebOverrideIndicator.INHERIT -> stringResource(R.string.web_inherit)
+                        }
+                        Icon(
+                            Icons.Filled.Circle,
+                            contentDescription = overrideCd,
+                            tint = overrideColor,
+                            modifier = Modifier.size(8.dp)
+                        )
+                        Box {
                         IconButton(onClick = { webMenuExpanded = true }) {
                             Icon(
                                 Icons.Filled.MoreVert,
@@ -861,11 +883,26 @@ private fun InlineModelSelectorBar(
                             )
                         }
                     }
+                    }
                 }
             }
         }
     }
 }
+
+/**
+ * Quick-task (phase53-trio): selector-bar override indicator state. Reads
+ * the existing per-chat `webOverride` tri-state — no new state, no global
+ * resolution (inherit renders as inherit, never as the effective value).
+ */
+internal enum class WebOverrideIndicator { ON, OFF, INHERIT }
+
+internal fun webOverrideIndicator(webOverride: Boolean?): WebOverrideIndicator =
+    when (webOverride) {
+        true -> WebOverrideIndicator.ON
+        false -> WebOverrideIndicator.OFF
+        null -> WebOverrideIndicator.INHERIT
+    }
 
 /**
  * Phase 53 (TOGGLE-01): one tri-state menu row with a check mark for the

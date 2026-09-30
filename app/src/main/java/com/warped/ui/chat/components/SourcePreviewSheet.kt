@@ -67,14 +67,9 @@ fun SourcePreviewSheet(
                 .padding(top = 24.dp)
                 .padding(horizontal = 16.dp),
         ) {
-            // Header block: title + [N] badge + resolved URL line.
-            Text(
-                text = stringResource(R.string.sheet_source_fmt, number),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(Modifier.height(8.dp))
+            // Quick-task (phase53-trio): the "Source N" heading is gone —
+            // the [N] badge by the title below already labels the row (one
+            // deletion, no restyle).
             // Phase 58 (OG-02/OG-03): OG header reusing the card pieces —
             // 64dp thumb + 16sp Semibold 1-line title + [N] badge + 14sp
             // primary 1-line URL. Absent/failed image gives the text-only
@@ -202,6 +197,21 @@ fun fuenteItems(
             FuenteItem(number = i + 1, url = url, clickable = true)
         }
     }
+
+/**
+ * Quick-task (phase53-trio): Fuentes block visibility. The block renders
+ * whenever rows exist (assistant turns) — all-omitida turns show struck
+ * rows + count instead of hiding (honesty: no silently dropped sources).
+ */
+internal fun fuentesVisible(fuenteList: List<FuenteItem>, isUser: Boolean): Boolean =
+    !isUser && fuenteList.isNotEmpty()
+
+/**
+ * Quick-task (phase53-trio): true when every row is omitida — the turn
+ * renders the struck-rows + count variant (no carousel, no title row).
+ */
+internal fun omitidaOnly(fuenteList: List<FuenteItem>): Boolean =
+    fuenteList.isNotEmpty() && fuenteList.none { it.clickable }
 
 /**
  * Phase 53: tap resolution — an ok item maps to its preview details, an

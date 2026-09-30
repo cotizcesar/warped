@@ -258,7 +258,6 @@
     <string name="bubble_retry_hint">Reintentá leer las páginas. Disponible cuando se recupere la conexión.</string>
 
     <!-- Hoja de vista previa de fuente -->
-    <string name="sheet_source_fmt">Fuente %1$d</string>
     <string name="sheet_empty_extract">No se pudo extraer el texto de esta página. Abrila en el navegador para ver su contenido.</string>
 
     <!-- Bloque de código -->
@@ -397,6 +396,7 @@
     <string name="lab_select_template">Seleccioná una plantilla</string>
     <string name="lab_empty_hint">Elegí una plantilla, ingresá una entrada y tocá Ejecutar.</string>
     <string name="fuente_skipped_fmt">[%1$d] %2$s — omitida</string>
+    <string name="fuentes_all_skipped_fmt">%1$d fuentes omitidas</string>
     <string name="thinking_ellipsis">Pensando…</string>
     <string name="error_no_memory_fmt">Memoria insuficiente: el modelo necesita %1$d MB pero solo hay %2$d MB disponibles. Liberá memoria o usá una cuantización menor.</string>
 

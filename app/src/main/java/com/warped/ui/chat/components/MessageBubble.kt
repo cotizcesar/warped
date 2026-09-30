@@ -268,12 +268,26 @@ fun MessageBubble(
         // Quick-task (all-sources sheet): ephemeral open flag only — never
         // the hydrated data, same discipline as previewSource above.
         var showAllSources by remember { mutableStateOf(false) }
-        if (!isUser && fuenteList.any { it.clickable }) {
+        // Quick-task (phase53-trio): the block renders whenever rows exist
+        // — all-omitida turns show struck rows + count instead of hiding
+        // (honesty: no silently dropped sources). Title + carousel only
+        // when ok rows exist; struck omitida rows keep their existing
+        // language in both variants.
+        if (fuentesVisible(fuenteList, isUser)) {
+            if (omitidaOnly(fuenteList)) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = stringResource(R.string.fuentes_all_skipped_fmt, fuenteList.size),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
             Spacer(Modifier.height(4.dp))
             // Quick-task (all-sources sheet): title + trailing "View all
             // sources" icon on the same row. The icon renders only when
-            // ≥2 sources exist (single source needs no drawer); zero ok
-            // sources keeps the whole block hidden via the gate above.
+            // ≥2 sources exist (single source needs no drawer).
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -332,7 +346,9 @@ fun MessageBubble(
                     )
                 }
             }
-            // Omitida rows stay as struck text below the carousel.
+            }
+            // Omitida rows stay as struck text below the carousel (and as
+            // the full honesty block on all-omitida turns).
             fuenteList.filter { !it.clickable }.forEach { item ->
                 Spacer(Modifier.height(8.dp))
                 Text(
