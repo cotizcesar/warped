@@ -31,8 +31,9 @@ const val HOST_EXECUTED = "executed by host loop"
  *   (`query`/`url` authored by the model and validated here); conversation
  *   history is never serialized into tool calls.
  * - T-56-04 (denial, wallet): the [MAX_TOOL_CALLS] cap counts CALLS, and
- *   each `web_search` burns exactly 1 Tavily credit (basic-depth default),
- *   so worst case is 5 credits/message; blank queries short-circuit
+ *   `web_search` is DDG-primary (keyless, no credit burn) — only the
+ *   Tavily fallback leg burns 1 credit (basic-depth default) — so worst
+ *   case stays 5 credits/message; blank queries short-circuit
  *   pre-socket (no credit burn).
  *
  * Executor gating order (cheapest first, plan 02 implements): grounding
@@ -48,8 +49,9 @@ object LocalToolLoop {
 
     /**
      * Step cap: max TOOL CALLS per message (not rounds). Call-counting
-     * bounds worst-case Tavily credits 1:1 (5 calls = at most 5 credits);
-     * multi-call rounds cannot multiply the burn.
+     * bounds worst-case fallback credits 1:1 (5 calls = at most 5 Tavily
+     * credits; DDG-primary calls burn none); multi-call rounds cannot
+     * multiply the burn.
      */
     const val MAX_TOOL_CALLS = 5
 
@@ -86,9 +88,9 @@ object LocalToolLoop {
     /**
      * Phase 56 (56-02): single loop-arming predicate shared by the provider
      * (owns the authoritative per-turn decision) and ChatViewModel (must
-     * skip its VM-side Tavily pre-search when the loop is armed, or the
+     * skip its VM-side DDG pre-search when the loop is armed, or the
      * model would never need to search itself and the 5-call wallet bound
-     * would stack on top of the pre-search credit). All three inputs are
+     * would stack on top of the pre-search call). All three inputs are
      * ANDed — grounding off, incapable model, or unvalidated internet each
      * independently force the exact pre-56 plain-turn behavior. The provider
      * being LiteRT-LM is structural (this object is only consumed there).

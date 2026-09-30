@@ -6,6 +6,7 @@ import com.warped.data.agentic.ToolCallAccumulator
 import com.warped.data.agentic.ToolCapabilityMatrix
 import com.warped.data.agentic.parseToolArgs
 import com.warped.data.grounding.MultiUrlFetcher
+import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.TavilySearchRepository
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.remote.dto.OpenAiChatRequest
@@ -77,7 +78,12 @@ internal object CompatToolLoop {
         modelId: String,
         baseMessages: List<OpenAiMessage>,
         request: ChatRequest,
-        tavily: TavilySearchRepository,
+        /**
+         * Quick-task (DDG-default): web_search goes through the DDG-primary
+         * / Tavily-fallback repository (same outcome type — mapping below
+         * untouched).
+         */
+        ddg: DuckDuckGoSearchRepository,
         multiUrlFetcher: MultiUrlFetcher,
         webPageFetcher: WebPageFetcher,
         logTag: String,
@@ -157,7 +163,7 @@ internal object CompatToolLoop {
                         try {
                             val outcome = executeRemoteTool(
                                 canonical, argsMap, contextSize,
-                                tavily, multiUrlFetcher, webPageFetcher, logTag,
+                                ddg, multiUrlFetcher, webPageFetcher, logTag,
                             )
                             emit(StreamToken.ToolCompleted(call.id, summarizeForTranscript(outcome)))
                             outcome
@@ -206,7 +212,7 @@ internal object CompatToolLoop {
         toolName: String,
         args: Map<String, Any?>,
         contextSize: Int,
-        tavily: TavilySearchRepository,
+        ddg: DuckDuckGoSearchRepository,
         multiUrlFetcher: MultiUrlFetcher,
         webPageFetcher: WebPageFetcher,
         logTag: String,
@@ -227,7 +233,7 @@ internal object CompatToolLoop {
                         // Explicit args (no Kotlin defaults): keeps the call
                         // on the instance method so MockK can stub it.
                         LocalToolLoop.mapSearchOutcome(
-                            tavily.search(
+                            ddg.search(
                                 query = query,
                                 maxResults = TavilySearchRepository.DEFAULT_MAX_RESULTS,
                                 contextSize = contextSize,

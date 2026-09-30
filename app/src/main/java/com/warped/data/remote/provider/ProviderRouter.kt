@@ -3,8 +3,8 @@ package com.warped.data.remote.provider
 import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.local.inference.LiteRTLmProvider
 import com.warped.data.local.security.ApiKeyStore
+import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.MultiUrlFetcher
-import com.warped.data.grounding.TavilySearchRepository
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.preferences.AdvancedPreferences
 import com.warped.di.LlmHelperQualifiers
@@ -32,8 +32,11 @@ class ProviderRouter @Inject constructor(
      * actually executes in production instead of staying dead code behind
      * null collaborators. Nullable with null defaults so legacy manual
      * call sites keep compiling; Hilt always provides real bindings.
+     *
+     * Quick-task (DDG-default): the search collaborator is the DDG-primary
+     * / Tavily-fallback repository.
      */
-    private val tavily: TavilySearchRepository? = null,
+    private val ddg: DuckDuckGoSearchRepository? = null,
     private val multiUrlFetcher: MultiUrlFetcher? = null,
     private val webPageFetcher: WebPageFetcher? = null,
     private val advancedPreferences: AdvancedPreferences? = null,
@@ -53,7 +56,7 @@ class ProviderRouter @Inject constructor(
                 endpointId = endpoint.id,
                 apiKey = keyStr,
                 inputSanitizer = inputSanitizer,
-                tavily = tavily,
+                ddg = ddg,
                 multiUrlFetcher = multiUrlFetcher,
                 webPageFetcher = webPageFetcher,
                 advancedPreferences = advancedPreferences
@@ -63,7 +66,7 @@ class ProviderRouter @Inject constructor(
                 modelId = modelId,
                 apiKey = keyStr,
                 inputSanitizer = inputSanitizer,
-                tavily = tavily,
+                ddg = ddg,
                 multiUrlFetcher = multiUrlFetcher,
                 webPageFetcher = webPageFetcher,
                 advancedPreferences = advancedPreferences
@@ -72,7 +75,7 @@ class ProviderRouter @Inject constructor(
                 baseUrl = endpoint.url,
                 modelId = modelId,
                 inputSanitizer = inputSanitizer,
-                tavily = tavily,
+                ddg = ddg,
                 multiUrlFetcher = multiUrlFetcher,
                 webPageFetcher = webPageFetcher,
                 advancedPreferences = advancedPreferences
@@ -82,7 +85,7 @@ class ProviderRouter @Inject constructor(
                 modelId = modelId,
                 apiKey = keyStr,
                 inputSanitizer = inputSanitizer,
-                tavily = tavily,
+                ddg = ddg,
                 multiUrlFetcher = multiUrlFetcher,
                 webPageFetcher = webPageFetcher,
                 advancedPreferences = advancedPreferences
@@ -92,7 +95,7 @@ class ProviderRouter @Inject constructor(
                 modelId = modelId,
                 apiKey = keyStr,
                 inputSanitizer = inputSanitizer,
-                tavily = tavily,
+                ddg = ddg,
                 multiUrlFetcher = multiUrlFetcher,
                 webPageFetcher = webPageFetcher,
                 advancedPreferences = advancedPreferences

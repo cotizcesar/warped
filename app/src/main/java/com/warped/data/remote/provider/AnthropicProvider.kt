@@ -8,6 +8,7 @@ import com.warped.data.agentic.ToolMode
 import com.warped.data.agentic.parseToolArgs
 import com.warped.data.grounding.GroundingPrecedence
 import com.warped.data.grounding.MultiUrlFetcher
+import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.TavilySearchRepository
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.inference.InputSanitizer
@@ -63,7 +64,12 @@ class AnthropicProvider(
      * The endpoint key stays on this client's interceptor ONLY; loop code
      * never references it (T-57-07).
      */
-    private val tavily: TavilySearchRepository? = null,
+    /**
+     * Quick-task (DDG-default): web_search goes through the DDG-primary /
+     * Tavily-fallback repository (same outcome type — downstream mapping
+     * untouched).
+     */
+    private val ddg: DuckDuckGoSearchRepository? = null,
     private val multiUrlFetcher: MultiUrlFetcher? = null,
     private val webPageFetcher: WebPageFetcher? = null,
     private val advancedPreferences: AdvancedPreferences? = null,
@@ -144,7 +150,7 @@ class AnthropicProvider(
     private suspend fun isLoopArmed(perChat: Boolean?): Boolean {
         val prefs = advancedPreferences ?: return false
         val net = webPageFetcher ?: return false
-        if (tavily == null || multiUrlFetcher == null) return false
+        if (ddg == null || multiUrlFetcher == null) return false
         if (ToolCapabilityMatrix.modeFor(ProviderType.ANTHROPIC) != ToolMode.NATIVE_ANTHROPIC) return false
         return try {
             val global = try {
@@ -348,7 +354,7 @@ class AnthropicProvider(
                 LocalToolLoop.TOOL_WEB_SEARCH -> {
                     if (!online) return@withContext LocalToolLoop.OFFLINE_STRING
                     val query = (args["query"] as? String).orEmpty()
-                    val repo = tavily
+                    val repo = ddg
                         ?: return@withContext LocalToolLoop.toolFailureMessage("search unavailable")
                     try {
                         // Explicit args (no Kotlin defaults): keeps the call

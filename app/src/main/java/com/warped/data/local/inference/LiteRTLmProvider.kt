@@ -12,6 +12,7 @@ import com.google.ai.edge.litertlm.tool
 import com.warped.data.agentic.LocalToolLoop
 import com.warped.data.agentic.WebFetchToolSet
 import com.warped.data.agentic.WebSearchToolSet
+import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.GroundingPrecedence
 import com.warped.data.grounding.MultiUrlFetcher
 import com.warped.data.grounding.TavilySearchRepository
@@ -68,7 +69,12 @@ class LiteRTLmProvider @Inject constructor(
     private val engineManager: EngineManager,
     private val inputSanitizer: InputSanitizer,
     private val activeModelSelection: ActiveModelSelection,
-    private val tavily: TavilySearchRepository,
+    /**
+     * Quick-task (DDG-default): web_search goes through the DDG-primary /
+     * Tavily-fallback repository (same outcome type — downstream mapping
+     * untouched).
+     */
+    private val ddg: DuckDuckGoSearchRepository,
     private val multiUrlFetcher: MultiUrlFetcher,
     private val webPageFetcher: WebPageFetcher,
     private val allowlist: ModelAllowlistRepository,
@@ -463,7 +469,7 @@ class LiteRTLmProvider @Inject constructor(
                     // Explicit args (no Kotlin defaults): keeps the call on the
                     // instance method so MockK can stub it in JVM tests.
                     LocalToolLoop.mapSearchOutcome(
-                        tavily.search(
+                        ddg.search(
                             query = query,
                             maxResults = TavilySearchRepository.DEFAULT_MAX_RESULTS,
                             contextSize = contextSize,

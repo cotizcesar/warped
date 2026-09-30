@@ -10,7 +10,7 @@ import com.warped.data.grounding.GroundingResult
 import com.warped.data.grounding.MultiUrlFetcher
 import com.warped.data.grounding.MultiUrlResult
 import com.warped.data.grounding.TavilySearchOutcome
-import com.warped.data.grounding.TavilySearchRepository
+import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.preferences.AdvancedPreferences
 import com.warped.data.repository.AllowlistCapabilities
@@ -45,7 +45,7 @@ class LiteRTLmLoopTest {
     private val engineManager = mockk<EngineManager>()
     private val inputSanitizer = mockk<InputSanitizer>()
     private val activeModelSelection = mockk<ActiveModelSelection>()
-    private val tavily = mockk<TavilySearchRepository>()
+    private val ddg = mockk<DuckDuckGoSearchRepository>()
     private val multiUrlFetcher = mockk<MultiUrlFetcher>()
     private val webPageFetcher = mockk<WebPageFetcher>()
     private val allowlist = mockk<ModelAllowlistRepository>()
@@ -55,7 +55,7 @@ class LiteRTLmLoopTest {
         engineManager = engineManager,
         inputSanitizer = inputSanitizer,
         activeModelSelection = activeModelSelection,
-        tavily = tavily,
+        ddg = ddg,
         multiUrlFetcher = multiUrlFetcher,
         webPageFetcher = webPageFetcher,
         allowlist = allowlist,
@@ -173,7 +173,7 @@ class LiteRTLmLoopTest {
     fun `offline disarms with no socket`() = runTest {
         stubArmed(online = false)
         assertThat(provider().computeArmSnapshot(perChat = null).armed).isFalse()
-        coVerify(exactly = 0) { tavily.search(any(), any(), any()) }
+        coVerify(exactly = 0) { ddg.search(any(), any(), any()) }
     }
 
     @Test
@@ -225,7 +225,7 @@ class LiteRTLmLoopTest {
         val p = provider()
         val result = p.executeToolCall(ToolCall("rm_rf", mapOf("x" to "y")), 4096)
         assertThat(result).contains("Unknown tool")
-        coVerify(exactly = 0) { tavily.search(any(), any(), any()) }
+        coVerify(exactly = 0) { ddg.search(any(), any(), any()) }
         coVerify(exactly = 0) { multiUrlFetcher.fetchAll(any(), any(), any()) }
     }
 
@@ -234,7 +234,7 @@ class LiteRTLmLoopTest {
         val p = provider()
         val result = p.executeToolCall(ToolCall("web_search", mapOf("query" to "   ")), 4096)
         assertThat(result).isEqualTo(LocalToolLoop.MODEL_ONLY_STRING)
-        coVerify(exactly = 0) { tavily.search(any(), any(), any()) }
+        coVerify(exactly = 0) { ddg.search(any(), any(), any()) }
     }
 
     @Test
@@ -255,14 +255,14 @@ class LiteRTLmLoopTest {
         assertThat(
             p.executeToolCall(ToolCall("web_fetch", mapOf("url" to "https://x")), 4096)
         ).isEqualTo(LocalToolLoop.OFFLINE_STRING)
-        coVerify(exactly = 0) { tavily.search(any(), any(), any()) }
+        coVerify(exactly = 0) { ddg.search(any(), any(), any()) }
         coVerify(exactly = 0) { multiUrlFetcher.fetchAll(any(), any(), any()) }
     }
 
     @Test
     fun `search success maps fused block verbatim`() = runTest {
         every { webPageFetcher.hasValidatedInternet() } returns true
-        coEvery { tavily.search(any(), any(), any()) } returns TavilySearchOutcome.Grounded(
+        coEvery { ddg.search(any(), any(), any()) } returns TavilySearchOutcome.Grounded(
             MultiUrlResult.Fused(
                 block = "Source [1] test",
                 okUrls = listOf("https://x"),
@@ -278,7 +278,7 @@ class LiteRTLmLoopTest {
     @Test
     fun `missing key returns actionable string`() = runTest {
         every { webPageFetcher.hasValidatedInternet() } returns true
-        coEvery { tavily.search(any(), any(), any()) } returns TavilySearchOutcome.MissingKey
+        coEvery { ddg.search(any(), any(), any()) } returns TavilySearchOutcome.MissingKey
         val p = provider()
         assertThat(
             p.executeToolCall(ToolCall("web_search", mapOf("query" to "q")), 4096)
@@ -288,7 +288,7 @@ class LiteRTLmLoopTest {
     @Test
     fun `executor failure degrades to concise string - never throws`() = runTest {
         every { webPageFetcher.hasValidatedInternet() } returns true
-        coEvery { tavily.search(any(), any(), any()) } throws RuntimeException("boom detail")
+        coEvery { ddg.search(any(), any(), any()) } throws RuntimeException("boom detail")
         val p = provider()
         assertThat(
             p.executeToolCall(ToolCall("web_search", mapOf("query" to "q")), 4096)
@@ -340,7 +340,7 @@ class LiteRTLmLoopTest {
     @Test
     fun `multi-round loop streams text - thought to Done - tool results fed back`() = runTest {
         every { webPageFetcher.hasValidatedInternet() } returns true
-        coEvery { tavily.search(any(), any(), any()) } returns TavilySearchOutcome.Grounded(
+        coEvery { ddg.search(any(), any(), any()) } returns TavilySearchOutcome.Grounded(
             MultiUrlResult.Fused(
                 block = "Source [1] search",
                 okUrls = listOf("https://s"),
@@ -388,7 +388,7 @@ class LiteRTLmLoopTest {
     @Test
     fun `cap reached feeds continuation string - one call over the cap`() = runTest {
         every { webPageFetcher.hasValidatedInternet() } returns true
-        coEvery { tavily.search(any(), any(), any()) } returns TavilySearchOutcome.Grounded(
+        coEvery { ddg.search(any(), any(), any()) } returns TavilySearchOutcome.Grounded(
             MultiUrlResult.Fused(block = "S", okUrls = listOf("https://s"), skippedUrls = emptyList())
         )
         val sixCalls = (1..6).map { ToolCall("web_search", mapOf("query" to "q$it")) }
@@ -400,7 +400,7 @@ class LiteRTLmLoopTest {
         )
         val tokens = flow<StreamToken> { drive(transport) }.toList()
 
-        coVerify(exactly = 5) { tavily.search(any(), any(), any()) }
+        coVerify(exactly = 5) { ddg.search(any(), any(), any()) }
         val fed = toolResponses(transport.replies[1])
         assertThat(fed).hasSize(6)
         assertThat(fed.last()).isEqualTo("web_search" to LocalToolLoop.CAP_REACHED_STRING)
@@ -410,7 +410,7 @@ class LiteRTLmLoopTest {
     @Test
     fun `second tool request after cap finishes instead of ping-ponging`() = runTest {
         every { webPageFetcher.hasValidatedInternet() } returns true
-        coEvery { tavily.search(any(), any(), any()) } returns TavilySearchOutcome.Grounded(
+        coEvery { ddg.search(any(), any(), any()) } returns TavilySearchOutcome.Grounded(
             MultiUrlResult.Fused(block = "S", okUrls = listOf("https://s"), skippedUrls = emptyList())
         )
         val fiveCalls = (1..5).map { ToolCall("web_search", mapOf("query" to "q$it")) }
@@ -429,7 +429,7 @@ class LiteRTLmLoopTest {
         val tokens = flow<StreamToken> { drive(transport) }.toList()
 
         // 5 real calls + the 6th fed the cap string; the 7th never executes.
-        coVerify(exactly = 5) { tavily.search(any(), any(), any()) }
+        coVerify(exactly = 5) { ddg.search(any(), any(), any()) }
         assertThat(toolResponses(transport.replies[2]).single().second)
             .isEqualTo(LocalToolLoop.CAP_REACHED_STRING)
         assertThat(tokens.last()).isInstanceOf(StreamToken.Done::class.java)

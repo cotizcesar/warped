@@ -14,7 +14,7 @@ import com.warped.data.local.inference.LiteRtLlmHelper
 import com.warped.data.local.preferences.AdvancedPreferences
 import com.warped.data.repository.ModelAllowlistRepository
 import com.warped.data.grounding.MultiUrlFetcher
-import com.warped.data.grounding.TavilySearchRepository
+import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.domain.model.ActiveModelSelection
@@ -268,7 +268,7 @@ class LmStudioCancelTest {
             engineManager,
             InputSanitizer(),
             activeSelection,
-            mockk<TavilySearchRepository>(relaxed = true),
+            mockk<DuckDuckGoSearchRepository>(relaxed = true),
             mockk<MultiUrlFetcher>(relaxed = true),
             mockk<WebPageFetcher>(relaxed = true),
             mockk<ModelAllowlistRepository>(relaxed = true),
@@ -320,7 +320,7 @@ class LmStudioCancelTest {
             engineManager,
             InputSanitizer(),
             activeSelection,
-            mockk<TavilySearchRepository>(relaxed = true),
+            mockk<DuckDuckGoSearchRepository>(relaxed = true),
             mockk<MultiUrlFetcher>(relaxed = true),
             mockk<WebPageFetcher>(relaxed = true),
             mockk<ModelAllowlistRepository>(relaxed = true),

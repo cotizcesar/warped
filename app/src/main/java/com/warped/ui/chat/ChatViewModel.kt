@@ -6,6 +6,7 @@ import android.util.Base64
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.GroundingPrecedence
 import com.warped.data.grounding.GroundingPrompt
 import com.warped.data.grounding.GroundingResult
@@ -58,7 +59,14 @@ class ChatViewModel @Inject constructor(
     private val advancedPreferences: AdvancedPreferences,
     private val fetcher: WebPageFetcher,
     private val multiUrlFetcher: MultiUrlFetcher,
-    private val tavilySearchRepository: TavilySearchRepository,
+    /**
+     * Quick-task (DDG-default): the search branch goes through the
+     * DDG-primary/Tavily-fallback repository (same outcome type, same
+     * signatures in/out). Tavily stays in the graph as the DDG repo's
+     * internal fallback delegate + the Settings key probe — not as a
+     * direct VM dependency.
+     */
+    private val ddgSearchRepository: DuckDuckGoSearchRepository,
     /**
      * Phase 56 (56-02): allowlist capability read for the VM-side
      * loop-arming check (skip VM pre-search when the provider loop will
@@ -485,15 +493,19 @@ class ChatViewModel @Inject constructor(
                             updateInput { it.copy(isFetchingWeb = false, webFetchProgress = null) }
                         }
                     } else {
-                        // Phase 55 (TAV-02/TAV-03): Tavily search branch. Runs
-                        // ONLY when all hold — doGround (the once-per-send
-                        // GroundingPrecedence.shouldGround read above, same
-                        // precedence as fetch, never re-read mid-turn),
-                        // validated internet (offline yields the existing
-                        // OFFLINE model-only path with no socket opened and
-                        // no search attempt), and a stored Tavily key
-                        // (MissingKey yields the actionable notice, no
-                        // socket — the repository checks the key first).
+                        // Quick-task (DDG-default): DDG-primary search
+                        // branch. Runs ONLY when all hold — doGround (the
+                        // once-per-send GroundingPrecedence.shouldGround read
+                        // above, same precedence as fetch, never re-read
+                        // mid-turn), validated internet (offline yields the
+                        // existing OFFLINE model-only path with no socket
+                        // opened), and — NEW — no key gate at all: the DDG
+                        // repository searches keylessly, so no-key + DDG-OK
+                        // is a silent success (no notice) and no-key +
+                        // DDG-fail is the FETCH_FAILED notice (no key nag).
+                        // Key present-but-bad (401 via the Tavily fallback
+                        // leg) keeps the invalid-key message; MissingKey
+                        // survives only as the key-race edge.
                         // Success fuses through the IDENTICAL downstream
                         // path as URL grounding: GroundingPrompt.augment of
                         // requestUserText, groundedSources/okUrls, the
@@ -575,7 +587,7 @@ class ChatViewModel @Inject constructor(
                             try {
                                 val contextSize = state.generationParameters.contextSize
                                 when (
-                                    val outcome = tavilySearchRepository.search(
+                                    val outcome = ddgSearchRepository.search(
                                         query = userMessage.content,
                                         maxResults = searchCount,
                                         contextSize = contextSize,

@@ -111,7 +111,7 @@ class ChatSubStateTest {
             advancedPreferences = advancedPreferences,
             fetcher = fetcher,
             multiUrlFetcher = multiUrlFetcher,
-            tavilySearchRepository = mockk(),
+            ddgSearchRepository = mockk(),
             modelAllowlistRepository = mockk<com.warped.data.repository.ModelAllowlistRepository>(),
             context = context,
         )

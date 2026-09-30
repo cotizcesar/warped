@@ -3,7 +3,7 @@ package com.warped.data.remote.provider
 import com.warped.data.agentic.ToolCapabilityMatrix
 import com.warped.data.grounding.GroundingPrecedence
 import com.warped.data.grounding.MultiUrlFetcher
-import com.warped.data.grounding.TavilySearchRepository
+import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.local.preferences.AdvancedPreferences
@@ -53,9 +53,12 @@ class OllamaProvider(
      * All-null by default so the legacy `resolve()` path behaves exactly
      * as before — the compat loop only arms when every collaborator is
      * present (see [isLoopArmed]). Ollama takes no endpoint key; loop
-     * code only ever touches the Tavily/fetch singletons (T-57-07).
+     * code only ever touches the search/fetch singletons (T-57-07).
+     *
+     * Quick-task (DDG-default): the search collaborator is the DDG-primary
+     * / Tavily-fallback repository.
      */
-    private val tavily: TavilySearchRepository? = null,
+    private val ddg: DuckDuckGoSearchRepository? = null,
     private val multiUrlFetcher: MultiUrlFetcher? = null,
     private val webPageFetcher: WebPageFetcher? = null,
     private val advancedPreferences: AdvancedPreferences? = null,
@@ -110,10 +113,10 @@ class OllamaProvider(
                         OpenAiMessage(role = it.role.name.lowercase(), content = content)
                     }
                 }
-            val tavilyRepo = tavily
+            val ddgRepo = ddg
             val fetchAll = multiUrlFetcher
             val net = webPageFetcher
-            if (tavilyRepo != null && fetchAll != null && net != null) {
+            if (ddgRepo != null && fetchAll != null && net != null) {
                 with(CompatToolLoop) {
                     runTurn(
                         client = client,
@@ -122,7 +125,7 @@ class OllamaProvider(
                         modelId = modelId,
                         baseMessages = baseMessages,
                         request = request,
-                        tavily = tavilyRepo,
+                        ddg = ddgRepo,
                         multiUrlFetcher = fetchAll,
                         webPageFetcher = net,
                         logTag = "Ollama",
@@ -146,7 +149,7 @@ class OllamaProvider(
     private suspend fun isLoopArmed(perChat: Boolean?): Boolean {
         val prefs = advancedPreferences ?: return false
         val net = webPageFetcher ?: return false
-        if (tavily == null || multiUrlFetcher == null) return false
+        if (ddg == null || multiUrlFetcher == null) return false
         if (!ToolCapabilityMatrix.attemptsTools(
                 ToolCapabilityMatrix.modeFor(ProviderType.OLLAMA),
             )

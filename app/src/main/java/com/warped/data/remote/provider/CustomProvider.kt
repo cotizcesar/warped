@@ -15,7 +15,7 @@ import com.warped.domain.provider.LlmProvider
 import com.warped.data.agentic.ToolCapabilityMatrix
 import com.warped.data.grounding.GroundingPrecedence
 import com.warped.data.grounding.MultiUrlFetcher
-import com.warped.data.grounding.TavilySearchRepository
+import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.local.preferences.AdvancedPreferences
@@ -53,8 +53,11 @@ class CustomProvider(
      * as before — the compat loop only arms when every collaborator is
      * present (see [isLoopArmed]). The endpoint key stays on this
      * client's interceptor ONLY; loop code never references it (T-57-07).
+     *
+     * Quick-task (DDG-default): the search collaborator is the DDG-primary
+     * / Tavily-fallback repository.
      */
-    private val tavily: TavilySearchRepository? = null,
+    private val ddg: DuckDuckGoSearchRepository? = null,
     private val multiUrlFetcher: MultiUrlFetcher? = null,
     private val webPageFetcher: WebPageFetcher? = null,
     private val advancedPreferences: AdvancedPreferences? = null,
@@ -120,10 +123,10 @@ class CustomProvider(
                         OpenAiMessage(role = it.role.name.lowercase(), content = content)
                     }
                 }
-            val tavilyRepo = tavily
+            val ddgRepo = ddg
             val fetchAll = multiUrlFetcher
             val net = webPageFetcher
-            if (tavilyRepo != null && fetchAll != null && net != null) {
+            if (ddgRepo != null && fetchAll != null && net != null) {
                 with(CompatToolLoop) {
                     runTurn(
                         client = client,
@@ -132,7 +135,7 @@ class CustomProvider(
                         modelId = modelId,
                         baseMessages = baseMessages,
                         request = request,
-                        tavily = tavilyRepo,
+                        ddg = ddgRepo,
                         multiUrlFetcher = fetchAll,
                         webPageFetcher = net,
                         logTag = "Custom",
@@ -157,7 +160,7 @@ class CustomProvider(
     private suspend fun isLoopArmed(perChat: Boolean?): Boolean {
         val prefs = advancedPreferences ?: return false
         val net = webPageFetcher ?: return false
-        if (tavily == null || multiUrlFetcher == null) return false
+        if (ddg == null || multiUrlFetcher == null) return false
         if (!ToolCapabilityMatrix.attemptsTools(
                 ToolCapabilityMatrix.modeFor(ProviderType.CUSTOM),
             )

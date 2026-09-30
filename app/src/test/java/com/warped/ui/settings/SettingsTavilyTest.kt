@@ -6,6 +6,7 @@ import com.google.common.truth.Truth.assertThat
 import com.warped.data.grounding.GroundingPrompt
 import com.warped.data.grounding.GroundingResult
 import com.warped.data.grounding.MultiUrlResult
+import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.TavilySearchOutcome
 import com.warped.data.grounding.TavilySearchRepository
 import com.warped.data.local.inference.EngineManager
@@ -312,7 +313,7 @@ class SettingsTavilyTest {
     // ------------------------------------------------------------------
 
     private lateinit var chatRepository: ChatRepository
-    private lateinit var chatTavilyRepo: TavilySearchRepository
+    private lateinit var chatDdgRepo: DuckDuckGoSearchRepository
     private lateinit var chatFetcher: com.warped.data.grounding.WebPageFetcher
     private lateinit var chatMultiUrlFetcher: com.warped.data.grounding.MultiUrlFetcher
     private lateinit var lastHelper: LlmModelHelper
@@ -350,7 +351,7 @@ class SettingsTavilyTest {
         every { chatFetcher.cancel() } just Runs
         every { chatFetcher.hasValidatedInternet() } returns online
         chatMultiUrlFetcher = mockk()
-        chatTavilyRepo = mockk()
+        chatDdgRepo = mockk()
 
         return ChatViewModel(
             chatRepository = chatRepository,
@@ -365,7 +366,7 @@ class SettingsTavilyTest {
             advancedPreferences = advancedPreferences,
             fetcher = chatFetcher,
             multiUrlFetcher = chatMultiUrlFetcher,
-            tavilySearchRepository = chatTavilyRepo,
+            ddgSearchRepository = chatDdgRepo,
             modelAllowlistRepository = mockk<com.warped.data.repository.ModelAllowlistRepository>(),
             context = context,
         )
@@ -398,7 +399,7 @@ class SettingsTavilyTest {
         vm.sendMessage("hola sin urls")
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { chatTavilyRepo.search(any(), any(), any()) }
+        coVerify(exactly = 0) { chatDdgRepo.search(any(), any(), any()) }
         coVerify(exactly = 0) { chatMultiUrlFetcher.fetchAll(any(), any(), any()) }
         val requestSlot = slot<ChatRequest>()
         coVerify(exactly = 1) { lastHelper.runInference(capture(requestSlot), any()) }
@@ -416,7 +417,7 @@ class SettingsTavilyTest {
         advanceUntilIdle()
 
         // No socket: neither the fetcher fan-out nor the search producer runs.
-        coVerify(exactly = 0) { chatTavilyRepo.search(any(), any(), any()) }
+        coVerify(exactly = 0) { chatDdgRepo.search(any(), any(), any()) }
         coVerify(exactly = 0) { chatMultiUrlFetcher.fetchAll(any(), any(), any()) }
         assertThat(assistantOf(vm).modelOnlyNotice).isEqualTo(ModelOnlyNotice.OFFLINE)
         // The always-on web instruction is preserved on the model-only turn.
@@ -433,9 +434,10 @@ class SettingsTavilyTest {
         val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
         val vm = buildChatViewModel(modelFile.absolutePath, online = true)
         runCurrent()
-        // Key-present gate lives in the repository (55-01): MissingKey
-        // short-circuits before any socket opens.
-        coEvery { chatTavilyRepo.search(any(), any(), any()) } returns TavilySearchOutcome.MissingKey
+        // MissingKey survives only as the Tavily-fallback key-race edge
+        // (DDG-primary needs no key): the arm stays, rendering the
+        // actionable notice when the outcome ever surfaces.
+        coEvery { chatDdgRepo.search(any(), any(), any()) } returns TavilySearchOutcome.MissingKey
 
         vm.sendMessage("que hay de nuevo")
         advanceUntilIdle()
@@ -454,7 +456,7 @@ class SettingsTavilyTest {
         val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
         val vm = buildChatViewModel(modelFile.absolutePath, online = true)
         runCurrent()
-        coEvery { chatTavilyRepo.search(any(), any(), any()) } returns TavilySearchOutcome.InvalidKey
+        coEvery { chatDdgRepo.search(any(), any(), any()) } returns TavilySearchOutcome.InvalidKey
 
         vm.sendMessage("que hay de nuevo")
         advanceUntilIdle()
@@ -468,7 +470,7 @@ class SettingsTavilyTest {
         val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
         val vm = buildChatViewModel(modelFile.absolutePath, online = true)
         runCurrent()
-        coEvery { chatTavilyRepo.search(any(), any(), any()) } returns TavilySearchOutcome.UsageLimit
+        coEvery { chatDdgRepo.search(any(), any(), any()) } returns TavilySearchOutcome.UsageLimit
 
         vm.sendMessage("que hay de nuevo")
         advanceUntilIdle()
@@ -482,7 +484,7 @@ class SettingsTavilyTest {
         val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
         val vm = buildChatViewModel(modelFile.absolutePath, online = true)
         runCurrent()
-        coEvery { chatTavilyRepo.search(any(), any(), any()) } returns TavilySearchOutcome.ModelOnly(
+        coEvery { chatDdgRepo.search(any(), any(), any()) } returns TavilySearchOutcome.ModelOnly(
             MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
         )
 
@@ -499,14 +501,14 @@ class SettingsTavilyTest {
         val vm = buildChatViewModel(modelFile.absolutePath, online = true)
         runCurrent()
         val fused = fusedSearchResult()
-        coEvery { chatTavilyRepo.search(any(), any(), any()) } returns
+        coEvery { chatDdgRepo.search(any(), any(), any()) } returns
             TavilySearchOutcome.Grounded(fused)
 
         vm.sendMessage("que hay de nuevo")
         advanceUntilIdle()
 
         // Same block format the URL path asserts (numbered Source [N]).
-        coVerify(exactly = 1) { chatTavilyRepo.search("que hay de nuevo", 5, any()) }
+        coVerify(exactly = 1) { chatDdgRepo.search("que hay de nuevo", 5, any()) }
         val requestSlot = slot<ChatRequest>()
         coVerify(exactly = 1) { lastHelper.runInference(capture(requestSlot), any()) }
         assertThat(requestSlot.captured.messages.last().content).isEqualTo(
