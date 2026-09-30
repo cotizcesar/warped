@@ -1678,6 +1678,24 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun refreshActiveBackend() {
+        // Loading-flag heal: the selection collector derives isLoadingModel
+        // from localSelection.isConnected, but some paths leave
+        // LocalSelection(modelId, connected=false) behind while the engine is
+        // already loaded for that same path (restart restore rehydrates
+        // connected=false; a cancelled/failed preload never reaches
+        // connectLocal; the provider lazy-loads without touching selection).
+        // Reconcile against engine truth here — read the raw engine path and
+        // the raw selection (NOT isLocalModelLoaded, which derives from the
+        // stuck connected flag and would be circular). Emitting connectLocal
+        // lets the untouched collector clear isLoadingModel itself.
+        val selectedLocalId = _connection.value.selectedLocalModelId
+        val enginePath = engineManager.getActiveEngine()?.modelPath
+        if (selectedLocalId != null &&
+            enginePath == selectedLocalId &&
+            !activeModelSelection.localSelection.value.isConnected
+        ) {
+            activeModelSelection.connectLocal(selectedLocalId, ProviderType.LITE_RT_LM)
+        }
         val connection = _connection.value
         val isLocal = connection.selectedLocalModelId != null && connection.isLocalModelLoaded
         val backend = if (isLocal) {
