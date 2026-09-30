@@ -39,6 +39,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -180,6 +181,11 @@ fun OgSourceCard(
  * `GroundedSource(url)` rows) render the same card without the thumb slot —
  * title falls back to host, tap still opens the sheet. Omitida sources
  * never reach this composable (struck text rows stand below the carousel).
+ *
+ * Width modes (drawer-reuse quick-task): [cardWidth] non-null applies a
+ * fixed width (chat carousel default 272.dp); null fills max width
+ * (all-sources drawer rows). Only the width modifier differs — taps,
+ * ordering, caps, colors, collapse, and a11y are identical in both hosts.
  */
 @Composable
 fun CompactSourceCard(
@@ -188,6 +194,7 @@ fun CompactSourceCard(
     onPreview: () -> Unit,
     onOpenBrowser: (url: String) -> Unit,
     modifier: Modifier = Modifier,
+    cardWidth: Dp? = 272.dp,
 ) {
     val displayTitle = ogDisplayTitle(source.ogTitle, source.url)
     val desc = ogDisplayDescription(source.ogDescription, source.snippet)
@@ -207,7 +214,7 @@ fun CompactSourceCard(
         color = container,
         shape = MaterialTheme.shapes.medium,
         modifier = modifier
-            .width(272.dp)
+            .then(if (cardWidth != null) Modifier.width(cardWidth) else Modifier.fillMaxWidth())
             .clip(MaterialTheme.shapes.medium)
             .clickable(role = Role.Button, onClick = onPreview)
             .semantics {
