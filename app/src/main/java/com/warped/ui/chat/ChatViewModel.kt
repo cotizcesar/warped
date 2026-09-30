@@ -1703,13 +1703,25 @@ class ChatViewModel @Inject constructor(
 
     private suspend fun ensureConversation(firstMessage: String, hasMedia: Boolean = false): Long {
         val state = snapshot()
-        if (state.conversationId != null) return state.conversationId
-
-        val title = when {
-            firstMessage.isBlank() && hasMedia -> "Image conversation"
-            firstMessage.length > 50 -> firstMessage.take(50) + "..."
-            else -> firstMessage
+        if (state.conversationId != null) {
+            // Quick-task (activation-new-chat): activation-created rows
+            // arrive titled "New Chat" with zero messages — title from the
+            // first message so history keeps the first-message convention.
+            // Rows that already carry messages are never retitled.
+            if (state.messages.isEmpty()) {
+                try {
+                    chatRepository.updateConversationTitle(
+                        state.conversationId,
+                        conversationTitle(firstMessage, hasMedia),
+                    )
+                } catch (e: Exception) {
+                    Timber.w(e, "Chat: activation row retitle failed")
+                }
+            }
+            return state.conversationId
         }
+
+        val title = conversationTitle(firstMessage, hasMedia)
         val effectiveModelId = state.selectedLocalModelId ?: state.selectedRemoteModelId
         val effectiveProvider = state.selectedLocalModelId?.let { ProviderType.LITE_RT_LM }
             ?: state.selectedRemoteProvider ?: ProviderType.LITE_RT_LM
@@ -1744,6 +1756,12 @@ class ChatViewModel @Inject constructor(
         }
         activeModelSelection.saveLastConversation(conversationId)
         return conversationId
+    }
+
+    private fun conversationTitle(firstMessage: String, hasMedia: Boolean): String = when {
+        firstMessage.isBlank() && hasMedia -> "Image conversation"
+        firstMessage.length > 50 -> firstMessage.take(50) + "..."
+        else -> firstMessage
     }
 
     private suspend fun isModelAvailable(modelId: String, providerType: ProviderType): Boolean {

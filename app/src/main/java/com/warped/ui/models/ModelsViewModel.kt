@@ -19,6 +19,7 @@ import com.warped.domain.model.ActiveModelSelection
 import com.warped.domain.model.Endpoint
 import com.warped.domain.model.LocalModel
 import com.warped.domain.model.ProviderType
+import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.LocalModelRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -45,6 +46,7 @@ class ModelsViewModel @Inject constructor(
     private val providerRouter: ProviderRouter,
     private val inputSanitizer: InputSanitizer,
     private val allowlist: ModelAllowlistRepository,
+    private val chatRepository: ChatRepository,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -58,6 +60,19 @@ class ModelsViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ModelsUiState())
     val uiState: StateFlow<ModelsUiState> = _uiState.asStateFlow()
+
+    /**
+     * Quick-task (activation-new-chat): id of the conversation freshly
+     * created for an activation, consumed once by the screen for
+     * navigation. Null when no activation navigation is pending.
+     */
+    private val _pendingChatId = MutableStateFlow<Long?>(null)
+    val pendingChatId: StateFlow<Long?> = _pendingChatId.asStateFlow()
+
+    /** Consume a delivered activation navigation (single-shot). */
+    fun consumePendingChat() {
+        _pendingChatId.value = null
+    }
 
     private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         timber.log.Timber.e(throwable, "Unhandled coroutine exception")
@@ -113,6 +128,13 @@ class ModelsViewModel @Inject constructor(
 
     fun useLocalModel(model: LocalModel) {
         activeModelSelection.connectLocal(model.filePath, ProviderType.LITE_RT_LM)
+        viewModelScope.launch(coroutineExceptionHandler) {
+            openBoundChat(
+                providerType = ProviderType.LITE_RT_LM,
+                modelId = model.filePath,
+                endpointId = 0L,
+            )
+        }
     }
 
     private fun LocalModel.isLiteRtLm(): Boolean =
@@ -279,6 +301,40 @@ class ModelsViewModel @Inject constructor(
         viewModelScope.launch(coroutineExceptionHandler) {
             endpointRepository.activateEndpoint(endpoint.id)
             fetchEndpointModels(endpoint)
+            openBoundChat(
+                providerType = endpoint.apiType,
+                modelId = modelId,
+                endpointId = endpoint.id,
+            )
+        }
+    }
+
+    /**
+     * Quick-task (activation-new-chat): activation opens a NEW chat bound
+     * to the activated model. The existing connect/activate logic above is
+     * untouched; this only appends a fresh conversation row carrying the
+     * activated binding. Previous conversations keep their rows and
+     * bindings (no delete, no rebind, no message move). The row is titled
+     * "New Chat" until the first send retitles it (see
+     * `ChatViewModel.ensureConversation`).
+     */
+    private suspend fun openBoundChat(
+        providerType: ProviderType,
+        modelId: String,
+        endpointId: Long,
+    ) {
+        try {
+            val id = chatRepository.createConversation(
+                title = context.getString(R.string.new_chat),
+                providerType = providerType,
+                modelId = modelId,
+                endpointId = endpointId,
+            )
+            activeModelSelection.saveLastConversation(id)
+            _pendingChatId.value = id
+        } catch (e: Exception) {
+            Timber.e(e, "Models: activation chat creation failed")
+            _uiState.update { it.copy(error = e.message) }
         }
     }
 

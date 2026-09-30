@@ -68,6 +68,7 @@ class ActiveDownloadPauseTest {
             providerRouter = mockk(relaxed = true),
             inputSanitizer = mockk(relaxed = true),
             allowlist = mockk(relaxed = true),
+            chatRepository = mockk(relaxed = true),
             context = mockk(relaxed = true),
         )
     }

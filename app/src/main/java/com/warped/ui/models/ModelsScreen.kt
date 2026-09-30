@@ -42,7 +42,7 @@ import com.warped.ui.components.formatFileSize
 @Composable
 fun ModelsScreen(
     viewModel: ModelsViewModel = hiltViewModel(),
-    onUseInChat: () -> Unit = {},
+    onUseInChat: (conversationId: Long) -> Unit = {},
     onOpenHuggingFace: () -> Unit = {},
     onOpenDrawer: () -> Unit = {}
 ) {
@@ -51,6 +51,17 @@ fun ModelsScreen(
     var showAddWizard by remember { mutableStateOf(false) }
     val isEndpointFormOpen = uiState.isEndpointFormVisible || uiState.isEditingEndpoint
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Quick-task (activation-new-chat): activation creates the bound
+    // conversation row asynchronously — navigate once its id lands, then
+    // consume so a later recomposition never re-navigates.
+    val pendingChatId by viewModel.pendingChatId.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingChatId) {
+        pendingChatId?.let { id ->
+            onUseInChat(id)
+            viewModel.consumePendingChat()
+        }
+    }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let { msg ->
@@ -83,7 +94,6 @@ fun ModelsScreen(
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.useLocalModel(showMemoryWarning!!)
-                    onUseInChat()
                     showMemoryWarning = null
                 }) { Text(stringResource(R.string.continue_text)) }
             },
@@ -292,7 +302,6 @@ fun ModelsScreen(
                                     showMemoryWarning = model
                                 } else {
                                     viewModel.useLocalModel(model)
-                                    onUseInChat()
                                 }
                             },
                             onDelete = { viewModel.deleteModel(model) }
@@ -312,7 +321,6 @@ fun ModelsScreen(
                                 endpoint = endpoint,
                                 onUseInChat = {
                                     viewModel.useEndpoint(endpoint)
-                                    onUseInChat()
                                 },
                                 onEdit = { viewModel.editEndpoint(endpoint) },
                                 onDelete = { viewModel.deleteEndpoint(endpoint) }
