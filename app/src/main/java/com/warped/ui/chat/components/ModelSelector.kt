@@ -12,11 +12,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -37,6 +39,8 @@ import com.warped.R
 import com.warped.domain.model.Endpoint
 import com.warped.domain.model.LocalModel
 import com.warped.domain.model.ProviderType
+import com.warped.ui.chat.WebOverrideIndicator
+import com.warped.ui.chat.webOverrideIndicator
 
 /**
  * CHAT-04 / CHAT-05: ModalBottomSheet model picker.
@@ -52,7 +56,12 @@ fun ModelSelectorSheet(
     endpoints: List<Endpoint> = emptyList(),
     endpointModels: Map<Long, List<String>> = emptyMap(),
     onDismiss: () -> Unit,
-    onModelSelected: (String, ProviderType, Long?) -> Unit
+    onModelSelected: (String, ProviderType, Long?) -> Unit,
+    // Quick-task (thinking-header-feelings): per-chat web tri-state lives
+    // here now (relocated from the header bar). Same setWebOverride values.
+    webOverride: Boolean?,
+    globalWebEnabled: Boolean,
+    onWebOverrideSelected: (Boolean?) -> Unit
 ) {
     if (!visible) return
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -143,6 +152,14 @@ fun ModelSelectorSheet(
                     )
                 }
             }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            SectionHeader(stringResource(R.string.cd_web_options))
+            WebOverrideSheetRow(
+                webOverride = webOverride,
+                globalWebEnabled = globalWebEnabled,
+                onWebOverrideSelected = onWebOverrideSelected
+            )
         }
     }
 }
@@ -156,6 +173,96 @@ private fun SectionHeader(text: String) {
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(vertical = 4.dp)
     )
+}
+
+/**
+ * Quick-task (thinking-header-feelings): per-chat web tri-state row,
+ * relocated from the header overflow menu. Same semantics and strings:
+ * Sí / No / Heredar call `onWebOverrideSelected(true/false/null)`; the
+ * Heredar row carries the live global hint. Dots reuse the traffic/idle
+ * palette (green/on, orange/off, gray/inherit) — no new colors.
+ */
+@Composable
+private fun WebOverrideSheetRow(
+    webOverride: Boolean?,
+    globalWebEnabled: Boolean,
+    onWebOverrideSelected: (Boolean?) -> Unit
+) {
+    val inheritHint = if (globalWebEnabled) {
+        stringResource(R.string.web_inherit_on)
+    } else {
+        stringResource(R.string.web_inherit_off)
+    }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        WebOverrideOption(
+            label = stringResource(R.string.web_on),
+            subtitle = null,
+            dotColor = Color(0xFF4CAF50),
+            selected = webOverride == true,
+            onClick = { onWebOverrideSelected(true) }
+        )
+        WebOverrideOption(
+            label = stringResource(R.string.web_off),
+            subtitle = null,
+            dotColor = Color(0xFFFF9800),
+            selected = webOverride == false,
+            onClick = { onWebOverrideSelected(false) }
+        )
+        WebOverrideOption(
+            label = stringResource(R.string.web_inherit),
+            subtitle = inheritHint,
+            dotColor = Color(0xFF666666),
+            selected = webOverrideIndicator(webOverride) == WebOverrideIndicator.INHERIT,
+            onClick = { onWebOverrideSelected(null) }
+        )
+    }
+}
+
+@Composable
+private fun WebOverrideOption(
+    label: String,
+    subtitle: String?,
+    dotColor: Color,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Circle,
+            contentDescription = null,
+            tint = dotColor,
+            modifier = Modifier.size(8.dp)
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1
+            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+        }
+        if (selected) {
+            Icon(
+                imageVector = Icons.Filled.Check,
+                contentDescription = stringResource(R.string.cd_selected),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
 }
 
 @Composable
