@@ -23,8 +23,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -234,14 +236,36 @@ fun MessageBubble(
         // lifted into the ViewModel.
         var previewSource by remember { mutableStateOf<GroundedSource?>(null) }
         var previewNumber by remember { mutableIntStateOf(1) }
+        // Quick-task (all-sources sheet): ephemeral open flag only — never
+        // the hydrated data, same discipline as previewSource above.
+        var showAllSources by remember { mutableStateOf(false) }
         if (!isUser && fuenteList.any { it.clickable }) {
             Spacer(Modifier.height(4.dp))
-            Text(
-                text = stringResource(R.string.sources_title),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            // Quick-task (all-sources sheet): title + trailing "View all
+            // sources" icon on the same row. The icon renders only when
+            // ≥2 sources exist (single source needs no drawer); zero ok
+            // sources keeps the whole block hidden via the gate above.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.sources_title),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                if (shouldShowViewAll(fuenteList)) {
+                    IconButton(onClick = { showAllSources = true }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.List,
+                            contentDescription = stringResource(R.string.cd_view_all_sources),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
             Spacer(Modifier.height(8.dp))
             // Clickable ok items first (carousel); [N] numbering stays in
             // fetch-block order so cards match the fused Source [N] block
@@ -314,6 +338,28 @@ fun MessageBubble(
                     // browser intent actually launched.
                     if (openUrlInBrowser(context, url)) {
                         previewSource = null
+                    }
+                }
+            )
+        }
+        // Quick-task (all-sources sheet): host next to the single-source
+        // sheet above. Sources mirror the carousel's resolution so row
+        // numbering matches fetch-block order: hydrated details when
+        // present (omitida rows pass through for struck rendering),
+        // legacy text-only rows otherwise. Dismiss-only-on-launch, same
+        // as the single-source sheet.
+        if (showAllSources) {
+            val allSheetSources = if (sourceDetails.isNotEmpty()) {
+                sourceDetails
+            } else {
+                fuenteList.map { item -> GroundedSource(url = item.url) }
+            }
+            AllSourcesSheet(
+                sources = allSheetSources,
+                onDismiss = { showAllSources = false },
+                onOpenBrowser = { url ->
+                    if (openUrlInBrowser(context, url)) {
+                        showAllSources = false
                     }
                 }
             )
