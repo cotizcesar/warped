@@ -16,6 +16,7 @@ import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
+import okhttp3.OkHttpClient
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -52,7 +53,13 @@ class TavilySearchRepositoryTest {
         }
         apiKeyStore = ApiKeyStore(keystoreManager)
         api = mockk()
-        repository = TavilySearchRepository(api, apiKeyStore)
+        // Enrichment no-op seam: every search() test runs with headSupplier
+        // set, so unit tests never open real sockets.
+        val enricher = SearchOgEnricher(OkHttpClient()).apply {
+            headSupplier = { null }
+            ioDispatcher = Dispatchers.Unconfined
+        }
+        repository = TavilySearchRepository(api, apiKeyStore, enricher)
         repository.ioDispatcher = Dispatchers.Unconfined
     }
 
@@ -177,6 +184,50 @@ class TavilySearchRepositoryTest {
                 MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
             ),
         )
+    }
+
+    // ------------------------------------------------------------------
+    // Title threading (quick-task): fuse() OK rows carry the result title.
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `ok rows carry the result title, omitida rows stay null`() = runTest {
+        stubSearch(
+            result(1),
+            TavilySearchResult(title = "Empty", url = "https://tavily.example/blank", content = "   "),
+            result(3),
+        )
+
+        val outcome = repository.search("kotlin news")
+
+        assertThat(outcome).isInstanceOf(TavilySearchOutcome.Grounded::class.java)
+        val fused = (outcome as TavilySearchOutcome.Grounded).fused
+        assertThat(fused.details).hasSize(3)
+        assertThat(fused.details[0].ogTitle).isEqualTo("Title 1")
+        assertThat(fused.details[1].status).isEqualTo(GroundedSourceStatus.OMITIDA)
+        assertThat(fused.details[1].ogTitle).isNull()
+        assertThat(fused.details[2].ogTitle).isEqualTo("Title 3")
+        // Fused prompt text construction byte-identical to before.
+        assertThat(fused.block).contains("--- Source [1]: https://tavily.example/page1 ---")
+    }
+
+    @Test
+    fun `blank result title threads null ogTitle`() = runTest {
+        stubSearch(
+            TavilySearchResult(
+                title = "   ",
+                url = "https://tavily.example/blank-title",
+                content = "Some content with details.",
+            ),
+        )
+
+        val outcome = repository.search("kotlin news")
+
+        assertThat(outcome).isInstanceOf(TavilySearchOutcome.Grounded::class.java)
+        val fused = (outcome as TavilySearchOutcome.Grounded).fused
+        assertThat(fused.details).hasSize(1)
+        assertThat(fused.details[0].status).isEqualTo(GroundedSourceStatus.OK)
+        assertThat(fused.details[0].ogTitle).isNull()
     }
 
     @Test

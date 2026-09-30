@@ -53,11 +53,19 @@ class DuckDuckGoSearchRepositoryTest {
         tavily = mockk()
         // Real client instance (never used — every test sets htmlSupplier
         // or asserts the no-socket path, so no socket ever opens).
+        // The enricher seam returns null for every URL (enrichment no-op):
+        // every search() test runs with headSupplier set, so unit tests
+        // never open real sockets.
+        val enricher = SearchOgEnricher(OkHttpClient()).apply {
+            headSupplier = { null }
+            ioDispatcher = Dispatchers.Unconfined
+        }
         repository = DuckDuckGoSearchRepository(
             OkHttpClient(),
             webPageFetcher,
             apiKeyStore,
             tavily,
+            enricher,
         )
         repository.ioDispatcher = Dispatchers.Unconfined
     }
@@ -218,6 +226,47 @@ class DuckDuckGoSearchRepositoryTest {
 
         assertThat(outcome).isInstanceOf(TavilySearchOutcome.Grounded::class.java)
         coVerify(exactly = 0) { tavily.search(any(), any(), any(), any()) }
+    }
+
+    // ------------------------------------------------------------------
+    // Title threading (quick-task): fuse() OK rows carry the anchor title.
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `ok rows carry the search-result title, omitida rows stay null`() = runTest {
+        repository.htmlSupplier = { fixtureHtml() }
+
+        val outcome = repository.search("kotlin news")
+
+        assertThat(outcome).isInstanceOf(TavilySearchOutcome.Grounded::class.java)
+        val fused = (outcome as TavilySearchOutcome.Grounded).fused
+        assertThat(fused.details).hasSize(3)
+        assertThat(fused.details[0].ogTitle).isEqualTo("Kotlin News")
+        assertThat(fused.details[1].status).isEqualTo(GroundedSourceStatus.OMITIDA)
+        assertThat(fused.details[1].ogTitle).isNull()
+        assertThat(fused.details[2].ogTitle).isEqualTo("Bare Link")
+        // Fused prompt text construction byte-identical to before.
+        assertThat(fused.block).contains("--- Source [1]: https://example.com/kotlin ---")
+    }
+
+    @Test
+    fun `blank anchor title threads null ogTitle`() = runTest {
+        repository.htmlSupplier = {
+            """
+            <html><body>
+            <div class="result"><h2 class="result__title">
+              <a class="result__a" href="https://blank.example/title">   </a>
+            </h2><a class="result__snippet">Snippet with details.</a></div>
+            </body></html>
+            """.trimIndent()
+        }
+
+        val outcome = repository.search("blank title")
+
+        assertThat(outcome).isInstanceOf(TavilySearchOutcome.Grounded::class.java)
+        val fused = (outcome as TavilySearchOutcome.Grounded).fused
+        assertThat(fused.details).hasSize(1)
+        assertThat(fused.details[0].ogTitle).isNull()
     }
 
     @Test

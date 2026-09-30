@@ -244,7 +244,8 @@ fun MessageBubble(
             )
             Spacer(Modifier.height(8.dp))
             // Clickable ok items first (carousel); [N] numbering stays in
-            // fetch-block order so badges match the fused Source [N] block.
+            // fetch-block order so cards match the fused Source [N] block
+            // and the answer-text citations.
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth(),
@@ -257,7 +258,7 @@ fun MessageBubble(
                 ) { (index, item) ->
                     // Ok sources render compact carousel cards reusing the
                     // OgSourceCard pieces; tap body opens the sheet, thumb
-                    // (and the open icon) fires the guarded browser intent.
+                    // fires the guarded browser intent.
                     val cardSource = if (sourceDetails.isNotEmpty()) {
                         previewForTap(sourceDetails, index)
                     } else {

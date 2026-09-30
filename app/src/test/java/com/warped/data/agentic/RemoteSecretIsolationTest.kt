@@ -4,6 +4,7 @@ import com.google.common.truth.Truth.assertThat
 import com.warped.data.grounding.GroundingResult
 import com.warped.data.grounding.MultiUrlFetcher
 import com.warped.data.grounding.MultiUrlResult
+import com.warped.data.grounding.SearchOgEnricher
 import com.warped.data.grounding.TavilySearchOutcome
 import com.warped.data.grounding.TavilySearchRepository
 import com.warped.data.grounding.WebPageFetcher
@@ -23,6 +24,7 @@ import io.mockk.slot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import okhttp3.OkHttpClient
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import retrofit2.Response
@@ -93,7 +95,13 @@ class RemoteSecretIsolationTest {
         apiKeyStore.storeKey(ENDPOINT_ID, ENDPOINT_FAKE_KEY.toCharArray())
 
         tavilyApi = mockk()
-        searchRepository = TavilySearchRepository(tavilyApi, apiKeyStore)
+        // Enrichment no-op seam (no sockets in unit tests — same pattern
+        // as the repository tests).
+        val enricher = SearchOgEnricher(OkHttpClient()).apply {
+            headSupplier = { null }
+            ioDispatcher = Dispatchers.Unconfined
+        }
+        searchRepository = TavilySearchRepository(tavilyApi, apiKeyStore, enricher)
         searchRepository.ioDispatcher = Dispatchers.Unconfined
     }
 
