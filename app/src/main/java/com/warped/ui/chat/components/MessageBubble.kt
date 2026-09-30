@@ -84,6 +84,43 @@ fun MessageBubble(
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val copiedText = stringResource(R.string.copied)
+    // Quick-task (citation taps): Fuentes resolution lives above the
+    // content render so the assistant-answer MarkdownText can plumb
+    // `onCitationClick` into the same preview state the cards use.
+    // Numbering stays 1-based fetch-block order (matches card taps).
+    val sourceDetails = message.groundedSourceDetails
+    val fuenteList = remember(sourceDetails, message.groundedSources) {
+        fuenteItems(details = sourceDetails, legacyUrls = message.groundedSources)
+    }
+    // Local sheet state only — never the hydrated data itself, so
+    // recomposition always re-resolves from the message param. Never
+    // lifted into the ViewModel.
+    var previewSource by remember { mutableStateOf<GroundedSource?>(null) }
+    var previewNumber by remember { mutableIntStateOf(1) }
+    // A null callback renders plain (no annotations, no affordance) on
+    // no-source turns; out-of-range/omitida taps resolve to null and are
+    // ignored — no crash, no sheet.
+    val citationClick: ((Int) -> Unit)? =
+        if (fuenteList.any { it.clickable }) {
+            { n ->
+                val item = fuenteList.firstOrNull { it.number == n }
+                if (item != null && item.clickable) {
+                    val resolved = if (sourceDetails.isNotEmpty()) {
+                        previewForTap(sourceDetails, n - 1)
+                    } else {
+                        // Legacy ok-only rows predate hydrated details:
+                        // same text-only construction as the card path.
+                        GroundedSource(url = item.url)
+                    }
+                    if (resolved != null) {
+                        previewSource = resolved
+                        previewNumber = n
+                    }
+                }
+            }
+        } else {
+            null
+        }
     if (isStreaming && !message.reasoning.isNullOrBlank()) {
         showReasoning = true
     }
@@ -203,7 +240,8 @@ fun MessageBubble(
                                 modifier = Modifier.fillMaxWidth(),
                                 codeTheme = codeTheme,
                                 codeFontScale = codeFontScale,
-                                isStreaming = isStreaming
+                                isStreaming = isStreaming,
+                                onCitationClick = citationClick,
                             )
                         }
                     } else {
@@ -227,15 +265,6 @@ fun MessageBubble(
         // render struck/disabled below the carousel with no preview so no
         // source is silently dropped. Zero ok sources renders no block at
         // all (unchanged Phase 50 behavior).
-        val sourceDetails = message.groundedSourceDetails
-        val fuenteList = remember(sourceDetails, message.groundedSources) {
-            fuenteItems(details = sourceDetails, legacyUrls = message.groundedSources)
-        }
-        // Local sheet state only — never the hydrated data itself, so
-        // recomposition always re-resolves from the message param. Never
-        // lifted into the ViewModel.
-        var previewSource by remember { mutableStateOf<GroundedSource?>(null) }
-        var previewNumber by remember { mutableIntStateOf(1) }
         // Quick-task (all-sources sheet): ephemeral open flag only — never
         // the hydrated data, same discipline as previewSource above.
         var showAllSources by remember { mutableStateOf(false) }
