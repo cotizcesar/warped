@@ -21,10 +21,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -53,24 +49,27 @@ import com.warped.ui.theme.OgShimmer
 import java.net.URI
 
 /**
- * Phase 58 (OG-02): horizontal OG thumbnail card for one grounded source,
- * per the locked card layout (thumb 64dp left | title 1-line + desc 2-line
- * middle | [N] badge + open icon right; rounded-12dp container, 12dp
- * internal padding, 8dp inter-card gaps applied by the caller).
+ * Phase 58 (OG-02) + quick-task two-column layout (user-locked): horizontal
+ * source card with TWO columns — left favicon/thumb image, right Title (max
+ * 2 lines, ellipsis) + URL (1 line, muted, ellipsis). Rounded-12dp
+ * container, 12dp internal padding, 8dp inter-card gaps applied by the
+ * caller. No [N] number badges, no open/external-link icon (citations
+ * `[1]`/`[2]` in answer text and the model prompt are untouched — only the
+ * card chrome loses numbers).
  *
  * Container is the locked 2B2B29 neutral in dark theme /
- * M3 surfaceVariant in light theme; title + description render in neutral
- * onSurface tones; the coral primary is reserved for the [N] badge and the
- * open-in-browser glyph. Whole-card tap opens the preview sheet; the open
- * icon consumes its tap and fires the guarded browser intent instead.
- * Omitida sources never reach this composable (struck text rows stand).
+ * M3 surfaceVariant in light theme; title + URL render in neutral
+ * onSurface tones (zero purple). Whole-card tap opens the preview sheet;
+ * the thumbnail consumes its tap and fires the guarded browser intent
+ * instead ("Open in browser" a11y). Omitida sources never reach this
+ * composable (struck text rows stand).
  *
  * Image policy (T-58-06/T-58-07, quick-task favicon fallback): the model
  * URL is re-gated to http(s) at render (defense in depth over the parse
  * gate); a null og:image falls back to the Google S2 favicon for the page
- * host (same gate); title/description render via plain Compose Text only.
+ * host (same gate); title/URL render via plain Compose Text only.
  * A null/unusable host or a failed load collapses the thumb slot silently
- * — the text-only card, no error affordance.
+ * — the text-only card (title + URL only), no error affordance.
  */
 @Composable
 fun OgSourceCard(
@@ -81,7 +80,6 @@ fun OgSourceCard(
     modifier: Modifier = Modifier,
 ) {
     val displayTitle = ogDisplayTitle(source.ogTitle, source.url)
-    val description = source.ogDescription?.trim()?.takeIf { it.isNotEmpty() }
     val gatedImage = gatedHttpImageUrl(source.ogImageUrl)
         ?: faviconFallbackUrl(source.url)?.let(::gatedHttpImageUrl)
     var imageFailed by remember(gatedImage) { mutableStateOf(false) }
@@ -93,7 +91,6 @@ fun OgSourceCard(
     }
     val previewCd = stringResource(R.string.cd_source_preview, number, displayTitle)
     val openBrowserCd = stringResource(R.string.cd_open_in_browser)
-    val openSourceCd = stringResource(R.string.cd_open_source_browser, number)
 
     Surface(
         color = container,
@@ -110,6 +107,7 @@ fun OgSourceCard(
             modifier = Modifier
                 .padding(12.dp)
                 .height(IntrinsicSize.Min),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             if (showThumb) {
                 Box(
@@ -136,66 +134,33 @@ fun OgSourceCard(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = source.url,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (description != null) {
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = description,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Normal,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-            Spacer(Modifier.width(8.dp))
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxHeight(),
-            ) {
-                // [N] badge — same construction as the preview sheet badge.
-                Surface(
-                    shape = MaterialTheme.shapes.extraSmall,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                    contentColor = MaterialTheme.colorScheme.primary,
-                ) {
-                    Text(
-                        text = "[$number]",
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                    )
-                }
-                // 48dp hit area comes from IconButton's enforced minimum
-                // touch target; the glyph itself is 20dp.
-                IconButton(onClick = { onOpenBrowser(source.url) }) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
-                        contentDescription = openSourceCd,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
             }
         }
     }
 }
 
 /**
- * Sources-carousel compact card (fixed 272dp width) reusing the
- * [OgSourceCard] pieces: the same [OgThumb] 64dp slot (tap → browser), the
- * same title fallback ([ogDisplayTitle], `maxLines = 2`), the same `[N]`
- * badge construction, and the same container colors ([OgCardDark] dark /
- * M3 surfaceVariant light — zero new color constants, zero purple).
+ * Sources-carousel compact card (fixed 272dp width) with the same locked
+ * two-column layout as [OgSourceCard]: left thumb (tap → browser), right
+ * Title (max 2 lines) + URL (1 line, muted). Same container colors
+ * ([OgCardDark] dark / M3 surfaceVariant light — zero new color constants,
+ * zero purple). No [N] badge, no open icon.
  *
  * Tap rules mirror [OgSourceCard]: whole-card tap opens the preview sheet;
- * the thumbnail and the open icon consume their taps and fire the guarded
- * browser intent instead. Text-only sources (null/failed thumb, legacy
+ * the thumbnail consumes its tap and fires the guarded browser intent
+ * instead. Text-only sources (null/failed thumb, legacy
  * `GroundedSource(url)` rows) render the same card without the thumb slot —
  * title falls back to host, tap still opens the sheet. Omitida sources
  * never reach this composable (struck text rows stand below the carousel).
@@ -219,8 +184,7 @@ fun CompactSourceCard(
         MaterialTheme.colorScheme.surfaceVariant
     }
     val previewCd = stringResource(R.string.cd_preview_source, number)
-    val openSourceTitleCd = stringResource(R.string.cd_open_source_title, number, displayTitle)
-    val openSourceCd = stringResource(R.string.cd_open_source_browser, number)
+    val openBrowserCd = stringResource(R.string.cd_open_in_browser)
 
     Surface(
         color = container,
@@ -233,64 +197,52 @@ fun CompactSourceCard(
                 contentDescription = previewCd
             },
     ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
+        Row(
+            modifier = Modifier
+                .padding(12.dp)
+                .height(IntrinsicSize.Min),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (showThumb) {
-                    Box(
-                        modifier = Modifier
-                            .clickable(role = Role.Button, onClick = { onOpenBrowser(source.url) })
-                            .semantics {
-                                contentDescription = openSourceTitleCd
-                            },
-                    ) {
-                        OgThumb(
-                            imageUrl = gatedImage,
-                            contentDescription = null,
-                            onError = { imageFailed = true },
-                        )
-                    }
-                    Spacer(Modifier.width(8.dp))
-                }
-                // [N] badge — same construction as OgSourceCard.
-                Surface(
-                    shape = MaterialTheme.shapes.extraSmall,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                    contentColor = MaterialTheme.colorScheme.primary,
+            if (showThumb) {
+                Box(
+                    modifier = Modifier
+                        .clickable(role = Role.Button, onClick = { onOpenBrowser(source.url) })
+                        .semantics {
+                            contentDescription = openBrowserCd
+                        },
                 ) {
-                    Text(
-                        text = "[$number]",
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
+                    OgThumb(
+                        imageUrl = gatedImage,
+                        contentDescription = null,
+                        onError = { imageFailed = true },
                     )
                 }
-                Spacer(Modifier.weight(1f))
-                // 48dp hit area comes from IconButton's enforced minimum
-                // touch target; the glyph itself is 20dp.
-                IconButton(onClick = { onOpenBrowser(source.url) }) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
-                        contentDescription = openSourceCd,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
+                Spacer(Modifier.width(8.dp))
             }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = displayTitle,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    text = displayTitle,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = source.url,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
