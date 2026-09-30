@@ -6,4 +6,5 @@
             android:drawable="@drawable/logo"
             android:inset="20%" />
     </foreground>
+    <monochrome android:drawable="@drawable/logo" />
 </adaptive-icon>
