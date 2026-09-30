@@ -413,6 +413,14 @@ class ChatViewModel @Inject constructor(
                 // details on Done below. Armed turns skip the VM
                 // pre-search, so this is normally the only source.
                 val loopSourceDetails = mutableListOf<GroundedSource>()
+                // Quick-task (loop-images): per-turn loop-image
+                // accumulator. Loop drivers emit one `ToolCompleted` per
+                // executed search call carrying the call's fused Tavily
+                // `images[]`; they union here (first-seen order, distinct)
+                // and merge with the pre-search `groundedImages` on Done
+                // below. Armed turns skip the VM pre-search, so this is
+                // normally the only image source.
+                val loopImages = mutableListOf<String>()
                 var modelOnlyNotice: ModelOnlyNotice? = null
                 var modelOnlySourceCount: Int = 1
                 // Grounding precedence (threat T-53-05): single decision
@@ -851,6 +859,13 @@ class ChatViewModel @Inject constructor(
                                     loopSourceDetails += source
                                 }
                             }
+                            // Quick-task (loop-images): union the call's
+                            // fused images (first-seen order, distinct).
+                            for (image in token.images) {
+                                if (image !in loopImages) {
+                                    loopImages += image
+                                }
+                            }
                         }
                         is StreamToken.Delta -> {
                             tokenBuffer.add(token.content)
@@ -892,6 +907,12 @@ class ChatViewModel @Inject constructor(
                                 val allSources = (groundedSources + loopOkUrls).distinct()
                                 val allDetails = (groundedSourceDetails + loopSourceDetails)
                                     .distinctBy { it.url }
+                                // Quick-task (loop-images): loop-turn images
+                                // merge with the pre-search list (pre-search
+                                // keeps precedence, first-seen order).
+                                // Ephemeral — never persisted (toEntity
+                                // untouched, no migration).
+                                val allImages = (groundedImages + loopImages).distinct()
                                 val assistantMessage = ChatMessage(
                                     role = Role.ASSISTANT,
                                     content = content,
@@ -900,7 +921,7 @@ class ChatViewModel @Inject constructor(
                                     stats = token.stats,
                                     groundedSources = allSources,
                                     groundedSourceDetails = allDetails,
-                                    groundedImages = groundedImages,
+                                    groundedImages = allImages,
                                     modelOnlyNotice = modelOnlyNotice,
                                     modelOnlySourceCount = modelOnlySourceCount,
                                 )

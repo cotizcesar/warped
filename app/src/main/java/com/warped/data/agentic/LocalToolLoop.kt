@@ -167,10 +167,15 @@ object LocalToolLoop {
      * as pre-search grounded turns — captured from the outcome object, never
      * re-parsed from the fused string. Empty when the call produced no
      * persistable rows.
+     *
+     * Quick-task (loop-images): [images] carries the fused Tavily `images[]`
+     * URLs verbatim (http(s)-gated upstream). Fetch outcomes and
+     * non-grounded search outcomes carry an empty list.
      */
     data class ToolCallOutcome(
         val text: String,
         val sources: List<GroundedSource> = emptyList(),
+        val images: List<String> = emptyList(),
     )
 
     /**
@@ -181,6 +186,15 @@ object LocalToolLoop {
      */
     fun searchSources(outcome: TavilySearchOutcome): List<GroundedSource> =
         (outcome as? TavilySearchOutcome.Grounded)?.fused?.details.orEmpty()
+
+    /**
+     * Quick-task (loop-images): fused Tavily `images[]` URLs verbatim for a
+     * search outcome — empty for every non-grounded outcome (ModelOnly/key/
+     * limit paths carry no images). Sits next to [searchSources]; the 4 loop
+     * executors populate `ToolCallOutcome.images` from this.
+     */
+    fun searchImages(outcome: TavilySearchOutcome): List<String> =
+        (outcome as? TavilySearchOutcome.Grounded)?.fused?.images.orEmpty()
 
     /**
      * Quick-task (agentic-rows): structured Fuentes details for a fetch

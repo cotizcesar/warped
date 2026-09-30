@@ -291,6 +291,7 @@ class OpenAIProvider(
                                         call.id,
                                         summarizeForTranscript(outcome.text),
                                         sources = outcome.sources,
+                                        images = outcome.images,
                                     ),
                                 )
                             }
@@ -371,6 +372,7 @@ class OpenAIProvider(
                         LocalToolLoop.ToolCallOutcome(
                             text = LocalToolLoop.mapSearchOutcome(outcome),
                             sources = LocalToolLoop.searchSources(outcome),
+                            images = LocalToolLoop.searchImages(outcome),
                         )
                     } catch (e: CancellationException) {
                         throw e

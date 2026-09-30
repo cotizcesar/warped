@@ -464,6 +464,7 @@ class LiteRTLmProvider @Inject constructor(
                                         toolId = "local:${call.name}#$callsUsed",
                                         summary = summarizeForTranscript(outcome.text),
                                         sources = outcome.sources,
+                                        images = outcome.images,
                                     ),
                                 )
                             }
@@ -521,6 +522,7 @@ class LiteRTLmProvider @Inject constructor(
                     LocalToolLoop.ToolCallOutcome(
                         text = LocalToolLoop.mapSearchOutcome(outcome),
                         sources = LocalToolLoop.searchSources(outcome),
+                        images = LocalToolLoop.searchImages(outcome),
                     )
                 } catch (e: CancellationException) {
                     throw e

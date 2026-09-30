@@ -15,10 +15,6 @@ sealed interface StreamToken {
     data class ToolStatus(val toolName: String?) : StreamToken
 
     /**
-     * 47-03: a remote-loop tool finished. Carries the persistable record
-     * ([toolId] + ≤200-char [summary]) plus the optional [errorReason]
-     * driving the `"{Display} failed: …"` error row.
-     *
      * Quick-task (agentic-rows): [sources] carries the per-call Fuentes
      * rows in the SAME row shape (incl. OG columns) as the pre-search
      * grounded turns — the ViewModel accumulates them across the turn and
@@ -26,6 +22,11 @@ sealed interface StreamToken {
      * Empty when the call produced no persistable rows (validation
      * short-circuit, offline, cap string, key/limit outcomes). Local manual
      * loop emits this too (one per executed search/fetch call).
+     *
+     * Quick-task (loop-images): [images] carries the call's fused Tavily
+     * `images[]` URLs verbatim — the ViewModel unions them across the turn
+     * into the ephemeral `groundedImages` the grid reads. Empty for fetch
+     * calls and non-grounded search outcomes.
      *
      * Explicitly NOT `role=tool` transcript rows (Phase 49 DEL-01: no
      * Role.TOOL rows are produced; legacy ones replay read-only) — the
@@ -36,6 +37,7 @@ sealed interface StreamToken {
         val summary: String,
         val errorReason: String? = null,
         val sources: List<GroundedSource> = emptyList(),
+        val images: List<String> = emptyList(),
     ) : StreamToken
 
     /**
