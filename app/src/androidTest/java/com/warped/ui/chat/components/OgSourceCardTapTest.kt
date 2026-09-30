@@ -77,7 +77,7 @@ class OgSourceCardTapTest {
     }
 
     @Test
-    fun `thumbnail tap opens browser and not preview sheet`() {
+    fun `thumbnail_tap_opens_browser_and_not_preview_sheet`() {
         setCardContent()
         composeTestRule
             .onNodeWithContentDescription("Open in browser", useUnmergedTree = true)
@@ -91,7 +91,7 @@ class OgSourceCardTapTest {
     }
 
     @Test
-    fun `body tap opens preview sheet and not browser`() {
+    fun `body_tap_opens_preview_sheet_and_not_browser`() {
         setCardContent()
         composeTestRule
             .onNodeWithText("Example title", useUnmergedTree = true)
@@ -105,7 +105,7 @@ class OgSourceCardTapTest {
     }
 
     @Test
-    fun `open icon still routes to browser callback`() {
+    fun `open_icon_still_routes_to_browser_callback`() {
         setCardContent()
         composeTestRule
             .onNodeWithContentDescription("Open source 1 in browser", useUnmergedTree = true)

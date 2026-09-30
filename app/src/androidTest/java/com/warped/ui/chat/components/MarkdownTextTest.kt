@@ -14,7 +14,7 @@ class MarkdownTextTest {
     val composeTestRule = createComposeRule()
 
     @Test
-    fun `renders bold text with FontWeight Bold span`() {
+    fun `renders_bold_text_with_fontweight_bold_span`() {
         composeTestRule.setContent {
             MarkdownText("**bold**", codeTheme = SyntaxTheme.MONOKAI)
         }
@@ -22,7 +22,7 @@ class MarkdownTextTest {
     }
 
     @Test
-    fun `renders header then body text in column order`() {
+    fun `renders_header_then_body_text_in_column_order`() {
         composeTestRule.setContent {
             MarkdownText("# Title\nBody", codeTheme = SyntaxTheme.MONOKAI)
         }
@@ -32,7 +32,7 @@ class MarkdownTextTest {
     }
 
     @Test
-    fun `accepts SyntaxTheme parameter with ONE DARK theme`() {
+    fun `accepts_syntaxtheme_parameter_with_one_dark_theme`() {
         composeTestRule.setContent {
             MarkdownText("text", codeTheme = SyntaxTheme.ONE_DARK)
         }
@@ -40,7 +40,7 @@ class MarkdownTextTest {
     }
 
     @Test
-    fun `renders fenced code block`() {
+    fun `renders_fenced_code_block`() {
         composeTestRule.setContent {
             MarkdownText(
                 "```python\nprint(1)\n```",
@@ -52,7 +52,7 @@ class MarkdownTextTest {
     }
 
     @Test
-    fun `renders inline code with monospace font`() {
+    fun `renders_inline_code_with_monospace_font`() {
         composeTestRule.setContent {
             MarkdownText("`inline`", codeTheme = SyntaxTheme.MONOKAI)
         }
@@ -60,7 +60,7 @@ class MarkdownTextTest {
     }
 
     @Test
-    fun `complex markdown with mixed blocks renders in correct order`() {
+    fun `complex_markdown_with_mixed_blocks_renders_in_correct_order`() {
         composeTestRule.setContent {
             MarkdownText(
                 "# Header\nBody text\n- item1\n- item2\n```js\nconsole.log('hi')\n```\nDone",
@@ -76,7 +76,7 @@ class MarkdownTextTest {
     }
 
     @Test
-    fun `empty text returns early without block parsing`() {
+    fun `empty_text_returns_early_without_block_parsing`() {
         composeTestRule.setContent {
             MarkdownText("", codeTheme = SyntaxTheme.MONOKAI)
         }
