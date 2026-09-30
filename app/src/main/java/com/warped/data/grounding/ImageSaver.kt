@@ -55,12 +55,14 @@ class ImageSaver(
                     }
                     val body = response.body
                         ?: throw IOException("Image download returned an empty body")
-                    val bytes = body.bytes()
-                    if (bytes.isEmpty()) throw IOException("Image download returned zero bytes")
                     val mime = body.contentType()?.toString()
                         ?.substringBefore(';')?.trim()
                         ?.takeIf { it.startsWith("image/") }
                         ?: "image/jpeg"
+                    // Bounded read: a hostile image host must not be able
+                    // to OOM the app with a multi-GB stream.
+                    val bytes = readBounded(body)
+                    if (bytes.isEmpty()) throw IOException("Image download returned zero bytes")
                     writeToMediaStore(context, bytes, mime, trimmed)
                 }
                 SaveResult.Saved
@@ -113,6 +115,25 @@ class ImageSaver(
     }
 
     companion object {
+        /** Gallery download cap — refuses larger images before MediaStore. */
+        const val MAX_IMAGE_BYTES = 20 * 1024 * 1024
+
+        /**
+         * Read at most [MAX_IMAGE_BYTES]+1 bytes; throws when the stream
+         * exceeds the cap (the +1 distinguishes exact-cap from over-cap).
+         */
+        private fun readBounded(body: okhttp3.ResponseBody): ByteArray {
+            val buffer = okio.Buffer()
+            var remaining = MAX_IMAGE_BYTES + 1L
+            val source = body.source()
+            while (remaining > 0) {
+                val read = source.read(buffer, minOf(remaining, 8192L))
+                if (read == -1L) break
+                remaining -= read
+            }
+            if (remaining == 0L) throw IOException("Image exceeds 20MB limit")
+            return buffer.readByteArray()
+        }
         /**
          * Deterministic gallery file name from the source URL + MIME type.
          * Pure Kotlin — JVM-testable without Android.
