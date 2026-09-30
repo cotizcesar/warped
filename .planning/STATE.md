@@ -126,6 +126,7 @@ None — v2.2 phases shipped with accepted deferrals recorded above. Next milest
 | 20260929-all-sources-sheet | 2026-09-29 | Complete ✓ | Icono ver-todas + drawer lista completa; 9 tests |
 | 20260929-citation-taps-youtube-oembed | 2026-09-29 | Complete ✓ | Citas [N] clicables → drawer individual + oEmbed YouTube; 651 green |
 | 20260929-loop-images-plumbing | 2026-09-29 | Complete ✓ | includeImages en los 4 executors + images→mensaje (efímero); 656 green |
+| 20260929-attachments-skip-search | 2026-09-29 | Complete ✓ | Sin pre-búsqueda ciega en turnos con imagen/audio (regresión v2.4); 665 green |
 | 20260929-langmatch-i18n-paragraphs | 2026-09-29 | Complete ✓ | Regla idioma-usuario en prompts + EN/ES 459/459 + párrafos 8dp; 512 green |
 
 ## Session Continuity
