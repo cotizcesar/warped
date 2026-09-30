@@ -334,4 +334,51 @@ class ChatLoopSourcesTest {
         assertThat(savedUser.first { it.role == com.warped.domain.model.Role.USER }.content)
             .isEqualTo("latest news")
     }
+
+    @Test
+    fun `loop turn unions ToolCompleted images into groundedImages`() = runTest {
+        // Quick-task (loop-images): a loop turn whose ToolCompleted rows
+        // carry fused images produces an assistant message with
+        // `groundedImages` non-empty — the exact input the grid condition
+        // (`MessageBubble`: `!isUser && groundedImages.isNotEmpty()` →
+        // `GroundedImageGrid`) reads. The pre-search half is stubbed
+        // model-only above, so the images come from the loop only.
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
+        helperTokens = listOf(
+            StreamToken.ToolCompleted(
+                "local:web_search#1",
+                "s",
+                sources = loopRows,
+                images = listOf(
+                    "https://s1.example/grid1.png",
+                    "https://s1.example/grid2.png",
+                ),
+            ),
+            // Duplicate across calls: union keeps the first occurrence.
+            StreamToken.ToolCompleted(
+                "local:web_search#2",
+                "s",
+                sources = loopRows,
+                images = listOf("https://s1.example/grid2.png"),
+            ),
+            StreamToken.Delta("answer with pictures"),
+            StreamToken.Done(),
+        )
+        val vm = buildViewModel(modelFile.absolutePath)
+        runCurrent()
+
+        vm.sendMessage("show me pictures of cats")
+        advanceUntilIdle()
+
+        val messageSlot = slot<ChatMessage>()
+        coVerify(exactly = 1) {
+            chatRepository.saveMessageWithSources(42L, capture(messageSlot), any())
+        }
+        // First-seen order, distinct — pre-search half empty here.
+        assertThat(messageSlot.captured.groundedImages).containsExactly(
+            "https://s1.example/grid1.png",
+            "https://s1.example/grid2.png",
+        ).inOrder()
+    }
 }

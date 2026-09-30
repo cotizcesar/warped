@@ -290,4 +290,52 @@ class LocalToolLoopTest {
             ),
         ).isEmpty()
     }
+
+    // Quick-task (loop-images): fused Tavily `images[]` carried verbatim.
+
+    @Test
+    fun `grounded search outcome yields fused images verbatim`() {
+        val outcome = TavilySearchOutcome.Grounded(
+            MultiUrlResult.Fused(
+                block = "BLOQUE",
+                okUrls = listOf("https://a.example/uno"),
+                skippedUrls = emptyList(),
+                images = listOf(
+                    "https://a.example/img1.png",
+                    "https://a.example/img2.png",
+                ),
+            ),
+        )
+
+        assertThat(LocalToolLoop.searchImages(outcome)).containsExactly(
+            "https://a.example/img1.png",
+            "https://a.example/img2.png",
+        ).inOrder()
+    }
+
+    @Test
+    fun `non-grounded search outcomes yield no images`() {
+        assertThat(
+            LocalToolLoop.searchImages(
+                TavilySearchOutcome.ModelOnly(
+                    MultiUrlResult.AllFailed(GroundingResult.Reason.OFFLINE),
+                ),
+            ),
+        ).isEmpty()
+        assertThat(LocalToolLoop.searchImages(TavilySearchOutcome.MissingKey)).isEmpty()
+        assertThat(LocalToolLoop.searchImages(TavilySearchOutcome.InvalidKey)).isEmpty()
+        assertThat(LocalToolLoop.searchImages(TavilySearchOutcome.UsageLimit)).isEmpty()
+        // Grounded without a Tavily image leg carries an empty list.
+        assertThat(
+            LocalToolLoop.searchImages(
+                TavilySearchOutcome.Grounded(
+                    MultiUrlResult.Fused(
+                        block = "BLOQUE",
+                        okUrls = listOf("https://a.example/uno"),
+                        skippedUrls = emptyList(),
+                    ),
+                ),
+            ),
+        ).isEmpty()
+    }
 }

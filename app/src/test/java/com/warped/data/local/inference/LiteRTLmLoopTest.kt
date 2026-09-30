@@ -189,7 +189,7 @@ class LiteRTLmLoopTest {
     fun `offline disarms with no socket`() = runTest {
         stubArmed(online = false)
         assertThat(provider().computeArmSnapshot(perChat = null).armed).isFalse()
-        coVerify(exactly = 0) { ddg.search(any(), any(), any()) }
+        coVerify(exactly = 0) { ddg.search(any(), any(), any(), any()) }
     }
 
     @Test
@@ -241,7 +241,7 @@ class LiteRTLmLoopTest {
         val p = provider()
         val result = p.executeToolCall(ToolCall("rm_rf", mapOf("x" to "y")), 4096)
         assertThat(result).contains("Unknown tool")
-        coVerify(exactly = 0) { ddg.search(any(), any(), any()) }
+        coVerify(exactly = 0) { ddg.search(any(), any(), any(), any()) }
         coVerify(exactly = 0) { multiUrlFetcher.fetchAll(any(), any(), any()) }
     }
 
@@ -250,7 +250,7 @@ class LiteRTLmLoopTest {
         val p = provider()
         val result = p.executeToolCall(ToolCall("web_search", mapOf("query" to "   ")), 4096)
         assertThat(result).isEqualTo(LocalToolLoop.MODEL_ONLY_STRING)
-        coVerify(exactly = 0) { ddg.search(any(), any(), any()) }
+        coVerify(exactly = 0) { ddg.search(any(), any(), any(), any()) }
     }
 
     @Test
@@ -271,14 +271,14 @@ class LiteRTLmLoopTest {
         assertThat(
             p.executeToolCall(ToolCall("web_fetch", mapOf("url" to "https://x")), 4096)
         ).isEqualTo(LocalToolLoop.OFFLINE_STRING)
-        coVerify(exactly = 0) { ddg.search(any(), any(), any()) }
+        coVerify(exactly = 0) { ddg.search(any(), any(), any(), any()) }
         coVerify(exactly = 0) { multiUrlFetcher.fetchAll(any(), any(), any()) }
     }
 
     @Test
     fun `search success maps fused block verbatim`() = runTest {
         every { webPageFetcher.hasValidatedInternet() } returns true
-        coEvery { ddg.search(any(), any(), any()) } returns TavilySearchOutcome.Grounded(
+        coEvery { ddg.search(any(), any(), any(), any()) } returns TavilySearchOutcome.Grounded(
             MultiUrlResult.Fused(
                 block = "Source [1] test",
                 okUrls = listOf("https://x"),
@@ -294,7 +294,7 @@ class LiteRTLmLoopTest {
     @Test
     fun `missing key returns actionable string`() = runTest {
         every { webPageFetcher.hasValidatedInternet() } returns true
-        coEvery { ddg.search(any(), any(), any()) } returns TavilySearchOutcome.MissingKey
+        coEvery { ddg.search(any(), any(), any(), any()) } returns TavilySearchOutcome.MissingKey
         val p = provider()
         assertThat(
             p.executeToolCall(ToolCall("web_search", mapOf("query" to "q")), 4096)
@@ -304,7 +304,7 @@ class LiteRTLmLoopTest {
     @Test
     fun `executor failure degrades to concise string - never throws`() = runTest {
         every { webPageFetcher.hasValidatedInternet() } returns true
-        coEvery { ddg.search(any(), any(), any()) } throws RuntimeException("boom detail")
+        coEvery { ddg.search(any(), any(), any(), any()) } throws RuntimeException("boom detail")
         val p = provider()
         assertThat(
             p.executeToolCall(ToolCall("web_search", mapOf("query" to "q")), 4096)
@@ -356,7 +356,7 @@ class LiteRTLmLoopTest {
     @Test
     fun `multi-round loop streams text - thought to Done - tool results fed back`() = runTest {
         every { webPageFetcher.hasValidatedInternet() } returns true
-        coEvery { ddg.search(any(), any(), any()) } returns TavilySearchOutcome.Grounded(
+        coEvery { ddg.search(any(), any(), any(), any()) } returns TavilySearchOutcome.Grounded(
             MultiUrlResult.Fused(
                 block = "Source [1] search",
                 okUrls = listOf("https://s"),
@@ -404,7 +404,7 @@ class LiteRTLmLoopTest {
     @Test
     fun `cap reached feeds continuation string - one call over the cap`() = runTest {
         every { webPageFetcher.hasValidatedInternet() } returns true
-        coEvery { ddg.search(any(), any(), any()) } returns TavilySearchOutcome.Grounded(
+        coEvery { ddg.search(any(), any(), any(), any()) } returns TavilySearchOutcome.Grounded(
             MultiUrlResult.Fused(block = "S", okUrls = listOf("https://s"), skippedUrls = emptyList())
         )
         val sixCalls = (1..6).map { ToolCall("web_search", mapOf("query" to "q$it")) }
@@ -416,7 +416,7 @@ class LiteRTLmLoopTest {
         )
         val tokens = flow<StreamToken> { drive(transport) }.toList()
 
-        coVerify(exactly = 5) { ddg.search(any(), any(), any()) }
+        coVerify(exactly = 5) { ddg.search(any(), any(), any(), any()) }
         val fed = toolResponses(transport.replies[1])
         assertThat(fed).hasSize(6)
         assertThat(fed.last()).isEqualTo("web_search" to LocalToolLoop.CAP_REACHED_STRING)
@@ -426,7 +426,7 @@ class LiteRTLmLoopTest {
     @Test
     fun `second tool request after cap finishes instead of ping-ponging`() = runTest {
         every { webPageFetcher.hasValidatedInternet() } returns true
-        coEvery { ddg.search(any(), any(), any()) } returns TavilySearchOutcome.Grounded(
+        coEvery { ddg.search(any(), any(), any(), any()) } returns TavilySearchOutcome.Grounded(
             MultiUrlResult.Fused(block = "S", okUrls = listOf("https://s"), skippedUrls = emptyList())
         )
         val fiveCalls = (1..5).map { ToolCall("web_search", mapOf("query" to "q$it")) }
@@ -445,7 +445,7 @@ class LiteRTLmLoopTest {
         val tokens = flow<StreamToken> { drive(transport) }.toList()
 
         // 5 real calls + the 6th fed the cap string; the 7th never executes.
-        coVerify(exactly = 5) { ddg.search(any(), any(), any()) }
+        coVerify(exactly = 5) { ddg.search(any(), any(), any(), any()) }
         assertThat(toolResponses(transport.replies[2]).single().second)
             .isEqualTo(LocalToolLoop.CAP_REACHED_STRING)
         assertThat(tokens.last()).isInstanceOf(StreamToken.Done::class.java)
@@ -498,7 +498,7 @@ class LiteRTLmLoopTest {
     fun `executed search emits ToolCompleted carrying structured sources`() = runTest {
         every { webPageFetcher.hasValidatedInternet() } returns true
         val details = searchDetails()
-        coEvery { ddg.search(any(), any(), any()) } returns TavilySearchOutcome.Grounded(
+        coEvery { ddg.search(any(), any(), any(), any()) } returns TavilySearchOutcome.Grounded(
             MultiUrlResult.Fused(
                 block = "Source [1] search",
                 okUrls = listOf("https://s1.example/a"),
@@ -537,7 +537,7 @@ class LiteRTLmLoopTest {
                 status = com.warped.domain.model.GroundedSourceStatus.OK,
             ),
         )
-        coEvery { ddg.search(any(), any(), any()) } returns TavilySearchOutcome.Grounded(
+        coEvery { ddg.search(any(), any(), any(), any()) } returns TavilySearchOutcome.Grounded(
             MultiUrlResult.Fused(
                 block = "Source [1] search",
                 okUrls = listOf("https://s1.example/a"),
@@ -595,13 +595,13 @@ class LiteRTLmLoopTest {
         val shortTokens = flow<StreamToken> { drive(short) }.toList()
         assertThat(shortTokens.filterIsInstance<StreamToken.ToolCompleted>()).isEmpty()
         assertThat(shortTokens.filterIsInstance<StreamToken.ToolStatus>()).isEmpty()
-        coVerify(exactly = 0) { ddg.search(any(), any(), any()) }
+        coVerify(exactly = 0) { ddg.search(any(), any(), any(), any()) }
     }
 
     @Test
     fun `detailed executor keeps text mapping identical to the string executor`() = runTest {
         every { webPageFetcher.hasValidatedInternet() } returns true
-        coEvery { ddg.search(any(), any(), any()) } returns TavilySearchOutcome.Grounded(
+        coEvery { ddg.search(any(), any(), any(), any()) } returns TavilySearchOutcome.Grounded(
             MultiUrlResult.Fused(
                 block = "Source [1] search",
                 okUrls = listOf("https://s"),
@@ -621,5 +621,88 @@ class LiteRTLmLoopTest {
             .isEqualTo(p.executeToolCall(call, 4096))
         assertThat(p.executeToolCallDetailed(call, 4096).sources.map { it.url })
             .containsExactly("https://s")
+    }
+
+    // ------------------------------------------------------------------
+    // Quick-task (loop-images): includeImages + fused-images threading.
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `loop web_search requests images from the repository`() = runTest {
+        every { webPageFetcher.hasValidatedInternet() } returns true
+        coEvery { ddg.search(any(), any(), any(), any()) } returns TavilySearchOutcome.Grounded(
+            MultiUrlResult.Fused(
+                block = "Source [1] search",
+                okUrls = listOf("https://s1.example/a"),
+                skippedUrls = emptyList(),
+                details = searchDetails().take(1),
+                images = listOf("https://s1.example/img1.png"),
+            )
+        )
+        val transport = FakeTransport(
+            listOf(
+                FakeTurn(
+                    terminal = textTerminal("", toolCalls = listOf(ToolCall("web_search", mapOf("query" to "q")))),
+                ),
+                FakeTurn(terminal = textTerminal("Final"), texts = listOf("Final")),
+            )
+        )
+        flow<StreamToken> { drive(transport) }.toList()
+
+        // includeImages=true ALWAYS: the DDG leg ignores it, only the keyed
+        // Tavily fallback leg uses it (credit-capped).
+        coVerify(exactly = 1) { ddg.search("q", any(), any(), includeImages = true) }
+    }
+
+    @Test
+    fun `executed search emits ToolCompleted carrying fused images`() = runTest {
+        every { webPageFetcher.hasValidatedInternet() } returns true
+        val withImages = MultiUrlResult.Fused(
+            block = "Source [1] search",
+            okUrls = listOf("https://s1.example/a"),
+            skippedUrls = emptyList(),
+            details = searchDetails().take(1),
+            images = listOf(
+                "https://s1.example/img1.png",
+                "https://s1.example/img2.png",
+            ),
+        )
+        val withoutImages = MultiUrlResult.Fused(
+            block = "Source [1] other",
+            okUrls = listOf("https://o.example/b"),
+            skippedUrls = emptyList(),
+            details = listOf(
+                com.warped.domain.model.GroundedSource(
+                    url = "https://o.example/b",
+                    extractedText = "Other text.",
+                    status = com.warped.domain.model.GroundedSourceStatus.OK,
+                ),
+            ),
+        )
+        coEvery { ddg.search("q1", any(), any(), any()) } returns TavilySearchOutcome.Grounded(withImages)
+        coEvery { ddg.search("q2", any(), any(), any()) } returns TavilySearchOutcome.Grounded(withoutImages)
+        val transport = FakeTransport(
+            listOf(
+                FakeTurn(
+                    terminal = textTerminal("", toolCalls = listOf(ToolCall("web_search", mapOf("query" to "q1")))),
+                ),
+                FakeTurn(
+                    terminal = textTerminal("", toolCalls = listOf(ToolCall("web_search", mapOf("query" to "q2")))),
+                ),
+                FakeTurn(terminal = textTerminal("Final"), texts = listOf("Final")),
+            )
+        )
+        val tokens = flow<StreamToken> { drive(transport) }.toList()
+
+        val completed = tokens.filterIsInstance<StreamToken.ToolCompleted>()
+        assertThat(completed).hasSize(2)
+        // Fused Tavily images[] carried verbatim on the search turn.
+        assertThat(completed[0].images).containsExactly(
+            "https://s1.example/img1.png",
+            "https://s1.example/img2.png",
+        ).inOrder()
+        // Sources-only outcomes stay imageless.
+        assertThat(completed[1].images).isEmpty()
+        assertThat(completed[1].sources.map { it.url }).containsExactly("https://o.example/b")
     }
 }

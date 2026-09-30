@@ -92,12 +92,13 @@ class CompatToolLoopSourcesTest {
 
     @Test
     fun `compat turn emits ToolCompleted carrying structured sources`() = runTest {
-        coEvery { ddg.search(any(), any(), any()) } returns TavilySearchOutcome.Grounded(
+        coEvery { ddg.search(any(), any(), any(), any()) } returns TavilySearchOutcome.Grounded(
             MultiUrlResult.Fused(
                 block = "Source [1] remote",
                 okUrls = listOf("https://r.example/news"),
                 skippedUrls = listOf("https://dead.example/x"),
                 details = searchDetails,
+                images = listOf("https://r.example/grid1.png"),
             )
         )
         startServer(
@@ -132,11 +133,15 @@ class CompatToolLoopSourcesTest {
         assertThat(completed.single().toolId).isEqualTo("call_1")
         // Same row shape incl. OG columns, same order.
         assertThat(completed.single().sources).isEqualTo(searchDetails)
+        // Quick-task (loop-images): fused Tavily images[] carried verbatim.
+        assertThat(completed.single().images).containsExactly("https://r.example/grid1.png")
         // Turn still answers normally from gathered context.
         assertThat(tokens.filterIsInstance<StreamToken.Delta>().map { it.content })
             .contains("done answer")
         assertThat(tokens.last()).isInstanceOf(StreamToken.Done::class.java)
-        coVerify(exactly = 1) { ddg.search(any(), any(), any()) }
+        // Quick-task (loop-images): includeImages=true ALWAYS (DDG leg
+        // ignores it; only the keyed Tavily fallback leg uses it).
+        coVerify(exactly = 1) { ddg.search(any(), any(), any(), includeImages = true) }
     }
 
     @Test
@@ -170,7 +175,7 @@ class CompatToolLoopSourcesTest {
 
         assertThat(tokens.filterIsInstance<StreamToken.ToolCompleted>()).isEmpty()
         assertThat(tokens.last()).isInstanceOf(StreamToken.Done::class.java)
-        coVerify(exactly = 0) { ddg.search(any(), any(), any()) }
+        coVerify(exactly = 0) { ddg.search(any(), any(), any(), any()) }
     }
 
     @Test
@@ -183,9 +188,14 @@ class CompatToolLoopSourcesTest {
                 okUrls = listOf("https://r.example/news"),
                 skippedUrls = emptyList(),
                 details = searchDetails.take(1),
+                images = listOf("https://r.example/grid1.png"),
             ),
         )
         assertThat(LocalToolLoop.mapSearchOutcome(outcome)).isEqualTo("BLOQUE")
         assertThat(LocalToolLoop.searchSources(outcome)).isEqualTo(searchDetails.take(1))
+        // Quick-task (loop-images): same shared-helper coverage for the
+        // images leg (all four loop executors populate from this).
+        assertThat(LocalToolLoop.searchImages(outcome))
+            .containsExactly("https://r.example/grid1.png")
     }
 }
