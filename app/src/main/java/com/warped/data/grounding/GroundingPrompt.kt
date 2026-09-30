@@ -14,7 +14,8 @@ object GroundingPrompt {
             "Cite sources with [1]/[2] markers. " +
             "If you need fresh information and there is no context block, " +
             "ask the user to paste a link. " +
-            "Never invent URLs: only cite URLs from the block or pasted by the user."
+            "Never invent URLs: only cite URLs from the block or pasted by the user. " +
+            "Always reply in the same language the user wrote in."
 
     fun buildBlock(url: String, text: String): String =
         "--- Source [1]: $url ---\n$text\n--- End of sources ---"

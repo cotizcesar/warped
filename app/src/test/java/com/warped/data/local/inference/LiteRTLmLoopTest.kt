@@ -129,10 +129,13 @@ class LiteRTLmLoopTest {
         assertThat(LiteRTLmProvider.TOOL_USE_SYSTEM_HINT).isEqualTo(
             "Use web_search when the question needs current or external facts, " +
                 "and web_fetch to read a full page from the results or the user. " +
-                "Answer with the gathered context."
+                "Answer with the gathered context. " +
+                "Always reply in the same language the user wrote in."
         )
         assertThat(LiteRTLmProvider.TOOL_USE_SYSTEM_HINT).contains("web_search")
         assertThat(LiteRTLmProvider.TOOL_USE_SYSTEM_HINT).contains("web_fetch")
+        assertThat(LiteRTLmProvider.TOOL_USE_SYSTEM_HINT)
+            .contains("Always reply in the same language the user wrote in.")
     }
 
     // ------------------------------------------------------------------

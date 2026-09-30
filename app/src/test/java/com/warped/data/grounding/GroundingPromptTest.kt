@@ -14,6 +14,12 @@ class GroundingPromptTest {
     }
 
     @Test
+    fun `system prompt requires replying in the user's language`() {
+        assertThat(GroundingPrompt.SYSTEM_PROMPT)
+            .contains("Always reply in the same language the user wrote in.")
+    }
+
+    @Test
     fun `augment order is prompt then block then original`() {
         val block = GroundingPrompt.buildBlock("https://a.com", "contenido")
         val out = GroundingPrompt.augment("pregunta original", block, groundingEnabled = true)
