@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import javax.inject.Inject
@@ -68,11 +69,14 @@ class LiteRtLlmHelper @Inject constructor(
         return raw
             .let { upstream ->
                 if (enableThinking) upstream
-                else upstream.map { token ->
+                else upstream.mapNotNull { token ->
                     when (token) {
                         is StreamToken.Delta -> StreamToken.Delta(stripThinkTags(token.content))
                         is StreamToken.Done -> StreamToken.Done(stats = token.stats, reasoning = null)
                         is StreamToken.Error -> token
+                        // Quick-task (live-thinking): hidden when the toggle
+                        // is off — dropped, never surfaced as text.
+                        is StreamToken.Thinking -> null
                         // 47-02: live tool status passes through untouched
                         // (never think-stripped, never filtered).
                         is StreamToken.ToolStatus -> token

@@ -434,6 +434,9 @@ class LiteRTLmLoopTest {
         val tokens = flow<StreamToken> { drive(transport) }.toList()
 
         assertThat(tokens).containsExactly(
+            // Quick-task (live-thinking): turn-1 native thought streams
+            // live ahead of the tool calls it triggers.
+            StreamToken.Thinking("need fresh info"),
             StreamToken.ToolStatus("Searching for \"q\"…"),
             StreamToken.ToolStatus(null),
             StreamToken.ToolStatus("Reading f…"),
@@ -793,5 +796,53 @@ class LiteRTLmLoopTest {
 
         assertThat(tokens.last())
             .isEqualTo(StreamToken.Done(reasoning = "línea1\nlínea2 final"))
+    }
+
+    // ------------------------------------------------------------------
+    // Quick-task (live-thinking): native thought streams live as Thinking
+    // tokens; Done stays the final authoritative value.
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `thought deltas stream live as Thinking tokens in order before Done`() = runTest {
+        val transport = FakeTransport(
+            listOf(
+                FakeTurn(
+                    terminal = textTerminal("Answer"),
+                    texts = listOf("Answer"),
+                    thoughts = listOf("Cómo", " te", " puedo", " ayudar"),
+                ),
+            )
+        )
+        val tokens = flow<StreamToken> { drive(transport) }.toList()
+
+        // FakeTransport delivers texts before thoughts; what matters is
+        // Thinking tokens arrive live, in order, ahead of the final Done.
+        assertThat(tokens).containsExactly(
+            StreamToken.Delta("Answer"),
+            StreamToken.Thinking("Cómo"),
+            StreamToken.Thinking(" te"),
+            StreamToken.Thinking(" puedo"),
+            StreamToken.Thinking(" ayudar"),
+            StreamToken.Done(reasoning = "Cómo te puedo ayudar"),
+        ).inOrder()
+    }
+
+    @Test
+    fun `empty thought deltas emit no Thinking token`() = runTest {
+        val transport = FakeTransport(
+            listOf(
+                FakeTurn(
+                    terminal = textTerminal("Hi"),
+                    texts = listOf("Hi"),
+                    thoughts = listOf("", "real", ""),
+                ),
+            )
+        )
+        val tokens = flow<StreamToken> { drive(transport) }.toList()
+
+        assertThat(tokens.filterIsInstance<StreamToken.Thinking>())
+            .containsExactly(StreamToken.Thinking("real"))
+        assertThat(tokens.last()).isEqualTo(StreamToken.Done(reasoning = "real"))
     }
 }

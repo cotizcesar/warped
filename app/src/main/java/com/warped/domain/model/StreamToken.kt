@@ -6,6 +6,16 @@ sealed interface StreamToken {
     data class Error(val message: String) : StreamToken
 
     /**
+     * Quick-task (live-thinking): a native thought-channel delta streamed
+     * DURING generation. The provider emits one per non-empty `onThought`
+     * callback (same strings, same no-separator join as the `Done.reasoning`
+     * accumulator) so the Thinking panel updates live; `Done(reasoning)`
+     * stays the final authoritative value the stream reconciles to.
+     * Dropped (never surfaced) when the thinking toggle is off.
+     */
+    data class Thinking(val delta: String) : StreamToken
+
+    /**
      * 47-02: live tool-execution signal. With `automaticToolCalling=true`
      * the engine emits no tool events, so each `@Tool` body posts
      * start/finish via `ToolEventSink` and the provider forwards them here.

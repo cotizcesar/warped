@@ -857,6 +857,18 @@ class ChatViewModel @Inject constructor(
                 val reasoningActive = _input.value.reasoningEnabled
                 val modelMayThink = state.localModels.firstOrNull { it.filePath == modelId }?.capabilities?.reasoning == true
                 Timber.d("ChatVM: sendMessage reasoningActive=%b modelMayThink=%b", reasoningActive, modelMayThink)
+                // Quick-task (live-thinking): native thought deltas stream
+                // here DURING generation (Thinking), not just at Done.
+                // liveThought is the streamed authoritative mirror of the
+                // provider's thought accumulator (same deltas, same
+                // no-separator join — no parsing needed, so deltas append
+                // directly and only the UI emit is throttled). tagReasoning
+                // carries the last <think>-tag parse so both branches
+                // resolve the live panel with Done-branch precedence
+                // (tags win, native thought fills when tags are absent).
+                val liveThought = StringBuilder()
+                var tagReasoning = ""
+                var lastThoughtEmitTime = System.currentTimeMillis()
 
                 // 46-01 RUNTIME-13: the ONE real collection — the helper's cold flow is
                 // shared per-turn (shareIn replay=1 scoped to the generation job
@@ -913,14 +925,38 @@ class ChatViewModel @Inject constructor(
                                 val chunk = tokenBuffer.joinToString("")
                                 rawBuffer.append(chunk)
                                 val (cleanContent, reasoning) = parseThinkBlocks(rawBuffer.toString(), reasoningActive, modelMayThink)
+                                // Quick-task (live-thinking): a text flush
+                                // must not blank an in-flight native thought
+                                // panel — fall back to the streamed thought
+                                // when the text carries no <think> tags
+                                // (identical to Done-branch precedence).
+                                tagReasoning = reasoning
                                 updateTranscript {
                                     it.copy(
                                         streamingContent = cleanContent,
-                                        streamingReasoning = reasoning,
+                                        streamingReasoning = tagReasoning.ifEmpty { liveThought.toString() },
                                     )
                                 }
                                 tokenBuffer.clear()
                                 lastEmitTime = now
+                            }
+                        }
+                        // Quick-task (live-thinking): native thought deltas
+                        // update the Thinking panel live, throttled like
+                        // content (50ms). Done stays the final — the
+                        // streamed value reconciles to Done.reasoning.
+                        is StreamToken.Thinking -> {
+                            if (token.delta.isNotEmpty()) {
+                                liveThought.append(token.delta)
+                                val now = System.currentTimeMillis()
+                                if (now - lastThoughtEmitTime >= 50) {
+                                    lastThoughtEmitTime = now
+                                    updateTranscript {
+                                        it.copy(
+                                            streamingReasoning = tagReasoning.ifEmpty { liveThought.toString() },
+                                        )
+                                    }
+                                }
                             }
                         }
                         is StreamToken.Done -> {

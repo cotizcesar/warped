@@ -119,6 +119,9 @@ class PromptLabViewModel @Inject constructor(
                         // Phase 57 UI-review: typed tools-unsupported
                         // notice carries no text — ignored by PromptLab.
                         is StreamToken.ToolsUnsupported -> Unit
+                        // Quick-task (live-thinking): native thought carries
+                        // no answer text — ignored by PromptLab.
+                        is StreamToken.Thinking -> Unit
                     }
                 }
             } catch (e: Exception) {

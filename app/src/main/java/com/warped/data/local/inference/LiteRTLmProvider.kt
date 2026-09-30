@@ -493,6 +493,11 @@ class LiteRTLmProvider @Inject constructor(
                 onThought = { thinking ->
                     if (thinking.isNotEmpty()) {
                         thought.append(thinking)
+                        // Quick-task (live-thinking): forward every native
+                        // thought delta live (same string, no separator —
+                        // identical to the accumulator above). Done stays
+                        // the final; the VM throttles and reconciles.
+                        emit(StreamToken.Thinking(thinking))
                     }
                 },
             ).terminal

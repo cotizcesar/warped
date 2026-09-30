@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.runBlocking
 import okhttp3.Call
@@ -133,11 +134,14 @@ class LmStudioHelper @Inject constructor(
             .onCompletion { activeCall.set(null) } // no stale handle: follow-up turns are safe (pitfall 2)
             .let { upstream ->
                 if (enableThinking) upstream
-                else upstream.map { token ->
+                else upstream.mapNotNull { token ->
                     when (token) {
                         is StreamToken.Delta -> StreamToken.Delta(stripThinkTags(token.content))
                         is StreamToken.Done -> StreamToken.Done(stats = token.stats, reasoning = null)
                         is StreamToken.Error -> token
+                        // Quick-task (live-thinking): hidden when the toggle
+                        // is off — dropped, never surfaced as text.
+                        is StreamToken.Thinking -> null
                         // Legacy StreamToken variants: no producer remains
                         // post-DEL-01; passed through untouched.
                         is StreamToken.ToolStatus -> token

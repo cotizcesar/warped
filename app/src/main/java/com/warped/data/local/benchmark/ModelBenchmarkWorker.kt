@@ -98,6 +98,9 @@ class ModelBenchmarkWorker @AssistedInject constructor(
                         // Phase 57 UI-review: typed tools-unsupported
                         // notice carries no text — ignored by benchmarks.
                         is StreamToken.ToolsUnsupported -> Unit
+                        // Quick-task (live-thinking): native thought carries
+                        // no answer text — ignored by benchmarks.
+                        is StreamToken.Thinking -> Unit
                     }
                 }
             } catch (e: Exception) {

@@ -210,6 +210,9 @@ class ChatCancellationTest {
                         // Phase 57 UI-review: typed tools-unsupported
                         // notice carries no text either.
                         is StreamToken.ToolsUnsupported -> Unit
+                        // Quick-task (live-thinking): native thought
+                        // carries no answer text either.
+                        is StreamToken.Thinking -> Unit
                     }
                 }
             }
