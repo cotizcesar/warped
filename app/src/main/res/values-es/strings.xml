@@ -244,6 +244,7 @@
     <string name="bubble_fetch_failed_one">No se pudo leer la página. Respuesta solo del modelo — revisá tu conexión o pegá otro enlace.</string>
     <string name="bubble_fetch_failed_many">No se pudieron leer las páginas. Respuesta solo del modelo — revisá tu conexión o pegá otros enlaces.</string>
     <string name="bubble_tavily_missing">No hay clave Tavily guardada. Respuesta solo del modelo — conseguí una clave en tavily.com y pegala en Ajustes &gt; Búsqueda web.</string>
+    <string name="bubble_images_need_key">Los resultados de imágenes necesitan una clave Tavily — conseguí una en tavily.com y pegala en Ajustes &gt; Búsqueda web.</string>
     <string name="bubble_tavily_invalid">Clave Tavily inválida. Respuesta solo del modelo — revisá la clave en Ajustes &gt; Búsqueda web.</string>
     <string name="bubble_tavily_limit">Límite de uso de Tavily alcanzado. Respuesta solo del modelo — revisá el uso de tu plan e intentá más tarde.</string>
     <string name="bubble_tools_unsupported">Este endpoint no admite llamadas a herramientas. Respuesta solo del modelo — sin fuentes web en este turno. Cambiá a un endpoint compatible para restaurar la búsqueda.</string>

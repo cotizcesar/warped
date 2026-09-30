@@ -382,4 +382,90 @@ class DuckDuckGoSearchRepositoryTest {
 
         assertThat(captured).hasLength(500)
     }
+
+    // ------------------------------------------------------------------
+    // Image-turn routing: image-intent + key skips the DDG leg
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `image-intent with key skips ddg and goes straight to tavily`() = runTest {
+        apiKeyStore.storeTavilyKey("tvly-test-key".toCharArray())
+        var ddgLegRan = false
+        repository.htmlSupplier = { ddgLegRan = true; fixtureHtml() }
+        val withImages = groundedOutcome(listOf("https://tavily.example/delegate"))
+        coEvery { tavily.search(any(), any(), any(), any()) } returns withImages
+
+        val outcome = repository.search(
+            "show me pictures of cats",
+            maxResults = 5,
+            contextSize = 4096,
+            includeImages = true,
+        )
+
+        assertThat(outcome).isEqualTo(withImages)
+        // DDG would have served this turn (fixture parses) — the direct
+        // leg must skip it so the grid is never starved by a DDG-OK.
+        assertThat(ddgLegRan).isFalse()
+        coVerify(exactly = 1) {
+            tavily.search("show me pictures of cats", 5, 4096, true)
+        }
+    }
+
+    @Test
+    fun `image-intent with key passes truncated query to tavily direct`() = runTest {
+        apiKeyStore.storeTavilyKey("tvly-test-key".toCharArray())
+        repository.htmlSupplier = { fixtureHtml() }
+        val delegated = groundedOutcome(listOf("https://tavily.example/delegate"))
+        coEvery { tavily.search(any(), any(), any(), any()) } returns delegated
+
+        repository.search("x".repeat(600), includeImages = true)
+
+        coVerify(exactly = 1) {
+            tavily.search("x".repeat(500), any(), any(), true)
+        }
+    }
+
+    @Test
+    fun `image-intent without key falls through to ddg text grounding`() = runTest {
+        var ddgLegRan = false
+        repository.htmlSupplier = { ddgLegRan = true; fixtureHtml() }
+
+        val outcome = repository.search("show me pictures of cats", includeImages = true)
+
+        // DDG text grounds the turn; the grid stays empty (no image API on
+        // the DDG leg); the caller attaches the images-need-key notice.
+        assertThat(outcome).isInstanceOf(TavilySearchOutcome.Grounded::class.java)
+        val fused = (outcome as TavilySearchOutcome.Grounded).fused
+        assertThat(fused.okUrls).isNotEmpty()
+        assertThat(fused.images).isEmpty()
+        assertThat(ddgLegRan).isTrue()
+        coVerify(exactly = 0) { tavily.search(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `image-intent without key and ddg-empty collapses to fetch-failed`() = runTest {
+        repository.htmlSupplier = { "<html><body>No results.</body></html>" }
+
+        val outcome = repository.search("show me pictures of cats", includeImages = true)
+
+        assertThat(outcome).isEqualTo(
+            TavilySearchOutcome.ModelOnly(
+                MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
+            ),
+        )
+        coVerify(exactly = 0) { tavily.search(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `non-image with key keeps ddg-primary even when ddg serves`() = runTest {
+        apiKeyStore.storeTavilyKey("tvly-test-key".toCharArray())
+        var ddgLegRan = false
+        repository.htmlSupplier = { ddgLegRan = true; fixtureHtml() }
+
+        val outcome = repository.search("kotlin news")
+
+        assertThat(outcome).isInstanceOf(TavilySearchOutcome.Grounded::class.java)
+        assertThat(ddgLegRan).isTrue()
+        coVerify(exactly = 0) { tavily.search(any(), any(), any(), any()) }
+    }
 }

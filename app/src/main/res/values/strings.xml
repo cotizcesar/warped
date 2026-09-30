@@ -243,6 +243,7 @@
     <string name="bubble_fetch_failed_one">Couldn\'t read the page. Model-only answer — check your connection or paste another link.</string>
     <string name="bubble_fetch_failed_many">Couldn\'t read the pages. Model-only answer — check your connection or paste other links.</string>
     <string name="bubble_tavily_missing">No Tavily key saved. Model-only answer — get a key at tavily.com and paste it in Settings &gt; Web Search.</string>
+    <string name="bubble_images_need_key">Image results need a Tavily key — get one at tavily.com and paste it in Settings &gt; Web Search.</string>
     <string name="bubble_tavily_invalid">Invalid Tavily key. Model-only answer — check the key in Settings &gt; Web Search.</string>
     <string name="bubble_tavily_limit">Tavily usage limit reached. Model-only answer — check your plan usage and try again later.</string>
     <string name="bubble_tools_unsupported">This endpoint doesn\'t support tool calling. Model-only answer — no web sources this turn. Switch to a tool-capable endpoint to restore search.</string>

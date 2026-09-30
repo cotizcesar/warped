@@ -32,6 +32,13 @@ import javax.inject.Singleton
  * `InvalidKey` / `UsageLimit` / the `MissingKey` key-race edge). No key +
  * DDG-OK = silent success; no key + DDG-fail = FETCH_FAILED (no key nag).
  *
+ * Image-turn exception (quick-task image-turn routing): when the caller
+ * passes `includeImages = true` (image-intent turn) AND a Tavily key is
+ * stored, the DDG leg is skipped entirely and Tavily runs direct with
+ * `include_images=true` — the DDG HTML endpoint has no image API, so a
+ * DDG-OK turn would otherwise starve the image grid. Unkeyed image-intent
+ * turns keep the DDG-primary policy above (text grounding, empty grid).
+ *
  * Producer shape mirrors [TavilySearchRepository.fuse] exactly: DDG title +
  * snippet pairs flow into [GroundingPrompt.buildFusedBlock] with the same
  * OK/OMITIDA semantics, snippets through [WebContextSanitizer], same
@@ -93,12 +100,13 @@ class DuckDuckGoSearchRepository @Inject constructor(
         maxResults: Int = TavilySearchRepository.DEFAULT_MAX_RESULTS,
         contextSize: Int = 4096,
         /**
-         * Quick-task (image-grid): pass-through to the Tavily fallback leg
-         * ONLY. The DDG HTML endpoint has no image API, so a turn served by
-         * the DDG leg alone fuses zero images — images arrive only when the
-         * Tavily fallback fires (DDG yields nothing usable AND a key is
-         * stored). Documented honestly: image-intent queries on unkeyed
-         * devices get grounded text with an empty grid.
+         * Quick-task (image-turn routing): pass-through to Tavily image
+         * search. When a key is stored, image-intent turns skip the DDG leg
+         * entirely and go STRAIGHT to Tavily with `include_images=true`
+         * (the DDG HTML endpoint has no image API, so a DDG-OK turn would
+         * fuse zero images and starve the grid). Unkeyed image-intent turns
+         * fall through to the DDG leg below (text grounding, empty grid) —
+         * the caller attaches the images-need-key notice.
          */
         includeImages: Boolean = false,
     ): TavilySearchOutcome = withContext(ioDispatcher) {
@@ -120,6 +128,31 @@ class DuckDuckGoSearchRepository @Inject constructor(
             return@withContext TavilySearchOutcome.ModelOnly(
                 MultiUrlResult.AllFailed(GroundingResult.Reason.OFFLINE),
             )
+        }
+        // Quick-task (image-turn routing): image-intent turns with a stored
+        // key skip the DDG leg entirely and go STRAIGHT to Tavily with
+        // include_images=true — the DDG HTML endpoint has no image API, so
+        // a DDG-OK turn would fuse zero images and starve the grid (the
+        // Tavily fallback below only fires when DDG yields nothing usable).
+        // The key copy is zeroed after the presence check; the delegate
+        // re-reads the key itself when it runs (the MissingKey key-race
+        // edge is preserved). Unkeyed image-intent turns fall through to
+        // the DDG leg (text grounding, empty grid) — the caller attaches
+        // the images-need-key notice.
+        if (includeImages) {
+            val directKey = apiKeyStore.getTavilyKey()
+            val hasDirectKey = directKey != null && directKey.isNotEmpty()
+            directKey?.fill('0')
+            if (hasDirectKey) {
+                // Explicit args (no Kotlin defaults): keeps the call on the
+                // instance method so MockK can stub it in JVM tests.
+                return@withContext tavily.search(
+                    query = trimmedQuery,
+                    maxResults = maxResults,
+                    contextSize = contextSize,
+                    includeImages = true,
+                )
+            }
         }
         val pairs: List<DdgResult>? = try {
             val encoded = URLEncoder.encode(trimmedQuery, StandardCharsets.UTF_8.toString())

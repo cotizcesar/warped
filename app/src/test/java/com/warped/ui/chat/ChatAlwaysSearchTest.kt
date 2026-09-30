@@ -9,6 +9,7 @@ import com.warped.data.grounding.GroundingResult
 import com.warped.data.grounding.MultiUrlResult
 import com.warped.data.grounding.TavilySearchOutcome
 import com.warped.data.grounding.WebPageFetcher
+import com.warped.data.local.security.ApiKeyStore
 import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.preferences.AdvancedPreferences
@@ -96,6 +97,9 @@ class ChatAlwaysSearchTest {
         modelPath: String,
         online: Boolean = true,
         supportsFunctionCalling: Boolean = true,
+        // Quick-task (image-turn routing): stored Tavily key state for the
+        // unkeyed image-intent notice gate. Null = unkeyed device.
+        tavilyKey: CharArray? = null,
     ): ChatViewModel {
         chatRepository = mockk()
         val endpointRepository = mockk<EndpointRepository>()
@@ -144,6 +148,11 @@ class ChatAlwaysSearchTest {
             ),
         )
         ddgSearchRepository = mockk()
+        // Fresh copy per call: the VM zero-fills the returned array after
+        // the presence check, so a shared instance would read as missing
+        // on the second turn.
+        val apiKeyStore = mockk<ApiKeyStore>()
+        every { apiKeyStore.getTavilyKey() } answers { tavilyKey?.copyOf() }
 
         return ChatViewModel(
             chatRepository = chatRepository,
@@ -159,6 +168,7 @@ class ChatAlwaysSearchTest {
             fetcher = fetcher,
             multiUrlFetcher = mockk(),
             ddgSearchRepository = ddgSearchRepository,
+            apiKeyStore = apiKeyStore,
             modelAllowlistRepository = allowlist,
             context = context,
         )
@@ -341,5 +351,129 @@ class ChatAlwaysSearchTest {
         assertThat(requestSlot.captured.messages.last().content).startsWith(
             GroundingPrompt.SYSTEM_PROMPT,
         )
+    }
+
+    // ------------------------------------------------------------------
+    // Quick-task (image-turn routing): intent x key matrix at the VM seam.
+    // The Tavily-direct skip lives inside DuckDuckGoSearchRepository (see
+    // DuckDuckGoSearchRepositoryTest); here the repo is mocked, so these
+    // tests pin the VM contract: image list threading + the unkeyed
+    // images-need-key notice gate.
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `image-intent keyed turn populates grid with no notice`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
+        val vm = buildViewModel(
+            modelFile.absolutePath,
+            tavilyKey = "tvly-test-key".toCharArray(),
+        )
+        runCurrent()
+        val outcome = groundedOutcome()
+        val withImages = TavilySearchOutcome.Grounded(outcome.fused.copy(images = listOf("https://img.example/a.png")))
+        coEvery {
+            ddgSearchRepository.search(any(), any(), any(), any())
+        } returns withImages
+
+        vm.sendMessage("muéstrame fotos de gatos")
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) {
+            ddgSearchRepository.search(any(), any(), any(), includeImages = true)
+        }
+        assertThat(
+            vm.transcriptState.value.messages.any {
+                it.role == Role.ASSISTANT &&
+                    it.groundedImages == listOf("https://img.example/a.png") &&
+                    it.modelOnlyNotice == null
+            },
+        ).isTrue()
+    }
+
+    @Test
+    fun `image-intent unkeyed turn grounds text with images-need-key notice`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
+        val vm = buildViewModel(modelFile.absolutePath)
+        runCurrent()
+        coEvery {
+            ddgSearchRepository.search(any(), any(), any(), any())
+        } returns groundedOutcome()
+
+        vm.sendMessage("muéstrame fotos de gatos")
+        advanceUntilIdle()
+
+        // DDG text grounding preserved (sources on the message), grid
+        // empty (no image API on the DDG leg), actionable notice naming
+        // the Settings fix alongside.
+        assertThat(
+            vm.transcriptState.value.messages.any {
+                it.role == Role.ASSISTANT &&
+                    it.groundedSources == listOf("https://a.example/uno") &&
+                    it.groundedImages.isEmpty() &&
+                    it.modelOnlyNotice == ModelOnlyNotice.IMAGES_NEED_KEY
+            },
+        ).isTrue()
+    }
+
+    @Test
+    fun `image-intent unkeyed fetch-failed turn renders images-need-key notice`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
+        val vm = buildViewModel(modelFile.absolutePath)
+        runCurrent()
+        coEvery {
+            ddgSearchRepository.search(any(), any(), any(), any())
+        } returns TavilySearchOutcome.ModelOnly(
+            MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
+        )
+
+        vm.sendMessage("muéstrame fotos de gatos")
+        advanceUntilIdle()
+
+        // Single banner slot: the images-need-key notice takes precedence
+        // — the user asked for images and storing a key is the actionable
+        // fix, while a DDG failure is not user-fixable. No crash, the
+        // model still answers.
+        assertThat(
+            vm.transcriptState.value.messages.any {
+                it.role == Role.ASSISTANT &&
+                    it.groundedImages.isEmpty() &&
+                    it.modelOnlyNotice == ModelOnlyNotice.IMAGES_NEED_KEY &&
+                    it.content == "hola"
+            },
+        ).isTrue()
+    }
+
+    @Test
+    fun `non-image keyed turn stays ddg-primary with no notice`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
+        val vm = buildViewModel(
+            modelFile.absolutePath,
+            tavilyKey = "tvly-test-key".toCharArray(),
+        )
+        runCurrent()
+        coEvery {
+            ddgSearchRepository.search(any(), any(), any(), any())
+        } returns groundedOutcome()
+
+        vm.sendMessage("latest news")
+        advanceUntilIdle()
+
+        // Key present but no image intent: include_images stays false, no
+        // grid, no notice — byte-identical to the unkeyed non-image path.
+        coVerify(exactly = 1) {
+            ddgSearchRepository.search(any(), any(), any(), includeImages = false)
+        }
+        assertThat(
+            vm.transcriptState.value.messages.any {
+                it.role == Role.ASSISTANT &&
+                    it.groundedSources == listOf("https://a.example/uno") &&
+                    it.groundedImages.isEmpty() &&
+                    it.modelOnlyNotice == null
+            },
+        ).isTrue()
     }
 }

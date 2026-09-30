@@ -35,6 +35,14 @@ enum class ModelOnlyNotice {
     FETCH_FAILED,
     /** Phase 55 (TAV-03): search gated — no key stored (actionable copy). */
     TAVILY_MISSING_KEY,
+    /**
+     * Quick-task (image-turn routing): image-intent turn on a device with
+     * no stored Tavily key. DDG text grounding (when it serves the turn)
+     * is preserved — the grid stays empty and this banner names the fix
+     * (store a key → Settings). Never OFFLINE so `retryGrounding` stays
+     * OFFLINE-only.
+     */
+    IMAGES_NEED_KEY,
     /** Phase 55 (TAV-03): search gated — stored key rejected (401). */
     TAVILY_INVALID_KEY,
     /** Phase 55 (TAV-03): search gated — plan usage exhausted (429). */

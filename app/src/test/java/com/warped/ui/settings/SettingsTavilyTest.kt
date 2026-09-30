@@ -371,6 +371,11 @@ class SettingsTavilyTest {
         every { chatFetcher.hasValidatedInternet() } returns online
         chatMultiUrlFetcher = mockk()
         chatDdgRepo = mockk()
+        // Unkeyed device for the chat VM (the Settings VM above owns the
+        // keyed states); chat queries here never carry image intent, so the
+        // gate never reads this — stubbed for construction only.
+        apiKeyStore = mockk()
+        every { apiKeyStore.getTavilyKey() } returns null
 
         return ChatViewModel(
             chatRepository = chatRepository,
@@ -386,6 +391,7 @@ class SettingsTavilyTest {
             fetcher = chatFetcher,
             multiUrlFetcher = chatMultiUrlFetcher,
             ddgSearchRepository = chatDdgRepo,
+            apiKeyStore = apiKeyStore,
             modelAllowlistRepository = mockk<com.warped.data.repository.ModelAllowlistRepository>(),
             context = context,
         )

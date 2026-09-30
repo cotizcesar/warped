@@ -164,6 +164,9 @@ class ChatLoopSourcesTest {
             fetcher = fetcher,
             multiUrlFetcher = mockk(),
             ddgSearchRepository = ddgSearchRepository,
+            apiKeyStore = mockk<com.warped.data.local.security.ApiKeyStore>().apply {
+                every { getTavilyKey() } returns null
+            },
             modelAllowlistRepository = allowlist,
             context = context,
         )

@@ -18,6 +18,7 @@ import com.warped.data.grounding.TavilySearchRepository
 import com.warped.data.grounding.UrlDetector
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.inference.BackendType
+import com.warped.data.local.security.ApiKeyStore
 import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.preferences.AdvancedPreferences
@@ -66,6 +67,15 @@ class ChatViewModel @Inject constructor(
      * direct VM dependency.
      */
     private val ddgSearchRepository: DuckDuckGoSearchRepository,
+    /**
+     * Quick-task (image-turn routing): read-only Tavily key-presence probe
+     * for the unkeyed image-intent notice. The Tavily-direct call itself
+     * lives inside [DuckDuckGoSearchRepository] (image-intent + keyed
+     * skips the DDG leg there) — the VM never calls Tavily directly, so
+     * this store is consulted only to decide the notice, never for key
+     * material (zero-fill pattern, never logged).
+     */
+    private val apiKeyStore: ApiKeyStore,
     /**
      * Quick-task (always-search): the VM no longer mirrors loop-arming —
      * the provider owns arming (computeArmSnapshot /
@@ -545,10 +555,12 @@ class ChatViewModel @Inject constructor(
                         // model-driven fetch, and loop ToolCompleted rows
                         // keep merging with pre-search details in the Done
                         // union below. There is deliberately NO VM-level
-                        // direct Tavily call and NO loop-cap change — the
-                        // Tavily fallback fires only inside
-                        // DuckDuckGoSearchRepository.search when DDG yields
-                        // nothing usable AND a key is stored.
+                        // direct Tavily call and NO loop-cap change — Tavily
+                        // fires only inside
+                        // DuckDuckGoSearchRepository.search: direct with
+                        // include_images on image-intent turns when a key is
+                        // stored (DDG has no image API), as fallback when
+                        // DDG yields nothing usable AND a key is stored.
                         if (!online) {
                             modelOnlyNotice = ModelOnlyNotice.OFFLINE
                             requestUserText = GroundingPrompt.augment(
@@ -643,6 +655,29 @@ class ChatViewModel @Inject constructor(
                                             null,
                                             groundingEnabled = doGround,
                                         )
+                                    }
+                                }
+                                // Quick-task (image-turn routing): unkeyed
+                                // image-intent turns ground via DDG text above
+                                // but the grid stays empty — attach the
+                                // actionable images-need-key notice (Settings
+                                // path) alongside the grounded text or the
+                                // outcome notice. Single banner slot, so the
+                                // key notice takes precedence here: the user
+                                // asked for images and the fix (store a
+                                // Tavily key) is actionable, while a DDG
+                                // failure is not user-fixable. Scoped to
+                                // wantImages + empty grid + no stored key, so
+                                // keyed turns (images or outcome mapping
+                                // intact) and non-image turns are untouched.
+                                // Key copy zeroed after the presence check;
+                                // never logged.
+                                if (wantImages && groundedImages.isEmpty()) {
+                                    val keyChars = apiKeyStore.getTavilyKey()
+                                    val hasKey = keyChars != null && keyChars.isNotEmpty()
+                                    keyChars?.fill('0')
+                                    if (!hasKey) {
+                                        modelOnlyNotice = ModelOnlyNotice.IMAGES_NEED_KEY
                                     }
                                 }
                             } finally {

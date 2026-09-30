@@ -378,6 +378,11 @@ private fun ModelOnlyBanner(
                 // OFFLINE-only.
                 ModelOnlyNotice.TAVILY_MISSING_KEY ->
                     stringResource(R.string.bubble_tavily_missing)
+                // Quick-task (image-turn routing): unkeyed image-intent
+                // turn — grounded text (when DDG served it) stays, the grid
+                // stays empty, and this banner names the Settings fix.
+                ModelOnlyNotice.IMAGES_NEED_KEY ->
+                    stringResource(R.string.bubble_images_need_key)
                 ModelOnlyNotice.TAVILY_INVALID_KEY ->
                     stringResource(R.string.bubble_tavily_invalid)
                 ModelOnlyNotice.TAVILY_LIMIT ->
