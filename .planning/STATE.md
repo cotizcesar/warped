@@ -130,6 +130,7 @@ None — v2.2 phases shipped with accepted deferrals recorded above. Next milest
 | 20260929-explicit-language-directive | 2026-09-29 | Complete ✓ | Detección ES + directiva explícita última línea (adiós regla probabilística); 677 green |
 | 20260929-image-history-carry | 2026-09-29 | Complete ✓ | Historial con últimas 3 imágenes (local); remoto follow-up; 683 green |
 | 20260930-pending-sweep | 2026-09-30 | Complete ✓ | ThinkingConfig+carry remoto+snippet+pausa+new-chat+snackbar+trío; 739 green |
+| 20260930-needs-web-gate | 2026-09-30 | Complete ✓ | Sin búsqueda en social/identidad + línea identidad + hint; 782 green |
 | 20260929-image-history-carry | 2026-09-29 | Complete ✓ | Historial con últimas 3 imágenes (local); remoto follow-up; 683 green |
 | 20260929-langmatch-i18n-paragraphs | 2026-09-29 | Complete ✓ | Regla idioma-usuario en prompts + EN/ES 459/459 + párrafos 8dp; 512 green |
 
