@@ -132,6 +132,8 @@ None — v2.2 phases shipped with accepted deferrals recorded above. Next milest
 | 20260930-thinking-header-feelings | 2026-09-30 | Complete ✓ | Thinking sin saltos + header solo dot/flecha (web al sheet) + feelings sin búsqueda; 795 green |
 | 20260930-language-sources-override | 2026-09-30 | Complete ✓ | Directivas anti-espejo de idioma de fuentes; suite verde |
 | 20260930-reference-resolution-rule | 2026-09-30 | Complete ✓ | Resolver referentes vs historial + prohibir reciclaje de citas; suite verde |
+| 20260930-thinking-scroll-live-hairline | 2026-09-30 | Complete ✓ | Thinking en vivo + pin robusto (hairline: sin fuente ilegítima) |
+| 20260930-always-presearch-anchored | 2026-09-30 | Complete ✓ | Query anclada en anáforas (DDG+loop intactos); 885 green |
 | 20260930-langdetect-library | 2026-09-30 | Complete ✓ | Optimaize es+en (CLEAN) + fallback 3 capas; 804 green |
 | 20260930-code-intent-gate | 2026-09-30 | Complete ✓ | Sin búsqueda en turnos de código (escapatoria intacta); tests verdes |
 | 20260930-unified-turn-status | 2026-09-30 | Complete ✓ | Un solo indicador (ring+texto, tool>fetch>gap) + searching honesto; 845 green |
@@ -141,6 +143,8 @@ None — v2.2 phases shipped with accepted deferrals recorded above. Next milest
 | 20260930-thinking-header-feelings | 2026-09-30 | Complete ✓ | Thinking sin saltos + header solo dot/flecha (web al sheet) + feelings sin búsqueda; 795 green |
 | 20260930-language-sources-override | 2026-09-30 | Complete ✓ | Directivas anti-espejo de idioma de fuentes; suite verde |
 | 20260930-reference-resolution-rule | 2026-09-30 | Complete ✓ | Resolver referentes vs historial + prohibir reciclaje de citas; suite verde |
+| 20260930-thinking-scroll-live-hairline | 2026-09-30 | Complete ✓ | Thinking en vivo + pin robusto (hairline: sin fuente ilegítima) |
+| 20260930-always-presearch-anchored | 2026-09-30 | Complete ✓ | Query anclada en anáforas (DDG+loop intactos); 885 green |
 | 20260930-langdetect-library | 2026-09-30 | Complete ✓ | Optimaize es+en (CLEAN) + fallback 3 capas; 804 green |
 | 20260930-code-intent-gate | 2026-09-30 | Complete ✓ | Sin búsqueda en turnos de código (escapatoria intacta); tests verdes |
 | 20260930-unified-turn-status | 2026-09-30 | Complete ✓ | Un solo indicador (ring+texto, tool>fetch>gap) + searching honesto; 845 green |
