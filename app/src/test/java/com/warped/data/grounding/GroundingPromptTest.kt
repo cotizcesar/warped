@@ -1,6 +1,8 @@
 package com.warped.data.grounding
 
 import com.google.common.truth.Truth.assertThat
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 /**
@@ -69,11 +71,20 @@ class GroundingPromptTest {
 
     @Test
     fun `null block with grounding enabled prepends system prompt`() {
-        val out = GroundingPrompt.augment("pregunta", null, groundingEnabled = true)
+        // Fixture is English ("hello" — probed en=1.000, no markers, no
+        // function words) so the fail-open English directive applies.
+        // (Quick-task langdetect-library: the old "pregunta" fixture now —
+        // correctly — yields the SPANISH directive, since tildeless
+        // "pregunta" scores es=1.000; the assembly contract this test pins
+        // is unchanged, only the fixture language needed to stay English
+        // for the expectation to hold. "question" was tried and rejected:
+        // it scores es=0.999996 — a single-word qu+tion artifact — so it can
+        // never serve as an English fixture under library-first.)
+        val out = GroundingPrompt.augment("hello", null, groundingEnabled = true)
 
-        assertThat(out).isEqualTo("${GroundingPrompt.SYSTEM_PROMPT}\n\npregunta\n\nReply in English, even if the sources are in another language.")
+        assertThat(out).isEqualTo("${GroundingPrompt.SYSTEM_PROMPT}\n\nhello\n\nReply in English, even if the sources are in another language.")
         assertThat(out.indexOf(GroundingPrompt.SYSTEM_PROMPT)).isEqualTo(0)
-        assertThat(out.indexOf("pregunta")).isGreaterThan(0)
+        assertThat(out.indexOf("hello")).isGreaterThan(0)
     }
 
     @Test
@@ -223,5 +234,104 @@ class GroundingPromptTest {
             count++
             from = idx + needle.length
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Quick-task (langdetect-library): library-first decider with regex
+    // fallback. The detector is warmed synchronously so JVM tests pin
+    // behavior deterministically (production warms on a daemon thread).
+    // ------------------------------------------------------------------
+
+    @BeforeEach
+    fun warmDetectorBlocking() {
+        LanguageDetectorHolder.resetForTest()
+        LanguageDetectorHolder.ensureLoadedBlocking()
+    }
+
+    @AfterEach
+    fun resetDetector() {
+        LanguageDetectorHolder.resetForTest()
+    }
+
+    @Test
+    fun `library detects tildeless spanish`() {
+        // "hola quien eres" / "gracias por tu ayuda" / "donde esta la
+        // biblioteca" carry zero markers (verified: no SPANISH_MARKERS match)
+        // and score es=1.000 — TRUE comes from the library (layer 1).
+        // "que es hollow knight" scores en=1.000 (probed — proper-noun
+        // n-grams dominate), so TRUE comes from the function-word layer
+        // (layer 3: "que" + "es" as standalone tokens).
+        assertThat(GroundingPrompt.isSpanish("hola quien eres")).isTrue()
+        assertThat(GroundingPrompt.isSpanish("que es hollow knight")).isTrue()
+        assertThat(GroundingPrompt.isSpanish("gracias por tu ayuda")).isTrue()
+        assertThat(GroundingPrompt.isSpanish("donde esta la biblioteca")).isTrue()
+    }
+
+    @Test
+    fun `function-word layer ignores english lookalikes`() {
+        // Curated exclusions: "dime" (coin), "favor" ("do me a favor") must
+        // NOT trigger Spanish; the library reads both as confident English
+        // and neither is in SPANISH_FUNCTION_WORDS.
+        assertThat(GroundingPrompt.isSpanish("Flip a dime")).isFalse()
+        assertThat(GroundingPrompt.isSpanish("Do me a favor")).isFalse()
+        assertThat(GroundingPrompt.isSpanish("Is this the best theme?")).isFalse()
+    }
+
+    @Test
+    fun `library keeps english english`() {
+        assertThat(GroundingPrompt.isSpanish("What is the capital of France?")).isFalse()
+        assertThat(GroundingPrompt.isSpanish("hello world")).isFalse()
+        assertThat(GroundingPrompt.isSpanish("Can you help me debug this crash?")).isFalse()
+    }
+
+    @Test
+    fun `short strings pin the fail-open contract`() {
+        // Probed against the short-text profiles: "hola" → es=0.994 and
+        // "si" → es=0.996, both above the 0.5 threshold → TRUE from the
+        // library (layer 1). The contract pinned here is the observable
+        // outcome, whatever layer produces it.
+        assertThat(GroundingPrompt.isSpanish("hola")).isTrue()
+        assertThat(GroundingPrompt.isSpanish("si")).isTrue()
+    }
+
+    @Test
+    fun `empty and whitespace stay english`() {
+        assertThat(GroundingPrompt.isSpanish("")).isFalse()
+        assertThat(GroundingPrompt.isSpanish("   ")).isFalse()
+    }
+
+    @Test
+    fun `library never overrides marker presence`() {
+        // Mostly-English text with a Spanish marker keeps today's outcome
+        // even if the n-gram model reads it as confident English: markers
+        // stay sufficient for Spanish.
+        assertThat(GroundingPrompt.isSpanish("What is el niño?")).isTrue()
+    }
+
+    @Test
+    fun `detector throw falls back to the regex`() {
+        LanguageDetectorHolder.detectorFactory = { throw IllegalStateException("boom") }
+        LanguageDetectorHolder.ensureLoadedBlocking()
+
+        assertThat(LanguageDetectorHolder.detectSpanish("niño")).isNull()
+        // Layer 2 (markers) proves the regex decides with the detector dead…
+        assertThat(GroundingPrompt.isSpanish("niño")).isTrue()
+        assertThat(GroundingPrompt.isSpanish("hello")).isFalse()
+        // …and layer 3 keeps tildeless recall alive without the library:
+        // "hola"+"quien" are function-word tokens, so TRUE even on throw.
+        assertThat(GroundingPrompt.isSpanish("hola quien eres")).isTrue()
+    }
+
+    @Test
+    fun `detector not ready falls back to the regex`() {
+        // Simulates a cold start where the detector is unavailable (warm
+        // thread still loading, or init failed): NULL → regex decides.
+        // A null-returning factory is deterministic — no timing dependence.
+        LanguageDetectorHolder.detectorFactory = { null }
+        LanguageDetectorHolder.ensureLoadedBlocking()
+
+        assertThat(LanguageDetectorHolder.detectSpanish("¿Cómo estás?")).isNull()
+        assertThat(GroundingPrompt.isSpanish("¿Cómo estás?")).isTrue()
+        assertThat(GroundingPrompt.isSpanish("hello")).isFalse()
     }
 }

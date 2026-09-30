@@ -6,6 +6,7 @@ import androidx.lifecycle.SavedStateHandle
 import com.google.common.truth.Truth.assertThat
 import com.warped.data.grounding.GroundingPrompt
 import com.warped.data.grounding.GroundingResult
+import com.warped.data.grounding.LanguageDetectorHolder
 import com.warped.data.grounding.MultiUrlResult
 import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.TavilySearchOutcome
@@ -440,6 +441,11 @@ class SettingsTavilyTest {
 
         // Quick-task (needs-web-gate): non-social fixture — "hola" is a
         // locked social token and would skip the pre-search by design.
+        // Quick-task (langdetect-library): the detector is warmed
+        // synchronously so the directive below is deterministic (the
+        // tildeless fixture now — correctly — yields the SPANISH directive).
+        LanguageDetectorHolder.resetForTest()
+        LanguageDetectorHolder.ensureLoadedBlocking()
         vm.sendMessage("pregunta sin urls")
         advanceUntilIdle()
 
@@ -451,7 +457,7 @@ class SettingsTavilyTest {
         val requestSlot = slot<ChatRequest>()
         coVerify(exactly = 1) { lastHelper.runInference(capture(requestSlot), any()) }
         assertThat(requestSlot.captured.messages.last().content).isEqualTo(
-            "${GroundingPrompt.SYSTEM_PROMPT}\n\npregunta sin urls\n\nReply in English, even if the sources are in another language.",
+            "${GroundingPrompt.SYSTEM_PROMPT}\n\npregunta sin urls\n\nResponde en español, aunque las fuentes estén en inglés.",
         )
     }
 

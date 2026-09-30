@@ -3,6 +3,7 @@ package com.warped.ui.chat
 import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import com.google.common.truth.Truth.assertThat
+import com.warped.data.grounding.LanguageDetectorHolder
 import com.warped.data.grounding.MultiUrlResult
 import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.MemoryChecker
@@ -175,6 +176,11 @@ class ChatGroundingToggleTest {
 
         // Quick-task (needs-web-gate): non-social fixture — "hola" is a
         // locked social token and would skip the pre-search by design.
+        // Quick-task (langdetect-library): the detector is warmed
+        // synchronously so the directive below is deterministic (the
+        // tildeless fixture now — correctly — yields the SPANISH directive).
+        LanguageDetectorHolder.resetForTest()
+        LanguageDetectorHolder.ensureLoadedBlocking()
         vm.sendMessage("pregunta sin urls")
         advanceUntilIdle()
 
@@ -184,7 +190,7 @@ class ChatGroundingToggleTest {
         val requestSlot = slot<com.warped.domain.model.ChatRequest>()
         coVerify(exactly = 1) { lastHelper.runInference(capture(requestSlot), any()) }
         assertThat(requestSlot.captured.messages.last().content).isEqualTo(
-            "${com.warped.data.grounding.GroundingPrompt.SYSTEM_PROMPT}\n\npregunta sin urls\n\nReply in English, even if the sources are in another language.",
+            "${com.warped.data.grounding.GroundingPrompt.SYSTEM_PROMPT}\n\npregunta sin urls\n\nResponde en español, aunque las fuentes estén en inglés.",
         )
         assertThat(
             vm.transcriptState.value.messages.any { it.role == Role.ASSISTANT && it.content == "hola" },

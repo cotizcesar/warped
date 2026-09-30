@@ -20,10 +20,45 @@ object GroundingPrompt {
     /** Locked high-precision ES markers: ¿ ¡ á é í ó ú ñ ü (case-insensitive). */
     private val SPANISH_MARKERS = Regex("[¿¡áéíóúñü]", RegexOption.IGNORE_CASE)
 
+    /**
+     * Tildeless-Spanish function words, consulted only when the library is
+     * NOT confident-Spanish and no markers are present. Every entry must be
+     * overwhelmingly Spanish-indicative as a STANDALONE token — deliberately
+     * EXCLUDED lookalikes: "dime" (English coin), "favor" ("do me a favor"),
+     * "si" (SI units; the library already scores standalone "si" es=0.996
+     * anyway). Matching is whole-token, case-insensitive.
+     */
+    private val SPANISH_FUNCTION_WORDS = setOf(
+        "que", "es", "hola", "quien", "eres", "esta", "estas",
+        "porque", "como", "donde", "cuando", "gracias",
+        "estoy", "tienes", "quieres", "quiero", "puedes",
+        "cual", "hora", "biblioteca", "ayuda",
+    )
+    private val WORD_TOKENS = Regex("\\p{L}+")
+
     const val SPANISH_DIRECTIVE = "Responde en español, aunque las fuentes estén en inglés."
     const val ENGLISH_DIRECTIVE = "Reply in English, even if the sources are in another language."
 
-    fun isSpanish(text: String): Boolean = SPANISH_MARKERS.containsMatchIn(text)
+    fun isSpanish(text: String): Boolean {
+        if (text.isEmpty()) return false
+        // Layer 1 — library: a confident TRUE decides Spanish on its own
+        // (fixes pure tildeless recall — those strings carry no markers, so
+        // TRUE here can only come from the library). A library FALSE/NULL
+        // never overrides the layers below: marker presence stays sufficient
+        // for Spanish (pinned contract — "What is el niño?" must remain true
+        // even though the mostly-English text scores en=1.000).
+        if (LanguageDetectorHolder.detectSpanish(text) == true) return true
+        // Layer 2 — diacritic/inverted markers (unchanged legacy behavior).
+        if (SPANISH_MARKERS.containsMatchIn(text)) return true
+        // Layer 3 — tildeless function words. Required by the plan's test
+        // table: mixed queries like "que es hollow knight" score en=1.000
+        // (probed — "hollow knight" dominates the n-grams), so NO threshold
+        // trickery can catch them without also flipping pure-English
+        // controls that score an identical en=1.000. The word list catches
+        // exactly these; empty/uncertain still falls through to false
+        // (fail-open English default preserved).
+        return WORD_TOKENS.findAll(text).any { it.value.lowercase() in SPANISH_FUNCTION_WORDS }
+    }
 
     fun languageDirective(text: String): String =
         if (isSpanish(text)) SPANISH_DIRECTIVE else ENGLISH_DIRECTIVE
