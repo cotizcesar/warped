@@ -133,6 +133,7 @@ None — v2.2 phases shipped with accepted deferrals recorded above. Next milest
 | 20260930-language-sources-override | 2026-09-30 | Complete ✓ | Directivas anti-espejo de idioma de fuentes; suite verde |
 | 20260930-langdetect-library | 2026-09-30 | Complete ✓ | Optimaize es+en (CLEAN) + fallback 3 capas; 804 green |
 | 20260930-code-intent-gate | 2026-09-30 | Complete ✓ | Sin búsqueda en turnos de código (escapatoria intacta); tests verdes |
+| 20260930-unified-turn-status | 2026-09-30 | Complete ✓ | Un solo indicador (ring+texto, tool>fetch>gap) + searching honesto; 845 green |
 | 20260930-pending-sweep | 2026-09-30 | Complete ✓ | ThinkingConfig+carry remoto+snippet+pausa+new-chat+snackbar+trío; 739 green |
 | 20260930-needs-web-gate | 2026-09-30 | Complete ✓ | Sin búsqueda en social/identidad + línea identidad + hint; 782 green |
 | 20260929-image-history-carry | 2026-09-29 | Complete ✓ | Historial con últimas 3 imágenes (local); remoto follow-up; 683 green |
@@ -140,6 +141,7 @@ None — v2.2 phases shipped with accepted deferrals recorded above. Next milest
 | 20260930-language-sources-override | 2026-09-30 | Complete ✓ | Directivas anti-espejo de idioma de fuentes; suite verde |
 | 20260930-langdetect-library | 2026-09-30 | Complete ✓ | Optimaize es+en (CLEAN) + fallback 3 capas; 804 green |
 | 20260930-code-intent-gate | 2026-09-30 | Complete ✓ | Sin búsqueda en turnos de código (escapatoria intacta); tests verdes |
+| 20260930-unified-turn-status | 2026-09-30 | Complete ✓ | Un solo indicador (ring+texto, tool>fetch>gap) + searching honesto; 845 green |
 | 20260929-langmatch-i18n-paragraphs | 2026-09-29 | Complete ✓ | Regla idioma-usuario en prompts + EN/ES 459/459 + párrafos 8dp; 512 green |
 
 ## Session Continuity
