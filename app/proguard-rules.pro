@@ -86,3 +86,9 @@
 # R8 must never strip the web_search/web_fetch schemas).
 -keep class com.warped.data.agentic.** { *; }
 -keepclassmembers class com.warped.data.agentic.** { *; }
+
+# Quick-task (langdetect): slf4j-api arrives transitively via Optimaize
+# language-detector without a runtime binding — slf4j degrades to no-op
+# logging, which is fine on Android. Silence the missing
+# org.slf4j.impl.StaticLoggerBinder R8 error (release-only gate).
+-dontwarn org.slf4j.impl.StaticLoggerBinder
