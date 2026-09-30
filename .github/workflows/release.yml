@@ -1,5 +1,7 @@
 name: Release
 
+# Workflow evaluation refresh (startup_failure triage 2026-09-30).
+
 on:
   push:
     branches:
