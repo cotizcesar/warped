@@ -19,6 +19,7 @@ import com.warped.data.grounding.MultiUrlFetcher
 import com.warped.data.grounding.TavilySearchRepository
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.preferences.AdvancedPreferences
+import com.warped.data.remote.provider.HistoryImageCarry
 import com.warped.data.repository.ModelAllowlistRepository
 import com.warped.domain.model.ActiveModelSelection
 import com.warped.domain.model.ChatMessage
@@ -132,7 +133,7 @@ class LiteRTLmProvider @Inject constructor(
          * worst case; newest-first because recency predicts relevance for
          * follow-ups.
          */
-        const val HISTORY_IMAGE_CARRY_MAX = 3
+        const val HISTORY_IMAGE_CARRY_MAX = HistoryImageCarry.CARRY_MAX
     }
 
     @Volatile
@@ -863,21 +864,14 @@ class LiteRTLmProvider @Inject constructor(
      */
     internal fun buildHistoryMessages(sanitized: List<ChatMessage>): List<Message> {
         val history = sanitized.dropLast(1)
-        // K newest image-bearing USER turns, by history index.
-        val carryIndexes = history
-            .mapIndexedNotNull { index, msg ->
-                if (msg.role == Role.USER && msg.imageUris.isNotEmpty()) index else null
-            }
-            .takeLast(HISTORY_IMAGE_CARRY_MAX)
-            .toSet()
-        // Newest-first pass: decide which data URLs each carried turn
-        // keeps. A repeated image is carried only on its newest turn.
-        val keptByIndex = mutableMapOf<Int, List<String>>()
-        val seenUrls = mutableSetOf<String>()
-        for (index in carryIndexes.sortedDescending()) {
-            val kept = history[index].imageUris.distinct().filter { seenUrls.add(it) }
-            if (kept.isNotEmpty()) keptByIndex[index] = kept
-        }
+        // K newest image-bearing USER turns, by history index — via the
+        // shared [HistoryImageCarry] rule (newest-first, dedupe,
+        // skip-malformed); the decode check is this transport's `isUsable`.
+        val keptByIndex = HistoryImageCarry.selectKeptUrls(
+            sanitized,
+            HISTORY_IMAGE_CARRY_MAX,
+            isUsable = { decodeImage(it) != null },
+        )
         return history.mapIndexed { index, msg ->
             when (msg.role) {
                 Role.SYSTEM -> Message.system(msg.content)

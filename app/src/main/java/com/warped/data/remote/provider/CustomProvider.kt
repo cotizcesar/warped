@@ -2,7 +2,6 @@ package com.warped.data.remote.provider
 
 import com.warped.data.remote.api.CustomApi
 import com.warped.data.remote.dto.OpenAiChatRequest
-import com.warped.data.remote.dto.OpenAiMessage
 import com.warped.data.remote.network.asSseFlow
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.Role
@@ -10,7 +9,6 @@ import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.ModelInfo
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.StreamToken
-import com.warped.domain.model.toProviderText
 import com.warped.domain.provider.LlmProvider
 import com.warped.data.agentic.ToolCapabilityMatrix
 import com.warped.data.grounding.GroundingPrecedence
@@ -107,22 +105,13 @@ class CustomProvider(
         // servers default to attempt-then-fallback per the locked
         // decision); unarmed turns keep the exact Retrofit path.
         if (isLoopArmed(request.webOverride)) {
-            val baseMessages = request.messages
-                .filter { it.content.isNotBlank() }
-                .map {
-                    // Phase 49 (DEL-01): TOOL rows replay as plain user text.
-                    if (it.role == Role.TOOL) {
-                        val (role, text) = it.toProviderText()
-                        OpenAiMessage(role = role, content = text)
-                    } else {
-                        // WR-02: USER content sanitized like every sibling
-                        // armed branch (Ollama/LM Studio pattern).
-                        val content = if (it.role == Role.USER) {
-                            inputSanitizer?.sanitize(it.content) ?: it.content
-                        } else it.content
-                        OpenAiMessage(role = it.role.name.lowercase(), content = content)
-                    }
-                }
+            // Quick-task (remote-image-carry): compat rounds carry history
+            // images as `image_url` parts (shared K=3 rule).
+            val baseMessages = mapOpenAiHistory(
+                request.messages,
+                includeSystem = true,
+                sanitizeUser = { inputSanitizer?.sanitize(it) ?: it },
+            )
             val ddgRepo = ddg
             val fetchAll = multiUrlFetcher
             val net = webPageFetcher
@@ -190,21 +179,13 @@ class CustomProvider(
 
     /** Phase 57 (57-02): the exact pre-57 Retrofit path, unchanged. */
     private suspend fun FlowCollector<StreamToken>.postPlainTurn(request: ChatRequest) {
-        val messages = request.messages
-            .filter { it.content.isNotBlank() }
-            .map {
-                // Phase 49 (DEL-01): TOOL rows replay as plain user text (see OpenAIProvider).
-                if (it.role == Role.TOOL) {
-                    val (role, text) = it.toProviderText()
-                    OpenAiMessage(role = role, content = text)
-                } else {
-                    // WR-02: USER content sanitized (Ollama/LM Studio pattern).
-                    val content = if (it.role == Role.USER) {
-                        inputSanitizer?.sanitize(it.content) ?: it.content
-                    } else it.content
-                    OpenAiMessage(role = it.role.name.lowercase(), content = content)
-                }
-            }
+        // Quick-task (remote-image-carry): shared K=3 history carry
+        // (`image_url` parts); text-only rows map exactly as before.
+        val messages = mapOpenAiHistory(
+            request.messages,
+            includeSystem = true,
+            sanitizeUser = { inputSanitizer?.sanitize(it) ?: it },
+        )
         val body = OpenAiChatRequest(
             model = modelId,
             messages = messages,

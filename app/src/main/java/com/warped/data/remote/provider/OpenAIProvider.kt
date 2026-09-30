@@ -35,7 +35,6 @@ import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.ModelInfo
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.StreamToken
-import com.warped.domain.model.toProviderText
 import com.warped.domain.provider.LlmProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -124,21 +123,14 @@ class OpenAIProvider(
     }
 
     override fun chat(request: ChatRequest): Flow<StreamToken> = flow {
-        val messages = request.messages
-            .filter { it.role != Role.SYSTEM && it.content.isNotBlank() }
-            .map {
-                // Phase 49 (DEL-01): TOOL rows replay as plain user text —
-                // the raw "<toolId>\n<summary>" encoding must never hit the
-                // wire, and an unpaired role:"tool" (no tool_calls echo) is
-                // rejected by strict OpenAI-compatible servers.
-                if (it.role == Role.TOOL) {
-                    val (role, text) = it.toProviderText()
-                    OpenAiMessage(role = role, content = text)
-                } else {
-                    val content = if (it.role == Role.USER) inputSanitizer.sanitize(it.content) else it.content
-                    OpenAiMessage(role = it.role.name.lowercase(), content = content)
-                }
-            }
+        // Quick-task (remote-image-carry): history image turns ride as
+        // `image_url` parts (K=3 newest-first, shared rule); text-only
+        // rows map exactly as before.
+        val messages = mapOpenAiHistory(
+            request.messages,
+            includeSystem = false,
+            sanitizeUser = inputSanitizer::sanitize,
+        )
         // Phase 57 (57-01): unarmed turns keep the exact pre-57 plain path;
         // armed turns run the tools[] round driver below.
         if (!isLoopArmed(request.webOverride)) {

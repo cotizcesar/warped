@@ -6,14 +6,29 @@ import com.warped.data.agentic.WEB_FETCH_URL_DESCRIPTION
 import com.warped.data.agentic.WEB_SEARCH_QUERY_DESCRIPTION
 import com.warped.data.agentic.WEB_SEARCH_TOOL_DESCRIPTION
 import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.descriptors.element
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonEncoder
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
+import kotlinx.serialization.json.jsonObject
 
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
@@ -117,28 +132,111 @@ data class OpenAiJsonSchema(
 )
 
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
-@Serializable
+@Serializable(with = OpenAiMessageSerializer::class)
 data class OpenAiMessage(
     /**
      * Phase 49 (DEL-01): single-turn only. Legacy `role=tool` rows never hit
      * the wire as `role:"tool"` — providers replay them as plain user text.
      *
-     * IN-02: `NEVER`-encoded so the assistant tool_calls echo (which leaves
-     * content null) omits the key instead of sending explicit
-     * `"content":null` — strict compat servers may 400 the latter. Plain
-     * messages always carry non-null content, so they are unaffected.
+     * IN-02: null content is omitted (never explicit `"content":null`) —
+     * the assistant tool_calls echo (content null) omits the key instead of
+     * sending explicit null — strict compat servers may 400 the latter.
+     * Plain messages always carry non-null content, so they are unaffected.
      */
     val role: String,
-    @EncodeDefault(EncodeDefault.Mode.NEVER) val content: String? = null,
+    val content: String? = null,
     /**
      * Phase 57 (57-01): assistant-echo `tool_calls` (exact ids + complete
      * arguments strings) and `role:"tool"` result messages
      * (`tool_call_id`). In-memory loop echoes only — never persisted to
-     * Room. `NEVER`-encoded so plain messages stay byte-identical.
+     * Room. Omitted when null so plain messages stay byte-identical.
      */
-    @EncodeDefault(EncodeDefault.Mode.NEVER) @SerialName("tool_calls") val toolCalls: List<OpenAiCompletedToolCall>? = null,
-    @EncodeDefault(EncodeDefault.Mode.NEVER) @SerialName("tool_call_id") val toolCallId: String? = null
+    @SerialName("tool_calls") val toolCalls: List<OpenAiCompletedToolCall>? = null,
+    @SerialName("tool_call_id") val toolCallId: String? = null,
+    /**
+     * Quick-task (remote-image-carry): history image data URLs carried as
+     * OpenAI `content` array parts (`{type:"image_url",
+     * image_url:{url}}`) alongside the text part. Null/empty keeps the
+     * legacy string-content shape byte-identically (see
+     * [OpenAiMessageSerializer]). Encode-only in practice — the client
+     * never decodes chat messages off the wire.
+     */
+    val imageUrls: List<String>? = null,
 )
+
+/**
+ * Quick-task (remote-image-carry): custom serializer so `content` stays a
+ * plain string for every pre-carry row (byte-identical keys, nulls
+ * omitted) while image-carrying history rows encode the multipart array.
+ * Replaces the `@EncodeDefault(NEVER)` annotations 1:1 — omission rules
+ * are enforced here instead.
+ */
+object OpenAiMessageSerializer : KSerializer<OpenAiMessage> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("OpenAiMessage") {
+            element<String>("role")
+            element<String?>("content")
+        }
+
+    override fun serialize(encoder: Encoder, value: OpenAiMessage) {
+        val jsonEncoder = encoder as? JsonEncoder
+            ?: throw SerializationException("OpenAiMessageSerializer requires JSON encoding")
+        val json = jsonEncoder.json
+        val obj = buildJsonObject {
+            put("role", value.role)
+            val images = value.imageUrls?.filter { it.isNotBlank() }.orEmpty()
+            if (images.isNotEmpty()) {
+                putJsonArray("content") {
+                    if (!value.content.isNullOrEmpty()) {
+                        addJsonObject {
+                            put("type", "text")
+                            put("text", value.content)
+                        }
+                    }
+                    for (url in images) {
+                        addJsonObject {
+                            put("type", "image_url")
+                            putJsonObject("image_url") { put("url", url) }
+                        }
+                    }
+                }
+            } else if (value.content != null) {
+                put("content", value.content)
+            }
+            if (value.toolCalls != null) {
+                put(
+                    "tool_calls",
+                    json.encodeToJsonElement(
+                        ListSerializer(OpenAiCompletedToolCall.serializer()),
+                        value.toolCalls,
+                    ),
+                )
+            }
+            if (value.toolCallId != null) put("tool_call_id", value.toolCallId)
+        }
+        jsonEncoder.encodeJsonElement(obj)
+    }
+
+    override fun deserialize(decoder: Decoder): OpenAiMessage {
+        val el = (decoder as? JsonDecoder)?.decodeJsonElement()?.jsonObject
+            ?: throw SerializationException("OpenAiMessageSerializer requires JSON decoding")
+        val contentEl = el["content"]
+        val content = when {
+            contentEl == null || contentEl is JsonNull -> null
+            contentEl is JsonPrimitive -> contentEl.contentOrNull
+            contentEl is JsonArray -> contentEl
+                .mapNotNull { (it as? JsonObject)?.get("text") as? JsonPrimitive }
+                .joinToString("") { it.content }
+                .ifEmpty { null }
+            else -> null
+        }
+        return OpenAiMessage(
+            role = (el["role"] as? JsonPrimitive)?.contentOrNull.orEmpty(),
+            content = content,
+            toolCallId = (el["tool_call_id"] as? JsonPrimitive)?.contentOrNull,
+        )
+    }
+}
 
 /**
  * Phase 57 (57-01): completed-call shape for the assistant echo and for

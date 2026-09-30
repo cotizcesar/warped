@@ -7,13 +7,13 @@ import com.warped.data.remote.dto.LmStudioDownloadRequest
 import com.warped.data.remote.dto.LmStudioInputItem
 import com.warped.data.remote.dto.LmStudioIntegration
 import com.warped.data.remote.dto.LmStudioSseEvent
+import com.warped.domain.model.ChatMessage
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.ModelInfo
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.Role
 import com.warped.domain.model.StreamToken
-import com.warped.domain.model.toProviderText
 import com.warped.domain.model.toolDisplayNameCapitalized
 import com.warped.domain.provider.LlmProvider
 import kotlinx.coroutines.CancellationException
@@ -27,7 +27,6 @@ import com.warped.data.grounding.MultiUrlFetcher
 import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.preferences.AdvancedPreferences
-import com.warped.data.remote.dto.OpenAiMessage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.first
@@ -107,20 +106,13 @@ class LMStudioProvider(
         // unarmed turns keep the exact native `/api/v1/chat` path below
         // (images, integrations, reasoning, stats untouched).
         if (isLoopArmed(request.webOverride)) {
-            val baseMessages = request.messages
-                .filter { it.role != Role.SYSTEM && it.content.isNotBlank() }
-                .map {
-                    // Phase 49 (DEL-01): TOOL rows replay as plain user
-                    // text — the raw "<toolId>\n<summary>" encoding must
-                    // never hit the wire.
-                    if (it.role == Role.TOOL) {
-                        val (role, text) = it.toProviderText()
-                        OpenAiMessage(role = role, content = text)
-                    } else {
-                        val content = if (it.role == Role.USER) inputSanitizer.sanitize(it.content) else it.content
-                        OpenAiMessage(role = it.role.name.lowercase(), content = content)
-                    }
-                }
+            // Quick-task (remote-image-carry): compat rounds carry history
+            // images as `image_url` parts (shared K=3 rule).
+            val baseMessages = mapOpenAiHistory(
+                request.messages,
+                includeSystem = false,
+                sanitizeUser = inputSanitizer::sanitize,
+            )
             val ddgRepo = ddg
             val fetchAll = multiUrlFetcher
             val net = webPageFetcher
@@ -243,35 +235,48 @@ class LMStudioProvider(
         currentCall?.cancel()
     }
 
+    /**
+     * Quick-task (remote-image-carry): native `/api/v1/chat` input builder
+     * with the shared K=3 carry. The flat input list keeps its exact
+     * pre-carry order (current-turn images first, then per-turn text);
+     * history USER turns selected by [HistoryImageCarry] additionally emit
+     * their image items immediately before their own text item. TOOL rows
+     * replay as plain-text summaries (Phase 49 DEL-01) and never carry.
+     */
+    internal fun buildNativeInput(
+        messages: List<ChatMessage>,
+        currentImages: List<String>,
+    ): Pair<String?, List<LmStudioInputItem>> {
+        val systemMessage = messages.firstOrNull { it.role == Role.SYSTEM }?.content
+        val kept = HistoryImageCarry.selectKeptUrls(messages)
+        val allInput = mutableListOf<LmStudioInputItem>()
+        allInput += currentImages.map { LmStudioInputItem(type = "image", dataUrl = it) }
+        messages.forEachIndexed { index, msg ->
+            if (msg.role == Role.SYSTEM || msg.content.isBlank()) return@forEachIndexed
+            kept[index]?.forEach { url ->
+                allInput += LmStudioInputItem(type = "image", dataUrl = url)
+            }
+            val content = when (msg.role) {
+                Role.USER -> inputSanitizer.sanitize(msg.content)
+                Role.TOOL -> {
+                    val idx = msg.content.indexOf('\n')
+                    val toolId = if (idx < 0) msg.content else msg.content.substring(0, idx)
+                    val summary = if (idx < 0) "" else msg.content.substring(idx + 1)
+                    "Used ${toolDisplayNameCapitalized(toolId)}: $summary"
+                }
+                else -> msg.content
+            }
+            allInput += LmStudioInputItem(type = "text", content = content)
+        }
+        return systemMessage to allInput
+    }
+
     fun chat(
         request: ChatRequest,
         integrations: List<LmStudioIntegration> = emptyList(),
         onCallCreated: (Call) -> Unit = {},
     ): Flow<StreamToken> = callbackFlow {
-        val systemMessage = request.messages.firstOrNull { it.role == Role.SYSTEM }?.content
-        val chatMessages = request.messages
-            .filter { it.role != Role.SYSTEM }
-            .filter { it.content.isNotBlank() }
-            .map {
-                // Phase 49 (DEL-01): resumed role:tool rows (persisted as
-                // "<toolId>\n<summary>") replay as plain-text summaries on
-                // the native path, which has no role:tool concept. Plain
-                // chat (no TOOL rows) is byte-identical to before.
-                val content = when (it.role) {
-                    Role.USER -> inputSanitizer.sanitize(it.content)
-                    Role.TOOL -> {
-                        val idx = it.content.indexOf('\n')
-                        val toolId = if (idx < 0) it.content else it.content.substring(0, idx)
-                        val summary = if (idx < 0) "" else it.content.substring(idx + 1)
-                        "Used ${toolDisplayNameCapitalized(toolId)}: $summary"
-                    }
-                    else -> it.content
-                }
-                LmStudioInputItem(type = "text", content = content)
-            }
-
-        val imageItems = request.images.map { LmStudioInputItem(type = "image", dataUrl = it) }
-        val allInput = imageItems + chatMessages
+        val (systemMessage, allInput) = buildNativeInput(request.messages, request.images)
 
         val body = LmStudioChatRequest(
             model = modelId,

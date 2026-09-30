@@ -16,7 +16,13 @@ data class OllamaChatRequest(
 @Serializable
 data class OllamaMessage(
     val role: String,
-    val content: String
+    val content: String,
+    /**
+     * Quick-task (remote-image-carry): Ollama `/api/chat` native `images[]`
+     * (raw base64, no data-URL prefix — providers strip the prefix when
+     * shaping). Omitted when null so text-only rows stay byte-identical.
+     */
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val images: List<String>? = null
 )
 
 @Serializable

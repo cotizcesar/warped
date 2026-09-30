@@ -7,12 +7,9 @@ import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.local.preferences.AdvancedPreferences
-import com.warped.data.remote.dto.OpenAiMessage
-import kotlinx.coroutines.flow.first
-import okhttp3.Call
+import com.warped.data.remote.dto.OllamaChatRequest
 import timber.log.Timber
 import com.warped.data.remote.api.OllamaApi
-import com.warped.data.remote.dto.OllamaChatRequest
 import com.warped.data.remote.dto.OllamaCreateRequest
 import com.warped.data.remote.dto.OllamaDeleteRequest
 import com.warped.data.remote.dto.OllamaEmbedRequest
@@ -23,6 +20,7 @@ import com.warped.data.remote.dto.OllamaShowRequest
 import com.warped.data.remote.network.asOllamaFlow
 import com.warped.data.remote.network.asOllamaGenerateFlow
 import com.warped.data.remote.network.asOllamaPullFlow
+import com.warped.domain.model.ChatMessage
 import com.warped.domain.model.ChatRequest
 import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.ModelInfo
@@ -35,9 +33,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.json.Json
+import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -99,20 +99,13 @@ class OllamaProvider(
         // Compat rounds use the Chat Completions envelope throughout —
         // never the native `tool_name` envelope (Pitfall 6).
         if (isLoopArmed(request.webOverride)) {
-            val baseMessages = request.messages
-                .filter { it.content.isNotBlank() }
-                .map {
-                    // Phase 49 (DEL-01): TOOL rows replay as plain user
-                    // text — the raw "<toolId>\n<summary>" encoding must
-                    // never hit the wire.
-                    if (it.role == Role.TOOL) {
-                        val (role, text) = it.toProviderText()
-                        OpenAiMessage(role = role, content = text)
-                    } else {
-                        val content = if (it.role == Role.USER) inputSanitizer.sanitize(it.content) else it.content
-                        OpenAiMessage(role = it.role.name.lowercase(), content = content)
-                    }
-                }
+            // Quick-task (remote-image-carry): compat rounds carry history
+            // images as `image_url` parts (shared K=3 rule).
+            val baseMessages = mapOpenAiHistory(
+                request.messages,
+                includeSystem = true,
+                sanitizeUser = inputSanitizer::sanitize,
+            )
             val ddgRepo = ddg
             val fetchAll = multiUrlFetcher
             val net = webPageFetcher
@@ -177,23 +170,38 @@ class OllamaProvider(
         }
     }
 
+    /**
+     * Quick-task (remote-image-carry): native `/api/chat` history mapping
+     * with the shared K=3 carry. Reproduces the pre-carry filter/sanitize
+     * exactly (blank rows dropped, TOOL replays as plain text, USER text
+     * sanitized); history USER turns selected by [HistoryImageCarry]
+     * ride as native `images[]` (raw base64 — the data-URL prefix is
+     * stripped per the Ollama wire format); every other row stays
+     * text-only and byte-identical on the wire.
+     */
+    internal fun mapNativeMessages(messages: List<ChatMessage>): List<OllamaMessage> {
+        val kept = HistoryImageCarry.selectKeptUrls(messages)
+        return messages.mapIndexedNotNull { index, msg ->
+            if (msg.content.isBlank()) return@mapIndexedNotNull null
+            if (msg.role == Role.TOOL) {
+                val (role, text) = msg.toProviderText()
+                OllamaMessage(role = role, content = text)
+            } else {
+                val content = if (msg.role == Role.USER) inputSanitizer.sanitize(msg.content) else msg.content
+                OllamaMessage(
+                    role = msg.role.name.lowercase(),
+                    content = content,
+                    images = kept[index]?.mapNotNull(::ollamaRawImage)?.takeIf { it.isNotEmpty() },
+                )
+            }
+        }
+    }
+
     /** Phase 57 (57-02): the exact native `/api/chat` path, unchanged. */
     private suspend fun FlowCollector<StreamToken>.postNativeTurn(
         request: ChatRequest,
     ) {
-        val messages = request.messages
-            .filter { it.content.isNotBlank() }
-            .map {
-                // Phase 49 (DEL-01): TOOL rows replay as plain user text —
-                // the raw "<toolId>\n<summary>" encoding must never hit the wire.
-                if (it.role == Role.TOOL) {
-                    val (role, text) = it.toProviderText()
-                    OllamaMessage(role = role, content = text)
-                } else {
-                    val content = if (it.role == Role.USER) inputSanitizer.sanitize(it.content) else it.content
-                    OllamaMessage(role = it.role.name.lowercase(), content = content)
-                }
-            }
+        val messages = mapNativeMessages(request.messages)
         val body = OllamaChatRequest(
             model = modelId,
             messages = messages,
