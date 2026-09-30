@@ -1,0 +1,89 @@
+# Requirements: Warped v2.5 Play Compliance + Leaks
+
+**Defined:** 2026-09-30
+**Core Value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
+
+## v1 Requirements
+
+Requirements for this milestone. Each maps to roadmap phases.
+
+### 16KB Page Support
+
+- [ ] **PAGE-01**: Every shipped native library (`.so`) is 16 KB-aligned — verified with `check_elf_alignment.sh` + `zipalign -c -P 16` on the release AAB/APK (covers LiteRT-LM, SQLCipher, and any transitive natives)
+- [ ] **PAGE-02**: App installs, launches, and runs a local chat turn on a 16 KB system image (emulator arm64, `getconf PAGE_SIZE` → 16384) with no native load failures
+- [ ] **PAGE-03**: CI fails the build on misalignment — alignment script runs on the release artifact in `check`/CI so regressions can't ship silently
+- [ ] **PAGE-04**: Misaligned dependencies are fixed by version bump only (LiteRT-LM/SQLCipher upgrade with re-verification) — never hand-patched `.so`, never linker-flag hacks, never `pageSizeCompat`
+
+### API 36 Target
+
+- [ ] **API-01**: App targets Android 16 (compileSdk 36 + targetSdk 36) with `assembleRelease` + R8 green and no Play Console target-API warnings
+- [ ] **API-02**: Edge-to-edge is real — `enableEdgeToEdge()` + WindowInsets consumption on chat (pill input), bottom sheets, Fuentes list; no overlap/bleed on gesture-nav + 3-button nav, icon contrast in light/dark
+- [ ] **API-03**: Back navigation migrated to predictive-back APIs (`OnBackPressedDispatcher` callbacks / `PredictiveBackHandler`) — chat, sheets, settings/preset screens dismiss correctly; no dead `onBackPressed()` paths
+- [ ] **API-04**: Model downloads + offline retry survive Android 16 quotas — precise FGS types declared, `WorkInfo.getStopReason()` logged, progress/cancel/retry verified under quota pressure
+- [ ] **API-05**: App fills large-screen windows (sw ≥ 600dp tablet/foldable emulator) — chat, catalog, sheets render without pillarboxing or broken constraints
+
+### Memory Leaks
+
+- [ ] **LEAK-01**: LeakCanary 2.14 harness (`debugImplementation` only, zero release impact) with a scripted leak tour covering: model load/switch/unload, streaming chat + Stop, 5-URL grounding + cancel, offline→retry, OG thumbnail scroll, rotation/process death
+- [ ] **LEAK-02**: EngineManager releases native handles on model switch/unload — no retained engine/session after unload, reload works cleanly
+- [ ] **LEAK-03**: Chat turn-scoped Flows cancel cleanly — single-flight `runInference` cancel propagation, no uncancelled collectors, transient Using-rows cleaned, SSE `ResponseBody`/streams closed on Stop
+- [ ] **LEAK-04**: Grounding pipeline leaves no zombies — 5-fan-out + Tavily + SSE accumulators cancelled as one scope per message-send, same-row retry reuses rows without retaining old jobs
+- [ ] **LEAK-05**: Coil + OkHttp are scope-disciplined — image requests cancel on list recycle, memory cache bounded for chat context, shared OkHttp clients never closed, no Activity-context singletons
+
+### Release Gates
+
+- [ ] **REL-01**: Release AAB passes all gates — 16 KB alignment green, `assembleRelease` + R8 green, 16 KB emulator smoke green, zero-application-leak pass green, Play Console pre-launch with no 16 KB/target warnings
+
+## v2 Requirements
+
+Deferred to future release. Tracked but not in current roadmap.
+
+### Polish (P2/P3 — only if the pass surfaces them)
+
+- **PERF-17**: Cold-start / battery before-after numbers on a 16 KB reference device for release notes
+- **MEM-01**: Memory-pressure UX (suggest smaller quant on low RAM) if audit finds OOM-adjacent paths that aren't leaks
+- **API-06**: Per-screen predictive-back animation polish if default migration works but feels abrupt
+
+## Out of Scope
+
+Explicitly excluded. Documented to prevent scope creep.
+
+| Feature | Reason |
+|---------|--------|
+| Engine/network dependency modernization | Zero Play benefit, high regression risk on 494-green stack |
+| Production memory telemetry | Needs PII story for chat content first |
+| Tablet/foldable bespoke layouts | Adaptive-fill compliance is enough; bespoke layouts are product work |
+| LeakCanary in release builds | Heap dumps freeze app, leak PII to disk, bloat APK — debug-only |
+| `largeHeap` as leak fix | Masks real leaks; fix retention roots instead |
+| Permanent compat-flag opt-outs | Google removes escape hatches; ship real fixes with stopgaps tracked |
+
+## Traceability
+
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| PAGE-01 | TBD | Pending |
+| PAGE-02 | TBD | Pending |
+| PAGE-03 | TBD | Pending |
+| PAGE-04 | TBD | Pending |
+| API-01 | TBD | Pending |
+| API-02 | TBD | Pending |
+| API-03 | TBD | Pending |
+| API-04 | TBD | Pending |
+| API-05 | TBD | Pending |
+| LEAK-01 | TBD | Pending |
+| LEAK-02 | TBD | Pending |
+| LEAK-03 | TBD | Pending |
+| LEAK-04 | TBD | Pending |
+| LEAK-05 | TBD | Pending |
+| REL-01 | TBD | Pending |
+
+**Coverage:**
+- v1 requirements: 15 total
+- Mapped to phases: 0
+- Unmapped: 15 ⚠️
+
+---
+*Requirements defined: 2026-09-30*
+*Last updated: 2026-09-30 after initial definition*
