@@ -177,6 +177,14 @@ class LiteRTLmLoopTest {
     }
 
     @Test
+    fun `system hint prefers code from knowledge`() {
+        // Quick-task (code-intent-gate): code comes from weights first;
+        // web_search is only for fresh or versioned API facts.
+        assertThat(LiteRTLmProvider.TOOL_USE_SYSTEM_HINT)
+            .contains("Write code from your own knowledge first")
+    }
+
+    @Test
     fun `armed instruction composes identity plus hint`() {
         val armed = "${LiteRTLmProvider.IDENTITY_LINE} ${LiteRTLmProvider.TOOL_USE_SYSTEM_HINT}"
         assertThat(armed).contains(LiteRTLmProvider.IDENTITY_LINE)
