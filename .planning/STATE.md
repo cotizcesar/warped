@@ -139,6 +139,7 @@ None — v2.2 phases shipped with accepted deferrals recorded above. Next milest
 | 20260930-unified-turn-status | 2026-09-30 | Complete ✓ | Un solo indicador (ring+texto, tool>fetch>gap) + searching honesto; 845 green |
 | 20260930-pending-sweep | 2026-09-30 | Complete ✓ | ThinkingConfig+carry remoto+snippet+pausa+new-chat+snackbar+trío; 739 green |
 | 20260930-needs-web-gate | 2026-09-30 | Complete ✓ | Sin búsqueda en social/identidad + línea identidad + hint; 782 green |
+| 20260930-source-card-density | 2026-09-30 | Complete ✓ | Densidad cards (interlineado, URL gris última, 48dp top); suite verde |
 | 20260929-image-history-carry | 2026-09-29 | Complete ✓ | Historial con últimas 3 imágenes (local); remoto follow-up; 683 green |
 | 20260930-thinking-header-feelings | 2026-09-30 | Complete ✓ | Thinking sin saltos + header solo dot/flecha (web al sheet) + feelings sin búsqueda; 795 green |
 | 20260930-language-sources-override | 2026-09-30 | Complete ✓ | Directivas anti-espejo de idioma de fuentes; suite verde |
