@@ -35,6 +35,14 @@ class NeedsWebTest {
             "what is your name",
             "que puedes hacer",
             "what can you do",
+            "cómo te sientes",
+            "como te sientes?",
+            "¿cómo se siente?",
+            "estás bien?",
+            "how are you",
+            "How are you?",
+            "how do you feel",
+            "how are you doing",
             "ayuda",
             "help",
             "qué modelo eres",
@@ -50,6 +58,8 @@ class NeedsWebTest {
             "qué es X?",
             "qué hora es",
             "quién ganó el partido",
+            "cómo está el clima",
+            "como esta el clima",
             "explícame la fotosíntesis",
             "what is the capital of France",
             "latest news",
@@ -70,5 +80,18 @@ class NeedsWebTest {
         // "holanda" — token matching must not.
         assertThat(NeedsWeb.needsWeb("holanda")).isTrue()
         assertThat(NeedsWeb.needsWeb("hola")).isFalse()
+    }
+
+    @Test
+    fun `factual como esta X still searches while feelings do not`() {
+        // como/esta bigram guard: factual "cómo está X" must keep
+        // searching — no bare como+esta phrase exists, and the feelings
+        // entries all carry distinctive tokens (sientes, siente, bien,
+        // feel, doing) that factual queries lack.
+        assertThat(NeedsWeb.needsWeb("cómo está el clima")).isTrue()
+        assertThat(NeedsWeb.needsWeb("como esta el clima")).isTrue()
+        assertThat(NeedsWeb.needsWeb("cómo está la economía")).isTrue()
+        assertThat(NeedsWeb.needsWeb("cómo te sientes")).isFalse()
+        assertThat(NeedsWeb.needsWeb("how are you doing")).isFalse()
     }
 }
