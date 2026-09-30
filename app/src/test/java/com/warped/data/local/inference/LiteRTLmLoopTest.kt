@@ -130,9 +130,8 @@ class LiteRTLmLoopTest {
             "Use web_search when the question needs current or external facts, " +
                 "and web_fetch to read a full page from the results or the user. " +
                 "Answer with the gathered context. " +
-                "Treat each new user message on its own: if it needs facts not covered " +
-                "by earlier tool results, call web_search again instead of answering " +
-                "from stale results. " +
+                "Resolve pronouns and references (he/she/it/this/that, él/ella/su/eso/este, and names) against the conversation history first, and include the resolved names in web_search queries; if the current answer needs facts not covered by earlier tool results, call web_search again instead of answering from stale results. " +
+                "Cite only sources fetched for the current answer; never reuse citation numbers from earlier turns. " +
                 "Write code from your own knowledge first; call web_search only for " +
                 "fresh or versioned API facts. " +
                 "Do not call web_search/web_fetch for greetings, thanks, or " +
@@ -148,10 +147,21 @@ class LiteRTLmLoopTest {
     fun `system hint carries the per-turn re-search rule`() {
         // Quick-task (agentic-rows): follow-ups needing new facts must
         // re-search instead of answering from stale turn-1 sources.
+        // Quick-task (reference-resolution): the resolve clause replaced
+        // the old independence sentence — pin the new wording here, the
+        // re-search substring below is preserved verbatim.
         assertThat(LiteRTLmProvider.TOOL_USE_SYSTEM_HINT)
-            .contains("Treat each new user message on its own")
+            .contains("Resolve pronouns and references")
         assertThat(LiteRTLmProvider.TOOL_USE_SYSTEM_HINT)
             .contains("call web_search again instead of answering from stale results")
+    }
+
+    @Test
+    fun `system hint resolves references into search queries`() {
+        assertThat(LiteRTLmProvider.TOOL_USE_SYSTEM_HINT)
+            .contains("include the resolved names in web_search queries")
+        assertThat(LiteRTLmProvider.TOOL_USE_SYSTEM_HINT)
+            .contains("never reuse citation numbers from earlier turns")
     }
 
     // ------------------------------------------------------------------
@@ -189,7 +199,7 @@ class LiteRTLmLoopTest {
         val armed = "${LiteRTLmProvider.IDENTITY_LINE} ${LiteRTLmProvider.TOOL_USE_SYSTEM_HINT}"
         assertThat(armed).contains(LiteRTLmProvider.IDENTITY_LINE)
         assertThat(armed).contains("Do not call web_search/web_fetch")
-        assertThat(armed).contains("Treat each new user message on its own")
+        assertThat(armed).contains("Resolve pronouns and references")
     }
 
     // ------------------------------------------------------------------

@@ -96,10 +96,12 @@ class LiteRTLmProvider @Inject constructor(
          * system message). Short on purpose — the fused Source[N] blocks do
          * the heavy lifting. Pinned verbatim by LiteRTLmLoopTest.
          *
-         * Quick-task (agentic-rows): per-turn-independence rule — each new
-         * user message is judged on its own; facts not covered by earlier
-         * tool results trigger a fresh `web_search`, never an answer from
-         * stale results/prior-turn citations alone.
+         * Quick-task (reference-resolution): reference-resolution +
+         * citation-hygiene rule — resolve pronouns/references against the
+         * conversation history first (including the resolved names in
+         * web_search queries) and never reuse earlier turns' citation
+         * numbers; facts not covered by earlier tool results still trigger
+         * a fresh `web_search`, never an answer from stale results.
          *
          * Quick-task (code-intent-gate): code-from-knowledge rule — code
          * comes from the model's own weights first; `web_search` is only
@@ -109,9 +111,8 @@ class LiteRTLmProvider @Inject constructor(
             "Use web_search when the question needs current or external facts, " +
                 "and web_fetch to read a full page from the results or the user. " +
                 "Answer with the gathered context. " +
-                "Treat each new user message on its own: if it needs facts not covered " +
-                "by earlier tool results, call web_search again instead of answering " +
-                "from stale results. " +
+                "Resolve pronouns and references (he/she/it/this/that, él/ella/su/eso/este, and names) against the conversation history first, and include the resolved names in web_search queries; if the current answer needs facts not covered by earlier tool results, call web_search again instead of answering from stale results. " +
+                "Cite only sources fetched for the current answer; never reuse citation numbers from earlier turns. " +
                 "Write code from your own knowledge first; call web_search only for " +
                 "fresh or versioned API facts. " +
                 "Do not call web_search/web_fetch for greetings, thanks, or " +

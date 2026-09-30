@@ -40,14 +40,25 @@ class GroundingPromptTest {
     }
 
     @Test
-    fun `system prompt carries the per-turn re-search rule`() {
-        // Quick-task (agentic-rows): tool-neutral wording (the pre-search
-        // path has no tools — the VM re-searches every turn) that also
-        // reaches every armed loop via the augmented user message.
+    fun `system prompt carries the reference-resolution rule`() {
+        // Quick-task (reference-resolution): resolve pronouns/references
+        // against conversation history (the pre-search path has no tools —
+        // the VM re-searches every turn with resolved names) and never
+        // reuse earlier turns' citation numbers.
         assertThat(GroundingPrompt.SYSTEM_PROMPT)
-            .contains("Treat each new question on its own")
+            .contains("Resolve pronouns and references")
         assertThat(GroundingPrompt.SYSTEM_PROMPT)
-            .contains("never answer from earlier sources alone")
+            .contains("Cite only sources fetched for the current answer")
+        assertThat(GroundingPrompt.SYSTEM_PROMPT)
+            .contains("never reuse citation numbers from earlier turns")
+    }
+
+    @Test
+    fun `system prompt resolves references and forbids citation reuse`() {
+        assertThat(GroundingPrompt.SYSTEM_PROMPT)
+            .contains("against the conversation history first")
+        assertThat(GroundingPrompt.SYSTEM_PROMPT)
+            .contains("never reuse citation numbers from earlier turns")
     }
 
     @Test
