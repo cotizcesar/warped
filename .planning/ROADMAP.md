@@ -1,8 +1,10 @@
-# Roadmap: Warped
+# Roadmap: Warped — v2.5 Play Compliance + Leaks
 
 ## Overview
 
-v2.4 Agentic Web shipped 2026-09-29 (Phases 55–58): Tavily search backend with Keystore key, local LiteRT-LM function-calling loop (web_search/web_fetch, device-confirmed), remote OpenAI-compatible tools[] loop across 5 providers, and OpenGraph thumbnail cards via Coil (Room v16). 10/10 requirements verified, 3 device follow-ups accepted. Previous: v2.3 Web Grounding v2 (Phases 52–54, multi-page fused grounding, preview + toggle, offline retry).
+v2.5 is a compliance + stability milestone, not a feature milestone: prove 16 KB page-size compatibility for Play, audit runtime behavior under `targetSdk 36`, and run a scripted memory-leak audit with fixes. Sequencing is external-blocker first (16 KB verification gates Play submission), contracts before churn (API-36 audit before leak fixes), baseline before fixes (LeakCanary tour before the fix loop).
+
+Previous: v2.4 Agentic Web shipped 2026-09-29 (Phases 55–58, 10/10 verified). Full archive: [`.planning/milestones/v2.4-ROADMAP.md`](milestones/v2.4-ROADMAP.md).
 
 ## Phases
 
@@ -11,47 +13,88 @@ v2.4 Agentic Web shipped 2026-09-29 (Phases 55–58): Tavily search backend with
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 55: Tavily Search Foundation** - API key settings + Keystore, Tavily client, search→ground fusion
-- [ ] **Phase 56: Local Agentic Loop** - LiteRT-LM function calling (web_search/web_fetch), channel hygiene, trust boundary
-- [ ] **Phase 57: Remote Agentic Loop** - OpenAI-compatible tools[] loop with capability gating
-- [x] **Phase 58: OpenGraph Thumbnails** - OG scrape + Room v16, Coil cards, sheet header (completed 2026-09-29)
+- [ ] **Phase 59: 16 KB Dependency Verification** - Prove every shipped .so is 16 KB-aligned, CI gate, 16 KB emulator smoke
+- [ ] **Phase 60: API-36 Behavior Audit** - targetSdk 36 conformance: edge-to-edge, predictive back, quotas, large screens
+- [ ] **Phase 61: LeakCanary Instrumentation + Guided Audit** - Debug-only harness + scripted leak tour with triaged baseline
+- [ ] **Phase 62: Fix Loop + Release Hardening** - Owner-local leak fixes with regression tests + all release gates green
 
 ## Phase Details
 
 ### Shipped: v2.1 Finish v2.0 Leftovers (2026-09-28)
 
-4 phases (45–48), 18/18 requirements MET. Full archive: [`.planning/milestones/v2.1-ROADMAP.md`](milestones/v2.1-ROADMAP.md) · Audit: [`v2.1-MILESTONE-AUDIT.md`](v2.1-MILESTONE-AUDIT.md) (passed)
+4 phases (45–48), 18/18 requirements MET. Full archive: [`milestones/v2.1-ROADMAP.md`](milestones/v2.1-ROADMAP.md)
 
 ### Shipped: v2.2 Simplificación + Web Grounding (2026-09-28)
 
-3 phases (49–51), 5 plans, 14 requirements — 10 MET, 4 PARTIAL (DEL-06, WEB-05, WEB-06, THEME-01: automated gates pass, device smoke deferred, user-accepted). Full archive: [`.planning/milestones/v2.2-ROADMAP.md`](milestones/v2.2-ROADMAP.md) · Audit: [`milestones/v2.2-MILESTONE-AUDIT.md`](milestones/v2.2-MILESTONE-AUDIT.md) (gaps_found, accepted)
+3 phases (49–51), 5 plans, 14 requirements — 10 MET, 4 PARTIAL (device smoke deferred, user-accepted). Full archive: [`milestones/v2.2-ROADMAP.md`](milestones/v2.2-ROADMAP.md)
 
 ### Shipped: v2.3 Web Grounding v2 (2026-09-28)
 
-3 phases (52–54), 8 plans, 12 requirements — 12/12 verified (automatable evidence 100%; 3 device-smoke follow-ups accepted, release-UAT standing). Full archive: [`.planning/milestones/v2.3-ROADMAP.md`](milestones/v2.3-ROADMAP.md) · Audit: [`milestones/v2.3-MILESTONE-AUDIT.md`](milestones/v2.3-MILESTONE-AUDIT.md) (gaps_found, accepted)
+3 phases (52–54), 8 plans, 12 requirements — 12/12 verified. Full archive: [`milestones/v2.3-ROADMAP.md`](milestones/v2.3-ROADMAP.md)
 
 ### Shipped: v2.4 Agentic Web (2026-09-29)
 
-4 phases (55–58), 9 plans, 10 requirements — 10/10 verified (automatable evidence 100%; 3 device follow-ups accepted, release-UAT standing). Full archive: [`.planning/milestones/v2.4-ROADMAP.md`](milestones/v2.4-ROADMAP.md) · Audit: [`milestones/v2.4-MILESTONE-AUDIT.md`](milestones/v2.4-MILESTONE-AUDIT.md) (gaps_found, accepted)
+4 phases (55–58), 9 plans, 10 requirements — 10/10 verified. Full archive: [`milestones/v2.4-ROADMAP.md`](milestones/v2.4-ROADMAP.md)
+
+### Phase 59: 16 KB Dependency Verification
+**Goal**: Play can accept the release — every shipped native library is proven 16 KB-aligned with a CI gate preventing regressions
+**Depends on**: Phase 58 (v2.4 complete)
+**Requirements**: PAGE-01, PAGE-02, PAGE-03, PAGE-04
+**Success Criteria** (what must be TRUE):
+  1. Release AAB/APK passes `check_elf_alignment.sh` (every `.so` ALIGNED) and `zipalign -c -P 16` with per-library evidence
+  2. App installs, launches, and completes a local chat turn on a 16 KB emulator image (`getconf PAGE_SIZE` → 16384) with no native load failures
+  3. CI fails the build on misalignment — alignment check runs on the release artifact so regressions can't ship silently
+  4. Any misaligned dependency is resolved by version bump with re-verification (no hand-patched `.so`, no linker-flag hacks, no `pageSizeCompat`)
+**Plans**: TBD
+
+### Phase 60: API-36 Behavior Audit
+**Goal**: App runs correctly under Android 16 platform contracts — edge-to-edge, predictive back, quotas, large screens
+**Depends on**: Phase 59
+**Requirements**: API-01, API-02, API-03, API-04, API-05
+**Success Criteria** (what must be TRUE):
+  1. App targets Android 16 (compileSdk 36 + targetSdk 36) with `assembleRelease` + R8 green and no Play Console target-API warnings
+  2. Chat pill input, bottom sheets, and Fuentes list render edge-to-edge with correct insets on gesture-nav and 3-button nav in light and dark
+  3. Back gesture/button dismisses chat, sheets, and settings/preset screens correctly with no dead `onBackPressed()` paths
+  4. Model downloads and offline retry survive Android 16 quotas — progress, cancel, and retry verified with stop reasons logged
+  5. Chat, catalog, and sheets fill large-screen windows (sw ≥ 600dp tablet/foldable emulator) without pillarboxing or broken constraints
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 61: LeakCanary Instrumentation + Guided Audit
+**Goal**: Team has a reproducible leak baseline — every heavy surface exercised under observation with triaged findings
+**Depends on**: Phase 60 (needs runnable API-36/16 KB build)
+**Requirements**: LEAK-01
+**Success Criteria** (what must be TRUE):
+  1. LeakCanary 2.14 harness installed as `debugImplementation` only — release APK contains zero LeakCanary classes
+  2. Scripted leak tour runs end-to-end: model load/switch/unload, streaming chat + Stop, 5-URL grounding + cancel, offline→retry, OG thumbnail scroll, rotation/process death
+  3. Each finding is triaged to its owning layer (native → VM → network → Compose) with heap evidence, ready for owner-local fixes
+**Plans**: TBD
+
+### Phase 62: Fix Loop + Release Hardening
+**Goal**: Zero-application-leak release — all baseline leaks fixed at their owners and every Play gate green
+**Depends on**: Phase 61
+**Requirements**: LEAK-02, LEAK-03, LEAK-04, LEAK-05, REL-01
+**Success Criteria** (what must be TRUE):
+  1. Model switch/unload releases native handles — reload works cleanly with no retained engine/session
+  2. Chat turn resources cancel cleanly — Stop ends inference, collectors, transient rows, and SSE streams with no zombies
+  3. Grounding pipeline (5-fan-out + Tavily + SSE accumulators) cancels as one scope per send; retry reuses rows without retaining old jobs
+  4. Coil image requests cancel on recycle with bounded cache; shared OkHttp clients never closed; no Activity-context singletons
+  5. Release AAB passes all gates — alignment green, `assembleRelease` + R8 green, 16 KB emulator smoke green, zero-leak pass green, Play Console pre-launch clean
+**Plans**: TBD
 
 ## Progress
 
 **Execution Order:**
-Next milestone continues from Phase 58.
+59 → 60 → 61 → 62 (61 needs a runnable build from 59/60; 62 consumes the 61 baseline)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 49. Surface Removal | 2/2 | Complete (smoke deferred) | 2026-09-28 |
-| 50. Web Grounding | 2/2 | Complete (smoke deferred) | 2026-09-28 |
-| 51. Syntax-Theme Fix | 1/1 | Complete (smoke deferred) | 2026-09-28 |
-| 52. Multi-URL Fetch Foundation | 2/2 | Complete    | 2026-09-28 |
-| 53. Sources Preview + Per-Chat Toggle | 4/4 | Complete    | 2026-09-28 |
-| 54. Offline Retry | 2/2 | Complete    | 2026-09-28 |
-| 55. Tavily Search Foundation | 2/2 | Complete    | 2026-09-29 |
-| 56. Local Agentic Loop | 2/2 | Complete    | 2026-09-29 |
-| 57. Remote Agentic Loop | 2/2 | Complete    | 2026-09-29 |
-| 58. OpenGraph Thumbnails | 2/2 | Complete    | 2026-09-29 |
+| 59. 16 KB Dependency Verification | 0/0 | Not started | - |
+| 60. API-36 Behavior Audit | 0/0 | Not started | - |
+| 61. LeakCanary Instrumentation + Guided Audit | 0/0 | Not started | - |
+| 62. Fix Loop + Release Hardening | 0/0 | Not started | - |
 
 ---
 
-**Cumulative state after v2.4:** 58 phases shipped, 337 requirements delivered across v1.0–v2.4 (327 entering v2.4 + 10 verified in v2.4; 3 device follow-ups accepted as release-UAT).
+**Cumulative state after v2.4:** 58 phases shipped, 337 requirements delivered across v1.0–v2.4.
+**v2.5 scope:** 4 phases (59–62), 15 requirements (PAGE-01..04, API-01..05, LEAK-01..05, REL-01). Coarse granularity.
