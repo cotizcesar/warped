@@ -205,6 +205,8 @@
         <item quantity="one">Reading %1$d of %2$d page. Tap Stop to cancel reading.</item>
         <item quantity="other">Reading %1$d of %2$d pages. Tap Stop to cancel reading.</item>
     </plurals>
+    <string name="searching">Searching…</string>
+    <string name="searching_cd">Searching. Tap Stop to cancel.</string>
 
     <!-- Chat errors and dialogs -->
     <string name="error_model_unavailable">This model is no longer available. Please select a different model or re-download it.</string>
