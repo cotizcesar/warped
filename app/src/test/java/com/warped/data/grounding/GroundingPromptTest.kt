@@ -9,6 +9,22 @@ import org.junit.jupiter.api.Test
 class GroundingPromptTest {
 
     @Test
+    fun `system prompt never asks the user for links`() {
+        // Quick-task (always-search): the no-URL sentence competed with
+        // the web_search tool hint — the model asked for links instead of
+        // calling tools. The prompt must direct tool-capable turns to the
+        // provided sources / web_search instead.
+        assertThat(GroundingPrompt.SYSTEM_PROMPT).doesNotContain("paste a link")
+    }
+
+    @Test
+    fun `system prompt directs armed turns to sources and web_search`() {
+        assertThat(GroundingPrompt.SYSTEM_PROMPT)
+            .contains("Answer with the provided sources")
+        assertThat(GroundingPrompt.SYSTEM_PROMPT).contains("web_search")
+    }
+
+    @Test
     fun `system prompt never invents urls`() {
         assertThat(GroundingPrompt.SYSTEM_PROMPT).contains("Never invent URLs")
     }

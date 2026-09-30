@@ -10,15 +10,13 @@ import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.GroundingPrecedence
 import com.warped.data.grounding.GroundingPrompt
 import com.warped.data.grounding.GroundingResult
+import com.warped.data.grounding.ImageIntent
 import com.warped.data.grounding.MultiUrlFetcher
 import com.warped.data.grounding.MultiUrlResult
 import com.warped.data.grounding.TavilySearchOutcome
 import com.warped.data.grounding.TavilySearchRepository
 import com.warped.data.grounding.UrlDetector
 import com.warped.data.grounding.WebPageFetcher
-import com.warped.data.agentic.LocalToolLoop
-import com.warped.data.agentic.ToolCapabilityMatrix
-import com.warped.data.agentic.ToolMode
 import com.warped.data.local.inference.BackendType
 import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.MemoryChecker
@@ -69,10 +67,13 @@ class ChatViewModel @Inject constructor(
      */
     private val ddgSearchRepository: DuckDuckGoSearchRepository,
     /**
-     * Phase 56 (56-02): allowlist capability read for the VM-side
-     * loop-arming check (skip VM pre-search when the provider loop will
-     * fire). Verified-only semantics live in the repository.
+     * Quick-task (always-search): the VM no longer mirrors loop-arming —
+     * the provider owns arming (computeArmSnapshot /
+     * ConversationConfig.tools) and the DDG-primary pre-search runs on
+     * every grounded turn including armed ones. Retained in the graph so
+     * Hilt construction sites stay untouched.
      */
+    @Suppress("unused")
     private val modelAllowlistRepository: ModelAllowlistRepository,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
@@ -388,6 +389,10 @@ class ChatViewModel @Inject constructor(
                 var requestUserText = userMessage.content
                 var groundedSources: List<String> = emptyList()
                 var groundedSourceDetails: List<GroundedSource> = emptyList()
+                // Quick-task (image-grid): ephemeral render list for the
+                // image grid. Set on image-intent Grounded turns only;
+                // never persisted (same ephemeral contract as the rows).
+                var groundedImages: List<String> = emptyList()
                 // Quick-task (agentic-rows): per-turn tool-source
                 // accumulator. Loop drivers (local `runToolLoop`,
                 // `CompatToolLoop`, OpenAI/Anthropic inline loops) emit one
@@ -531,52 +536,20 @@ class ChatViewModel @Inject constructor(
                             Timber.w(e, "Chat: connectivity check failed, treating as offline")
                             false
                         }
-                        // Phase 56 (56-02): when the local agentic loop is
-                        // armed, the MODEL searches for itself — VM
-                        // pre-search would burn a Tavily credit AND starve
-                        // the loop (the model would never need web_search, so
-                        // no status row would ever render and the 5-call
-                        // wallet bound would stack on the pre-search credit).
-                        // Skip the branch but keep the SYSTEM_PROMPT persona
-                        // via the null-block augment. Unarmed turns and
-                        // non-local providers keep the exact Phase-55 path.
-                        //
-                        // Phase 57 (57-02, CR-02 fixed by CR-01 wiring): the
-                        // skip broadens to armed REMOTE loops — every matrix
-                        // dialect that attempts tools (ATTEMPT/
-                        // ATTEMPT_FALLBACK/NATIVE_ANTHROPIC) skips the VM
-                        // pre-search so worst case stays 5 credits per
-                        // message. The provider stays authoritative (it
-                        // re-checks grounding, matrix, internet, plus its
-                        // own collaborators); the VM mirrors for the
-                        // pre-search skip only. The mirror is exact because
-                        // CR-01 injects the same singletons at both
-                        // production construction sites (ProviderRouter +
-                        // LmStudioHelper.createProvider), so a VM-armed
-                        // turn is provider-armed too — no silent loss of
-                        // grounding on either path.
-                        val localArmed = effectiveProvider == ProviderType.LITE_RT_LM &&
-                            LocalToolLoop.isLoopArmed(
-                                groundingOn = doGround,
-                                supportsFunctionCalling = isFunctionCallingCapable(effectiveModelId),
-                                hasValidatedInternet = online,
-                            )
-                        val remoteMode = ToolCapabilityMatrix.modeFor(effectiveProvider)
-                        val remoteArmed = ToolCapabilityMatrix.isRemoteLoopArmed(
-                            groundingOn = doGround,
-                            matrixAttemptsTools = remoteMode == ToolMode.ATTEMPT ||
-                                remoteMode == ToolMode.ATTEMPT_FALLBACK ||
-                                remoteMode == ToolMode.NATIVE_ANTHROPIC,
-                            hasValidatedInternet = online,
-                        )
-                        val loopArmed = localArmed || remoteArmed
-                        if (loopArmed) {
-                            requestUserText = GroundingPrompt.augment(
-                                requestUserText,
-                                null,
-                                groundingEnabled = doGround,
-                            )
-                        } else if (!online) {
+                        // Always-on pre-search (quick-task always-search): the
+                        // DDG-primary branch runs on EVERY grounded no-URL
+                        // turn INCLUDING armed ones. DDG is free/keyless so
+                        // this adds 0 credits when DDG serves the turn; the
+                        // loop stays armed provider-side (computeArmSnapshot
+                        // / ConversationConfig.tools untouched) for deeper
+                        // model-driven fetch, and loop ToolCompleted rows
+                        // keep merging with pre-search details in the Done
+                        // union below. There is deliberately NO VM-level
+                        // direct Tavily call and NO loop-cap change — the
+                        // Tavily fallback fires only inside
+                        // DuckDuckGoSearchRepository.search when DDG yields
+                        // nothing usable AND a key is stored.
+                        if (!online) {
                             modelOnlyNotice = ModelOnlyNotice.OFFLINE
                             requestUserText = GroundingPrompt.augment(
                                 requestUserText,
@@ -584,6 +557,12 @@ class ChatViewModel @Inject constructor(
                                 groundingEnabled = doGround,
                             )
                         } else {
+                            // Quick-task (image-grid): intent-gated
+                            // include_images — the Tavily leg only (the DDG
+                            // leg has no image API and fuses zero images).
+                            // Non-intent turns pass false: byte-identical
+                            // to today, no extra payload.
+                            val wantImages = ImageIntent.hasImageIntent(userMessage.content)
                             val searchCount = TavilySearchRepository.DEFAULT_MAX_RESULTS
                             updateInput {
                                 it.copy(
@@ -602,6 +581,7 @@ class ChatViewModel @Inject constructor(
                                         query = userMessage.content,
                                         maxResults = searchCount,
                                         contextSize = contextSize,
+                                        includeImages = wantImages,
                                     )
                                 ) {
                                     is TavilySearchOutcome.Grounded -> {
@@ -613,6 +593,7 @@ class ChatViewModel @Inject constructor(
                                         )
                                         groundedSources = fused.okUrls
                                         groundedSourceDetails = fused.details
+                                        groundedImages = fused.images
                                         val total =
                                             fused.okUrls.size + fused.skippedUrls.size
                                         updateInput { s ->
@@ -884,6 +865,7 @@ class ChatViewModel @Inject constructor(
                                     stats = token.stats,
                                     groundedSources = allSources,
                                     groundedSourceDetails = allDetails,
+                                    groundedImages = groundedImages,
                                     modelOnlyNotice = modelOnlyNotice,
                                     modelOnlySourceCount = modelOnlySourceCount,
                                 )
@@ -1462,24 +1444,6 @@ class ChatViewModel @Inject constructor(
             return models.firstOrNull { it.filePath == localId }?.capabilities?.reasoning == true
         }
         return remoteId != null
-    }
-
-    /**
-     * Phase 56 (56-02): VM-side loop-arming capability read. Verified-only:
-     * unlisted models default CLOSED. Reads the allowlist (same source as
-     * the provider gate) — LocalModel.capabilities is a hardcoded all-true
-     * lazy and is NEVER consulted here. Never throws: a failed read arms
-     * nothing (plain Phase-55 turn).
-     */
-    private fun isFunctionCallingCapable(modelId: String?): Boolean {
-        if (modelId == null) return false
-        return try {
-            modelAllowlistRepository.findByModelFile(modelId.substringAfterLast("/"))
-                ?.capabilities?.supportsFunctionCalling == true
-        } catch (e: Exception) {
-            Timber.w(e, "Chat: allowlist read failed, treating as incapable")
-            false
-        }
     }
 
     /**

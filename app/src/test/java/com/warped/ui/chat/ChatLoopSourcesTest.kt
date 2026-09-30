@@ -4,7 +4,10 @@ import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import com.google.common.truth.Truth.assertThat
 import com.warped.data.grounding.DuckDuckGoSearchRepository
+import com.warped.data.grounding.GroundingResult
 import com.warped.data.grounding.MultiUrlFetcher
+import com.warped.data.grounding.MultiUrlResult
+import com.warped.data.grounding.TavilySearchOutcome
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.MemoryChecker
@@ -54,12 +57,15 @@ import java.io.File
  * Quick-task (agentic-rows): loop-turn Fuentes persistence at the
  * ViewModel collector.
  *
- * The turn runs loop-armed (capable local model + grounding on + validated
- * internet), so the VM pre-search is skipped and the ONLY rows come from
- * the helper's `ToolCompleted.sources`. On Done the VM persists via the
- * IDENTICAL `saveMessageWithSources` path as grounded turns — same row
- * shape (incl. OG columns), same `replaceSources`-safety (the retry path
- * is never touched), no history rewrite (no Role.TOOL rows).
+ * The turn runs on a capable local model + grounding on + validated
+ * internet. The DDG-primary VM pre-search runs on every such turn
+ * (always-on) and the loop's `ToolCompleted.sources` union with it on Done
+ * (first-seen order, distinct by URL). These tests stub the pre-search
+ * model-only so the ONLY rows come from the helper — isolating the loop
+ * half of the union. On Done the VM persists via the IDENTICAL
+ * `saveMessageWithSources` path as grounded turns — same row shape (incl.
+ * OG columns), same `replaceSources`-safety (the retry path is never
+ * touched), no history rewrite (no Role.TOOL rows).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatLoopSourcesTest {
@@ -136,6 +142,13 @@ class ChatLoopSourcesTest {
         every { fetcher.cancel() } just Runs
         every { fetcher.hasValidatedInternet() } returns true
         ddgSearchRepository = mockk()
+        // Always-on pre-search stubbed model-only: isolates the loop half
+        // of the Done union (no fused rows to merge).
+        coEvery {
+            ddgSearchRepository.search(any(), any(), any(), any())
+        } returns TavilySearchOutcome.ModelOnly(
+            MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
+        )
 
         return ChatViewModel(
             chatRepository = chatRepository,
@@ -189,8 +202,10 @@ class ChatLoopSourcesTest {
         vm.sendMessage("latest news")
         advanceUntilIdle()
 
-        // Armed turn: the VM pre-search never runs — rows come from the loop only.
-        coVerify(exactly = 0) { ddgSearchRepository.search(any(), any(), any()) }
+        // Always-on: the VM pre-search runs (stubbed model-only above)
+        // and the loop rows union with it — here the pre-search half is
+        // empty, so rows come from the loop only.
+        coVerify(exactly = 1) { ddgSearchRepository.search(any(), any(), any(), any()) }
         val messageSlot = slot<ChatMessage>()
         val sourcesSlot = slot<List<GroundedSource>>()
         coVerify(exactly = 1) {
@@ -280,8 +295,8 @@ class ChatLoopSourcesTest {
     fun `history keeps originals - only the outgoing request carries augmented text`() = runTest {
         // HISTORY-SEMANTICS DECISION (keep-as-is): Room persists the
         // ORIGINAL user text; augmentation (SYSTEM_PROMPT, no fused block
-        // on armed turns) lives only on the outgoing request's current
-        // message — never rewritten into history.
+        // on model-only pre-search turns) lives only on the outgoing
+        // request's current message — never rewritten into history.
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
         helperTokens = listOf(
@@ -306,7 +321,7 @@ class ChatLoopSourcesTest {
             com.warped.data.grounding.GroundingPrompt.SYSTEM_PROMPT,
         )
         assertThat(sent.single().content).contains("latest news")
-        // Armed turn with no pre-search: no fused Source block injected.
+        // Model-only pre-search: no fused Source block injected.
         assertThat(sent.single().content).doesNotContain("--- Source [")
 
         // Persisted user row keeps the original — no augmentation leaks

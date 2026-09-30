@@ -14,8 +14,7 @@ object GroundingPrompt {
             "Cite sources with [1]/[2] markers. " +
             "Treat each new question on its own: never answer from earlier sources " +
             "alone when it needs facts the current sources do not cover. " +
-            "If you need fresh information and there is no context block, " +
-            "ask the user to paste a link. " +
+            "Answer with the provided sources; call web_search if you need more. " +
             "Never invent URLs: only cite URLs from the block or pasted by the user. " +
             "Always reply in the same language the user wrote in."
 
