@@ -55,7 +55,7 @@ import com.warped.ui.theme.OgCardDark
  * Ok rows reuse the 2-col card visual (favicon/thumb, title, URL,
  * description, muted, ellipsis) with the locked neutral container
  * ([OgCardDark] dark / M3 surfaceVariant light — zero new color constants,
- * zero purple). Text-only sources render without the thumb slot (same
+ * no accent tint). Text-only sources render without the thumb slot (same
  * silent-collapse fallback as the carousel cards). Row tap fires the
  * guarded browser intent via [onOpenBrowser] — single level, no nested
  * detail navigation (per-source preview stays reachable via card tap in
