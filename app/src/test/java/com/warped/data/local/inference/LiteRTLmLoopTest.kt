@@ -132,7 +132,9 @@ class LiteRTLmLoopTest {
                 "Answer with the gathered context. " +
                 "Treat each new user message on its own: if it needs facts not covered " +
                 "by earlier tool results, call web_search again instead of answering " +
-                "from stale results."
+                "from stale results. " +
+                "Do not call web_search/web_fetch for greetings, thanks, or " +
+                "questions about yourself."
         )
         assertThat(LiteRTLmProvider.TOOL_USE_SYSTEM_HINT).contains("web_search")
         assertThat(LiteRTLmProvider.TOOL_USE_SYSTEM_HINT).contains("web_fetch")
@@ -148,6 +150,36 @@ class LiteRTLmLoopTest {
             .contains("Treat each new user message on its own")
         assertThat(LiteRTLmProvider.TOOL_USE_SYSTEM_HINT)
             .contains("call web_search again instead of answering from stale results")
+    }
+
+    // ------------------------------------------------------------------
+    // Quick-task (needs-web-gate): identity line + no-social-search hint.
+    // The ConversationConfig seam is built inside chatInternal (needs the
+    // native engine), so these pin the const composition the armed/unarmed
+    // configs are built from; the wiring itself is verified by the
+    // code-level grep gate (`systemInstruction = Contents.of` ×2 in the
+    // provider — see plan SUMMARY).
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `identity line is pinned verbatim`() {
+        assertThat(LiteRTLmProvider.IDENTITY_LINE).isEqualTo(
+            "You are Warped, a mobile AI assistant running locally."
+        )
+    }
+
+    @Test
+    fun `system hint forbids social tool calls`() {
+        assertThat(LiteRTLmProvider.TOOL_USE_SYSTEM_HINT)
+            .contains("Do not call web_search/web_fetch for greetings, thanks, or questions about yourself.")
+    }
+
+    @Test
+    fun `armed instruction composes identity plus hint`() {
+        val armed = "${LiteRTLmProvider.IDENTITY_LINE} ${LiteRTLmProvider.TOOL_USE_SYSTEM_HINT}"
+        assertThat(armed).contains(LiteRTLmProvider.IDENTITY_LINE)
+        assertThat(armed).contains("Do not call web_search/web_fetch")
+        assertThat(armed).contains("Treat each new user message on its own")
     }
 
     // ------------------------------------------------------------------

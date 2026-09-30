@@ -107,7 +107,20 @@ class LiteRTLmProvider @Inject constructor(
                 "Answer with the gathered context. " +
                 "Treat each new user message on its own: if it needs facts not covered " +
                 "by earlier tool results, call web_search again instead of answering " +
-                "from stale results."
+                "from stale results. " +
+                "Do not call web_search/web_fetch for greetings, thanks, or " +
+                "questions about yourself."
+
+        /**
+         * Quick-task (needs-web-gate): local identity line. Set as
+         * `systemInstruction` on EVERY local turn (armed or not) so the
+         * ~2B model can answer "quién eres" from prompt — ungrounded turns
+         * carry no other persona today. Static: the display name is not
+         * trivially available at this layer. Remote providers untouched
+         * (local-only by design — see plan SUMMARY follow-up).
+         */
+        const val IDENTITY_LINE =
+            "You are Warped, a mobile AI assistant running locally."
 
         /** `ToolCompleted` transcript summary cap (≤200 chars, remote parity). */
         const val TRANSCRIPT_SUMMARY_MAX_CHARS = 200
@@ -314,13 +327,14 @@ class LiteRTLmProvider @Inject constructor(
                 // 47 precedent: FRESH ToolSet instances per creation — never singletons.
                 tools = listOf(tool(WebSearchToolSet()), tool(WebFetchToolSet())),
                 automaticToolCalling = false,
-                systemInstruction = Contents.of(TOOL_USE_SYSTEM_HINT),
+                systemInstruction = Contents.of("$IDENTITY_LINE $TOOL_USE_SYSTEM_HINT"),
                 extraContext = emptyMap()
             )
         } else {
             ConversationConfig(
                 initialMessages = historyMessages,
                 samplerConfig = samplerConfig,
+                systemInstruction = Contents.of(IDENTITY_LINE),
                 extraContext = emptyMap()
             )
         }
