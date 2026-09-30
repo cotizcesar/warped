@@ -54,11 +54,3 @@ jobs:
           else
             echo "track=$BRANCH" >> "$GITHUB_OUTPUT"
           fi
-
-      - name: Upload to Google Play Store
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-          packageName: com.warped.app
-          releaseFiles: app/build/outputs/bundle/release/app-release.aab
-          tracks: ${{ steps.track.outputs.track }}
