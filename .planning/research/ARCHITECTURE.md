@@ -1,241 +1,238 @@
-# Architecture Research: Web Grounding v2 (multi-URL, previews, per-chat toggle, offline retry)
+# Architecture Research: v2.5 Play Compliance + Leaks
 
-**Domain:** Android LLM chat app (Warped) — grounding subsystem extension
-**Researched:** 2026-09-28
-**Confidence:** HIGH (all claims verified against the live codebase in `app/src/main/java/com/warped/`)
+**Domain:** Android LLM chat app (Warped) — Play-compliance + memory-leak milestone on existing codebase
+**Researched:** 2026-09-30
+**Confidence:** HIGH (all structural claims verified against the live codebase; Android 16/16KB claims from official developer.android.com docs fetched same day)
 
 ## Standard Architecture
 
-### System Overview — grounding v1 as built (v2.2, Phase 50)
+### System Overview — what v2.5 touches (and what it doesn't)
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  UI layer (Compose + ChatViewModel)                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────────┐   │
-│  │ ChatScreen   │  │ MessageBubble│  │ SettingsScreen/toggle │   │
-│  │ fetch chip   │  │ Fuentes list │  │ (global default-ON)   │   │
-│  │ (isFetching- │  │ + ModelOnly  │  │                       │   │
-│  │  Web)        │  │ Banner       │  │                       │   │
-│  └──────┬───────┘  └──────┬───────┘  └───────────┬───────────┘   │
-│         │ StateFlow       │ ephemeral fields     │ DataStore     │
-├─────────┴─────────────────┴──────────────────────┴──────────────┤
-│  Orchestration (ChatViewModel.sendMessage, lines 269–297)        │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │ detect → fetch → augment (sequential, inside turn scope)  │  │
-│  └──────┬──────────────┬───────────────┬──────────────────────┘  │
-│         │              │               │                          │
-├─────────┴──────────────┴───────────────┴──────────────────────────┤
-│  Data layer — data/grounding/ (pure Kotlin + 1 Android class)     │
-│  ┌──────────┐ ┌──────────────┐ ┌───────────────┐ ┌────────────┐  │
-│  │UrlDetector│ │WebPageFetcher│ │HtmlToTextExtr.│ │Grounding-  │  │
-│  │firstUrl() │ │fetch(url)    │ │extract() 4K   │ │Prompt+     │  │
-│  │(JVM-pure) │ │(IO+OkHttp)   │ │(JVM-pure)     │ │Sanitizer   │  │
-│  └──────────┘ └──────────────┘ └───────────────┘ └────────────┘  │
+┌──────────────────────────────────────────────────────────────────┐
+│  BUILD LAYER (16KB work lives here — zero Kotlin changes)         │
+│  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────┐   │
+│  │ AGP 9.3.0    │  │ packaging{}  │  │ deps' .so files        │   │
+│  │ (≥ 8.5.1 ✓)  │  │ legacy=false │  │ LiteRT 0.17.1 / SQLCipher│
+│  │ 16KB zip-    │  │ uncompressed │  │ verify alignment,      │   │
+│  │ align default│  │ .so ✓        │  │ never rebuild          │   │
+│  └──────────────┘  └──────────────┘  └────────────────────────┘   │
 ├──────────────────────────────────────────────────────────────────┤
-│  Keystone + persistence (UNCHANGED by v2)                         │
-│  ┌──────────────────┐  ┌──────────────┐  ┌──────────────────┐    │
-│  │ LlmModelHelper   │  │ Room v14     │  │ AdvancedPrefs    │    │
-│  │ runInference()   │  │ messages/    │  │ web_grounding_   │    │
-│  │ (prompt in/out)  │  │ conversations│  │ enabled (global) │    │
-│  └──────────────────┘  └──────────────┘  └──────────────────┘    │
+│  MANIFEST + OS BEHAVIOR LAYER (API 36 audit lives here)           │
+│  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────┐   │
+│  │ targetSdk 36 │  │ WorkManager  │  │ MainActivity/NavGraph  │   │
+│  │ ALREADY set  │  │ download FGS │  │ edge-to-edge / back    │   │
+│  │ (audit only) │  │ dataSync ✓   │  │ handling verify/fix    │   │
+│  └──────────────┘  └──────────────┘  └────────────────────────┘   │
+├──────────────────────────────────────────────────────────────────┤
+│  APP RUNTIME (leak audit lives here — existing layers, no new)    │
+│  ┌──────────────────┐  ┌──────────────┐  ┌───────────────────┐    │
+│  │ Singletons       │  │ ChatViewModel│  │ Network singletons│    │
+│  │ EngineManager →  │  │ generationJob│  │ base / sse /      │    │
+│  │ LiteRTLmEngine → │  │ retryJob,    │  │ tavily / Coil     │    │
+│  │ native Engine +  │  │ shareIn turn │  │ OkHttp clients +  │    │
+│  │ openSessions set │  │ scope, flows │  │ callbackFlow SSE  │    │
+│  └──────────────────┘  └──────────────┘  └───────────────────┘    │
+│  ┌────────────────────────────────────────────────────────────┐   │
+│  │ Compose (ChatScreen, sheets, OgSourceCard, MarkdownText)   │   │
+│  │ collectAsStateWithLifecycle ✓ / DisposableEffect audit     │   │
+│  └────────────────────────────────────────────────────────────┘   │
+├──────────────────────────────────────────────────────────────────┤
+│  OBSERVABILITY (NEW — debug builds only, zero release footprint)  │
+│  ┌────────────────────────────────────────────────────────────┐   │
+│  │ LeakCanary 2.14 + plumber-android (debugImplementation)    │   │
+│  │ auto-installs via App Startup; no code, no Hilt binding    │   │
+│  └────────────────────────────────────────────────────────────┘   │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-Key v1 invariants that v2 must preserve:
-1. **Providers unchanged.** Grounding is prompt-prefix augmentation (`GroundingPrompt.augment`), applied to the current user turn's outgoing `ChatRequest` only. `LlmModelHelper.runInference` receives a longer string — no interface change, no helper change.
-2. **History keeps originals.** Persisted `MessageEntity.content` is the user's raw text; the augmented text exists only in `requestMessages` (ChatViewModel lines 376–381). v2 must keep this: fused blocks never persist into history.
-3. **`activeCall` cancel discipline.** `WebPageFetcher.cancel()` + `stopResponse()` + `generationJob.cancel()` run together in both the new-turn pre-cancel (lines 255–259) and `stopGeneration()` (lines 521–537). Multi-fetch must extend this to N calls, not bypass it.
-4. **Auth isolation.** The fetcher's OkHttp client strips `AuthInterceptor` (WebPageFetcher lines 48–59) so endpoint API keys never leak to arbitrary fetched hosts. Any new fetch path (parallel client, WorkManager retry) must reuse this derived client or re-apply the strip.
+The single most important architectural fact for this milestone: **there is no new feature subsystem.** All three workstreams integrate into seams that already exist:
+
+1. **16KB** integrates at the *build/packaging* seam only. The app ships **zero first-party native code** (no `src/main/cpp/`, no CMake, no `ndkVersion` anywhere in Gradle files — verified by grep). Every `.so` in the APK arrives inside a dependency AAR — primarily `litertlm-android:0.17.1` (`liblitertlm_jni.so` + GPU delegate libs + `libcdsprpc.so` for the NPU path) and SQLCipher (`libsqlcipher.so`). Therefore no `LOCAL_LDFLAGS` / `target_link_options` changes exist to make; the work is **verify → escalate-or-bump → test on 16KB image**.
+2. **API 36** integrates at the *manifest + WorkManager + navigation* seams, and the codebase is already most of the way there: `compileSdk = 36`, `targetSdk = 36` are set in `app/build.gradle.kts`; `POST_NOTIFICATIONS` runtime request exists in `MainActivity`; `SCHEDULE_EXACT_ALARM` is declared; the download worker already runs as a `dataSync` foreground service (`SystemForegroundService` merge in the manifest). What remains is a **behavior-change audit**, not a migration.
+3. **Leak fixes** integrate *inside* existing components (no new layers, no new repositories). The fix surface is: singleton native-handle lifecycle, ViewModel job/flow discipline, OkHttp client/stream lifecycle, Compose effect/collector discipline, grounding-pipeline coroutine scopes. LeakCanary itself is a **debug-only observer** — it adds no architecture, only visibility.
 
 ### Component Responsibilities
 
-| Component | Responsibility | Typical Implementation in this codebase |
-|-----------|----------------|------------------------------------------|
-| `UrlDetector` | URL extraction from user text | `object`, JVM-pure, regex; v1 = `firstUrl()` only |
-| `WebPageFetcher` | Bounded network fetch + extract + sanitize + block build | `@Singleton`, `Dispatchers.IO`, manual redirects, 64 KB cap, single `activeCall` |
-| `GroundingPrompt` | `[WEB CONTEXT]` block construction + prefix augmentation | `object`, JVM-pure; v1 single-source `buildBlock(url, text)` hardcodes `[1]` |
-| `GroundingResult` | Fetch outcome type | `sealed interface`: `Grounded(block, url)` / `ModelOnly(reason)` |
-| `ChatViewModel` turn hook | Detect→fetch→augment orchestration, toggle snapshot, state flags | Coroutine in `sendMessage`; `webGroundingEnabled` volatile snapshot from DataStore |
-| `ChatInputState.isFetchingWeb` | Transient fetch indicator | Chip in `ChatScreen` bottomBar; never persisted |
-| `ChatMessage.groundedSources/modelOnlyNotice` | Ephemeral per-message grounding state | Domain-only fields; `EntityMappers` maps field-by-field so they never reach Room |
-| `AdvancedPreferences.webGroundingEnabled` | Global default-ON toggle | DataStore boolean, default `true` |
+| Component | Responsibility | Implementation in this codebase |
+|-----------|----------------|---------------------------------|
+| AGP + `packaging.jniLibs` | 16KB zip-alignment of uncompressed `.so` | AGP 9.3.0 (≥ 8.5.1 requirement ✓); `useLegacyPackaging = false` already (verified `app/build.gradle.kts` lines 81–84). **No change needed.** |
+| Dependency AAR `.so` files | 16KB ELF-alignment (`LOAD align 2**14`) | Owned by Google (LiteRT-LM) / Zetetic (SQLCipher). Warped's only lever is version bumps. **Verify, don't rebuild.** |
+| `AndroidManifest.xml` | API 36 declarations | `targetSdk 36` via Gradle; FGS `dataSync` service merge; native-lib `required="false"` entries. May gain `enableOnBackInvokedCallback` decision (see Pattern 2). |
+| `ModelDownloadWorker` / `ModelBenchmarkWorker` | Deferrable work under Android 16 JobScheduler quotas | Download worker already foreground + `dataSync` (exempt path). Benchmark worker is the audit target for quota-stop handling (`WorkInfo.getStopReason()` logging). |
+| `MainActivity` + `NavGraph` | Edge-to-edge, predictive back | Audit: confirm no `windowOptOutEdgeToEdgeEnforcement` usage (attr is dead on target-36/API-36); confirm back handling uses supported APIs or opt out. |
+| `EngineManager` → `LiteRTLmEngine` → native `Engine` | Native handle lifecycle (largest leak surface) | `@Singleton` chain; `openSessions` tracking + ordered close (sessions → engine) already exists; `ioScope` is never cancelled (singleton-scoped — acceptable, document). |
+| `ChatViewModel` | Turn-scoped job/flow lifecycle | `generationJob` + `retryJob` with pre-cancel discipline (lines ~377–391, ~1266–1287); per-turn `shareIn` scoped to the generation job (line ~904); `onCleared()` exists (line ~1919 — audit its body). |
+| `LMStudioProvider` / `LmStudioHelper` / remote providers | SSE `Call` + `callbackFlow` lifecycle | `activeCall` AtomicReference + `callHook` + `onCompletion` null-out already in `LmStudioHelper`; `callbackFlow` in `LMStudioProvider` (line ~278) is the `awaitClose` audit target. |
+| OkHttp clients (`NetworkModule` + Coil) | Connection/client lifecycle | 4 clients: base, `@Named("sse")` (50 MB cache), `@Named("tavily")`, Coil bare client in `WarpedApplication.newImageLoader`. All `@Singleton`/singleton-factory — pools live for app lifetime by design. |
+| `WebPageFetcher` + `MultiUrlFetcher` + search repos | Grounding fetch scope lifecycle | `activeCalls` ConcurrentHashMap registry + `cancel()` already; audit: parallel fan-out children must die with the turn scope, never `GlobalScope`. |
+| Compose screens | Collector/effect discipline | `collectAsStateWithLifecycle` used throughout (ChatScreen, PromptLab, Benchmark, Wizard ✓); `DisposableEffect` observer properly removed ✓; `DisposableEffect(Unit) { unloadLocalModels() }` in ChatScreen is a *correctness* smell to review (model unload on composition leave), not a leak per se. |
+| LeakCanary 2.14 + plumber (sibling STACK.md decision) | Debug-only leak detection + framework-leak plumber | `debugImplementation` only; auto-installs via App Startup provider; no Hilt module, no Application code. |
 
 ## Recommended Project Structure
 
+No new packages. v2.5 adds at most debug scaffolding and fix-local code inside existing files:
+
 ```
-app/src/main/java/com/warped/
-├── data/grounding/              # EXTEND — stays the grounding home
-│   ├── UrlDetector.kt           # MODIFY — firstUrl() → extractUrls(limit=5)
-│   ├── WebPageFetcher.kt        # MODIFY — single Call → parallel fetchAll()
-│   ├── GroundingOrchestrator.kt # NEW — parallel fan-out + fusion + budget (see below)
-│   ├── GroundedSource.kt        # NEW — per-source value type (url, title, excerpt, status)
-│   ├── GroundingPrompt.kt       # MODIFY — buildBlock() gains multi-source builder
-│   ├── GroundingResult.kt       # MODIFY — Grounded gains List<GroundedSource>
-│   ├── HtmlToTextExtractor.kt   # MODIFY only if research picks robust extractor
-│   ├── WebContextSanitizer.kt   # REUSE as-is (per-source sanitize, unchanged)
-│   └── GroundingRetryWorker.kt  # NEW — WorkManager offline-retry (or data/local/download/ neighbor)
-├── data/local/db/
-│   ├── entity/
-│   │   ├── ConversationEntity.kt  # MODIFY — add web_grounding_mode column (v15 migration)
-│   │   └── GroundedSourceEntity.kt# NEW — cached source previews (only if previews persist)
-│   ├── dao/
-│   │   └── GroundedSourceDao.kt   # NEW — only with the entity above
-│   ├── AppDatabase.kt             # MODIFY — version 14 → 15, register entity
-│   └── Migrations.kt              # MODIFY — MIGRATION_14_15 (ALTER + CREATE, manual style)
-├── domain/model/
-│   ├── ChatMessage.kt             # MODIFY — groundedSources: List<String> → List<GroundedSource>
-│   └── Conversation.kt            # MODIFY — add webGroundingMode (per-chat override)
-├── domain/repository/
-│   └── GroundingRepository.kt     # NEW — interface: fetchParallel(), sourcesFor(), retryEnqueue()
-├── ui/chat/
-│   ├── ChatViewModel.kt           # MODIFY — turn hook calls orchestrator; per-chat toggle resolution
-│   ├── ChatUiState.kt             # MODIFY — ChatInputState gains preview/selection state
-│   ├── ChatScreen.kt              # MODIFY — per-chat toggle affordance + preview entry point
-│   └── components/
-│       ├── MessageBubble.kt       # MODIFY — Fuentes list becomes tappable preview rows
-│       └── SourcePreviewSheet.kt  # NEW — ModalBottomSheet rendering cached extracted text
+app/
+├── build.gradle.kts                  # MODIFY (maybe) — LeakCanary debugImplementation lines only;
+│                                     #   16KB needs NO build change (AGP 9.3 + legacy=false already)
+├── src/main/AndroidManifest.xml      # MODIFY (maybe) — enableOnBackInvokedCallback decision;
+│                                     #   NEVER add android:pageSizeCompat (would mask misalignment)
+├── src/main/java/com/warped/
+│   ├── data/local/inference/
+│   │   ├── EngineManager.kt          # MODIFY (fix) — unload/close discipline gaps only
+│   │   └── LiteRTLmEngine.kt         # MODIFY (fix) — session/engine close ordering gaps only
+│   ├── data/remote/provider/
+│   │   ├── LMStudioProvider.kt       # AUDIT — callbackFlow awaitClose
+│   │   └── LmStudioHelper.kt         # AUDIT — activeCall null-out (already present, verify)
+│   ├── data/grounding/               # AUDIT — scope discipline (no GlobalScope, turn-bound)
+│   ├── di/NetworkModule.kt           # AUDIT — client singleton-ness (already @Singleton, verify Coil)
+│   ├── ui/chat/
+│   │   ├── ChatViewModel.kt          # MODIFY (fix) — onCleared body, job null-outs, shareIn scope
+│   │   └── ChatScreen.kt             # AUDIT — DisposableEffect review
+│   └── WarpedApplication.kt          # UNCHANGED — Coil factory already singleton-scoped
+└── scripts/
+    └── verify-16kb.sh                # NEW (optional) — check_elf_alignment + zipalign gate for CI
 ```
 
 ### Structure Rationale
 
-- **`data/grounding/` stays the home.** v1 deliberately co-located all six files there with zero new dependencies. v2 adds two files (`GroundingOrchestrator`, `GroundedSource`) in the same package rather than a new top-level module — the pipeline is still one bounded subsystem, and Hilt bindings stay trivial (`@Singleton` orchestrator injecting the existing fetcher + OkHttp client).
-- **Orchestrator, not ViewModel fan-out.** The parallel-fetch + fusion logic (per-URL timeout, truncation budgeting, partial-failure policy) is pure concurrency + string policy — unit-testable on the JVM. Putting `async` fan-out directly in `ChatViewModel.sendMessage` would entangle it with the turn's `generationJob` cancellation and make it untestable without Hilt. A `GroundingOrchestrator` with a `suspend fun ground(text, budget): GroundingResult` signature keeps the ViewModel hook a 10-line call site, mirroring how v1 isolated `HtmlToTextExtractor`/`GroundingPrompt` as pure objects.
-- **Repository interface only if previews persist.** If source previews are served from the in-memory `GroundedSource` list carried on `ChatMessage` (ephemeral, like v1's `groundedSources`), no repository is needed. Introduce `GroundingRepository` + Room entity only when the decision is "previews survive process death / history reload" — that is the single branching decision that changes the schema surface (see Data Flow §2).
-- **Migration style follows precedent.** `Migrations.kt` documents why manual `Migration(13,14)` replaced AutoMigration (missing `app/schemas/` JSONs break KSP). v15 must follow the manual pattern: `ALTER TABLE conversations ADD COLUMN web_grounding_mode …` + optional `CREATE TABLE grounded_sources`.
+- **No new production packages** because none of the three workstreams introduces a capability — 16KB is a packaging property, API 36 is behavioral conformance, leaks are lifecycle corrections. A new `util/leaks/` or `di/LeakModule` would be pure ceremony; LeakCanary needs no binding.
+- **Fixes land at the owner, not in a central "leak fixer."** The codebase already follows single-owner discipline (48-01 sub-states, per-component cancel methods). Each leak fix is a 5–20 line change inside the owning component (null the `Call` ref, close the session, scope the `shareIn`). Centralizing would break the ownership pattern that makes the current discipline work.
+- **The one permissible NEW file is a verification script**, not app code: a `verify-16kb.sh` wrapping `check_elf_alignment.sh` + `zipalign -c -P 16` so CI gates alignment on every release build. This is build tooling, invisible to the app architecture.
 
 ## Architectural Patterns
 
-### Pattern 1: Bounded parallel fan-out with supervisor + per-source budget
+### Pattern 1: Verify-don't-rebuild for transitive native code
 
-**What:** Replace the sequential single `fetcher.fetch(url)` call with a `coroutineScope { urls.map { async { fetchOne(url) } }.awaitAll() }` fan-out inside the orchestrator, where each child has its own timeout derived from the v1 20 s call budget (e.g. 20 s wall-clock total via `withTimeout`, children share the scope so the first failure never cancels siblings — use `supervisorScope` or per-child `try/catch` returning a failure value, never throwing).
-**When to use:** The multi-URL turn hook. This is the core v2 data-path change.
-**Trade-offs:** + latency is max(slowest) not sum; partial success (2/3 pages) still grounds. − N concurrent sockets need a dispatcher cap (`Dispatchers.IO.limitedParallelism(3)` or a `Semaphore(3)`) so a 5-URL message on a slow radio doesn't saturate the pool; each child reuses the same stripped OkHttp client (connection pool shared, AuthInterceptor still stripped).
+**What:** For 16KB, treat every `.so` as a third-party artifact: extract the APK/AAB, run `check_elf_alignment.sh` + `zipalign -c -P 16`, and map each `UNALIGNED` library back to its Maven dependency. The only fixes available at Warped's layer are (a) bump the dependency to a 16KB-aligned release, or (b) file/escalate upstream. There is no CMake/ndk-build file in this repo to add linker flags to.
+**When to use:** The entire 16KB workstream.
+**Trade-offs:** + zero app-code risk; aligns with Google's own guidance ("update tools + use 16KB-compatible prebuilt dependencies → compatible by default"). − if LiteRT-LM 0.17.1 ships an unaligned `.so`, Warped is blocked on Google's release train; mitigation is the documented 16KB backcompat mode (works but shows a system dialog and is explicitly second-best) — never set `android:pageSizeCompat` in the manifest to silence it, since that hides the debt instead of tracking it.
+
+**Example:**
+```bash
+# verify-16kb.sh sketch (CI gate on release APK)
+unzip -o app-release.apk -d /tmp/warped_apk
+./check_elf_alignment.sh app-release.apk          # expect ALIGNED for arm64-v8a
+zipalign -c -P 16 -v 4 app-release.apk            # expect "Verification successful"
+adb shell getconf PAGE_SIZE                       # 16384 on the 16KB test image
+```
+
+### Pattern 2: API-36 audit as allowlist — assert each behavior change, change as little as possible
+
+**What:** Walk the two official behavior-change lists and record a disposition per item against the current code, defaulting to "already conformant, verified by X." From this research, the dispositions are:
+- *All-apps / JobScheduler quotas* → download worker already foreground `dataSync`; **benchmark worker** is the one component that must log `WorkInfo.getStopReason()` and tolerate quota stops. Only fix if observed.
+- *All-apps / 16KB compat mode* → converges with Pattern 1; no manifest property.
+- *Target-36 / edge-to-edge opt-out removed* → target-35 already enforced edge-to-edge; grep for `windowOptOutEdgeToEdgeEnforcement` and delete any use (the attribute is silently ignored on API 36, so stale uses are dead weight, not crashes).
+- *Target-36 / predictive back* → if back handling uses only NavController/`OnBackPressedDispatcher` with supported APIs, no change; only if custom `onBackPressed`/key interception exists, either migrate or set `android:enableOnBackInvokedCallback="false"` as a deliberate, documented deferral.
+- *Target-36 / `scheduleAtFixedRate` single-catch-up* → grep scheduled executors (`MemorySampler`, benchmark sampling); only matters if code counts missed executions.
+- *Local Network Permission* → **opt-in phase only, not enforced**; Ollama/LM Studio-on-LAN and Tavily flows need no permission code today. Record as monitored future work, do not add `NEARBY_WIFI_DEVICES` permission requests now (would confuse users for zero benefit).
+- *Intent hardening / Safer Intents* → Warped's `BrowserIntents` (external browser opens) and share intents are standard explicit intents; no `removeLaunchSecurityProtection` needed; do not opt into `enforceIntentFilter` prematurely.
+**When to use:** The whole API-36 workstream — it is a checklist with evidence, not a refactor.
+**Trade-offs:** + minimal diff, minimal regression risk on a shipped app. − requires real-device/API-36-emulator verification per item; emulator-only gaps must be recorded as release-UAT items (house precedent: v2.2/v2.3/v2.4 all carry device-smoke deferrals).
+
+### Pattern 3: Turn-scoped structured concurrency for every cancellable stream
+
+**What:** Every streaming resource (inference tokens, SSE `Call`s, grounding fetch fan-out, retry jobs) is owned by exactly one coroutine scope whose lifetime equals one chat turn (`generationJob`), and every handle is nulled/closed on all three exit paths: new-turn pre-cancel, Stop, `onCleared`. This pattern is **already the codebase norm** (`generationJob` + `fetcher.cancel()` + `stopResponse()` triple-cancel; `shareIn(this, …)` scoped to the generation job at ChatViewModel ~line 904; `activeCall` AtomicReference with `onCompletion` null-out in `LmStudioHelper`). The leak audit's job is to *verify completeness* of this pattern at each site and close the gaps ( научной: `callbackFlow` without `awaitClose { call.cancel() }`, sessions created but never closed, jobs nulled on some paths but not others).
+**When to use:** All leak fixes in chat, providers, and grounding.
+**Trade-offs:** + consistent with the v2.1 CR-02 interleaving fix and v2.4 channel-hygiene work — reviewers already know the shape. − the triple-exit-path discipline is easy to regress; each fix should add or extend a unit test asserting cancel/close (e.g. "stop cancels all activeCalls", "close() with live sessions releases sessions first").
 
 **Example:**
 ```kotlin
-// GroundingOrchestrator (data/grounding/) — sketch, JVM-testable minus fetcher fake
-suspend fun ground(text: String, maxUrls: Int = 5): GroundingResult = supervisorScope {
-    val urls = UrlDetector.extractUrls(text, maxUrls)
-    if (urls.isEmpty() || !toggleAllows()) return@supervisorScope ModelOnly(SKIPPED)
-    val deferred = urls.map { url ->
-        async(Dispatchers.IO) { runCatching { fetcher.fetchOne(url) }.getOrNull() }
+// Canonical turn-scoped SSE stream (what the audit should confirm everywhere):
+fun stream(url: String): Flow<StreamToken> = callbackFlow {
+    val call = client.newCall(request)
+    activeCall.set(call)
+    try {
+        call.execute().use { response ->   // use{} closes the body on all paths
+            // ... parse SSE, trySend tokens ...
+        }
+    } finally {
+        activeCall.set(null)
     }
-    val sources = withTimeoutOrNull(TOTAL_BUDGET_MS) { deferred.awaitAll().filterNotNull() }
-        .orEmpty()
-    if (sources.isEmpty()) ModelOnly(FETCH_FAILED)
-    else Grounded(GroundingPrompt.buildFusedBlock(sources), sources)
+    awaitClose { call.cancel() }           // THE audit line: must exist
 }
 ```
 
-### Pattern 2: Fuse-then-truncate with numbered citations (context fusion)
+### Pattern 4: Singleton owns native, Application owns pressure signals, nothing else holds either
 
-**What:** `GroundingPrompt` gains `buildFusedBlock(sources: List<GroundedSource>): String` emitting one `[WEB CONTEXT]` envelope containing per-source sections `[1] url + title + excerpt`, `[2] …`. The total fused budget is fixed (recommend: keep v1's ~4000-char extractor output per page, cap the fused block at ~8000 chars by trimming the *longest* excerpts first, never by dropping a cited source silently — if a source is cut, its marker must not appear in the citation list).
-**When to use:** Always for multi-URL turns; single-URL turns should also route through the fused builder with one source so prompt shape is uniform (avoids two prompt formats drifting).
-**Trade-offs:** + uniform prompt shape simplifies eval and the SYSTEM_PROMPT citation contract (`[1]/[2]` markers already exist in v1's SYSTEM_PROMPT). − naive concatenation blows the model's context window on small local models; the fusion budget must be subtracted from `GenerationParameters.contextSize` awareness (at minimum, document the worst-case prefix length; ideally clamp fused chars to a fraction of contextSize).
-
-**Example:**
-```kotlin
-fun buildFusedBlock(sources: List<GroundedSource>): String = buildString {
-    appendLine("[WEB CONTEXT — ${sources.size} fuentes]")
-    sources.forEachIndexed { i, s ->
-        appendLine("[${i + 1}] ${s.url} — ${s.title}")
-        appendLine(WebContextSanitizer.sanitize(s.excerpt))
-    }
-    append("[FIN WEB CONTEXT]")
-}
-```
-
-### Pattern 3: Toggle resolution chain — global default → per-chat override → per-message force
-
-**What:** Three-level resolution computed at turn start: `effective = messageForce ?: conversationOverride ?: globalDefault`. Storage: global stays in `AdvancedPreferences.webGroundingEnabled` (DataStore, default ON — untouched); per-chat override is a new nullable column `web_grounding_mode` on `conversations` (`NULL` = inherit global, `0` = off, `1` = on); per-message force is a transient send-time flag (long-press send / input-bar toggle, never persisted).
-**When to use:** The v2.3 "per-chat toggle" requirement.
-**Trade-offs:** + nullable-column inherit pattern means existing conversations (all rows) automatically follow the global toggle with zero backfill; only explicit overrides write a value. − adds one Room migration (14→15) and a `Conversation` domain-field addition; the ViewModel must load the override when `selectConversation()` runs and clear it in `newConversation()`.
-
-### Pattern 4: Offline retry as WorkManager one-shot with connectivity constraint (not in-turn blocking)
-
-**What:** When the turn-time fetch short-circuits OFFLINE (existing `hasValidatedInternet()` check), the orchestrator records a pending retry record (URLs + conversationId + messageId) and enqueues a `OneTimeWorkRequest` with `Constraints(REQUIRED_NETWORK_TYPE = CONNECTED)`. The worker re-runs `fetchAll()`, writes the fused result into the source store, and posts a notification / updates the message's `modelOnlyNotice` → grounded state via `ChatRepository`. The *original turn still completes model-only immediately* — retry never blocks the chat response.
-**When to use:** The v2.3 "offline retry queue" requirement.
-**Trade-offs:** + follows the codebase's existing WorkManager precedent (`ModelDownloadWorker`, `ModelBenchmarkWorker` with `BenchmarkScheduler`); survives process death; OS-gated on connectivity so no polling. − WorkManager is for deferrable work: retry latency is minutes, not seconds — pair it with a lightweight in-UI "Reintentar" button on the ModelOnly banner for the immediate path (button calls the orchestrator directly, no worker). Both paths must converge on the same `ground()` entry point or behavior drifts.
+**What:** The native `Engine` (hundreds of MB via mmap) is referenced only through the `EngineManager` → `LiteRTLmEngine` `@Singleton` chain; the only lifecycle signals are `Application.onTrimMemory → handleTrimMemory` (already wired, with RUNNING_LOW soft-cap vs RUNNING_CRITICAL unload+evict tiers) and explicit user/model-switch unload. No ViewModel, Composable, or repository may cache `Engine`, `Conversation`, or `modelPath` references beyond the turn. The audit checks for exactly this: any `Conversation` stored outside `openSessions`, any engine handle in a ViewModel field, any `remember {}` holding a session across recompositions.
+**When to use:** Native-side leak audit.
+**Trade-offs:** + single ownership makes the 4 GB-model OOM story tractable (`largeHeap` + `MemoryChecker` gate + trim handling already form a coherent defense). − singleton-scoped `ioScope` (never cancelled) is *by design* but must stay free of per-turn state — a `launch` that captures a `Conversation` or callback there outlives the turn silently.
 
 ## Data Flow
 
-### Request Flow — v2 turn (modified v1 hook)
+### Request Flow — v2.5 adds no data flow
+
+There is deliberately no new data flow in this milestone. The flows the audit traces (to prove nothing is retained) are the existing ones:
 
 ```
-User taps Send (ChatScreen)
-    ↓
-ChatViewModel.sendMessage()
-    ↓ resolve effective toggle (NEW: messageForce ?: conversationOverride ?: globalDataStore)
-    ↓ ensureConversation() → conversationId (UNCHANGED)
-    ↓ saveMessage(original user text) (UNCHANGED — history keeps originals)
-    ↓ GroundingOrchestrator.ground(text) (MODIFIED hook, was fetch-single)
-    │     ├─ UrlDetector.extractUrls(text, max 5) (MODIFIED: firstUrl → list)
-    │     ├─ supervisorScope fan-out: N × WebPageFetcher.fetchOne (MODIFIED: activeCall → call registry)
-    │     ├─ per-source extract (HtmlToTextExtractor, REUSE) + sanitize (REUSE)
-    │     └─ GroundingPrompt.buildFusedBlock(sources) (MODIFIED builder)
-    ↓ requestMessages = history.dropLast(1) + last.copy(augmented) (UNCHANGED shape)
-    ↓ helper.initialize(modelId) → helper.runInference(request) (UNCHANGED — providers blind)
-    ↓ Done → assistantMessage.copy(groundedSources = sources, modelOnlyNotice = …)
-    │         (MODIFIED: sources now List<GroundedSource>, persisted per §2 decision)
-    ↓ saveMessage(assistant) (UNCHANGED call, MODIFIED payload)
+[Turn start] ChatViewModel.sendMessage()
+    ↓ generationJob = viewModelScope.launch { ... }   (turn scope — AUDIT: cancelled on all exits?)
+    ↓ fetcher/multiUrlFetcher fan-out                 (AUDIT: children inherit turn scope?)
+    ↓ provider stream (callbackFlow + Call)           (AUDIT: awaitClose cancels Call? body use{}?)
+    ↓ engine.createConversation → Conversation        (AUDIT: session closed before engine close?)
+[Turn end / Stop / new send / onCleared]
+    ↓ fetcher.cancel() + stopResponse() + job.cancel()(AUDIT: all three, all paths?)
+    ↓ activeCall.set(null), openSessions pruned       (AUDIT: no stale handle reuse?)
 ```
 
 ### State Management
 
 ```
-ChatViewModel sub-states (48-01 single-owner discipline PRESERVED):
-  _transcript ← turn boundaries, streaming collector, Done/Error (adds preview-selection? NO —
-                preview sheet state lives in ChatScreen remember{}, not the VM)
-  _input      ← isFetchingWeb (REUSE flag, now covers N-fetch window) + per-message force flag (NEW)
-  _connection ← conversation list (REUSE) + per-chat override for active conversation (NEW field)
-DataStore     ← global default (REUSE, untouched)
-Room          ← conversations.web_grounding_mode (NEW col) + grounded_sources table (NEW, conditional)
-WorkManager   ← retry queue (NEW worker, observed via WorkInfo → banner "reintentando" state)
+LeakCanary (debug only) observes; fixes change ownership discipline, not state shape:
+  _transcript / _input / _connection (48-01 single-owner) — UNCHANGED shape
+  generationJob / retryJob nullable handles            — FIX: null-out verified on every path
+  openSessions set in LiteRTLmEngine                   — FIX: close-before-engine invariant kept
+  activeCalls registry / activeCall ref                — FIX: cancel + null verified
+  OkHttp pools/caches (app-lifetime singletons)        — NO CHANGE (by design)
+  Coil memory (25%) + disk (50 MB og_thumbnails)       — NO CHANGE; trim handled by Coil internally
 ```
 
 Key state decisions:
-1. **Preview content does NOT go through the ViewModel.** The `GroundedSource` list already rides on `ChatMessage` (in-memory after the domain-type change). Tapping a Fuentes row opens `SourcePreviewSheet` reading `message.groundedSources[i]` directly — no new StateFlow, no re-fetch. This respects the 48-01 single-owner rule (no new writer groups on `_transcript`).
-2. **Preview persistence is the schema fork.** Option A (recommended): previews are ephemeral — history reload shows Fuentes URLs but preview re-fetches on demand (tap → `fetchOne(url)` live, with offline error). Zero new tables, zero migration beyond the toggle column. Option B: persist extracted excerpts in `grounded_sources` keyed by (url hash + fetched_at) with an LRU/TTL cap — enables offline previews and the retry worker's write path, at the cost of a new entity + DAO + eviction policy. The retry queue *needs* Option B's store (or equivalent) to land results; the preview UI alone does not.
-3. **`isFetchingWeb` semantics widen, not split.** One boolean still covers "grounding in flight" for N fetches (chip copy changes to "Leyendo N páginas…"). Per-source progress (2/5) is a nice-to-have derived from orchestrator progress callbacks — defer unless cheap.
+1. **LeakCanary is debug-only and installs itself.** No `Application.onCreate` code, no Hilt module, no `ContentProvider` entry — `leakcanary-android` ships its own startup provider. Release APK is byte-identical except the absent dependency. (Per sibling STACK.md: `leakcanary-android:2.14` + `plumber-android:2.14`, `debugImplementation`.)
+2. **Heap dumps never leave the device by default.** Large LLM-session heaps may need `shark-cli` off-device analysis (sibling STACK.md) — that is a developer-workstation step, not an app data flow; no new permissions, no upload code.
+3. **`onTrimMemory` tiers stay the memory-pressure contract.** The audit must not "fix" leaks by unloading more aggressively (that would regress the v1.5 "resume without model-not-loaded" requirement). Leak fixes remove *unintended* retention; pressure handling stays as designed.
 
 ## Scaling Considerations
 
 | Scale | Architecture Adjustments |
 |-------|--------------------------|
-| 2–5 URLs/turn (v2.3 scope) | In-scope design above is sufficient: `limitedParallelism(3)`, 20 s total budget, ~8K fused cap. No new deps. |
-| 5+ URLs or whole-page archives | Per-source excerpt budget must shrink (fused cap fixed, more slices); consider hostname dedup and same-article canonicalization before fetch. |
-| Offline-first / metered networks | Retry worker constraints gain `REQUIRES_UNMETERED` opt-in setting; source store gains size cap + TTL eviction (recommend 5 MB / 7 days). |
+| v2.5 scope (one release, existing user base) | No scaling work. 16KB verification is per-APK, API-36 audit is per-behavior, leak fixes are per-site. All linear in the existing codebase. |
+| Future: 16KB-only devices (post Feb-2027 Play gate) | The `verify-16kb.sh` CI gate becomes release-blocking; LiteRT-LM version bumps must re-run it (new AAR = new `.so` set). |
+| Future: local-network permission enforcement | When Google moves LNP from opt-in to enforced, add the Nearby-devices permission flow around LAN endpoint connections only — remote-cloud and on-device paths unaffected. |
 
 ### Scaling Priorities
 
-1. **First bottleneck: prompt prefix vs context window.** Fused multi-source blocks compete with small local-model context sizes (smart presets already tune `contextSize` per device memory). Clamp fused output and log worst-case prefix length per turn (Timber, debug) so truncation bugs are diagnosable.
-2. **Second bottleneck: socket fan-out on slow radios.** 5 parallel fetches × 20 s timeouts on a poor connection delays every grounded turn to the full budget. Mitigate with per-child 8 s connect (reuse v1 values) + total `withTimeoutOrNull` so the turn degrades to partial sources instead of hanging.
+1. **First bottleneck: LiteRT-LM AAR alignment (external dependency).** If `liblitertlm_jni.so` (or its GPU delegate `.so`s) is `UNALIGNED`, Warped cannot ship Play-compliant until Google ships an aligned release. Check this *first* — it is the only item that can block the milestone from outside the repo.
+2. **Second bottleneck: heap-dump size during leak triage.** Debug builds chatting with multi-GB models produce heaps too large for on-device Shark analysis; plan workstation-based `shark-cli` analysis from the start rather than discovering it mid-audit.
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Fetch fan-out directly in the ViewModel with bare `async`
+### Anti-Pattern 1: Adding linker flags / NDK config to "fix" 16KB
 
-**What people do:** `viewModelScope.launch { urls.map { async { fetcher.fetch(it) } } }` inline in `sendMessage`.
-**Why it's wrong:** The turn's `generationJob` cancellation, the Stop path, and the new-turn pre-cancel all assume one cancellable fetch handle; stray `async` children leak past turn boundaries and interleave sources between turns (the exact CR-02 interleaving bug v2.1 fixed for inference). Untestable without Hilt.
-**Do this instead:** Encapsulate fan-out in `GroundingOrchestrator` owning a `CallRegistry` (list of active OkHttp `Call`s, `cancelAll()` mirroring v1's `cancel()`); the ViewModel keeps calling exactly two methods: `orchestrator.ground(…)` and `orchestrator.cancel()`.
+**What people do:** Add `ndkVersion`, CMake `target_link_options(-z max-page-size=16384)`, or `Android.mk` changes to a project with no native sources.
+**Why it's wrong:** There is nothing to compile — every `.so` is prebuilt inside AARs. Linker flags on an empty native build change nothing while creating the illusion of compliance; the Play Console warning would persist.
+**Do this instead:** Verify with `check_elf_alignment.sh` + `zipalign -P 16`; fix by bumping the offending dependency.
 
-### Anti-Pattern 2: Persisting the fused block into message history
+### Anti-Pattern 2: Setting `android:pageSizeCompat` to silence the backcompat dialog
 
-**What people do:** Saving the augmented prompt text (or the full `[WEB CONTEXT]` block) into `MessageEntity.content` so previews "just work" from history.
-**Why it's wrong:** Breaks the v1 invariant that history holds originals — subsequent turns would re-send stale context as user text, citations would compound, and Room rows bloat by KBs per message. `EntityMappers` is field-by-field precisely to prevent this class of leak.
-**Do this instead:** Persist structured `GroundedSource(url, title, excerpt, fetchedAt)` rows (or nothing — Option A), and re-fuse at send time only.
+**What people do:** Add the manifest property so the 16KB compat-mode warning stops appearing during testing.
+**Why it's wrong:** It opts the app into the degraded compat path permanently and hides genuine misalignment from CI and testers. Google's guidance is explicit: align the app; compat mode is a safety net, not a target.
+**Do this instead:** Leave the property unset; treat any compat dialog during testing as a failing test.
 
-### Anti-Pattern 3: Per-chat toggle as a second DataStore key
+### Anti-Pattern 3: "Fixing" leaks by widening unload (aggressive engine eviction)
 
-**What people do:** Storing per-conversation overrides in DataStore (`web_grounding_conv_<id>`) to avoid a migration.
-**Why it's wrong:** DataStore is key-value with no cascade: deleting a conversation orphans its key, listing overrides requires key-prefix scans, and backup/restore diverges from Room. Conversations already live in Room with a migration discipline (v14 precedent).
-**Do this instead:** Nullable `web_grounding_mode` column on `conversations` with `NULL = inherit`; delete cascades free via the existing conversation delete path.
+**What people do:** On finding retained memory, add extra `unloadCurrent()` calls (e.g. on every backgrounding, every navigation).
+**Why it's wrong:** Directly regresses the validated v1.5 requirement "app resumes active chat without model-not-loaded warning after backgrounding" and makes every resume pay a multi-second reload. It treats the symptom (heap size) while the disease (unintended retention) remains.
+**Do this instead:** Remove the unintended reference (scope the job, close the session, null the handle); keep pressure-driven eviction exactly where it is.
 
-### Anti-Pattern 4: Retry worker reusing the endpoint-authenticated OkHttp client
+### Anti-Pattern 4: Leaking the audit into feature refactors
 
-**What people do:** Injecting the base `OkHttpClient` (with `AuthInterceptor`) into the worker for convenience.
-**Why it's wrong:** The v1 fetcher strips `AuthInterceptor` for a reason — retry fetches hit arbitrary hosts, and a tag-mismatch bug would leak the user's LM Studio/API key to a third-party site. Workers run without the turn's endpoint-tag context, making this *more* likely, not less.
-**Do this instead:** Worker injects `WebPageFetcher` (or the shared stripped client provider) — never the raw base client.
+**What people do:** While auditing `ChatViewModel`, "simplify" the turn pipeline, merge `generationJob`/`retryJob`, or rework the grounding orchestration.
+**Why it's wrong:** v2.5 ships conformance + stability on a codebase with 12 shipped milestones. Refactors widen the blast radius and invalidate the device-smoke history (v2.2–v2.4 deferrals assume current structure). The house rule from v2.1 applies: finish what's there before reshaping it.
+**Do this instead:** Minimal diffs at the owning component; each fix paired with a regression test; no signature changes to `LlmModelHelper`, provider interfaces, or Room schema (no migration in this milestone — none is needed).
 
 ## Integration Points
 
@@ -243,38 +240,40 @@ Key state decisions:
 
 | Service | Integration Pattern | Notes |
 |---------|---------------------|-------|
-| Arbitrary web hosts (fetch targets) | Outbound GET via shared stripped OkHttp client, browser UA, `Accept: text/html, text/plain` (REUSE v1 policy) | No new hosts, no API keys; keep 3-redirect cap, scheme allowlist (http/https), content-type gate per fetch, not just per turn |
-| Connectivity (offline detection) | `ConnectivityManager.NET_CAPABILITY_VALIDATED` check (REUSE `hasValidatedInternet`) + WorkManager `NetworkType.CONNECTED` constraint for retries | Turn path stays synchronous-check-then-model-only; worker path is constraint-gated — two mechanisms, same predicate semantics |
-| No new external deps | Heuristic extractor extends in place per research verdict | If research picks robust HTML→text (e.g. Jsoup), it lands as one Gradle dep inside `data/grounding` only — never in UI or domain layers |
+| Google Play Console | 16KB compliance signal + target-36 gate | Play warns on 4KB-only updates targeting API 35+; hard block from Feb-2027. Verification is local (`zipalign -P 16`); Console is the confirm, not the test. |
+| LiteRT-LM Maven (`litertlm-android:0.17.1`) | Transitive `.so` supplier; version-bump lever only | Check its `.so` alignment first (Pattern 1, priority 1). NPU path keeps `libcdsprpc.so required=false`. No JNI code changes in Warped. |
+| SQLCipher (+ other AARs with `.so`) | Same verify-and-bump treatment | Enumerate via APK Analyzer `lib/` folder; every `arm64-v8a` + `x86_64` `.so` must be `ALIGNED`. |
+| Android 16 device / 16KB emulator image | Test environments, not code deps | `adb shell getconf PAGE_SIZE` → `16384`; compat-flag `adb` overrides for quota testing (`OVERRIDE_QUOTA_ENFORCEMENT_TO_TOP_STARTED_JOBS`, `…_TO_FGS_JOBS`). |
 
 ### Internal Boundaries
 
 | Boundary | Communication | New vs modified | Notes |
 |----------|---------------|-----------------|-------|
-| `ChatViewModel → GroundingOrchestrator` | `suspend ground()` + `cancel()` | NEW interface, MODIFIED call site (lines 269–297 replaced by ~10 lines) | Orchestrator is `@Singleton` Hilt; ViewModel keeps toggle-resolution + request assembly |
-| `Orchestrator → WebPageFetcher` | `suspend fetchOne(url): FetchedSource?` (refactored inner step of v1 `fetch`) | MODIFIED (extract method, add call registry) | v1 `fetch(url): GroundingResult` becomes a 1-URL convenience over `fetchAll`; existing unit tests keep passing |
-| `UrlDetector` | `firstUrl()` → `extractUrls(text, limit)` | MODIFIED (additive; keep `firstUrl` delegating) | Pure Kotlin, JVM tests extend naturally |
-| `GroundingPrompt` | `buildBlock()` + `buildFusedBlock()` | MODIFIED (additive; single-URL routes through fused builder) | SYSTEM_PROMPT citation contract already covers `[1]/[2]` — verify wording scales to `[5]` |
-| `ChatMessage.groundedSources` | `List<String>` → `List<GroundedSource>` | MODIFIED domain type | Ephemeral invariant preserved; `EntityMappers` untouched unless Option B persists |
-| `Conversation` + `conversations` table | `webGroundingMode: Boolean?` + `MIGRATION_14_15` | MODIFIED (+1 nullable col, default NULL) | `ConversationDao` gains `setWebGroundingMode(id, mode)`; `ChatRepository` exposes override get/set |
-| `MessageBubble Fuentes` → preview | Clickable rows → `SourcePreviewSheet` | MODIFIED list + NEW sheet | Sheet reads in-memory excerpts; stateless, no VM involvement |
-| `ModelOnlyBanner` → retry | "Reintentar" button (immediate) + worker status (deferred) | MODIFIED banner | Immediate path calls `viewModel.retryGrounding(messageId)`; deferred path observes `WorkInfo` |
-| `LlmModelHelper` + providers | No change | UNCHANGED (explicit non-goal) | Fusion output is a longer prompt string; helpers remain blind — state this in the phase plan so nobody "improves" the interface |
-| `AdvancedPreferences` global toggle | No change | UNCHANGED | Becomes the inherit-default; Settings UI untouched |
+| Gradle build ↔ APK `.so` set | `check_elf_alignment` + `zipalign` gate | NEW script (optional), MODIFIED nothing | Zero app-code impact; CI-gate candidate. |
+| Manifest ↔ Android 16 OS | `targetSdk 36` (set), FGS type (set), back-callback decision | MODIFIED at most 1 attr | No new permissions in v2.5 (LNP not enforced; notifications/alarms already declared). |
+| WorkManager ↔ JobScheduler quotas | `getStopReason()` logging | MODIFIED benchmark worker only if gaps found | Download worker already foreground-exempt. |
+| `Application` ↔ `EngineManager` | `onTrimMemory` tiers | UNCHANGED | Audit must preserve; not a leak-fix lever. |
+| `EngineManager` ↔ `LiteRTLmEngine` ↔ native | `init` / `createConversation` / ordered `close` | MODIFIED (fix-only, close/session gaps) | No interface change; `LlmModelHelper` untouched. |
+| `ChatViewModel` ↔ providers ↔ grounding | Turn scope + cancel triple | MODIFIED (fix-only, scope/handle gaps) | No pipeline rework (Anti-Pattern 4). |
+| LeakCanary ↔ everything | Debug-only observation | NEW dependency, ZERO integration code | Auto-install; release footprint nil. |
+| Room schema (v16) | No migration | UNCHANGED (explicit non-goal) | Stating so the phase plan doesn't invent one. |
 
 ## Suggested Build Order (dependency-gated)
 
-1. **Foundation: multi-URL fetch + fusion (no UI).** `UrlDetector.extractUrls` → `WebPageFetcher.fetchOne` + call registry → `GroundingOrchestrator.ground` → `GroundingPrompt.buildFusedBlock` → rewire `ChatViewModel` hook. Deliverable: 2–5 URL turns ground with fused context; chip copy counts pages; Stop cancels all. All JVM-testable except the hook. *Unblocks everything below.*
-2. **Source store + preview UI.** `GroundedSource` domain type → `ChatMessage` field migration → tappable Fuentes rows → `SourcePreviewSheet`. Decide Option A (ephemeral) vs B (Room persist) at plan time; A ships in this step alone, B adds entity/DAO here. *Depends on 1 (needs the `List<GroundedSource>` shape).*
-3. **Per-chat toggle.** `MIGRATION_14_15` (`web_grounding_mode`) → `Conversation` field → repository methods → ViewModel resolution chain → chat-surface toggle affordance (input-bar or conversation menu — plan-time UI call). *Independent of 2 except for shared `ChatViewModel` touchpoints; can parallelize after 1 lands.*
-4. **Offline retry queue.** Pending-retry record → `GroundingRetryWorker` + constraints → banner "Reintentar" immediate path + worker-status observation. *Depends on 1 (shared `ground()` entry) and on the 2-schema decision (where results land). Build last.*
+1. **16KB dependency verification (blocks Play submission — do first).** Extract release APK → `check_elf_alignment.sh` → attribute every `.so` to its AAR → `zipalign -P 16` → record aligned/misaligned per dependency. If LiteRT-LM 0.17.1 (or SQLCipher) is misaligned: bump-or-escalate decision before anything else. *No code; unblocks the release regardless of what follows.*
+2. **API-36 behavior-change audit with evidence.** Walk the all-apps + target-36 lists (Pattern 2 dispositions), verifying each against code + API-36 emulator/device. Land the small fixes (edge-to-edge dead attr, back-callback decision, benchmark stop-reason logging) as they are found. *Depends on nothing; parallelizable with 1.*
+3. **LeakCanary instrumentation + guided audit.** Add the two `debugImplementation` lines (sibling STACK.md), run the scripted leak tour (cold start → load model → chat turns → Stop mid-stream → model switch → grounding turns → OG thumbnails → background/foreground → endpoint CRUD), triage heap dumps per layer (native → VM → network → Compose). *Depends on 1–2 only for scheduling (needs a runnable API-36/16KB build to be meaningful); technically independent.*
+4. **Fix → regression-test → re-verify loop, per owning component.** Each fix at its owner with a cancel/close unit test; full `289+`-style unit gate + release assemble green; close with a 16KB-image + API-36-device smoke (fold into the existing release-UAT deferral pattern if hardware is unavailable).
 
 ## Sources
 
-- Live codebase (HIGH): `data/grounding/{UrlDetector,WebPageFetcher,GroundingPrompt,GroundingResult,HtmlToTextExtractor,WebContextSanitizer}.kt`; `ui/chat/ChatViewModel.kt` (turn hook lines 269–297, cancel lines 255–259/521–537); `ui/chat/{ChatUiState,ChatScreen}.kt`; `ui/chat/components/MessageBubble.kt` (Fuentes/banner); `domain/model/{ChatMessage,Conversation}.kt`; `data/local/{db/{AppDatabase,Migrations,entity/ConversationEntity+MessageEntity+EntityMappers},preferences/AdvancedPreferences.kt,download/ModelDownloadWorker.kt,benchmark/ModelBenchmarkWorker.kt}`; `domain/llm/LlmModelHelper.kt`
-- Codebase precedent for WorkManager deferrable work (MEDIUM — pattern reuse, not a spec): `ModelDownloadWorker` + `BenchmarkScheduler`
-- No web sources consulted — this is an internal-integration analysis; all integration points are intra-repo. Confidence is HIGH for existing-structure claims, MEDIUM for sizing recommendations (fused cap, parallelism limit, TTL) which need device validation in-phase.
+- Official docs (HIGH): `developer.android.com/guide/practices/page-sizes` (Play 16KB requirement for target-35+, Feb-2027 block; AGP ≥ 8.5.1 + NDK r28 default-align; verify via `check_elf_alignment.sh` + `zipalign -P 16`; RELRO check) — fetched 2026-09-30
+- Official docs (HIGH): `developer.android.com/about/versions/16/behavior-changes-all` (JobScheduler quota enforcement, incl. FGS-concurrent jobs; 16KB compat mode + `android:pageSizeCompat`) — fetched 2026-09-30
+- Official docs (HIGH): `developer.android.com/about/versions/16/behavior-changes-16` (edge-to-edge opt-out dead on target-36; predictive-back default + `enableOnBackInvokedCallback` opt-out; `scheduleAtFixedRate` single catch-up; Local Network Permission opt-in phase via `RESTRICT_LOCAL_NETWORK` compat flag; Safer Intents opt-in) — fetched 2026-09-30
+- Live codebase (HIGH): `app/build.gradle.kts` (AGP via catalog 9.3.0, compile/target 36, `useLegacyPackaging=false`, `largeHeap`, `extractNativeLibs=false`); `gradle/libs.versions.toml` (litertlm 0.17.1, coil3 3.4.0 ceiling note); `AndroidManifest.xml` (FGS dataSync merge, permissions, native-lib `required=false`); `EngineManager.kt` / `LiteRTLmEngine.kt` (singleton chain, `openSessions`, ordered close, trim tiers); `ChatViewModel.kt` (job discipline, turn-scoped `shareIn`, `onCleared`); `LmStudioHelper.kt` / `LMStudioProvider.kt` (`activeCall`, `callbackFlow`); `NetworkModule.kt` (4-client shape); `WarpedApplication.kt` (Coil singleton factory, StrictMode, trim forwarding); `ChatScreen.kt` (collectors, DisposableEffects); `WebPageFetcher.kt` (`activeCalls` registry)
+- Sibling research (MEDIUM — consumed as input, not re-verified): `.planning/research/STACK.md` (LeakCanary 2.14 + plumber-android `debugImplementation`, Coil ceiling, Kotlin hold)
+- No `cpp/`, CMake, or `ndkVersion` in repo (HIGH — grep-verified): the basis for the verify-don't-rebuild recommendation
 
 ---
-*Architecture research for: Warped v2.3 Web Grounding v2*
-*Researched: 2026-09-28*
+*Architecture research for: Warped v2.5 Play Compliance + Leaks*
+*Researched: 2026-09-30*

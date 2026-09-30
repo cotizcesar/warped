@@ -1,162 +1,160 @@
 # Project Research Summary
 
-**Project:** Warped — v2.3 milestone (Web Grounding v2)
-**Domain:** On-device Android LLM chat with multi-URL web grounding
-**Researched:** 2026-09-28
+**Project:** Warped — v2.5 Play Compliance + Leaks
+**Domain:** Android on-device LLM chat app (LiteRT-LM / Compose) — Play-compliance retrofit + memory-leak audit milestone
+**Researched:** 2026-09-30
 **Confidence:** HIGH
 
 ## Executive Summary
 
-Warped v2.2 already ships single-URL web grounding: a bounded OkHttp fetch, heuristic HTML→text extraction, `[WEB CONTEXT]` prompt-prefix augmentation, hijack sanitization, offline fallback, and a global default-ON toggle. v2.3 extends that proven pipeline to multi-URL fetch (2–5 URLs per message, fused numbered context), in-chat source previews, a per-chat toggle override, and offline retry — without touching the inference providers, which stay blind to grounding (prompt string gets longer, interfaces unchanged).
+Warped is a shipped, production-grade Android LLM chat app (12 milestones, 494-green test suite in v2.4) entering a **compliance + stability milestone, not a feature milestone**. The v2.5 work is threefold: (1) prove 16 KB page-size compatibility for Play (AGP 9.3.0 already auto-aligns packaging; the risk is confined to transitive prebuilt `.so` files from LiteRT-LM 0.17.1 and SQLCipher 4.5.4), (2) audit runtime behavior under the already-set `targetSdk 36` (edge-to-edge opt-out removal, predictive back default, large-screen resizability ignore, JobScheduler quota sensitivity, Local Network Permission opt-in), and (3) run a scripted memory-leak audit over the heaviest surfaces (EngineManager native handles, chat turn-scoped Flows/SSE, grounding 5-fan-out, Coil thumbnails, download workers) with LeakCanary 2.14 as a debug-only observer.
 
-The recommended approach is to build the new `GroundingOrchestrator` (bounded parallel fan-out + context fusion + global token budget) as the foundation first, with the Jsoup extraction swap folded into that same phase — because budget numbers and the adversarial baseline both depend on extraction density. Source previews and the per-chat toggle come second (they share one Room migration v15 and consume the orchestrator's `List<GroundedSource>` output shape), and offline retry comes last (it orchestrates all three prior pieces and must respect fetch deadlines, cache identity, and toggle resolution). The only new dependency v2.3 needs is Jsoup 1.23.2 (plus desugar NIO build config); everything else reuses the existing OkHttp / Room / DataStore / WorkManager / Compose stack.
+The recommended approach is **verify-don't-rebuild, audit-don't-refactor, fix-at-the-owner**. 16 KB needs zero Kotlin changes — extract the release APK, run `check_elf_alignment.sh` + `zipalign -c -P 16`, attribute any UNALIGNED `.so` to its Maven AAR, and fix by version bump only (never linker flags, never hand-patched `.so`, never `pageSizeCompat`). The API-36 audit is an allowlist checklist with evidence per behavior change, defaulting to "already conformant." Leak fixes are 5–20 line changes inside owning components following the already-established turn-scoped structured-concurrency pattern, each paired with a cancel/close regression test. No new packages, no Room migration, no engine/network modernization.
 
-The key risks are context-budget blowout on small local-model windows (fix: global grounding budget divided across pages, model-window-aware, with a worst-case assertion test), injection surface scaling ×N (fix: single `sanitizePage` choke point + multi-page adversarial suite incl. collusion cases as a merge gate), and retry-mechanism mismatch (fix: message-scoped foreground retry first; WorkManager only as explicit opt-in with strict dedup — never periodic, never re-running inference).
+The key risks are external and behavioral, not architectural: an **unaligned LiteRT-LM `.so` blocks Play submission from outside the repo** (check first — it gates everything), `targetSdk 36` silently changes edge-to-edge/back/resizability contracts (audit before any leak churn), and leak fixes can boomerang into worse bugs (over-closed shared singletons, re-scoped state losing rotation drafts). Mitigation is sequencing — 16 KB verification first, API-36 audit second, leak tour third, hardening loop last — with the v2.1–v2.4 invariants (single-flight inference, Stop semantics, retry same-row reuse) re-run as regression gates after every fix.
 
 ## Key Findings
 
 ### Recommended Stack
 
-Only one new dependency is needed. Everything else is already in the project and sufficient (full detail in `STACK.md`).
+No toolchain churn: AGP 9.3.0, Kotlin 2.3.20, compileSdk/targetSdk 36 all stay. The v2.5 delta is two debug-only additions (LeakCanary 2.14 + plumber-android 2.14) and lifting the stale Coil 3.4.0 ceiling to 3.5.x minimum (validate 3.6.3 latest), plus platform verification tooling (`check_elf_alignment.sh`, `zipalign -P 16`, 16 KB emulator image). See STACK.md for install snippets and compatibility matrix.
 
 **Core technologies:**
-- Jsoup `org.jsoup:jsoup` 1.23.2: HTML→text extraction (parse-only via `Jsoup.parse(htmlString)`) — replaces the hand-rolled regex core of `HtmlToTextExtractor`; WHATWG-spec parser, ~430 KB pre-R8, zero runtime deps — this is the single new dependency
-- Desugar JDK libs NIO `com.android.tools:desugar_jdk_libs_nio` 2.1.5: mandatory build config for Jsoup on Android (`isCoreLibraryDesugaringEnabled = true`; project is on AGP 9.3.0 so compatible)
-- Kotlinx Coroutines (existing 1.11.0): multi-URL parallel fan-out (`supervisorScope` + `async`/`awaitAll` + `Semaphore(3)`)
-- OkHttp (existing 4.12.0): per-URL bounded fetch transport — existing `WebPageFetcher` policy reused unchanged per URL; Jsoup is parse-only, never `Jsoup.connect()`
-- Room (existing 2.8.5) + DataStore Preferences (existing 1.2.1): per-chat tri-state override column + unchanged global default-ON
-- WorkManager (existing 2.12.0) + Compose Material3 `ModalBottomSheet`: retry transport (conditional, see reconciliation below) + sources preview UI
-
-**Stack rule that must survive:** fetching stays a security boundary — Jsoup never fetches, the stripped-OkHttp-client policy (no AuthInterceptor, 64 KB cap, manual redirects, timeouts) applies to every page including retries and cache-miss refetches.
+- AGP 9.3.0 (keep) — 16 KB zip-alignment automatic since 8.5.1; `useLegacyPackaging=false` already correct
+- LeakCanary 2.14 + plumber-android (NEW, `debugImplementation` only) — auto-installs, zero app code; covers EngineManager singletons, chat StateFlow collectors, Coil requests, OkHttp SSE Calls
+- Coil 3 `3.5.x` min / validate `3.6.3` — unblocks compileSdk-36 line; same coordinates, low-risk bump validated by build + OG-thumbnail screen pass
+- Verification tooling (no artifacts) — `check_elf_alignment.sh` for transitive `.so` (LiteRT-LM, SQLCipher), `zipalign -c -P 16`, 16 KB emulator image (`getconf PAGE_SIZE` → 16384), shark-cli for oversized heap dumps
+- No NDK pin / no linker flags — zero first-party native code since v1.5; dead config if added
 
 ### Expected Features
 
-(Full landscape, dependency graph, and competitor analysis in `FEATURES.md`.)
+v2.5 is audit-only on a frozen surface — no new user features. "MVP" = minimum shippable Play-compliant release. See FEATURES.md for the full prioritization matrix.
 
 **Must have (table stakes):**
-- Multi-URL fetch (2–5 URLs/message, parallel, fused numbered `[WEB CONTEXT 1..N]` blocks) — the core milestone promise; users paste/compare multiple links
-- Numbered Fuentes list for N sources + progress chip (`Leyendo 2 de 4…`, per-source ok/skipped) — silent drops destroy trust
-- Partial grounding (one dead link never poisons the turn; banner only when ALL fail) — correctness requirement of multi-fetch
-- `GroundingResult` list reshape + `UrlDetector` list + numbered `GroundingPrompt` — the keystone refactor enabling everything
-- Per-chat web toggle (tri-state `null` = inherit global) — headline differentiator, cheap once migration v15 exists
-- Sources preview bottom sheet over persisted extracts — headline differentiator; trust receipts without leaving chat
-- Message-scoped offline retry (queued state + "Reintentar" on reconnect, OFFLINE-only) — offline-resilience promise
+- 16 KB alignment verified — every shipped `.so` ALIGNED, 16 KB emulator smoke (model load + inference) passes
+- targetSdk 36 + behavior audit closed — real edge-to-edge (no opt-out), predictive back migrated, large-screen smoke, FGS/WorkManager quota conformance for downloads
+- Zero-application-leak pass — scripted LeakCanary sweep (load/switch/unload, streaming + Stop, 5-URL grounding + cancel, offline→retry, thumbnail scroll); all application leaks fixed + re-verified
+- Release gates green — aligned AAB, `assembleRelease` + R8, Play Console with no 16 KB/target warnings
 
-**Should have (competitive / v2.3.x on trigger):**
-- Per-message "Sin web" composer override — one-off model-only escape hatch, cheap once per-chat toggle exists
-- Preview "Abrir en navegador" (Custom Tab) — trigger: users want the full page after reading the extract
-- Fused-context budget tuning per model context size — trigger: overflow reports on small local models
+**Should have (competitive):**
+- Leak-free multi-hour chat sessions — ViewModel + Flow hygiene; core-value multiplier for an on-device LLM app
+- Model-memory discipline — clean unload→reload without retained engine; device-verified
+- Grounding-pipeline cancellation hygiene — structured-concurrency scope per send; Stop cancels fan-out + SSE + Tavily
+- 16 KB cold-start / battery numbers — free UX win, release-note fodder if a 16 KB device is available
 
-**Defer (v2.4+ / explicit anti-features):**
-- WorkManager persistent grounding queue — message-scoped retry covers chat UX; persistent queue is a second feature disguised as retry
-- Model-output citation pills (`[1]` tappable in response text) — 4-constraint compound problem (rendering, copy, portability, grammar); small local models hallucinate markers
-- JavaScript-rendered (WebView) extraction — main-thread, memory-heavy, JS-execution escalation; mark JS-shell pages skipped
-- Unlimited URL count — hard cap 5 (context window, radio/battery, injection surface all demand it)
-- Auto-grounding URLs inside model responses — recursive-fetch risk; ground user-pasted URLs only
+**Defer (v2+):**
+- Engine/network dependency modernization — zero Play benefit, high regression risk on a proven stack
+- Production memory telemetry — needs PII story for chat content first
+- Tablet/foldable bespoke layouts — adaptive-fill compliance suffices; bespoke is product work
+- Shipping LeakCanary in release; `largeHeap=true` as a leak fix; permanent compat-flag opt-outs (all anti-features — see FEATURES.md)
 
 ### Architecture Approach
 
-(Full system diagram, build order, and boundary contracts in `ARCHITECTURE.md`. All structural claims verified against the live codebase — HIGH confidence.)
-
-v1's invariants survive: providers unchanged (prompt-prefix augmentation only), history keeps originals (fused blocks never persist into `MessageEntity.content`), `activeCall` cancel discipline extends to N calls, AuthInterceptor stripping applies to every fetch path. The new logic lives in `data/grounding/` (same package, two new files — no new module), with fan-out encapsulated in a JVM-testable `GroundingOrchestrator`, never inline in the ViewModel.
+There is no new feature subsystem: 16 KB integrates at the build/packaging seam only, API 36 at the manifest + WorkManager + navigation seams (already mostly conformant), and leak fixes land inside existing components with LeakCanary as a debug-only observer adding zero architecture. Fixes follow two established patterns — turn-scoped structured concurrency (every streaming resource owned by one turn-lifetime scope, nulled/closed on all three exits) and singleton-owns-native (Engine referenced only via EngineManager→LiteRTLmEngine chain, trim tiers preserved). See ARCHITECTURE.md for the system diagram, per-component audit table, and suggested build order.
 
 **Major components:**
-1. `GroundingOrchestrator` (NEW, `data/grounding/`) — parallel fan-out + fusion + budget; owns a `CallRegistry` with `cancelAll()`; exposes `ground()` + `cancel()`; the ViewModel hook becomes ~10 lines
-2. `GroundedSource` value type + `GroundingResult.Grounded(sources: List<…>)` reshape (NEW/MODIFIED) — the keystone change; everything downstream (ViewModel injection, Fuentes UI, banner logic, preview, retry) keys off this type
-3. `UrlDetector.extractUrls(limit=5)` + `GroundingPrompt.buildFusedBlock()` (MODIFIED, additive) — ordered distinct list; uniform fused prompt shape for 1..N URLs so formats never drift
-4. Preview + toggle persistence (MODIFIED schema, single `MIGRATION_14_15`) — nullable `web_grounding_mode` column (NULL = inherit, zero backfill) + `grounded_sources` metadata/excerpt store; preview sheet reads excerpts, full text behind a bounded in-memory LRU
-5. Retry path (NEW, last) — immediate "Reintentar" button (orchestrator direct call) + deferred connectivity-gated refetch converging on the same `ground()` entry point
-
-**Schema fork decided here:** combine the toggle column + source store into ONE migration v15 (avoid two migrations in one milestone); preview sheet state lives in Compose `remember{}`, not the ViewModel (48-01 single-owner discipline).
+1. Build/packaging seam (AGP + `packaging.jniLibs` + AAR `.so` set) — verify alignment, never rebuild; only NEW file allowed is `verify-16kb.sh` CI gate
+2. Manifest + OS behavior seam (`targetSdk 36`, WorkManager download/benchmark workers, MainActivity/NavGraph) — allowlist audit, minimal diff
+3. Runtime leak surface (EngineManager→LiteRTLmEngine native chain, ChatViewModel jobs/flows, SSE providers, grounding fetch scopes, Compose collectors) — fix at the owner, 5–20 lines each + regression test
+4. Debug-only observability (LeakCanary 2.14 + plumber) — auto-installs, no Hilt binding, zero release footprint
 
 ### Critical Pitfalls
 
-(Full 7-pitfall catalog with warning signs, debt table, and "looks done but isn't" checklist in `PITFALLS.md`. Do not regress the v2.2 injection/SSRF/fetch-cap defenses.)
+Top 7 from PITFALLS.md (all mapped to phases with verification):
 
-1. **Parallel fetch storm (tail latency)** — 5 naive `async` fetches make every turn as slow as the slowest page. Avoid: `supervisorScope` (never bare `coroutineScope` + `awaitAll()`), per-fetch timeout + overall deadline with drop policy, one shared OkHttp client, per-source progress UI.
-2. **Context-budget blowout** — 5 pages × v2.2 per-page caps overflow 4–8K local-model windows. Avoid: replace per-page constants with a global grounding budget divided across fetched pages (`perPage = budget / pagesFetched`), model-window-aware, truncation markers, worst-case assertion test. Never ship `MAX_URLS` raised with caps untouched.
-3. **Stop doesn't stop N fetches** — fan-out outside the cancellable `generationJob` leaks fetches past Stop into the next turn's context. Avoid: fan-out as a child of the generation job, shared `Call` handles, generation-epoch check before prompt build, mid-fetch Stop regression test as exit criterion.
-4. **Preview storage bloat** — full extracted text per source in Room (~20 KB/grounded turn) bloats the DB and janks recomposition. Avoid: Room holds metadata + ~500-char excerpt only; full text in a bounded in-memory LRU (keyed by URL+hash) with re-fetch-on-miss; stable IDs (not strings) through Compose state.
-5. **Toggle precedence ambiguity** — three layers (per-message > per-chat > global) with no single resolver produces wrong-state bugs and NULL-legacy crashes. Avoid: ONE pure unit-tested `effectiveGrounding()` function resolved at exactly one call site; nullable per-chat column (NULL = inherit, never backfill); 12-case matrix + legacy-upgrade tests as entry criteria for toggle UI.
-6. **Retry-mechanism mismatch** — WorkManager periodic (15-min minimum) is wrong for chat-timescale retry; risks worker spam, stale-turn injection, retrying inference instead of fetch. Avoid: message-scoped foreground retry on connectivity-gain events first; any WorkManager use gets `REPLACE` + unique name per (conversation, message) + attempt cap + URL-only input data; retry fetch only, user re-sends.
-7. **Injection surface × N** — the new merge path can bypass per-page sanitization; colluding pages can run quorum attacks single-page tests never exercise. Avoid: choke-point `sanitizePage` (merge concatenates sanitized spans only), multi-page adversarial suite (1-of-5 malicious, 3-of-5 colluding, delimiter-mimic, malicious-in-truncated-tail) as merge gate, per-source provenance delimiters, extractor change = security-gated change, plain-text-only preview rendering.
+1. **Unaligned LiteRT-LM `.so` you can't fix yourself** — prebuilt AAR alignment is Google's build decision; bump/compileSdk assumptions don't cover it. Avoid: `check_elf_alignment.sh` + APK Analyzer + `zipalign -P 16` on every RC, 16 KB emulator smoke; fix only by upgrading the artifact.
+2. **targetSdk 36 without auditing the three behavior cliffs** (edge-to-edge opt-out dead, predictive back default, resizability ignored on sw600dp+) — chat input hidden, back-gesture wrong, tablet layout stretched. Avoid: dedicated audit pass first; migrate vs. dated-TODO opt-out explicitly.
+3. **Local Network Permission blindsiding LAN endpoints** (Ollama/LM Studio over RFC-1918) — `EPERM` socket errors masquerading as server bugs. Avoid: opt into `RESTRICT_LOCAL_NETWORK` compat flag early, real-device Wi-Fi test, LAN-vs-internet error mapping. (ARCHITECTURE.md notes LNP is opt-in/not enforced today — record as monitored, don't add permission requests now.)
+4. **Engine outliving the chat** (singleton holding scoped refs, native handles skipped on exception paths) — native RSS stair-steps while Java heap looks flat. Avoid: single-owner close, try/finally on all paths, application-context-only singletons, profiler loop to baseline.
+5. **Streaming collectors that never cancel** (chat Flows + SSE bodies + shared accumulators) — connection-pool exhaustion, zombie fetches. Avoid: lifecycle-aware collection everywhere, `use{}`/finally on every SSE loop, Stop-means-closed, cancel-path regression tests.
+6. **Coil singleton + WorkManager stream leaks** — unbounded thumbnail cache, partial-file/FD residue on cancel. Avoid: one app-context ImageLoader, bounded thumbnail requests, `use{}` + partial cleanup + backoff + unique-work policy.
+7. **Remediation boomerang** (leak fix breaks threading/persistence — over-closed Room/OkHttp, re-scoped state losing rotation drafts). Avoid: fix ownership without moving dispatchers, never close shared singletons from screens, re-run v2.1–v2.4 invariant suite after every fix.
 
 ## Implications for Roadmap
 
 Based on research, suggested phase structure:
 
-### Phase 1: Multi-URL fetch + fusion + budget (+ Jsoup swap)
-**Rationale:** The fetch policy is the foundation everything else consumes — preview content, retry payloads, and toggle-gated fetching all key off the `List<GroundedSource>` shape. Budget numbers and the adversarial baseline both depend on extraction density, so the extraction-quality decision must land before or inside this phase, not after.
-**Delivers:** `UrlDetector.extractUrls` → `WebPageFetcher.fetchOne` + call registry → `GroundingOrchestrator.ground` → `GroundingPrompt.buildFusedBlock` → rewired `ChatViewModel` hook; Jsoup replacing the regex extractor core (keeping the 4000-char truncation contract + `WebContextSanitizer` untouched); 2–5 URL turns grounding with fused context; counted chip copy; Stop cancels all.
-**Addresses:** Multi-URL fetch, keystone `GroundingResult` reshape, partial grounding + all-fail banner fix, progress chip, fused citation hints.
-**Avoids:** Pitfalls 1 (fetch storm), 2 (budget blowout), 3 (Stop leak), 7 (injection × N — choke-point + adversarial gate are exit criteria).
-**Uses:** Jsoup 1.23.2 + desugar NIO (only new deps); coroutines `supervisorScope` fan-out; existing fetch policy per URL.
+### Phase 1: 16 KB Dependency Verification
+**Rationale:** Gates the entire Play release from outside the repo — if LiteRT-LM 0.17.1 ships an unaligned `.so`, everything else is moot until bump-or-escalate resolves. Zero code, fastest possible unblock.
+**Delivers:** Per-`.so` aligned/misaligned evidence (`check_elf_alignment.sh` + `zipalign -P 16` output), bump-or-escalate decision, `verify-16kb.sh` CI gate, 16 KB-image smoke (model load + inference).
+**Addresses:** 16 KB page-size support; release-gate alignment CI.
+**Avoids:** Pitfall 1 (unaligned native `.so`); Anti-Patterns 1–2 (linker flags, `pageSizeCompat`).
 
-### Phase 2: Sources preview + per-chat toggle
-**Rationale:** Both features consume Phase 1's output shape and both need schema work — combine into a single `MIGRATION_14_15` (one nullable toggle column + one source metadata/excerpt store) to avoid two migrations in one milestone. Storage shape and the precedence resolver must exist before any UI is built, or the UI bakes in the wrong data source.
-**Delivers:** `GroundedSource` domain type → `ChatMessage.groundedSources` list migration → tappable Fuentes rows → `SourcePreviewSheet` (excerpt-first, LRU full text, plain-text-only rendering) → tri-state toggle column + `effectiveGrounding()` resolver + chat-surface toggle affordance showing effective state + source layer.
-**Addresses:** Numbered Fuentes list for N, sources preview bottom sheet + persistence, per-chat toggle, per-message override groundwork (same send-path flag).
-**Avoids:** Pitfalls 4 (preview storage — schema review: no unbounded text column; LRU bounds test) and 5 (precedence — 12-case matrix + legacy-NULL upgrade tests are entry criteria for toggle UI).
-**Implements:** `SourcePreviewSheet`, `GroundedSourceDao` (if persisting), `Conversation.webGroundingMode`, repository get/set, `MIGRATION_14_15`.
+### Phase 2: API-36 Behavior Audit
+**Rationale:** Behavior audit before code churn — flipping/confirming `targetSdk 36` changes platform contracts, and leak fixes on a shifting surface invalidate their own baselines. Parallelizable with Phase 1.
+**Delivers:** Allowlist disposition per behavior change with evidence (edge-to-edge dead-attr grep + inset screenshots, back-handler migration/opt-out decision, large-screen rotation matrix, benchmark `getStopReason()` logging, scheduleAtFixedRate grep, LNP monitored-future record).
+**Uses:** No new stack; manifest + WorkManager + navigation seams only.
+**Implements:** Manifest/OS-behavior layer conformance; download worker already foreground-`dataSync` (exempt path confirmed).
+**Avoids:** Pitfalls 2–3 (behavior cliffs, LAN permission); UX pitfalls (insets, back-vs-Stop, compat dialog).
 
-### Phase 3: Offline retry (message-scoped first)
-**Rationale:** Retry orchestrates all three prior pieces and must respect fetch deadlines, cache identity, and toggle resolution — so it builds last. The FEATURES + PITFALLS consensus (over the STACK default) is message-scoped foreground retry first, WorkManager only as explicit opt-in.
-**Delivers:** OFFLINE-vs-FETCH_FAILED-gated pending-retry record per (message, URL) → connectivity-gain re-fetch through the same `ground()` entry point → banner "Reintentar" immediate path + deferred path with dedup (superseded turns cancel) → retry populates the same persisted source rows the preview sheet reads.
-**Addresses:** Message-scoped offline retry, retry-fills-preview enhancement, closed-conversation drop semantics.
-**Avoids:** Pitfall 6 (dedup test, no-inference test, closed-conversation drop test, SSRF re-check on every refetch).
+### Phase 3: LeakCanary Instrumentation + Guided Audit
+**Rationale:** Needs a runnable API-36/16 KB build to be meaningful (scheduling dependency on Phases 1–2), but technically independent. Establishes the frozen-surface baseline the fixes verify against.
+**Delivers:** Two `debugImplementation` lines, scripted leak tour (cold start → load → chat turns → Stop mid-stream → model switch → grounding turns → thumbnails → background/foreground → endpoint CRUD), triaged heap dumps per layer (native → VM → network → Compose) via on-device activity + shark-cli.
+**Uses:** LeakCanary 2.14 + plumber-android; strict `debugImplementation` (release APK must contain zero LeakCanary classes).
+**Implements:** Debug-only observability seam; no production architecture change.
+**Avoids:** Pitfall 7 setup (baseline before fixes); performance trap (LeakCanary in release).
+
+### Phase 4: Fix → Regression-Test → Re-verify Loop (+ Hardening)
+**Rationale:** Fixes land per owning component in dependency-gated order (engine first — dwarfs UI leaks in MB — then streaming, then media/download), each with a cancel/close unit test, closing with full-gate green + device smoke.
+**Delivers:** Minimal-diff fixes (EngineManager/LiteRTLmEngine close ordering, ChatViewModel `onCleared`/job null-outs, `callbackFlow awaitClose`, grounding scope discipline, single-ImageLoader assertion), unit gate + `assembleRelease` + R8 green, regenerated Baseline Profiles if renames occurred, Stop/retry/switch regression suite re-run, 16 KB + API-36 smoke folded into release-UAT deferral pattern if hardware unavailable.
+**Addresses:** Zero-application-leak pass; leak-free sessions; model-memory discipline; grounding cancellation hygiene; Coil cache discipline.
+**Avoids:** Pitfalls 4–7 (engine, streaming, media/download, boomerang); debt shortcuts (`largeHeap`, `System.gc()`, shared-resource closing).
 
 ### Phase Ordering Rationale
 
-- **Dependencies force the order:** Phase 1's `Grounded(sources: List)` reshape is the keystone — Phases 2 and 3 both key off that type. Phase 3 needs Phase 2's store (where retry results land) and Phase 2's resolver (retry must respect the effective toggle).
-- **Schema economy:** Phase 2 bundles both Room changes into one migration v15 (toggle column + source store) — the FEATURES dependency graph and ARCHITECTURE migration precedent agree.
-- **Security gating:** the adversarial suite + budget assertion are Phase 1 exit gates, because Phase 2's preview persistence and Phase 3's refetch paths would otherwise inherit an untested baseline; any later extractor change must re-pass the same gate.
-- **Contested decision resolved:** STACK.md defaults to a WorkManager retry queue; FEATURES.md and PITFALLS.md both argue message-scoped foreground retry first (WorkManager's 15-min granularity and worker-spam risk are wrong for chat). Recommendation: follow FEATURES+PITFALLS (message-scoped first, WorkManager only as explicit user-scheduled retry with `REPLACE` + unique names + attempt cap). The Phase 3 planner should treat this as settled unless new evidence appears.
+- **External-blocker first:** Phase 1 can only be resolved by evidence about a third-party AAR — no amount of app code substitutes, so it leads.
+- **Contracts before churn:** Phase 2 settles platform behavior so Phase 4 fixes are verified against the real runtime, not a pre-audit surface (PITFALLS.md: "behavior audit first, code churn second"; FEATURES.md: compileSdk→targetSdk sequencing).
+- **Baseline before fixes:** Phase 3 freezes the observable surface; Phase 4's per-site fixes are meaningless without a reproducible leak tour.
+- **Owner-local grouping:** Phase 4 groups by owning component (engine → streaming → media/download), not by leak symptom, matching the codebase's single-owner discipline and keeping diffs review-sized.
 
 ### Research Flags
 
-Phases likely needing deeper research during planning (`--research-phase` recommended):
-- **Phase 1:** YES — extraction-quality tuning (Jsoup main-content selectors `article`/`main`/`[role=main]` vs full-body, title+description fallback for JS-shell pages, fused ~8K cap vs per-model-window sizing) needs device validation; exact global token-budget numbers per allowlisted model window are LOW-confidence estimates. Also verify Compose BOM / desugar versions against Google Maven at plan time (STACK flags MEDIUM on BOM pinning).
-- **Phase 3:** LIGHT — verify current WorkManager constraint/backoff/unique-work APIs against developer.android.com at plan time (PITFALLS cites training knowledge); connectivity-Flow extension of `ConnectivityGate` needs a plan-time API check.
+Phases likely needing deeper research during planning:
+- **Phase 2 (API-36 audit):** Local Network Permission guidance is evolving (25Q4+ carve-outs pending) — re-check official behavior-change pages at plan time; exact compat-flag names and enforcement dates shift. `/gsd-plan-phase --research-phase` recommended if the plan touches LAN permission flows.
+- **Phase 4 (leak fixes):** Each fix site needs codebase-grounded verification (actual `awaitClose` presence, `onCleared` body, `openSessions` ordering) — plan-phase should re-read the cited file/line targets since code may have drifted since 2026-09-30 research.
 
 Phases with standard patterns (skip research-phase):
-- **Phase 2:** Room manual migration (v14 precedent in `Migrations.kt`), tri-state override resolution, `ModalBottomSheet` preview — all established codebase/platform patterns with HIGH-confidence guidance. Proceed directly to planning.
+- **Phase 1 (16 KB verification):** Fully mechanical — official guide + script + zipalign + emulator image; no API research needed.
+- **Phase 3 (LeakCanary instrumentation):** Two Gradle lines, auto-install, well-documented; standard patterns throughout.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Jsoup 1.23.2 + desugar 2.1.5 verified via jsoup.org, mvnrepository, Context7; project gap (no desugaring enabled) verified in `app/build.gradle.kts`. Only BOM pinning is MEDIUM (verify against Google Maven). |
-| Features | HIGH / MEDIUM | HIGH on codebase-verified items (existing `data/grounding/`, DataStore toggle, Room schema, ViewModel hook); MEDIUM on competitor behavior (Perplexity/ChatGPT patterns via 2026 teardowns). |
-| Architecture | HIGH | Every structural claim verified against live code (`data/grounding/`, `ChatViewModel` hook/cancel lines, Room entities, workers). Sizing recommendations (fused cap, parallelism 3, TTL) are MEDIUM — need device validation. |
-| Pitfalls | HIGH / MEDIUM | HIGH on repo-verified pipeline shape and inherited v2.2 defenses; MEDIUM on OkHttp/coroutine/WorkManager standard practices; LOW on exact budget numbers and LRU tuning (flagged for phase validation). |
+| Stack | HIGH | Official 16 KB guide + LeakCanary/Coil changelogs + repo build files verified; MEDIUM only on exact Coil 3.6.3 API deltas (needs build + screen pass) and `auditDependencies` interplay (verify via `./gradlew check`) |
+| Features | HIGH | 16 KB + API-36 behaviors from official Android docs; leak-audit practice from LeakCanary official docs; MEDIUM on Play deadline exact dates (shifted via extensions — use official page's Feb 1 2027) |
+| Architecture | HIGH | All structural claims grep-verified against the live codebase; Android 16/16 KB claims from official docs fetched same day |
+| Pitfalls | HIGH | 16 KB + API-36 from official docs; MEDIUM on leak patterns (community sources + codebase-shaped inference — verify per-leak against heap traces) |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Global token-budget numbers per model window (LOW):** exact fused-cap values are estimates. Handle in Phase 1 planning: read allowlisted model metadata, clamp fused output to a fraction of `contextSize`, log worst-case prefix length (Timber, debug), add the 5×max-size budget assertion test.
-- **Preview LRU size/TTL tuning (LOW):** 10 entries / 200 KB / 5 MB / 7 days are starting points. Handle in Phase 2 planning with an eviction test and low-RAM device check.
-- **Extraction-density effect on budget/adversarial baseline (open research question):** if Jsoup output density differs materially from the heuristic, re-tune the Phase 1 budget and re-run the full adversarial suite before merging — treat extractor change as security-gated.
-- **Version pins to verify at plan time:** Compose BOM 2026.06.01, desugar 2.1.5, WorkManager/hilt-work pair — re-check against Google Maven / AGP compatibility table before freezing.
+- **Transitive `.so` alignment status (LiteRT-LM 0.17.1, SQLCipher 4.5.4):** UNVERIFIED at research time — Phase 1 must run `check_elf_alignment.sh` on the actual release APK before any other commitment.
+- **Coil 3.6.3 vs 3.5.x hold decision:** resolve in Phase 1/2 by attempting the bump; fall back to newest 3.5.x if build or OG-thumbnail screens fail.
+- **`auditDependencies` gate on new debug deps:** LeakCanary pulls no banned modules per analysis, but confirm with `./gradlew check` after adding (MEDIUM confidence).
+- **LNP enforcement timeline:** opt-in today; re-check official docs at Phase 2 plan time for any 25Q4+ enforcement change affecting LAN endpoint UX.
+- **Device-dependent verification:** 16 KB emulator + API-36 device + real-LAN-endpoint tests; record emulator-only gaps as release-UAT items per house precedent (v2.2–v2.4 deferrals).
+- **Heap-dump scale:** multi-GB LLM-session heaps may exceed on-device Shark analysis — plan workstation `shark-cli` workflow from the start of Phase 3.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Live Warped codebase: `data/grounding/{UrlDetector,WebPageFetcher,GroundingPrompt,GroundingResult,HtmlToTextExtractor,WebContextSanitizer}.kt`; `ui/chat/ChatViewModel.kt` (turn hook, cancel discipline); `ui/chat/{ChatUiState,ChatScreen}` + `components/MessageBubble.kt`; `domain/model/{ChatMessage,Conversation}`; `data/local/db/{AppDatabase,Migrations}`; `AdvancedPreferences.webGroundingEnabled`; `ModelDownloadWorker`/`ModelBenchmarkWorker` (WorkManager precedent); `app/build.gradle.kts` (desugaring gap)
-- https://jsoup.org/download + https://jsoup.org/news/release-1.23.1 + https://jsoup.org/news/release-1.22.2 — current release 1.23.2, zero runtime deps, Android desugaring requirement, R8/re2j rule
-- Context7 `/jhy/jsoup` (342 snippets) + mvnrepository `org.jsoup:jsoup` versions + google/desugar_jdk_libs CHANGELOG (2.1.5)
+- developer.android.com/guide/practices/page-sizes — 16 KB requirements, AGP ≥ 8.5.1, NDK r28 default-align, verification commands, Play deadline (updated 2026-09-16)
+- developer.android.com/about/versions/16/behavior-changes-16 — edge-to-edge, predictive back, resizability, scheduleAtFixedRate, local-network permission opt-in
+- developer.android.com/about/versions/16/behavior-changes-all — JobScheduler quotas, FGS-concurrent jobs, `STOP_REASON_TIMEOUT_ABANDONED`, 16 KB compat mode
+- square.github.io/leakcanary/changelog + LeakCanary fundamentals docs — 2.14 latest stable, ObjectWatcher/heap-dump/categorization model
+- Live codebase evidence — `app/build.gradle.kts`, `gradle/libs.versions.toml`, `AndroidManifest.xml`, EngineManager/LiteRTLmEngine/ChatViewModel/LmStudioHelper/NetworkModule/WarpedApplication/ChatScreen/WebPageFetcher (see ARCHITECTURE.md for file-level detail)
 
 ### Secondary (MEDIUM confidence)
-- Android Developers offline-first guide + WorkManager BackoffPolicy docs (`NetworkType.CONNECTED`, `EXPONENTIAL` default, 15-min periodic minimum)
-- Setproduct "Designing AI chat interfaces" (2026) — citations-as-receipts, message-state checklist
-- Flaig "How Leading AI Apps Implement Inline Citations" (2026-04) — 4-constraint compound problem, Markdown-collision warning
-- LibreChat PR #7032 (Perplexity sources menu precedent); AnythingLLM #2827 (source-metadata-alongside-message precedent)
-- OkHttp Dispatcher/pool/timeout behavior (square.github.io/okhttp); Kotlin `supervisorScope` semantics (kotlinlang.org); OWASP LLM prompt-injection cheat sheet
-- `.planning/research/PITFALLS.md` (v2.2) Pitfalls 5–6 — inherited injection/SSRF baseline still in force
+- coil-kt.github.io/coil/changelog + coil GitHub README — 3.6.3 latest, 3.5.0 compile-SDK-36 entry (exact API deltas vs 3.4.0 unverified)
+- Community migration guides (API 34/35→36, Halodoc Android 16 journey) — consistent with official docs, single-source
+- Community leak-fix patterns (lifecycle-aware collection, SSE `use{}`/cancel, Coil singleton context) — consensus patterns, verify per-leak
+- Android Developers Blog — 16 KB Play requirement + Studio tooling posts
 
-### Tertiary (LOW confidence, needs phase validation)
-- Exact global token budgets per allowlisted model window; preview LRU size/TTL tuning; whether the extraction upgrade shifts the adversarial baseline (gated, not assumed)
+### Tertiary (LOW confidence)
+- WebSearch cross-checks (ProAndroidDev 16 KB guide, r/androiddev deadline thread, Medium Android-16 summaries) — directionally consistent; deadline dates vary by source age, defer to official page
 
 ---
-*Research completed: 2026-09-28*
+*Research completed: 2026-09-30*
 *Ready for roadmap: yes*

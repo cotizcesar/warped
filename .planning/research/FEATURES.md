@@ -1,120 +1,119 @@
 # Feature Research
 
-**Domain:** Web grounding v2 for mobile LLM chat (Warped / Android)
-**Researched:** 2026-09-28
-**Confidence:** HIGH (existing codebase verified) / MEDIUM (competitor behavior via web sources)
+**Domain:** Android Play compliance (16 KB pages, API 36) + memory-leak audit for on-device LLM chat app
+**Researched:** 2026-09-30
+**Confidence:** HIGH (16 KB + API 36 behavior changes from official Android Developers docs; leak-audit practice from LeakCanary official docs + community consensus — MEDIUM on Play deadline exact dates, which shifted via extensions)
 
 ## Feature Landscape
 
 ### Table Stakes (Users Expect These)
 
-Features users assume exist once any web grounding exists. Missing these = v2 feels incomplete.
+Play compliance and stability items. Missing these = app can't ship updates on Play, or crashes/OOMs in long sessions. All scoped to the v2.5 milestone — existing features (chat, catalog, grounding, OG thumbnails, agentic loops) are already built and out of scope except as leak-audit surfaces.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| Multi-URL fetch (2–5 URLs/message, fused context) | Users paste/compare multiple links; Perplexity cites 6–12 sources per answer, ChatGPT 1–3 — a single-URL cap feels broken once grounding exists | MEDIUM | Parallel fetch with `async`/`awaitAll` on Dispatchers.IO, per-URL timeout (reuse existing 8/10/20s budgets), per-URL 64KB cap; fuse as numbered `[WEB CONTEXT 1..N]` blocks. Total context budget must be enforced (e.g. truncate tail sources) so small-context local models don't overflow. Depends on existing `WebPageFetcher`, `UrlDetector` (must return list, not first), `GroundingPrompt.buildBlock`, `WebContextSanitizer` (per-block sanitization to preserve hijack protection). |
-| Numbered Fuentes list matching context blocks | Already shipped in v2.2 for 1 URL; with N URLs the [1..N] numbering must stay stable between injected context, model-visible numbering, and rendered list | LOW | Extend existing `GroundingResult` (currently `Grounded(block, url)` single) to `Grounded(blocks: List<SourcedBlock>)`; UI already renders numbered list — extend to N items. |
-| Per-source fetch status in "Leyendo página…" chip | Existing transient chip covers 1 fetch; with N fetches users expect progress ("Leyendo 2 de 4…") and per-source success/skip indication | LOW | Chip state becomes `Loading(done, total)` → `Done(okCount, skippedCount)`. Skipped sources must still appear or be explicitly marked skipped — silent drops destroy trust. |
-| Partial grounding (some URLs fail → ground with the rest) | Network reality: one dead link must not poison the whole turn. Android offline-first guidance: retry connectivity errors, don't retry 4xx/auth errors | LOW | Per-URL outcome is independent: success → block; failure → `ModelOnly`-equivalent skip for that URL only. Turn-level banner only when ALL fail (reuse existing offline-vs-failure banner copy). |
-| Global default-ON toggle keeps working | Already shipped (`AdvancedPreferences.webGroundingEnabled`, DataStore, Settings switch). v2 must not regress it | LOW | No change; per-chat override resolves against this default. |
+| 16 KB page-size support (ELF 16 KB alignment) | Play blocks updates targeting API 35+ without it (deadline Nov 1 2025, extensions to mid-2026/2027 per Play notices); 16 KB devices can't install/run unaligned native libs | LOW | Warped is Kotlin-first so likely near-free: AGP 8.5.1+ auto-aligns uncompressed .so at packaging; NDK r28+ compiles 16 KB-aligned by default. Work = bump AGP/NDK, verify every `.so` (LiteRT-LM AAR, Coil/OkHttp transitive natives if any) with APK Analyzer + `check_elf_alignment.sh`, smoke-test on 16 KB emulator image (arm64 v8a). No code change if pure Kotlin. |
+| Target API 36 (compileSdk 36 + targetSdk 36) with behavior-change audit | Play annual target-API requirement (~Aug 2026 for API 36); targeting 36 flips runtime behaviors even with no code change | MEDIUM | Two-step: `compileSdk 36` first (zero behavior change, surfaces deprecations), then `targetSdk 36` + audit. Mandatory fixes: edge-to-edge (opt-out flag dead), predictive back, large-screen resizability, JobScheduler/WorkManager quota sensitivity. |
+| Mandatory edge-to-edge UI | API 36 ignores `windowOptOutEdgeToEdgeEnforcement` / `setDecorFitsSystemWindows(false)`-style opt-outs; content renders behind status/nav bars without insets | MEDIUM | Compose: `enableEdgeToEdge()` in Activity + `WindowInsets` consumption (`safeContent`/`systemBars`, Scaffold `contentWindowInsets`), remove any opt-out attr. Acceptance: no overlap/bleed on gesture-nav + 3-button nav, light/dark icon contrast. Chat screen (pill input, bottom sheet, Fuentes list) is the highest-risk surface. |
+| Predictive-back compliance | API 36 enables predictive back by default; `onBackPressed()` no longer called, `KEYCODE_BACK` not dispatched | LOW | Migrate back interception to `OnBackInvokedCallback` / Compose `PredictiveBackHandler` / `OnBackPressedDispatcher.addCallback`. Audit: chat back (exit sheet? exit conversation?), bottom-sheet dismiss, settings/preset screens. Or explicit `android:enableOnBackInvokedCallback=false` opt-out as stopgap (document as tech debt). |
+| Large-screen adaptability (sw ≥ 600dp) | API 36 ignores orientation/resize/aspect constraints (`resizeableActivity=false`, min/maxAspectRatio) on tablets/foldables/ChromeOS; pillarboxing gone | LOW | Remove reliance on portrait lock / aspect limits; verify chat + catalog + bottom sheets fill window on tablet/foldable emulator. Temporary opt-out exists via manifest compat flag — prefer real adaptivity (this app is a scrolling chat list, inherently adaptive). |
+| Foreground-service types + JobScheduler/WorkManager quota conformance | Android 16 enforces FGS types/timeouts and JobScheduler runtime quotas by standby bucket (affects WorkManager model downloads + any `DownloadManager`/periodic jobs) | MEDIUM | Work = declare precise FGS types for download workers, use user-initiated data-transfer jobs where applicable, log `WorkInfo.getStopReason()` / `JobParameters.getStopReason()` (incl. new `STOP_REASON_TIMEOUT_ABANDONED`), test download progress/cancel/retry under quota pressure. Existing background-download + offline-retry flows are the test bed. |
+| Full memory-leak audit with fixes (EngineManager, ViewModels, chat Flows, grounding pipeline, Coil/OkHttp) | Long chat + model-load/unload + multi-URL grounding sessions OOM or jank without it; users expect an LLM app to survive hours of use | MEDIUM | LeakCanary (debug-only dep) scripted pass over: model load/switch/unload, streaming chat + Stop/cancel, 5-URL grounding fan-out + cancel, offline→retry, OG thumbnail scroll, endpoint CRUD, config rotation/process death. Fix classes: uncancelled `Flow` collections, singleton holding Activity context, leaked `JobParameters`/callbacks, OkHttp `Call`/`ResponseBody` not closed, Coil requests outliving composables, SSE streams not cancelled. Acceptance: zero application leaks on scripted pass. |
+| Release verification gates (aligned AAB + 16 KB emulator + no-leak pass) | Compliance is only real if CI/device-verified; Play Console flags non-compliant AABs | LOW | `check_elf_alignment.sh` on release AAB in CI, `assembleRelease` + R8 green, smoke on 16 KB system image, LeakCanary pass clean, Play Console pre-launch report with no 16 KB/target-API warnings. |
 
 ### Differentiators (Competitive Advantage)
 
-Features that set Warped apart. Perplexity/ChatGPT web patterns inform, but on-device + offline-first is Warped's edge.
+Not required by Play, but valuable for an on-device LLM app where sessions are long and models are huge.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Sources preview UI (tap source → preview extracted text in-chat) | Trust pattern from Perplexity (citations as "receipts"); in-chat preview avoids leaving the app via Custom Tab/browser. No mobile competitor does *extracted-text* preview — they link out | MEDIUM | Bottom sheet (`ModalBottomSheet`) showing stored extracted text per source (title/domain, char count, truncated flag), with "Abrir en navegador" action. Requires persisting extracted text per message (Room: new `grounded_sources` table or JSON column on MessageEntity: url, title, snippet/extract, status). Cache hit = instant preview, no re-fetch. Design decision: full extracted text (up to 64KB cap each) vs snippet — recommend full-with-scroll, it's already sanitized and local. |
-| Per-chat web toggle (per-conversation override of global default) | Power-user control: research chats grounded, creative/coding chats not. ChatGPT/LM Studio have no per-chat web toggle — genuine differentiator | LOW–MEDIUM | Tri-state per conversation: `null` (follow global) / `true` / `false`. Needs Room migration (new nullable column on `ConversationEntity` + migration v15), chat header/menu UI (overflow menu or header icon), resolution `effectiveEnabled = override ?: globalDefault`. Keep tri-state, NOT boolean — boolean forces backfill and breaks "follow global" semantics. |
-| Per-message override (skip grounding for one message) | Lightweight escape hatch: "answer from memory" without toggling the chat. Cheap to add once per-chat toggle exists | LOW | Long-press send / chip toggle on composer ("Sin web" chip when grounding would trigger). Pass-through flag on the send path only; no persistence needed. |
-| Offline retry queue (retry fetch when back online) | Offline-first is Warped's core value; local chat works offline but grounding silently degrades. Queue turns failed-only-offline fetches into retry | MEDIUM | Two scopes possible (see dependencies). Recommended: **message-scoped retry** first (see MVP). Full WorkManager persistent queue (NetworkType.CONNECTED + exponential backoff) is the Android-canonical pattern (developer.android.com offline-first guide) but is heavier; message-scoped `ConnectivityManager.registerDefaultNetworkCallback` + one-shot re-fetch is enough for chat UX. Must distinguish OFFLINE (retryable) from FETCH_FAILED (not retryable) — existing `GroundingResult.Reason` already does this. |
-| Fused multi-source answer hints (numbered context blocks the model can cite) | Extending `[WEB CONTEXT]` to numbered `[WEB CONTEXT 1..N]` with per-block source URL lets even small local models attribute ("según [2]…") without any citation-parsing machinery | LOW | Prompt-engineering only: `GroundingPrompt.buildBlock` gains index + total. No model output parsing (unlike Perplexity's bracket-pill system — explicitly out of scope, see anti-features). |
+| Leak-free multi-hour chat sessions (ViewModel + Flow hygiene) | On-device LLM apps die by a thousand retained chat states; surviving long sessions is the core-value multiplier | MEDIUM | `collectAsStateWithLifecycle`, `viewModelScope` cancellation on clear, single-flight `runInference` cancel propagation, transient Using-rows cleanup. Builds directly on v2.1 cancellable-inference work. |
+| Model-memory discipline (load/unload without retained engine) | A 4–8 GB model that can't fully unload bricks the phone; clean unload → reload is the LM-Studio-grade expectation | MEDIUM | EngineManager releases native handles on switch/unload, no static `LlmInference` refs, memory-pressure listener suggests smaller quant. Device-verified on real phone (emulator RAM behavior differs). |
+| Grounding-pipeline cancellation hygiene (5-fan-out + Tavily + SSE) | Parallel fetch + streaming + search is the leakiest surface (5 concurrent OkHttp calls, SSE accumulators, per-source progress); clean cancel = no zombie network + no retained chat rows | MEDIUM | Structured-concurrency scope per message-send, `Stop` cancels fan-out + SSE + Tavily, same-row reuse without retaining old jobs. v2.3/v2.4 cancel guards are the foundation. |
+| Coil thumbnail cache discipline (disk-bounded, composable-scoped) | OG thumbnails per source can balloon image cache across long grounded threads; bounded cache = smooth scroll without OOM | LOW | Coil 3.4.0 singleton + disk cache (already in v2.4), verify requests cancel on list recycle, cap memory cache for chat context. |
+| Faster cold start / lower battery from 16 KB pages | Google cites 3–30% launch improvement, ~4.5% battery gain on 16 KB devices — free marketing + real UX win for a heavyweight app | LOW | No extra work beyond 16 KB support; optionally record before/after cold-start on reference device as release note. |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| Model-emitted inline citation pills (`[1]` tappable in response text) | Looks like Perplexity; "real" grounded UX | Requires parsing/validating model output citations — small local models hallucinate markers, break Markdown rendering (brackets collide with link syntax), need renderer + copy-behavior surgery. Flaig (2026) teardown: inline citations are a 4-constraint compound problem (rendering, copy, portability, grammar). | Numbered Fuentes list + preview sheet (already planned). Model *may* reference [N] via prompt hints, but UI never parses response text for markers. |
-| Unlimited URL count per message | "More context = better answers" | Context-window overflow on small local models, battery/radio drain from N parallel fetches, prompt-injection surface scales with N. Perplexity retrieves many but *cites few* for a reason. | Hard cap 5 (milestone target), per-source char budget, total fused budget with tail truncation. |
-| Full WorkManager persistent grounding queue with history rewrite | "Never lose a grounding" | Grounding is turn-scoped and ephemeral — re-injecting fetched context into an old turn after reconnect rewrites history semantics (message already answered model-only). Persistent queue + re-answer flow is a second feature disguised as retry. | Message-scoped retry: banner/queued-state on the failed turn with "Reintentar" action when online; re-fetch re-runs the same turn (regenerate with context), doesn't patch history. Graduate to WorkManager only if message-scoped retry proves insufficient. |
-| JavaScript-rendered page support (WebView extraction) | Many modern pages are JS SPAs; heuristic extractor gets shells | WebView per-URL fetch is slow (seconds), memory-heavy, breaks `Dispatchers.IO` threading (WebView is main-thread), and executes arbitrary JS = XSS/prompt-injection escalation. | Keep heuristic HTML→text; mark JS-shell pages as skipped (empty-extract → skip path already exists). Revisit only via research spike on extraction quality. |
-| Auto-grounding linkified URLs inside *model responses* | "Everything clickable should ground" | Recursive fetch loop risk (response links trigger fetches trigger responses), unbounded network use, unpredictable latency mid-stream. | Ground only user-pasted URLs in user messages (current v2.2 semantic). Response URLs render as plain links. |
+| Rewriting inference/network stack "while we're at it" | Compliance milestone feels like a good time to modernize | Scope explosion; LiteRT-LM 0.17.1 + OkHttp/SSE + Coil stack is proven (494/494 green in v2.4). Touching it risks regressions with zero Play benefit | Freeze engine/network deps; only bump AGP/NDK/compileSdk/targetSdk + what's needed for alignment |
+| Shipping LeakCanary (or any heap-dump tooling) in release | "Detect leaks in production" | Heap dumps freeze the app, leak PII/chat content to disk, bloat release APK; Play pre-launch + debug pass is the right venue | `debugImplementation` only; release gets lightweight `WorkInfo.getStopReason()` logging + crash-handler OOM breadcrumbs |
+| `android:largeHeap="true"` as the leak fix | Quick OOM suppression | Masks real leaks, hurts system-wide memory, doesn't survive Play review scrutiny for behavior; delays the actual audit | Fix retention roots; use `largeHeap` only if a specific model-load path proves it necessary with profiler evidence |
+| Blanket `enableOnBackInvokedCallback=false` + orientation-lock compat flags as permanent fixes | Fastest way to silence API 36 behavior changes | Accumulates compat debt; Google removes these escape hatches (as it just did with edge-to-edge opt-out) | Use opt-outs only as stopgaps with a tracked follow-up; ship real edge-to-edge + predictive back + adaptive layout |
+| Dropping 32-bit ABIs / minSdk bump to dodge 16 KB work | Fewer .so to align | 16 KB requirement targets 64-bit; 32-bit alignment has its own edge cases, and minSdk bumps cut off real users for no benefit | Keep ABI/minSdk surface unchanged; align what ships, verify per-ABI with the alignment script |
+| Custom native memory manager / manual `mmap` tuning for 16 KB | "Optimize" page handling by hand | LiteRT-LM owns native allocation; hand-tuning against its allocator invites corruption that only reproduces on 16 KB hardware | Rebuild with NDK r28+ defaults, test, and file upstream issues if a bundled .so is misaligned |
 
 ## Feature Dependencies
 
 ```
-[Multi-URL fetch]
-    └──requires──> [UrlDetector returns list]
-    └──requires──> [GroundingResult.Grounded becomes list]
-    └──requires──> [GroundingPrompt numbered blocks]
-    └──requires──> [WebContextSanitizer per-block]
-    └──requires──> [Chip progress state (done/total)]
+16 KB page support
+    └──requires──> AGP 8.5.1+ / NDK r28+ toolchain bump
+                       └──requires──> LiteRT-LM AAR (0.17.1) ships 16 KB-aligned .so
+                                              (if misaligned: needs upstream fix or repackaging)
 
-[Sources preview UI]
-    └──requires──> [Multi-URL fetch] (N sources to preview)
-    └──requires──> [Persist extracted text per message (Room)]
-                        └──requires──> [Room migration v15]
+targetSdk 36 audit
+    ├──requires──> compileSdk 36 first (zero-behavior-change step)
+    ├──requires──> Edge-to-edge UI ──enhances──> chat/bottom-sheet visuals
+    ├──requires──> Predictive-back migration
+    └──requires──> FGS types + WorkManager quota conformance ──enhances──> model downloads + offline retry
 
-[Per-chat web toggle]
-    └──requires──> [Room migration v15 (nullable override column)]
-    └──requires──> [Effective-flag resolution (override ?: global)]
-    ├──enhances──> [Per-message override] (same send-path flag)
+Memory-leak audit + fixes
+    ├──requires──> LeakCanary debug harness
+    ├──covers──> EngineManager / model load-unload
+    ├──covers──> Chat Flows + single-flight runInference cancel
+    ├──covers──> Grounding fan-out (multi-URL + Tavily) + SSE accumulators
+    ├──covers──> Coil OG thumbnails + OkHttp clients
+    └──requires──> NOTHING new in user features (audit-only; no behavior change expected)
 
-[Offline retry queue (message-scoped)]
-    └──requires──> [OFFLINE vs FETCH_FAILED distinction] (already exists)
-    └──requires──> [Partial grounding] (know which URLs to retry)
-    ├──enhances──> [Sources preview UI] (retry fills preview cache)
+Release gates ──requires──> all three above (alignment script + 16 KB emulator smoke + zero-leak pass)
 ```
 
 ### Dependency Notes
 
-- **Multi-URL fetch requires UrlDetector list:** current detector returns first URL only (v2.2 semantic). Must return ordered distinct list, capped at 5, with same-scheme validation.
-- **Multi-URL fetch requires GroundingResult reshape:** `Grounded(block, url)` → `Grounded(sources: List<GroundedSource>)` where `GroundedSource(url, block, extract, title?)`. Everything downstream (ChatViewModel injection, Fuentes UI, banner logic) keys off this type — reshape first, it's the keystone change.
-- **Sources preview requires persistence:** extracted text lives only in the prompt today. Persist per assistant message (FK to MessageEntity) so preview works after restart/scroll without re-fetch.
-- **Per-chat toggle and preview both need Room migration:** combine into a single migration v15 (one `ConversationEntity` column + one new `grounded_sources` table) to avoid two migrations in one milestone.
-- **Retry enhances preview:** a successful retry populates the same persisted source rows the preview sheet reads — no separate cache path.
-- **Banner logic conflict:** current banner shows on any model-only turn. With partial grounding, banner must fire only on all-fail; per-source skip is chip-level, not banner-level. Update banner condition when partial grounding lands — same phase, not separate.
+- **16 KB requires toolchain bump:** AGP auto-aligns at packaging and NDK r28 compiles aligned by default — the cheapest path is upgrading, not hand-editing linker flags (`-Wl,-z,max-page-size=16384` is the legacy manual route for NDK ≤ r27).
+- **LiteRT-LM .so is the critical external dependency:** Warped ships no hand-written JNI (llama.cpp removed in v1.5); if the bundled LiteRT-LM native lib is misaligned, the fix is an upstream version bump or ABI repackaging — verify first with APK Analyzer before assuming work is needed.
+- **compileSdk before targetSdk:** raising `compileSdk` to 36 changes nothing at runtime and surfaces deprecations; `targetSdk 36` is what flips edge-to-edge/predictive-back/resizability — sequence them as separate verifiable steps.
+- **Leak audit conflicts with feature work in the same phase:** audit needs a frozen surface to get a stable baseline; combining with UI rewrites invalidates the pass. Keep v2.5 audit-only.
+- **WorkManager quota work enhances downloads:** existing background-download progress/cancel + offline-retry flows become the conformance test bed — no new download feature needed.
 
 ## MVP Definition
 
-### Launch With (v2.3)
+(v2.5 is a compliance + stability milestone, so "MVP" = minimum shippable Play-compliant release.)
 
-- [ ] Multi-URL fetch (2–5, parallel `async`/`awaitAll`, per-URL caps, numbered fused blocks) — core milestone promise
-- [ ] Numbered Fuentes list for N sources + progress chip (`done/total`, skip counts) — table stakes once N>1
-- [ ] Partial grounding (fail-one-keep-rest, all-fail banner only) — correctness requirement of multi-fetch
-- [ ] `GroundingResult` list reshape + `UrlDetector` list + numbered `GroundingPrompt` — keystone refactor enabling everything
-- [ ] Per-chat web toggle (tri-state, migration v15, header/menu UI) — headline differentiator, cheap once migration exists
-- [ ] Sources preview bottom sheet reading persisted extracts — headline differentiator; persist in same v15 migration
-- [ ] Message-scoped offline retry (queued state + "Reintentar" on reconnect, OFFLINE-only) — offline-resilience promise without WorkManager weight
+### Launch With (v1 — this milestone, P1)
 
-### Add After Validation (v2.3.x)
+- [ ] 16 KB alignment verified — every shipped `.so` 16 KB-aligned (`check_elf_alignment.sh` green), AGP/NDK bumped, 16 KB emulator smoke passes — without it Play blocks updates
+- [ ] targetSdk 36 + behavior audit closed — edge-to-edge real (no opt-out), predictive back migrated, large-screen smoke, FGS/WorkManager quota conformance for downloads — without it Play blocks updates on the annual deadline
+- [ ] Zero-application-leak pass — scripted LeakCanary sweep over model load/switch/unload, streaming + Stop, 5-URL grounding + cancel, offline→retry, thumbnail scroll; all found application leaks fixed and re-verified
+- [ ] Release gates green — aligned AAB, `assembleRelease` + R8, Play Console with no 16 KB/target warnings
 
-- [ ] Per-message "Sin web" composer override — trigger: users ask for one-off model-only answers
-- [ ] Preview "Abrir en navegador" (Custom Tab) — trigger: users want full page after reading extract
-- [ ] Total fused-context budget tuning per model context size — trigger: overflow reports on small local models
+### Add After Validation (v1.x — only if the pass surfaces them)
 
-### Future Consideration (v2.4+)
+- [ ] Cold-start / battery before-after numbers on reference device — trigger: 16 KB device available; feeds release notes
+- [ ] Memory-pressure UX (suggest smaller quant on low RAM) — trigger: audit finds OOM-adjacent paths that aren't leaks per se
+- [ ] Per-screen predictive-back animations polish — trigger: default migration works but feels abrupt in chat/sheets
 
-- [ ] WorkManager persistent grounding queue — why defer: message-scoped retry covers chat UX; persistent queue only pays off with background/drain semantics Warped doesn't need yet
-- [ ] Extraction quality upgrade (heuristic → robust HTML→text) — why defer: explicitly a research decision for this milestone; don't bundle with multi-URL
-- [ ] Model-output citation parsing — why defer: anti-feature (see above); revisit only with larger/more reliable local models
+### Future Consideration (v2+ — explicitly out of v2.5)
+
+- [ ] Engine/network dependency modernization — why defer: zero Play benefit, high regression risk on a 494-green stack
+- [ ] Production memory telemetry (telemetry-gated, privacy-reviewed) — why defer: needs PII story for chat content first
+- [ ] Tablet/foldable bespoke layouts — why defer: adaptive-fill compliance is enough; bespoke layouts are product work, not compliance
 
 ## Feature Prioritization Matrix
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| Multi-URL fetch + fused numbered context | HIGH | MEDIUM | P1 |
-| GroundingResult list reshape (keystone) | HIGH | LOW | P1 |
-| Partial grounding + all-fail banner fix | HIGH | LOW | P1 |
-| Per-chat web toggle (tri-state) | HIGH | LOW–MEDIUM | P1 |
-| Sources preview bottom sheet + persistence | HIGH | MEDIUM | P1 |
-| Message-scoped offline retry | MEDIUM | MEDIUM | P1 |
-| Progress chip (done/total) | MEDIUM | LOW | P1 |
-| Per-message override | MEDIUM | LOW | P2 |
-| Custom Tab "open in browser" | LOW | LOW | P2 |
-| WorkManager persistent queue | LOW | HIGH | P3 |
-| Model-output citation pills | LOW | HIGH | P3 |
-| JS-rendered extraction | LOW | HIGH | P3 |
+| 16 KB alignment verification | HIGH (installable on new devices; Play shippable) | LOW | P1 |
+| targetSdk 36 + edge-to-edge | HIGH (Play shippable; visible UI correctness) | MEDIUM | P1 |
+| Predictive-back migration | MEDIUM (correct back everywhere) | LOW | P1 |
+| FGS/WorkManager quota conformance | HIGH (downloads survive Android 16 quotas) | MEDIUM | P1 |
+| Memory-leak audit + fixes | HIGH (long-session stability = core value) | MEDIUM | P1 |
+| Large-screen adaptability smoke | MEDIUM (foldable/tablet correctness) | LOW | P1 |
+| Release gates (alignment CI + pre-launch) | MEDIUM (prevents regressions) | LOW | P1 |
+| Cold-start/battery numbers | LOW (release-note fodder) | LOW | P2 |
+| Memory-pressure UX | MEDIUM (graceful degradation) | MEDIUM | P2 |
+| Predictive-back animation polish | LOW (feel, not function) | LOW | P3 |
 
 **Priority key:**
 - P1: Must have for launch
@@ -123,23 +122,24 @@ Features that set Warped apart. Perplexity/ChatGPT web patterns inform, but on-d
 
 ## Competitor Feature Analysis
 
-| Feature | Perplexity (answer engine) | ChatGPT + browsing | LM Studio (desktop) | Our Approach |
-|---------|---------------------------|--------------------|---------------------|--------------|
-| Multi-source grounding | 6–12 sources retrieved, inline `[N]` pills + Sources card above response | 1–3 sources, footnote markers, paraphrase-heavy | No web grounding at all | 2–5 pasted URLs, numbered `[WEB CONTEXT N]` blocks + Fuentes list (no output parsing) |
-| Source preview | Source cards/chips open full pages | Footnote links open full pages (external) | N/A | In-chat bottom sheet over *extracted text* (offline-readable, no re-fetch) |
-| Per-chat/per-message web control | Always-on (retrieval is the product) | Per-message browsing toggle in some modes | N/A | Tri-state per-chat override + global default-ON + per-message escape hatch |
-| Offline behavior | Online-only product | Online-only product | Fully offline (no web) | Offline-first: local chat continues model-only; OFFLINE fetches queued for retry |
-| Citation trust model | Citations as receipts, persistent numbered | Inconsistent unless Deep Research | None | Fuentes list + preview = receipts without output parsing |
+| Feature | Google AI Edge Gallery (reference impl) | LM Studio (desktop) | Our Approach |
+|---------|----------------------------------------|---------------------|--------------|
+| 16 KB / target-API currency | Tracks latest AGP/NDK via Google maintainers; de-facto compliance reference for LiteRT-LM apps | Desktop — N/A (no Play policy pressure) | Match Gallery's toolchain posture (AGP 8.5.1+/NDK r28+), verify LiteRT-LM .so alignment the same way |
+| Edge-to-edge / predictive back | Compose-first, adopts new platform behaviors early | Desktop windowing — N/A | Real Compose insets + back-handler migration, no permanent opt-outs |
+| Leak/stability discipline | Sample-grade; not held to long-session bar | Long-session desktop app; process memory is abundant | Differentiate: audit explicitly for multi-hour chat + model switch + grounding cancel — the mobile-hard part neither reference fully covers |
 
 ## Sources
 
-- Existing codebase (HIGH): `data/grounding/` (WebPageFetcher, GroundingResult, HtmlToTextExtractor, UrlDetector, GroundingPrompt, WebContextSanitizer), `AdvancedPreferences.webGroundingEnabled` (DataStore), `ConversationEntity`/`MessageEntity` Room schema, `ChatViewModel` grounding call site
-- Setproduct "Designing AI chat interfaces" (2026) — citation-as-receipts pattern, Perplexity trust model, message-state checklist (MEDIUM)
-- Flaig "How Leading AI Apps Implement Inline Citations" (2026-04) — 4-constraint compound problem, Perplexity `[web:1]` uniform syntax, Markdown-collision warning (MEDIUM)
-- LibreChat PR #7032 (Perplexity sources menu + tooltips) — two-tab Search-vs-Sources menu precedent for preview UI (MEDIUM)
-- Android Developers: offline-first guide (read queue + WorkManager drain + exponential backoff), WorkManager BackoffPolicy docs (EXPONENTIAL default, LINEAR option, 10s min) (HIGH for platform pattern)
-- AnythingLLM #2827 (Perplexity citations populated from response object, not parsed) — precedent for persisting source metadata alongside message (LOW, single issue)
+- Android Developers — "Support 16 KB page sizes" (official guide: Play requirement for API 35+ on 64-bit, AGP 8.5.1+ auto-align, NDK r28+ default, APK Analyzer + `check_elf_alignment.sh`, 16 KB emulator images) — https://developer.android.com/guide/practices/page-sizes — HIGH
+- Android Developers Blog — "Prepare your apps for Google Play's 16 KB page size compatibility requirement" (Nov 1 2025 enforcement, benefits data) — https://android-developers.googleblog.com/2025/05/prepare-play-apps-for-devices-with-16kb-page-size.html — HIGH
+- Android Developers Blog — "Transition to using 16 KB page sizes for Android apps and games using Android Studio" (who must recompile, Studio tooling table) — https://android-developers.googleblog.com/2025/07/transition-to-16-kb-page-sizes-android-apps-games-android-studio.html — HIGH
+- Android Developers — "Behavior changes: Apps targeting Android 16" (edge-to-edge opt-out removal, predictive back default, large-screen constraint ignore, fixed-rate scheduling) — https://developer.android.com/about/versions/16/behavior-changes-16 — HIGH
+- Android Developers — "Behavior changes: all apps" (JobScheduler quota by standby bucket, FGS-concurrent quota, `STOP_REASON_TIMEOUT_ABANDONED`, affects WorkManager/DownloadManager) — https://developer.android.com/about/versions/16/behavior-changes-all — HIGH
+- Community migration guides (API 34/35 → 36 practical guide; Halodoc Android 16 journey: FGS types, edge-to-edge, compat-flag sequencing) — MEDIUM (single-source, consistent with official docs)
+- LeakCanary official docs — "How LeakCanary works" (ObjectWatcher on destroyed Activity/Fragment/View/ViewModel, retained threshold → heap dump → analysis → categorization) — https://github.com/square/leakcanary/blob/main/docs/fundamentals-how-leakcanary-works.md — HIGH
+- LeakCanary GitHub (square/leakcanary, ~30k stars, Apache-2.0; debug-only integration, instrumentation fail-on-leak listener) — HIGH
+- Community LeakCanary fix patterns (remove callbacks on destroy, avoid Activity-context singletons, cancel unscoped coroutines) — MEDIUM (patterns consensus, verify per-leak against heap trace)
 
 ---
-*Feature research for: Warped v2.3 Web Grounding v2 (multi-URL, preview, per-chat toggle, retry)*
-*Researched: 2026-09-28*
+*Feature research for: v2.5 Play Compliance + Leaks (16 KB, API 36, memory-leak audit)*
+*Researched: 2026-09-30*

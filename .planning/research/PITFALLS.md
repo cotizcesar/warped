@@ -1,183 +1,173 @@
-# Pitfalls Research: v2.3 Web Grounding v2
+# Pitfalls Research
 
-**Domain:** Android LLM chat app (Warped) — extending a shipped single-fetch grounding pipeline to multi-URL fetch, source previews, per-chat toggle, offline retry
-**Researched:** 2026-09-28
-**Confidence:** HIGH (repo-verified: v2.2 grounding shape, ChatViewModel hook, Room transcript, DataStore prefs); MEDIUM (Android/OkHttp/coroutine standard practices cited below); LOW where flagged (extraction-library decision still open per milestone scope)
-
-> Scope note: v2.2 shipped heuristic single-fetch grounding (`data/grounding/`, `[WEB CONTEXT]` block, hijack sanitization, offline fallback, default-ON toggle). Its pitfalls (indirect injection, SSRF/private-IP, unbounded fetch) are recorded in the v2.2 PITFALLS research and remain in force. This file covers only what is **new or amplified** when extending that pipeline. Do not regress the v2.2 defenses.
+**Domain:** Play compliance retrofit (16 KB pages + target API 36) + memory-leak audit on an existing LiteRT-LM / Compose chat app
+**Researched:** 2026-09-30
+**Confidence:** HIGH (16 KB + API 36 behavior changes from official Android docs); MEDIUM (leak patterns from community sources + codebase-shaped inference)
 
 ## Critical Pitfalls
 
-### Pitfall 1: Parallel fetch storm — slowest page sets latency, bursty connections waste radio/battery
+### Pitfall 1: LiteRT-LM native `.so` ships unaligned and you can't fix it yourself
 
 **What goes wrong:**
-2–5 URLs per message fetched naively (`async` × N with no limits) means every grounded turn opens up to 5 TLS connections at once, and total latency equals the *slowest* page. On mobile networks one stalled host turns a 1s grounding step into a 10–15s hang. Bursty parallel connections also keep the radio in high-power state longer than sequential or bounded fetch, draining battery per turn.
+App installs fine on 4 KB devices but Play Console flags "not 16 KB compatible", and on 16 KB-kernel devices the app either refuses to install or crashes at `System.loadLibrary` / first inference with a linker `SIGSEGV` (RELRO segment misalignment is the classic signature).
 
 **Why it happens:**
-The v2.2 fetcher was built for one URL: one call, one timeout, done. Scaling that loop to N without a concurrency policy feels like no change ("just `awaitAll()`"), but the failure mode changes from single-timeout to tail-latency-dominated. OkHttp's default `Dispatcher` (64 max requests, 5 per host) won't save you — it caps abuse, it doesn't bound *your* turn latency.
+Unlike the old llama.cpp era (CMake-built from source, where you add `-Wl,-z,max-page-size=16384` yourself), LiteRT-LM arrives as a **prebuilt Maven AAR**. Its `.so` ELF alignment is decided by Google's build, not yours. Developers bump `compileSdk` and assume they're done, never running `check_elf_alignment.sh` or APK Analyzer on the LiteRT AAR. Transitive native deps (e.g. an old `libc++_shared.so` from NDK ≤ r26, SQLCipher's native lib) can each independently break alignment.
 
 **How to avoid:**
-1. Bound concurrency explicitly: `async` fan-out inside a `supervisorScope` with a per-fetch timeout (e.g. 8s each) AND an overall deadline (e.g. 12s total). First-N-wins or deadline cutoff: pages that miss the deadline are dropped with a "source unavailable" marker, never awaited indefinitely.
-2. Fail-partial, never fail-all: one host down must not poison the other four. `supervisorScope` (child failure doesn't cancel siblings) is mandatory — bare `coroutineScope` + `awaitAll()` cancels everything on the first exception.
-3. Reuse a single OkHttpClient (connection pooling, one Dispatcher) rather than a client per fetch. Consider `dispatcher.maxRequestsPerHost` tuning if grounding hammers one domain.
-4. Show per-source progress ("Fetching 2/5…") via the existing `isFetchingWeb` transient state extended to a count, so a stalled page is visible, not a mystery hang.
+1. Upgrade AGP to 8.5.1+ (uncompressed `.so` with 16 KB zip alignment) and NDK to r28+ (16 KB ELF by default) — then you only have to worry about prebuilts.
+2. Run APK Analyzer → Alignment column, plus `zipalign -c -P 16 -v 4 app.apk` and the `check_elf_alignment.sh` script on every release candidate.
+3. If LiteRT-LM's `.so` is UNALIGNED, the only fix is upgrading to a LiteRT-LM version built with 16 KB support — track the release notes, don't try to repack the AAR.
+4. Test on a real 16 KB environment: emulator "Google APIs Experimental 16KB Page Size" image or Pixel 8+ "Boot with 16KB page size" developer option, `adb shell getconf PAGE_SIZE` → must return `16384`.
 
 **Warning signs:**
-- `awaitAll()` inside `coroutineScope` (not `supervisorScope`) in the multi-fetch design.
-- No overall deadline — only per-request timeouts.
-- A new OkHttpClient instantiated per URL.
-- Plan mentions "parallel fetch" with no dropped-source policy.
+- Play Console 16 KB warning on the release track.
+- `backcompat mode` warning dialog on first launch on a 16 KB device (package manager silently compat-modes your app — works today, Play blocks updates from Feb 2027).
+- Crash in native load with RELRO/`mmap` in the tombstone and no Kotlin frames.
 
 **Phase to address:**
-Multi-fetch + context-budget phase (first v2.3 phase — the fetch policy is the foundation everything else builds on).
+16 KB phase, first. It gates the entire Play release; everything else is moot if the AAB is rejected.
 
 ---
 
-### Pitfall 2: Context-budget blowout — 5 pages × current caps overflow small on-device windows
+### Pitfall 2: Bumping `targetSdk` to 36 without auditing the three behavior cliffs (edge-to-edge, predictive back, large-screen resizability)
 
 **What goes wrong:**
-v2.2 caps (~4k chars/page, ≤3 URLs ≈ 3k tokens) were sized for *one* fetch. Naively keeping the per-page cap and raising the URL count to 5 injects ~5–7k tokens of web context into models whose total windows can be 4–8k. Result: the grounding context evicts conversation history, or LiteRT-LM inference OOMs / slows to a crawl on-device — the exact memory pressure v2.1–v2.2 fought (smart presets, `largeHeap` awareness).
+Chat UI that looked fine on API 35 suddenly draws under the status/nav bars with unreadable input, back-gesture from a bottom sheet or chat navigates wrong (or `onBackPressed` silently stops firing), and on tablets/foldables the locked-portrait chat stretches or loses state on rotation because orientation/resizability restrictions are ignored on `sw600dp+`.
 
 **Why it happens:**
-Caps were designed as per-page constants, not as a *global budget* to be divided. Developers raise `MAX_URLS` without touching the char cap, and no test asserts total grounded tokens against the active model's window.
+`targetSdk 36` is not a version number — it opts into new platform contracts. The three that bite this app: (a) `windowOptOutEdgeToEdgeEnforcement` is deprecated AND disabled — no escape hatch; (b) predictive back animations are on by default and `onBackPressed`/`KEYCODE_BACK` stop being dispatched unless migrated or opted out via `android:enableOnBackInvokedCallback="false"`; (c) `screenOrientation`, `resizableActivity`, min/max aspect ratio are ignored on large screens (compat opt-out via `PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY` is temporary — gone at API 37).
 
 **How to avoid:**
-1. Replace per-page constants with a **global grounding budget** (e.g. 3–4k tokens total) divided across successfully fetched pages: `perPage = budget / pagesFetched`. Truncation gets a `…[truncated, N chars omitted]` marker per page so the model knows content is partial.
-2. Budget against the *active model's* context window (the allowlist already carries model metadata — reuse that read path). Small-window local models get fewer/shorter pages than large-window remote ones.
-3. Fuse-then-rank, don't just concatenate: if extraction quality work lands (milestone open question), prefer first-paragraph/lead extraction per page over tail truncation — lead paragraphs carry more signal per token for grounding.
-4. Add a budget assertion test: 5 × max-size pages → total `[WEB CONTEXT]` block ≤ budget, every page marked truncated.
+1. Do a dedicated API-36 audit pass before flipping `targetSdk`: `WindowInsets` handling in chat (pill input + `LazyColumn` padding), back handling (`OnBackPressedDispatcher` / predictive-back APIs) in chat, sheets (Sources preview), and pickers.
+2. Decide explicitly per cliff: migrate (insets + predictive back) vs. temporary opt-out with a dated TODO. Never opt out silently without recording it as tech debt.
+3. Test on a large-screen emulator (tablet/foldable, `sw600dp+`) with rotation — activity re-creation wipes chat draft/scroll state if not saved via `rememberSaveable`/`SavedStateHandle`.
+4. Use the compat-framework flags (`UNIVERSAL_RESIZABLE_BY_DEFAULT`) to preview breakage before the flip.
 
 **Warning signs:**
-- `MAX_URLS` raised with the per-page char cap untouched.
-- No test asserting total context size for the 5-URL worst case.
-- Grounding built before the extraction-quality decision (budget numbers depend on extraction density).
+- `windowOptOutEdgeToEdgeEnforcement` still referenced in themes — dead on 36, and masking missing insets support on 35.
+- Custom back interception (chat "Stop"/sheet dismiss) implemented via `onBackPressed` instead of the dispatcher.
+- `screenOrientation="portrait"` in the manifest (ignored on large screens at 36 — layout must be adaptive).
 
 **Phase to address:**
-Multi-fetch + context-budget phase (same phase as Pitfall 1 — fetch policy and token budget are one review, not two).
+Target-API-36 phase, before any leak-fix refactoring (behavior audit first, code churn second).
 
 ---
 
-### Pitfall 3: Stop doesn't stop N fetches — cancellation doesn't propagate to the fan-out
+### Pitfall 3: Local-network permission blindsides LAN endpoints (Ollama / LM Studio / Custom)
 
 **What goes wrong:**
-v2.1 built cancellable single-flight inference (`Call.cancel()`, Stop means stop). Multi-fetch adds N concurrent network calls inside the pre-inference hook. If the fan-out scope isn't a child of the cancellable `generationJob`, pressing Stop cancels inference but leaves up to 5 fetches running — wasted data/battery, and late-arriving pages can race into the *next* turn's context.
+Remote chat to `http://192.168.x.x:11434` (Ollama) or LM Studio on LAN works on the developer's API-35 phone but fails on Android 16 with `sendto failed: EPERM` socket errors. Looks exactly like a server bug or an OkHttp regression — it isn't.
 
 **Why it happens:**
-The grounding hook runs *before* `runInference`, so it's tempting to launch it in the ViewModel scope rather than inside the cancellable generation job. Single-fetch was fast enough that the leak window was invisible; 5 parallel fetches with a 12s deadline make it a real race.
+Android's Local Network Protection gates LAN traffic behind a runtime permission (Nearby devices group, `NEARBY_WIFI_DEVICES` today, dedicated permission in the enforcement release). Restrictions apply to **all** sockets including OkHttp/Cronet, native code, mDNS/`.local` resolution. The app's whole remote-provider surface is LAN-first (Ollama/LM Studio are almost always RFC-1918 addresses), so this is a first-order breakage, not an edge case.
 
 **How to avoid:**
-1. Launch the entire fetch fan-out as a child of the existing cancellable `generationJob` (same discipline as inference). Structured concurrency then cancels all N calls on Stop for free.
-2. Use a shared OkHttp `Call` handle per fetch and cancel via coroutine cancellation (OkHttp's `suspend` extension / `Call.cancel()` on `ensureActive()` paths) — don't rely on timeout alone.
-3. Guard against late arrival: generation counter / single-flight check before appending fetched pages to context, so a cancelled turn's pages can never leak into the next turn.
-4. Regression test: start grounded turn → Stop mid-fetch → assert zero network callbacks fire afterward and next turn contains no stale pages.
+1. During the API-36 phase, opt into restriction early: `adb shell am compat enable RESTRICT_LOCAL_NETWORK <pkg>` + reboot, then exercise every remote provider over LAN.
+2. Declare `NEARBY_WIFI_DEVICES`, add the permission rationale flow, and handle deny/revoke gracefully (remote fails with a clear "grant nearby-devices to reach LAN servers" message, not a generic network error).
+3. Distinguish LAN vs. internet failures in error mapping — `EPERM` on RFC-1918/`*.local` → permission guidance; elsewhere → existing retry/error path.
+4. Watch the 25Q4+ guidance for casting/media-picker carve-outs — re-check before release.
 
 **Warning signs:**
-- Fetch launched in `viewModelScope` instead of the generation job scope.
-- Stop tested only for inference, not for a mid-fetch Stop.
-- No generation-epoch check between fetch completion and prompt build.
+- Endpoint "test connection" passes on emulator (host loopback) but fails on physical device on Wi-Fi.
+- Bug reports that only mention Ollama/LM Studio (LAN) while OpenAI/Anthropic (internet) work.
 
 **Phase to address:**
-Multi-fetch + context-budget phase. Cancellation wiring is an exit criterion, not a follow-up.
+Target-API-36 phase (connectivity sub-pass). Verify with a real LAN endpoint, not just mocked HTTP tests.
 
 ---
 
-### Pitfall 4: Source preview storage — persisting full extracted text per source bloats Room and janks the list
+### Pitfall 4: The inference engine outlives the chat — EngineManager / session leak
 
 **What goes wrong:**
-Source preview ("tap a source to preview extracted text") needs the extracted text available after the turn. Storing full text for up to 5 pages per grounded turn as Room columns means the transcript table grows by ~20KB per grounded turn — chat history DB bloat, slower queries, slower backup, and `LazyColumn` recomposition passing multi-KB strings through every recompose. Storing nothing means previews break after process death or on old conversations.
+Each model switch or conversation leaves the previous LiteRT session/engine referenced. Memory climbs monotonically during a session-heavy day; eventually model load fails with OOM or the app is killed in background. LeakCanary points at a singleton holding an Activity/ViewModel-scoped object, or a native handle never released.
 
 **Why it happens:**
-The transcript is the convenient place (it's already persisted, already observed), so full text lands in a `sourcesJson`/`extractedText` column "temporarily" and never moves. The v2.2 transcript holds small rows; nobody re-evaluates the size assumption.
+The engine is a heavyweight singleton (correct), but its lifecycle methods (`close()`/session release) are only called on the happy path. Model switch, seamless-switch retry, GPU-constraint fallback, and process-death paths skip cleanup. Helpers captured in callbacks (inference listener → ViewModel → Compose) create reference chains back to destroyed screens. Native LiteRT handles are invisible to the JVM GC — the Java wrapper can be collected while native memory stays resident, so "no Java leak" ≠ "no leak".
 
 **How to avoid:**
-1. Two-tier storage: Room persists **metadata only** (URL, title, fetch timestamp, char count, truncation flag, content hash) + a short excerpt (~500 chars) for instant preview paint. Full text lives in an in-memory LRU cache (keyed by URL+hash, size-bounded, e.g. 10 entries / 200KB) with re-fetch-on-miss as the fallback.
-2. Cap the excerpt, index nothing full-text (no Room FTS on extracted content — query cost for zero user value).
-3. Pass stable IDs (not full strings) through Compose state; load preview text lazily on tap (`LaunchedEffect(sourceId)`), so list recomposition never touches page bodies.
-4. Decide the offline-preview policy explicitly: cached full text previewable offline; evicted/missing full text shows excerpt + "reconnect to reload" — consistent with the offline-first posture.
+1. Single owner, single close: EngineManager owns engine lifetime; sessions are scoped to the active conversation and closed on switch/disconnect/`onCleared`.
+2. Audit every early-return/exception path in load → inference → unload for a missing `close()` (try/finally, not happy-path calls).
+3. Never let the singleton capture Activity/Fragment/ViewModel references — application context only, callbacks via weak refs or Flow.
+4. Verify with a load → chat → switch-model → repeat loop under memory profiler; native (not just Java heap) must return to baseline.
 
 **Warning signs:**
-- Room entity gains an `extractedText: String` (unbounded) column.
-- Preview composable receives the full text as a parameter from list state.
-- No cache-size bound or eviction policy in the preview design.
+- "Model not loaded" or OOM after 2–3 model switches that a fresh start fixes.
+- Profiler shows native memory stair-stepping up per conversation while Java heap looks flat.
 
 **Phase to address:**
-Sources-preview + per-chat-toggle phase (storage shape must be decided before the preview UI is built, or the UI bakes in the wrong data source).
+Leak-audit phase, engine-lifetime workstream — fix before touching UI collectors (engine leaks dwarf UI leaks in MB).
 
 ---
 
-### Pitfall 5: Per-chat toggle precedence ambiguity — three layers, no defined override order
+### Pitfall 5: Streaming collectors that never cancel (chat Flows + SSE response bodies)
 
 **What goes wrong:**
-v2.3 adds per-conversation/per-message override on top of the v2.2 global default-ON toggle. Without an explicit precedence chain, edge cases produce wrong behavior: user disables globally but an old conversation re-enables; per-message toggle contradicts per-chat setting mid-thread; existing conversations (created before the column exists) read NULL and crash or silently default the wrong way.
+Stopping a stream (Stop button, navigating away, offline retry) leaves the coroutine collecting tokens alive plus the OkHttp `ResponseBody`/`BufferedSource` open. Leaked connections exhaust the connection pool ("A connection was leaked. Did you forget to close a response body?"), subsequent chats stall, and cancelled grounding fetches keep burning data in background.
 
 **Why it happens:**
-Each toggle is added where convenient (global in DataStore, per-chat as a Room column, per-message as transient UI state) and the resolution logic becomes an ad-hoc `if` chain scattered across ViewModel call sites. NULL-legacy handling is forgotten because all test conversations are created fresh.
+Three compounding mistakes: (a) collecting with `collectAsState()` / bare `launch` instead of lifecycle-aware collection (`collectAsStateWithLifecycle`, `repeatOnLifecycle`, `flowWithLifecycle`); (b) SSE parsing without a `use {}`/`finally` that closes the body when the coroutine is cancelled — `streamJob?.cancel()` only helps if cancellation actually closes the source; (c) `EventSource.cancel()` never called on the Stop path, or `SharedFlow` accumulators (the shared SSE accumulator from the remote agentic loop) holding emissions with no buffer eviction.
 
 **How to avoid:**
-1. Define and document ONE precedence function, pure and unit-tested: `effectiveGrounding(perMessageOverride?, perChatSetting?, globalDefault) -> Boolean`. Recommended: per-message (single-turn override) > per-chat (conversation setting, NULL = inherit) > global default-ON.
-2. Per-chat column nullable with NULL meaning "inherit global" — never backfill existing rows with a hardcoded value (that would silently override users' global choice on upgrade).
-3. Resolve the effective value at exactly one call site (the grounding hook), not in UI collectors. UI shows the *effective* state with its source ("On — from global default" vs "Off — for this chat") so users can predict behavior.
-4. Tests: matrix of (global × perChat NULL/true/false × perMessage null/true/false) = 12 cases; plus upgrade test opening a pre-v2.3 conversation (NULL column) asserting global applies.
+1. Rule: every streaming collection site gets lifecycle-aware collection; every SSE read loop gets `try { … } finally { body.close() / eventSource.cancel() }`.
+2. Re-audit the cancellable single-flight `runInference` work (v2.1) — "Stop means stop" must also mean "Stop means closed": cancel job → cancel EventSource → close body → clear accumulator.
+3. Cap and clear: shared accumulators cleared on conversation switch; grounding fan-out (cap 5) coroutines are children of a supervisor that the Stop/overlap guards actually cancel.
+4. Add a regression test: start stream → cancel → assert body closed / EventSource cancelled / no active jobs (fake EventSource + Turbine or `runTest`).
 
 **Warning signs:**
-- Toggle resolution logic duplicated in more than one place.
-- Non-nullable per-chat column with a default that isn't the global value.
-- Settings UI with no indication of which layer is currently deciding.
+- StrictMode / OkHttp "connection leaked" warnings in logcat after Stop or navigation.
+- Token callbacks firing into a disposed chat screen; progress UI (`Leyendo N de M…`) updating after cancel.
+- Connection pool exhaustion on long sessions with many remote calls.
 
 **Phase to address:**
-Sources-preview + per-chat-toggle phase. The precedence function and its 12-case test are entry criteria for any toggle UI work.
+Leak-audit phase, streaming workstream. Highest bug-density area (local loop + remote loop + grounding fan-out + offline retry all stream).
 
 ---
 
-### Pitfall 6: Offline retry queue — WorkManager overkill, duplicate retries, retrying the wrong thing
+### Pitfall 6: Image-loader and download-worker leaks (Coil singleton + WorkManager stream handling)
 
 **What goes wrong:**
-"Retry fetch when back online" sounds like a WorkManager job, but WorkManager's minimum periodic interval (15 min) and its persistent-job machinery are wrong for a chat-timescale retry (user expects seconds, not minutes). Misuse produces: duplicate enqueued workers per failed URL (5 URLs × retries = worker spam), retry firing long after the conversation moved on (stale context injected into a dead turn), battery drain from unconstrained retry loops, and retrying *inference* instead of just the *fetch*.
+OG thumbnails (Coil) and model downloads (WorkManager + OkHttp) leak slowly: chat with many grounded sources grows the image memory cache unbounded; a cancelled/retried multi-GB download leaves partial files plus open streams, and retry loops re-download from byte 0.
 
 **Why it happens:**
-WorkManager is the project's standard background tool (model downloads), so it becomes the default answer. But downloads are deferrable-by-nature; grounding retry is interactive-by-nature — different problem, different mechanism.
+(a) Coil: more than one `ImageLoader` (each with its own memory+disk cache), or a singleton built with an Activity context instead of application context — the loader pins the destroyed Activity. Per-source cards in a `LazyColumn` without size-bounded requests decode full-size OG images into a scrolling list. (b) WorkManager: download `ResponseBody` stream not closed in `finally`; progress listeners referencing the Worker after completion; `Result.retry()` without backoff/idempotence re-runs non-resumable downloads; partial files never cleaned on cancel.
 
 **How to avoid:**
-1. Prefer a lightweight foreground mechanism: `ConnectivityManager.NetworkCallback` (or existing `ConnectivityGate` extended to a Flow) → on reconnect, retry only the pending *fetch*, only if its conversation is still open and its turn still current (generation epoch check). No persistent workers for the common case.
-2. If WorkManager is used at all, reserve it for explicit user-requested "retry when online" with: `NetworkType.CONNECTED` constraint, `ExistingWorkPolicy.REPLACE` + unique work name per (conversationId, messageId) for dedup, `setBackoffCriteria(EXPONENTIAL)` with a max-attempt cap (e.g. 3), and input data carrying only URL + turn identity (never full context).
-3. Deduplicate by identity: one pending-retry record per (message, URL). New turn on the same conversation supersedes — cancel superseded retries, never pile them.
-4. Never auto-retry inference on reconnect — only the fetch. The user re-sends; the app doesn't hallucinate intent.
-5. Battery guard: retries only on actual connectivity *gain* events, never polling; cap attempts; drop retries for conversations closed >N minutes.
+1. Coil: exactly one `SingletonImageLoader.Factory` wired to the application context; bounded request sizes for thumbnail cards; verify disk-cache sizing (Coil 3.x defaults are sane — don't "tune" without measuring).
+2. Downloads: `use {}` on every body/stream, `finally` cleanup of partial files on cancel/failure, `Range`-resume where the server supports it, exponential backoff on retry, `setForeground()` notification cancelled with the work.
+3. Test: cancel a large download mid-flight → no FD leak, partial file removed or resumable; scroll a 20-source grounded chat → memory returns to baseline after leaving.
 
 **Warning signs:**
-- `PeriodicWorkRequest` with 15-min interval proposed for chat retry.
-- Worker input data containing prompt text or full context.
-- No unique-work-name / dedup story in the retry design.
-- Retry path re-triggers `runInference` instead of just re-fetch.
+- Memory grows with thumbnail count and never drops after leaving chat.
+- Duplicate/parallel download workers for the same model (missing single-flight / unique-work policy).
+- Retry storms on flaky Wi-Fi re-downloading gigabytes.
 
 **Phase to address:**
-Offline-retry phase (last functional phase — it depends on the fetch fan-out, preview cache, and toggle resolution all being final, since retry must respect all three).
+Leak-audit phase, media/download workstream. Lower severity than engine/streaming but user-visible (storage + data usage).
 
 ---
 
-### Pitfall 7: Injection surface × N — per-page sanitization drift and cross-page collusion
+### Pitfall 7: "Fixing" leaks by breaking threading or persistence (the remediation boomerang)
 
 **What goes wrong:**
-v2.2's hijack sanitization was built and adversarial-tested for ONE page. With 5 pages: (a) a new code path (fan-out merge, fused-context builder) can bypass or reorder sanitization for some pages — one unsanitized page poisons the whole fused block; (b) coordinated pages can run quorum attacks ("three independent sources agree: …ignore previous instructions…") which single-page adversarial tests never exercise; (c) the extraction-quality upgrade (if it changes HTML→text handling) can re-admit scripts/comments/metadata vectors the heuristic stripper removed.
+The leak fix introduces a worse bug: moving inference off a leaked scope onto the wrong dispatcher blocks the UI or crashes Room (SQLCipher) with "cannot access database on the main thread" / corrupt-state errors; closing a session too eagerly breaks seamless model switch or drops in-flight `grounded_sources` writes (Room v15/v16 migrations); aggressive `cancel()` kills the offline-retry `Reintentar` path that must survive.
 
 **Why it happens:**
-Sanitization lives at the single-fetch layer; the multi-page merge is written as *new* code that calls the fetcher but builds the context block itself. Security review covers "the fetcher" (unchanged, ✓) and misses "the new merge path" (untainted, ✗). Multi-page adversarial testing feels redundant ("we already test injection") so it's skipped.
+Leak fixes touch ownership and threading at once. Developers "fix" a retained ViewModel by scoping its job to the composable (now inference dies on rotation), or close shared resources (OkHttp client, Room DB, DataStore) that other screens still need. Room + SQLCipher adds a specific trap: leaked `Cursor`/unclosed transaction vs. premature `close()` — both corrupt or crash, and the failure surfaces far from the change.
 
 **How to avoid:**
-1. Sanitize at the narrowest choke point: ONE function `sanitizePage(raw) -> trusted-span` that every page passes through regardless of path (single, multi, retry-refetch, cache-hit). The merge step only concatenates already-sanitized spans — it must be *incapable* of inserting raw text (type-level if cheap: a `SanitizedText` inline class the builder accepts).
-2. Extend the v2.2 adversarial suite: multi-page cases — 1-of-5 malicious, 3-of-5 colluding (same instruction repeated), delimiter-mimic inside page 4, malicious content only in the truncated-away tail. Minimum bar before merge.
-3. Per-page provenance in the fused block (`--- source N: url, fetchedAt ---`), carried into the preview UI (Pitfall 4 metadata) so users can attribute influence per source.
-4. If extraction is upgraded (robust HTML→text), re-run the FULL adversarial suite against the new extractor before it touches the merge path — extractor change = security-relevant change, gated like one.
-5. Keep the v2.2 SSRF/private-IP/fetch-cap policy enforced per page AND on the fan-out (per-hop re-check already exists — verify the parallel path doesn't skip it).
+1. Separate the two concerns: fix *ownership* (who closes, when) without changing *dispatchers*; then review dispatchers separately.
+2. Never close shared singletons (OkHttp client, Room DB, DataStore, ImageLoader) from a screen/ViewModel — only conversation-/request-scoped resources.
+3. Keep the v2.1–v2.3 invariants as regression gates: single-flight inference, Stop semantics, same-row retry reuse, history-untouched retry, KV-channel hygiene. Every leak fix gets a re-run of those flows.
+4. Room: prefer structured transactions + `use {}` on cursors over manual open/close; never call `db.close()` from app code except tests.
 
 **Warning signs:**
-- Merge/fuse builder accepts raw `String` page bodies.
-- Adversarial tests only cover single-page cases.
-- Extraction upgrade PR with no adversarial re-run.
-- Fused block without per-source delimiters/provenance.
+- Leak fix PR also moves `withContext` dispatchers or adds `GlobalScope` — review flag, split the change.
+- Previously-green flows (Stop, retry, seamless switch) regress after a "cleanup" commit.
+- Crash reports migrate from OOM to `IllegalStateException` (closed resource) — you over-closed.
 
 **Phase to address:**
-Multi-fetch phase for the choke-point + adversarial tests (exit gate); extraction-upgrade work (whenever scheduled) must re-pass the same gate before merging.
+Every leak-fix plan needs a "no-boomerang" verification step; the milestone's final hardening pass re-runs Stop/retry/switch flows end to end.
 
 ---
 
@@ -185,107 +175,100 @@ Multi-fetch phase for the choke-point + adversarial tests (exit gate); extractio
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Reuse v2.2 per-page caps × 5 URLs, no global budget | Zero new logic | Context overflow on small-window local models; OOM-class bug shipped | Never — budget is day-one (Pitfall 2) |
-| `coroutineScope` + `awaitAll()` for fan-out ("simpler") | Less code | One bad host kills all pages; no partial results | Never — `supervisorScope` is the same line count |
-| Full extracted text in Room "for now" | Preview works immediately | DB bloat, slow queries, recomposition jank; migration needed to undo | Never — metadata + excerpt + LRU from the start (Pitfall 4) |
-| WorkManager periodic retry ("standard tool") | Familiar API | 15-min granularity, worker spam, stale-turn injection | Never for auto-retry; only for explicit user-scheduled retry with dedup (Pitfall 6) |
-| Per-chat toggle as non-null default-false column | No NULL handling | Silently overrides global-ON users' choice on upgrade | Never — nullable inherit (Pitfall 5) |
-| Merge path concatenates raw strings, "sanitizer runs earlier" | Faster merge code | One bypass poisons fused block; invisible until exploit | Never — choke-point sanitize (Pitfall 7) |
-| Retry re-runs inference on reconnect | "Feels seamless" | App acts on stale intent; unexpected data/battery use | Never — retry fetch only, user re-sends |
+| Rely on 16 KB backcompat mode instead of realigning | App "works" on 16 KB devices today, zero build changes | Play blocks updates from Feb 2027; compat mode warns users and is less stable | Never as the release strategy; only as a local-testing bridge |
+| `useLegacyPackaging = true` (compressed `.so`) to dodge zip-alignment | Dodges the AGP-8.5.1 upgrade | Larger installs, more install failures on low-storage devices, still need ELF alignment | Only if AGP upgrade is truly blocked; record as debt |
+| `enableOnBackInvokedCallback = false` blanket opt-out | Predictive-back crashes go away in one manifest line | Miss the platform navigation model; forced migration later | Acceptable as a stopgap iff each opted-out screen has a dated migration TODO |
+| `PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY` blanket opt-out | Tablet/foldable breakage hidden immediately | Forced breakage at API 37 with zero remaining escape hatch | Only per-activity, with adaptive-layout work scheduled |
+| Fix leaks with `System.gc()` / `onTrimMemory` cache clears | Memory graph looks better in a demo | Masks the real retention chain; leaks return under real use | Never — diagnose with profiler/LeakCanary, fix the reference |
+| Closing shared OkHttp client / Room DB to "stop a leak" | One leak warning disappears | Crashes every other consumer of the shared resource | Never |
+| Skipping the 16 KB emulator ("CI will catch it") | Saves an hour of setup | 16 KB failures are link-time/device-specific — unit tests cannot catch them | Never for the release candidate |
 
 ## Integration Gotchas
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| OkHttp fan-out | New client per URL; default timeouts inherited blindly | One shared client; per-fetch timeout + overall deadline; `maxRequestsPerHost` reviewed |
-| `ConnectivityGate` (v2.2) | Boolean check reused for retry ("poll until online") | Extend to a connectivity *Flow*; retry on gain-events only, never poll |
-| Room transcript | New columns for full page text + non-null toggle with wrong default | Metadata + excerpt columns only; nullable toggle (NULL = inherit global) |
-| ChatViewModel grounding hook | Second hook/branch for multi-URL alongside the v2.2 single path | One hook, N=1 is just the degenerate case — single code path for 1..5 URLs |
-| LiteRT-LM / LM Studio helpers | Per-backend budget tweaks scattered in helpers | Budget computed once in the hook from allowlist model metadata; helpers unchanged (v2.2 keystone discipline preserved) |
-| Preview UI ↔ cache | Preview reads Room full-text column directly | Preview reads LRU by content-hash; Room holds excerpt fallback; re-fetch on miss |
+| LiteRT-LM Maven AAR (native) | Assuming `targetSdk` bump covers 16 KB; never inspecting the AAR's `.so` | APK Analyzer + `check_elf_alignment.sh` + `zipalign -P 16` on every RC; upgrade LiteRT-LM if unaligned |
+| SQLCipher / Room native lib | Forgetting SQLCipher ships its own `.so` — app aligns but DB layer doesn't | Include SQLCipher's `.so` in the alignment check; upgrade SQLCipher alongside AGP/NDK |
+| Jsoup parse-only grounding | Treating Jsoup as pure-Java and skipping native checks | Jsoup core is pure JVM (safe), but verify no transitive native dep was added; keep the `never connect()` policy — network via OkHttp only |
+| Highlights syntax engine | Assuming a text library can't affect 16 KB | Same rule as Jsoup: pure-JVM is inherently 16 KB-safe, but still run APK Analyzer over the final APK rather than reasoning per-library |
+| Coil 3.x image pipeline | Second `ImageLoader` in a feature module; Activity context in factory | One app-scoped singleton via `SingletonImageLoader.Factory` with application context |
+| OkHttp SSE (all 5 remote providers) | `response.body` read without `use {}`; `EventSource` never cancelled on Stop | `use {}` + `finally { cancel/close }`; Stop path cancels job → source → body → accumulator |
+| Tavily / HF direct downloads | New endpoint added without LAN-permission analysis | Every new network integration gets a LAN-vs-internet classification + permission-path test |
+| Baseline Profiles / R8 (v2.1 Phase 48) | Leak-fix refactor renames classes without updating R8 keep rules or regenerating profiles | Re-run release build + profile generation after the leak pass; keep rules cover renamed engine/helper classes |
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Tail-latency fan-out | Grounded turns take 10s+ on flaky networks | Per-fetch timeout + overall deadline + drop policy (Pitfall 1) | First stalled host on mobile data |
-| Token-budget overflow | Slow inference, evicted history, RAM spike on-device | Global budget ÷ pages; model-window-aware (Pitfall 2) | First 5-URL turn on a small-window local model |
-| Cache without bounds | Preview cache grows to MBs over a long session | LRU with entry + byte caps; eviction test | Long grounding-heavy session on low-RAM device |
-| Re-fetch every follow-up | Same 5 URLs re-downloaded per turn in a thread | URL+hash cache with short TTL (e.g. 5–10 min) scoped per conversation | Second follow-up question on same sources |
-| Retry storms on flapping network | Connect/disconnect oscillation triggers fetch per flap | Debounce gain-events; dedup by (message, URL); attempt cap (Pitfall 6) | Elevator/tunnel commute usage |
+| 16 KB pages inflate RSS (single live object pins 16 KB) | App that fit in memory on 4 KB devices gets LMK-killed on 16 KB devices | Release empty pages (`madvise`-friendly pooling if custom allocators exist — LiteRT manages its own; keep model-window/grounding budgets tight); re-measure on 16 KB emulator | Large-model + grounding-budget + chat-history all resident on a 16 KB device |
+| Chat history `LazyColumn` retains all rendered messages | Scroll long conversations → jank then OOM; leak fix misdiagnosed as "engine leak" | Atomic sub-state / LazyColumn split (v2.1) must survive the leak pass; paginate or window history queries; keyed items with stable keys | 500+ message conversations with code blocks + thumbnails |
+| Streaming re-composition per token re-renders whole chat | Frame drops during streaming; "no jank" invariant (v1.6) regresses | Scoped recomposition (streaming text node only); deferred highlighting already in place — don't re-highlight per token | Fast remote models emitting many tokens/sec |
+| Unbounded grounding context (5 URLs × full text) | Prompt blows model window; inference slows or fails | Keep the model-window-aware grounding budget + adversarial/budget exit gates (v2.3); budget is a ceiling, not a target | Multi-URL grounding on small-window local models |
+| LeakCanary in release builds | Release APK slower/larger; Play pre-launch flags it | LeakCanary `debugImplementation` only; release verification via profiler + strictly-scoped manual testing | Any release candidate |
 
 ## Security Mistakes
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Merge path bypasses per-page sanitization | Single malicious page hijacks fused answer | Choke-point `sanitizePage`; merge accepts sanitized spans only (Pitfall 7) |
-| Colluding pages untested | Quorum-style instruction override succeeds | Multi-page adversarial suite incl. 3-of-5 collusion (Pitfall 7) |
-| Extractor upgrade without adversarial re-run | Re-admitted script/comment/metadata vectors | Extractor change gated on full adversarial suite |
-| Retry refetch skipping SSRF re-check | Redirect target changed since first fetch; LAN probe via retry | Same URL policy + per-hop checks on every refetch, including retries |
-| Preview rendering extracted HTML raw | Stored-XSS-adjacent: `WebView`/HTML render executes page content | Preview renders plain text only (extracted text, never raw HTML, never `WebView` with JS) |
-| Stale-turn retry injecting context | Retry lands in a conversation the user already left | Epoch check: retry applies only if conversation + turn still current |
+| LAN permission rationale collects more than needed | Over-requesting nearby-devices erodes trust; Play policy scrutiny | Request minimum, explain LAN-server use in rationale, handle deny gracefully |
+| Leak-fix logging dumps message content / API keys | PII/secret leak into logcat or leak-trace artifacts attached to bugs | Keep existing redaction (secret isolation from v2.4) in all new logging; scrub traces before sharing |
+| Copying native `.so` out of APK for alignment inspection and committing it | Proprietary binary in git; stale copy later mistaken for source of truth | Inspect in `/tmp`, never commit extracted `.so` files |
+| Disabling R8/ProGuard "to debug a leak" and shipping that build | De-obfuscated release with larger attack surface | Debug leaks on `debuggable` builds only; release always with shrinking+obfuscation |
 
 ## UX Pitfalls
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| "Fetching…" with no per-source detail | Mystery hang on 5-URL turns | Progressive state: "Fetching 2/5…", per-source success/failed markers, dropped-source note |
-| Failed source silently dropped | Answer cites sources that weren't actually read | Visible per-source status in Fuentes UI (✓/✗/truncated); answer never claims dropped sources |
-| Toggle layers disagree silently | User disables globally, old chat still grounds (or vice versa) | Show effective state + its source layer at the toggle site (Pitfall 5) |
-| Preview empty after process death | Tap source → blank, looks broken | Excerpt always available (Room); full text reload affordance when evicted |
-| Retry fires into a dead conversation | Surprise data use + confusing late banner | Retry only for the open conversation/current turn; silent-drop otherwise with no banner |
-| 5 sources, no attribution | Can't tell which source influenced which claim | Per-source numbered markers preserved from v2.2, extended per page; tap → preview (ties Pitfalls 4 + 7 together) |
+| Edge-to-edge without insets handling | Chat input hidden behind nav bar; messages under status bar | `WindowInsets` padding on chat scaffold, pill input above nav bar, scroll content clear of bars |
+| Predictive back breaking Stop/sheet UX | Back gesture dismisses whole chat instead of bottom sheet; Stop affordance confusing | Migrate back handling per-screen; sheet consumes back first; Stop remains an explicit button |
+| Permission wall for LAN without explanation | User denies nearby-devices, Ollama "never works", 1-star review | Pre-permission rationale ("reach your PC's LM Studio on Wi-Fi"), deep-link to Settings on deny |
+| Leak-fix induced state loss on rotation | Draft message / scroll position lost when rotating (new scope) | Preserve via `rememberSaveable`/`SavedStateHandle`; test rotation on phone + foldable |
+| 16 KB compat-mode warning dialog | User sees a scary system warning on first launch | Ship genuinely aligned — never let users see the compat dialog |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Multi-fetch:** Often missing partial-failure handling — verify 1-of-5 hostile/slow/dead still yields a 4-page grounded answer within the deadline
-- [ ] **Multi-fetch:** Often missing cancellation — verify Stop mid-fetch cancels all N calls with zero late-arriving pages in the next turn
-- [ ] **Budget:** Often missing worst-case assertion — verify 5 × max-size pages produce a `[WEB CONTEXT]` block within the global budget, all pages truncation-marked
-- [ ] **Budget:** Often missing model-awareness — verify a small-window local model gets a smaller grounding block than a large-window remote one
-- [ ] **Preview:** Often missing storage bounds — verify Room holds metadata + excerpt only, full text behind a bounded LRU, preview works from excerpt alone
-- [ ] **Preview:** Often missing plain-text rendering — verify preview never renders raw HTML / never uses `WebView` with JS
-- [ ] **Toggle:** Often missing precedence matrix — verify all 12 (global × perChat × perMessage) combinations resolve correctly
-- [ ] **Toggle:** Often missing legacy upgrade — verify a pre-v2.3 conversation (NULL column) follows the global default
-- [ ] **Retry:** Often missing dedup — verify flapping connectivity produces exactly one retry per (message, URL), superseded turns cancel
-- [ ] **Retry:** Often missing scope guard — verify retry re-fetches only, never re-runs inference, and never touches a closed conversation
-- [ ] **Security:** Often missing multi-page adversarial cases — verify 1-of-5 malicious, 3-of-5 colluding, and delimiter-mimic-in-page-N all fail to hijack
-- [ ] **Security:** Often missing refetch policy — verify retry and cache-miss refetch re-apply SSRF/private-IP checks and fetch caps
+- [ ] **16 KB support:** AGP/NDK bumped but APK never inspected — verify APK Analyzer Alignment column + `zipalign -c -P 16` + `check_elf_alignment.sh` on the actual release AAB/APK
+- [ ] **16 KB support:** App `.so` aligned but transitive `.so` (SQLCipher, LiteRT's `libc++_shared`) not checked — verify every `.so` under `lib/`
+- [ ] **16 KB support:** Tested on 4 KB emulator only — verify `getconf PAGE_SIZE` = 16384 in the test environment and smoke test model load + inference there
+- [ ] **API 36:** `targetSdk` bumped but `windowOptOutEdgeToEdgeEnforcement` still set — verify insets handling with the flag removed on API 35 and 36
+- [ ] **API 36:** Back navigation "works" via legacy `onBackPressed` — verify predictive-back animations on API 36 and per-screen back behavior
+- [ ] **API 36:** LAN endpoints tested on emulator only — verify real-device Wi-Fi test to Ollama/LM Studio with LNP restriction opted in
+- [ ] **Leak fix:** Java heap flat but native memory not measured — verify native RSS returns to baseline after switch-model / long-chat loops
+- [ ] **Leak fix:** Stop button stops tokens but connections not verified closed — verify no "connection leaked" warnings and pool recovers
+- [ ] **Leak fix:** Fix verified on happy path only — verify cancel-during-stream, switch-during-stream, rotation-during-stream, offline-retry paths
+- [ ] **Release:** R8 keep rules + Baseline Profiles regenerated after refactor — verify `assembleRelease` + startup-profile flow post-leak-pass
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Fetch storm / tail latency shipped | MEDIUM | Hotfix timeouts + deadline + drop policy; no schema change needed — reine in the fan-out, ship |
-| Budget blowout on small models | MEDIUM | Hotfix global cap + per-page division; consider grounding kill-switch pref while fixing; no migration |
-| Stop-leak / stale pages in next turn | MEDIUM | Move fan-out under generation job; add epoch check; regression test mid-fetch Stop |
-| Full text already in Room | HIGH (migration territory) | Ship migration moving bodies to cache/file store, leaving excerpt+metadata; or versioned table with cleanup worker — expensive, hence "never" in debt table |
-| Toggle precedence wrong post-ship | LOW–MEDIUM | Centralize resolver + backfill policy doc; if non-null default shipped, migrate values to nullable-inherit carefully |
-| Worker-spam retry shipped | LOW | Cancel all by tag, replace with connectivity-Flow retry; drain duplicate workers on upgrade |
-| Multi-page injection in the wild | HIGH (trust + safety) | Tighten choke-point, emergency adversarial patch, disclose; grounding kill-switch pref buys time |
+| Unaligned LiteRT-LM `.so` discovered late | MEDIUM (blocked on upstream) | Confirm via script → check for newer LiteRT-LM with 16 KB support → upgrade → re-verify; if none exists, ship interim with compat mode + expedite tracking issue (Play deadline Feb 2027) |
+| API-36 behavior regression shipped | MEDIUM | Compat-flag / manifest opt-out hotfix per cliff (back callback, resizability property) → schedule real migration; use staged rollout halt |
+| Engine/session leak in production | HIGH (OOM kills, data-loss risk on force-stop) | Hotfix close-paths on switch/disconnect → verify with profiler loop → release; meanwhile document "restart app" workaround |
+| SSE connection-pool exhaustion | MEDIUM | Hotfix `finally { close/cancel }` on all streaming sites → verify pool recovery → release |
+| Over-closed shared resource (boomerang) | MEDIUM | Revert to shared ownership, re-scope fix to request/conversation lifetime → re-run Stop/retry/switch regression suite |
+| Rotation state loss from re-scoping | LOW | Move state to `SavedStateHandle`/`rememberSaveable`, restore scope to ViewModel → rotation test matrix |
 
 ## Pitfall-to-Phase Mapping
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| 1 Fetch storm | Multi-fetch + budget phase | Kill-1-of-5 test; deadline test; single shared client |
-| 2 Budget blowout | Multi-fetch + budget phase | 5×max-size budget assertion; model-window-aware test |
-| 3 Stop doesn't stop N | Multi-fetch + budget phase | Mid-fetch Stop regression test; epoch check |
-| 7 Injection × N | Multi-fetch + budget phase (choke-point + adversarial gate) | Multi-page adversarial suite incl. collusion; extractor re-gate rule |
-| 4 Preview storage | Preview + toggle phase | Schema review (no unbounded text col); LRU bounds test; excerpt-only preview test |
-| 5 Toggle precedence | Preview + toggle phase | 12-case matrix test; legacy-NULL upgrade test |
-| 6 Retry queue | Offline-retry phase (last) | Dedup test; no-inference test; closed-conversation drop test |
-
-Suggested ordering rationale: fetch policy + budget + security choke-point first (everything else — preview content, retry payloads, toggle-gated fetching — consumes the fan-out's output shape); preview + toggle second (storage schema and precedence resolver must exist before retry can reference them); offline retry last (it orchestrates all three prior pieces and must respect fetch deadlines, cache identity, and toggle resolution). Extraction-quality decision (open research question) should land before or inside the first phase — budget numbers and adversarial baselines both depend on it.
+| 1 — Unaligned native `.so` | 16 KB phase (first) | APK Analyzer + `zipalign -P 16` + `check_elf_alignment.sh` green on RC; 16 KB emulator smoke (model load + inference) |
+| 2 — API-36 behavior cliffs | Target-API-36 phase (audit before flip) | Insets screenshot review, predictive-back walkthrough, large-screen rotation matrix |
+| 3 — LAN permission vs Ollama/LM Studio | Target-API-36 phase (connectivity sub-pass) | Real-device Wi-Fi test with `RESTRICT_LOCAL_NETWORK` opted in; deny-path UX review |
+| 4 — Engine/session leak | Leak-audit phase (engine workstream) | Profiler loop: native RSS to baseline across switch-model cycles; no singleton→Activity chains in LeakCanary |
+| 5 — Streaming collectors / SSE bodies | Leak-audit phase (streaming workstream) | Cancel-path tests (Stop/nav/rotation) assert closed bodies + cancelled sources; zero "connection leaked" warnings |
+| 6 — Coil / WorkManager leaks | Leak-audit phase (media/download workstream) | Single ImageLoader assertion; cancel-download → no FD/partial-file residue; thumbnail scroll memory test |
+| 7 — Remediation boomerang | Every leak-fix plan + final hardening | Stop/retry/seamless-switch regression suite re-run after each fix; release build with regenerated R8/profiles |
 
 ## Sources
 
-- Repo-verified, HIGH: v2.2 grounding pipeline shape (`data/grounding/`, pre-inference hook in `ChatViewModel.sendMessage`, `[WEB CONTEXT]` block, `ConnectivityGate`, `isFetchingWeb` transient, default-ON global toggle); v2.1 single-flight cancellation (`Call.cancel()`, Stop discipline); Room transcript + DataStore prefs conventions; `.planning/research/PITFALLS.md` (v2.2) Pitfalls 5–6 for the inherited injection/SSRF baseline
-- Android WorkManager constraints/backoff/unique-work guidance, MEDIUM (training knowledge, verify against current docs at plan time): `developer.android.com` background-work guides — `NetworkType.CONNECTED` constraints, `ExistingWorkPolicy`, 15-min periodic minimum
-- OkHttp Dispatcher/connection-pool/timeout behavior, MEDIUM (training knowledge, stable API surface): `square.github.io/okhttp` — shared client, per-call timeouts, `Dispatcher.maxRequestsPerHost`
-- Kotlin `supervisorScope` vs `coroutineScope` failure semantics, MEDIUM (stable language contract): `kotlinlang.org/api/kotlinx.coroutines`
-- OWASP LLM prompt-injection prevention (cheat sheet series) + v2.2 research citations, MEDIUM — policy for choke-point sanitization and adversarial testing carries over unchanged, amplified to N pages
-- LOW confidence, needs phase-level validation: exact global token budget numbers per allowlisted model window; LRU size/TTL tuning for the preview cache; whether extraction upgrade changes the adversarial baseline (flagged as a gate, not assumed)
+- Official: [Support 16 KB page sizes](https://developer.android.com/guide/practices/page-sizes) (HIGH — AGP 8.5.1+/NDK r28 guidance, `check_elf_alignment.sh`, `zipalign -P 16`, backcompat mode, Feb 2027 Play deadline)
+- Official: [Behavior changes: apps targeting Android 16](https://developer.android.com/about/versions/16/behavior-changes-16) (HIGH — edge-to-edge opt-out removal, predictive back default, resizability ignored on sw600dp+, LNP permission, `scheduleAtFixedRate` single-catch-up)
+- Community: 16 KB Play-console fix guides and r/androiddev threads (MEDIUM — confirm deadline/versions against official docs above)
+- Community: Compose `collectAsState` vs `collectAsStateWithLifecycle` / `repeatOnLifecycle` leak guides, OkHttp SSE `EventSource.cancel()` + `use {}` patterns, Coil singleton application-context guidance (MEDIUM — standard patterns, verify against project code during audit)
+- Project context: `.planning/PROJECT.md` v2.5 milestone scope + v2.1–v2.4 invariants (single-flight inference, Stop semantics, retry same-row reuse, secret isolation, Coil singleton, Room v15/v16)
 
 ---
-*Pitfalls research for: Warped v2.3 Web Grounding v2*
-*Researched: 2026-09-28*
+*Pitfalls research for: Warped v2.5 Play Compliance + Leaks*
+*Researched: 2026-09-30*
