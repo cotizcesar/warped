@@ -1,21 +1,16 @@
 ---
 gsd_state_version: "1.0"
-milestone: v2.4
-milestone_name: Agentic Web
-current_phase: 58
-current_phase_name: OpenGraph Thumbnails
-status: complete
-stopped_at: v2.4 milestone complete (audit gaps_found accepted, archived)
-last_updated: "2026-09-29T17:31:54.121Z"
-last_activity: 2026-09-29
-last_activity_desc: v2.4 milestone complete — all 4 phases verified and transitioned
-state_head: 095cb0a3098cc57ad7dd1b7ea13ffe5f7d122120
+milestone: v2.5
+milestone_name: Play Compliance + Leaks
+status: planning
+last_updated: "2026-09-30T22:54:06.802Z"
+last_activity: 2026-09-30
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 9
-  completed_plans: 9
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State: Warped
@@ -32,11 +27,10 @@ See: .planning/PROJECT.md (updated 2026-09-29 after v2.4 milestone close)
 
 ## Current Position
 
-Milestone: v2.4 Agentic Web — COMPLETE ✅
-Status: Archived, ready for next milestone
-Last activity: 2026-09-29 — audit (gaps_found, accepted) → complete → cleanup
-
-Progress: [██████████] 100%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-09-30 — Milestone v2.5 started
 
 ## Phase Structure (v2.4 — SHIPPED)
 

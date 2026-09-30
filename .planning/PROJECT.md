@@ -91,7 +91,14 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 **Known deferred:** 3 release-UAT device follow-ups (WEB-09 live Tavily E2E, WEB-10 LM Studio smoke + matrix + Stop, WEB-11 Coil images + ellipsis). Tech debt: budget floor, static matrix, ThinkingConfig enablement, Coil 3.4.0 ceiling. Pre-existing carry-overs: v2.3 smokes, UI polish trio, TUNE-01/02, Pixel 7 numbers, v2.2 smokes, Keystore orphan.
 
-## Current Milestone: (next — define scope first)
+## Current Milestone: v2.5 Play Compliance + Leaks
+
+**Goal:** Ship a Google Play-compliant release targeting API 36 with 16 KB page-size support, plus a full memory-leak audit with fixes.
+
+**Target features:**
+- 16 KB memory page-size support (AGP/NDK alignment, native libs verification)
+- Target Android 16 (API 36) with behavior-change audit
+- Full memory-leak audit (EngineManager, helpers, chat Flows, Coil/OkHttp, grounding pipeline) + fixes
 
 ## Requirements
 
@@ -149,7 +156,7 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 ### Active
 
-- [ ] Next milestone requirements — v2.3 Web Grounding v2 (multi-URL fetch, sources preview, per-chat toggle, offline retry)
+- [ ] Play-compliant release: 16 KB page-size support, target API 36, memory-leak audit + fixes — v2.5 Play Compliance + Leaks
 
 ### Out of Scope
 
@@ -237,4 +244,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-29 — v2.4 Agentic Web milestone complete*
+*Last updated: 2026-09-30 — v2.5 Play Compliance + Leaks milestone started*
