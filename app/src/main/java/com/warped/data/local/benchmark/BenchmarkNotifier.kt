@@ -37,17 +37,16 @@ class BenchmarkNotifier(private val context: Context) {
     }
 
     private fun ensureChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = android.app.NotificationChannel(
-                CHANNEL_BENCHMARK,
-                context.getString(R.string.notif_bench_channel),
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = context.getString(R.string.notif_bench_channel_desc)
-                setShowBadge(false)
-            }
-            context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        // minSdk is 28 — NotificationChannel always exists; no version gate.
+        val channel = android.app.NotificationChannel(
+            CHANNEL_BENCHMARK,
+            context.getString(R.string.notif_bench_channel),
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = context.getString(R.string.notif_bench_channel_desc)
+            setShowBadge(false)
         }
+        context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
     companion object {

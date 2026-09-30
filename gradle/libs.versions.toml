@@ -40,6 +40,7 @@ mockk = "1.14.11"
 turbine = "1.2.1"
 truth = "1.4.5"
 coroutines-test = "1.11.0"
+uiautomator = "2.3.0"  # held: 2.4.0 needs compileSdk 37 (no stable android-37 platform in SDK repo)
 errorprone = "2.50.0"
 
 [libraries]
@@ -139,6 +140,7 @@ turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine
 truth = { group = "com.google.truth", name = "truth", version.ref = "truth" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines-test" }
 room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
+uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "uiautomator" }
 errorprone-annotations = { group = "com.google.errorprone", name = "error_prone_annotations", version.ref = "errorprone" }
 
 [plugins]

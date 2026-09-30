@@ -34,10 +34,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.R
 import com.warped.domain.prompt.PromptTemplate
@@ -53,8 +54,8 @@ fun PromptLabScreen(
     val codeTheme by viewModel.codeTheme.collectAsStateWithLifecycle()
     val codeFontScale by viewModel.codeFontScale.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    val configuration = LocalConfiguration.current
-    val isWide = configuration.screenWidthDp >= 600
+    val windowInfo = LocalWindowInfo.current
+    val isWide = with(LocalDensity.current) { windowInfo.containerSize.width.toDp() } >= 600.dp
 
     LaunchedEffect(ui.error) {
         val msg = ui.error

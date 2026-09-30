@@ -88,7 +88,7 @@ android {
     // androidTest assets so MigrationTestHelper.runMigrationsAndValidate can
     // resolve them on-device. assembleDebug regenerates 15.json before the test.
     sourceSets {
-        getByName("androidTest").assets.srcDirs(files("$projectDir/schemas"))
+        getByName("androidTest").assets.directories.add("$projectDir/schemas")
     }
 }
 
@@ -206,7 +206,7 @@ dependencies {
     androidTestImplementation(libs.benchmark.macro.junit4)
     androidTestImplementation(libs.benchmark.junit4)
     androidTestImplementation(libs.coil3.test)
-    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
+    androidTestImplementation(libs.uiautomator)
 }
 
 tasks.withType<Test> {

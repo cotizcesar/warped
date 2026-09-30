@@ -24,7 +24,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -39,7 +38,7 @@ fun ModelParamsDialog(
     onSave: (GenerationParameters) -> Unit
 ) {
     var params by remember { mutableStateOf(initial) }
-    val context = LocalContext.current
+    val randomText = stringResource(R.string.param_random)
 
     WarpedAlertDialog(
         onDismissRequest = onDismiss,
@@ -111,7 +110,7 @@ fun ModelParamsDialog(
                     range = -1f..100000f,
                     steps = 10,
                     description = stringResource(R.string.param_desc_seed),
-                    format = { if (it.toInt() == -1) context.getString(R.string.param_random) else it.toInt().toString() }
+                    format = { if (it.toInt() == -1) randomText else it.toInt().toString() }
                 ) { params = params.copy(seed = it.toInt()) }
             }
         },

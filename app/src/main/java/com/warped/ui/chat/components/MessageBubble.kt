@@ -81,6 +81,7 @@ fun MessageBubble(
     @Suppress("DEPRECATION")
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+    val copiedText = stringResource(R.string.copied)
     if (isStreaming && !message.reasoning.isNullOrBlank()) {
         showReasoning = true
     }
@@ -93,7 +94,7 @@ fun MessageBubble(
                 onClick = {},
                 onLongClick = {
                     clipboardManager.setText(AnnotatedString(message.content))
-                    Toast.makeText(context, context.getString(R.string.copied), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, copiedText, Toast.LENGTH_SHORT).show()
                 }
             ),
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
@@ -232,7 +233,7 @@ fun MessageBubble(
         // recomposition always re-resolves from the message param. Never
         // lifted into the ViewModel.
         var previewSource by remember { mutableStateOf<GroundedSource?>(null) }
-        var previewNumber by remember { mutableStateOf(1) }
+        var previewNumber by remember { mutableIntStateOf(1) }
         if (!isUser && fuenteList.any { it.clickable }) {
             Spacer(Modifier.height(4.dp))
             Text(

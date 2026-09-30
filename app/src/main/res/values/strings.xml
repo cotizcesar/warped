@@ -1,46 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Warped</string>
-    <string name="tab_chat">Chat</string>
-    <string name="tab_endpoints">Endpoints</string>
     <string name="tab_models">Models</string>
     <string name="settings">Settings</string>
-    <string name="send">Send</string>
-    <string name="stop">Stop</string>
     <string name="cancel">Cancel</string>
     <string name="save">Save</string>
     <string name="delete">Delete</string>
     <string name="edit">Edit</string>
-    <string name="test_connection">Test Connection</string>
     <string name="no_endpoints">No endpoints configured</string>
-    <string name="no_models">No models found</string>
-    <string name="connecting">Connecting…</string>
     <string name="connected">Connected</string>
     <string name="disconnected">Disconnected</string>
-    <string name="error_network">Can\'t connect to server. Check the URL and try again.</string>
-    <string name="error_auth">Authentication failed. Check your API key.</string>
     <string name="connection_lost">Connection lost. Tap to retry.</string>
     <string name="new_chat">New Chat</string>
     <string name="type_message">Type a message…</string>
     <string name="select_model">Select a model</string>
-    <string name="no_models_select_model">No models, select a model</string>
     <string name="no_model_selected">Select a model before sending a message.</string>
     <string name="download_model_first">Download this model before using it for local chat.</string>
-    <string name="compatible_with_device">Compatible with this device</string>
-    <string name="may_be_too_large">May be too large for this device</string>
-    <string name="search_minimum_length">Enter at least 3 letters</string>
     <string name="thinking">Thinking</string>
-    <string name="generating">Generating…</string>
-    <string name="select_image">Select image</string>
-    <string name="remove">Remove</string>
     <string name="use_in_chat">Use in chat</string>
-    <string name="download">Download</string>
-    <string name="available_models">Available Models</string>
     <string name="active_downloads">Active Downloads</string>
     <string name="local_models">Local Models</string>
     <string name="network_endpoints">Network Endpoints</string>
     <string name="add_model">Add Model</string>
-    <string name="cancel_download">Cancel</string>
     <string name="delete_partial_file">Delete partial file</string>
     <string name="delete_chat_title">Delete chat</string>
     <string name="delete_chat_message">Delete \"%1$s\"? This cannot be undone.</string>
@@ -53,13 +34,10 @@
     <string name="continue_text">Continue</string>
     <string name="dismiss">Dismiss</string>
     <string name="loading_model">Loading %1$s…</string>
-    <string name="failed_to_load_model">Failed to load model</string>
-    <string name="failed_to_fetch_models">Failed to fetch models: %1$s</string>
     <string name="recents">Recents</string>
     <string name="empty_state_message">Select a model and start typing…</string>
     <string name="import_model_file">Import Model File</string>
     <string name="import_model_file_desc">Load a .litertlm model from your device</string>
-    <string name="connect_lm_studio">Connect LM Studio</string>
     <string name="connect_lm_studio_desc">Add a remote LM Studio server</string>
     <string name="no_models_endpoints_yet">No models or endpoints yet</string>
     <string name="custom_manual">Custom (type manually)</string>
@@ -73,14 +51,7 @@
     <string name="hide">Hide</string>
     <string name="fetch">Fetch</string>
     <string name="select_or_type_model">Select or type model ID</string>
-    <string name="pause">Pause</string>
-    <string name="resume">Resume</string>
     <string name="back">Back</string>
-    <string name="unload_model">Unload model from memory</string>
-    <string name="paused">Paused</string>
-    <string name="downloading">Downloading</string>
-    <string name="no_results_found">No results found</string>
-    <string name="loading_models">Loading models…</string>
     <string name="provider_openai">OpenAI</string>
     <string name="provider_anthropic">Anthropic</string>
     <string name="provider_ollama">Ollama</string>
@@ -93,7 +64,6 @@
     <string name="wizard_skip">Skip</string>
     <string name="wizard_skip_all">Skip all</string>
     <string name="wizard_close">Close</string>
-    <string name="wizard_close_wizard">Close wizard</string>
     <string name="wizard_done">Done</string>
     <string name="wizard_next">Next</string>
     <string name="wizard_revisar">Review</string>
@@ -180,7 +150,7 @@
     <string name="activate">Activate</string>
     <string name="badge_active">Active</string>
     <string name="endpoint_test">Test</string>
-    <string name="endpoint_testing">Testing...</string>
+    <string name="endpoint_testing">Testing…</string>
     <string name="running_ellipsis">Running…</string>
 
     <!-- Content descriptions -->
@@ -226,7 +196,10 @@
     <string name="reading_page">Reading page…</string>
     <string name="reading_multi_fmt">Reading %1$d of %2$d…</string>
     <string name="reading_page_cd">Reading page. Tap Stop to cancel reading.</string>
-    <string name="reading_multi_cd_fmt">Reading %1$d of %2$d pages. Tap Stop to cancel reading.</string>
+    <plurals name="reading_multi_cd_fmt">
+        <item quantity="one">Reading %1$d of %2$d page. Tap Stop to cancel reading.</item>
+        <item quantity="other">Reading %1$d of %2$d pages. Tap Stop to cancel reading.</item>
+    </plurals>
 
     <!-- Chat errors and dialogs -->
     <string name="error_model_unavailable">This model is no longer available. Please select a different model or re-download it.</string>
@@ -276,7 +249,10 @@
     <string name="sheet_empty_extract">Couldn\'t extract text from this page. Open the page in the browser to view its content.</string>
 
     <!-- Code block -->
-    <string name="code_show_all_fmt">Show all %1$d lines</string>
+    <plurals name="code_show_all_fmt">
+        <item quantity="one">Show all %1$d line</item>
+        <item quantity="other">Show all %1$d lines</item>
+    </plurals>
     <string name="code_show_less">Show less</string>
     <string name="code_empty">(empty)</string>
     <string name="code_issue_unclosed">Unclosed string literal</string>
@@ -298,7 +274,7 @@
     <string name="models_title_endpoints">Models &amp; Endpoints</string>
     <string name="connect_api_title">Connect to an API</string>
     <string name="models_catalog_hint">Choose from the built-in catalog</string>
-    <string name="models_importing_fmt">Importing model... %1$d%%</string>
+    <string name="models_importing_fmt">Importing model… %1$d%%</string>
     <string name="models_empty_hint">Tap Add Model to download one from the catalog or import a file.</string>
     <string name="models_memory_msg_fmt">This model needs ~%1$d MB, your device has %2$d MB available. Loading may cause instability.</string>
     <string name="selector_no_models">No models available. Download a .litertlm model or add an endpoint.</string>
@@ -327,7 +303,10 @@
     <string name="settings_security_desc">API keys are encrypted using Android Keystore (AES-256-GCM)</string>
     <string name="settings_delete_all_keys_btn">Delete all keys</string>
     <string name="settings_delete_chats_title">Delete All Chats</string>
-    <string name="settings_delete_chats_msg">This will permanently delete all %1$d conversations and their messages. This cannot be undone.</string>
+    <plurals name="settings_delete_chats_msg">
+        <item quantity="one">This will permanently delete all %1$d conversation and its messages. This cannot be undone.</item>
+        <item quantity="other">This will permanently delete all %1$d conversations and their messages. This cannot be undone.</item>
+    </plurals>
     <string name="settings_delete_all">Delete All</string>
     <string name="settings_delete_keys_title">Delete All API Keys</string>
     <string name="settings_delete_keys_msg">This will permanently delete all stored API keys. This cannot be undone.</string>
@@ -340,13 +319,13 @@
     <string name="settings_tavily_absent">No key saved</string>
     <string name="settings_tavily_label">Tavily API key</string>
     <string name="tavily_test">Test connection</string>
-    <string name="tavily_testing_short">Testing...</string>
+    <string name="tavily_testing_short">Testing…</string>
     <string name="tavily_paste_key">Paste a key before saving.</string>
     <string name="tavily_key_saved">Tavily API key saved.</string>
     <string name="tavily_save_failed">Couldn\'t save the key. Try again.</string>
     <string name="tavily_key_deleted">Tavily API key deleted.</string>
     <string name="tavily_delete_failed">Couldn\'t delete the key. Try again.</string>
-    <string name="tavily_testing">Testing connection...</string>
+    <string name="tavily_testing">Testing connection…</string>
     <string name="tavily_ok">Connection successful. Tavily search is working.</string>
     <string name="tavily_bad_key">Invalid API key. Check the key and try again.</string>
     <string name="tavily_429">Usage limit reached (429). Check your Tavily plan.</string>

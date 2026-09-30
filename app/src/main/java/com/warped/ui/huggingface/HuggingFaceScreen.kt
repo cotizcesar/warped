@@ -45,7 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.warped.R
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.data.local.download.DownloadState
 import com.warped.data.repository.AllowlistedModel
@@ -259,7 +259,7 @@ private fun CatalogModelCard(
             if (active) {
                 Spacer(Modifier.height(6.dp))
                 ActiveDownloadContent(
-                    download = downloadState!!,
+                    download = downloadState,
                     onCancel = { showCancelConfirm = true },
                     onDeleteIncomplete = { showCancelConfirm = true }
                 )
@@ -269,7 +269,7 @@ private fun CatalogModelCard(
             if (failed) {
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    text = downloadState!!.error!!,
+                    text = downloadState.error,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall
                 )

@@ -719,6 +719,10 @@ class ChatViewModel @Inject constructor(
                     // Model loads on-demand on first message
                 }
 
+                // The LOCAL branch below is a mandatory exhaustive reference to
+                // the deprecated legacy entry (persisted rows may still carry
+                // it) — not new use.
+                @Suppress("DEPRECATION")
                 val helper = when (selectedProvider) {
                     ProviderType.LOCAL,
                     ProviderType.LITE_RT_LM -> providerRouter.resolveLocalHelper(
@@ -1604,10 +1608,6 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun resolvedSelectedProvider(state: ChatUiState, overrideProvider: ProviderType? = null): ProviderType {
-        return overrideProvider ?: ProviderType.LITE_RT_LM
-    }
-
     private fun LocalModel.isLiteRtLm(): Boolean =
         modelFormat.equals("LITERTLM", ignoreCase = true) || filePath.endsWith(".litertlm", ignoreCase = true)
 
@@ -1712,7 +1712,10 @@ class ChatViewModel @Inject constructor(
     }
 
     private suspend fun isModelAvailable(modelId: String, providerType: ProviderType): Boolean {
-        return when (providerType) {
+        // The LOCAL branch below is a mandatory exhaustive reference to the
+        // deprecated legacy entry (persisted rows may still carry it) — not new use.
+        @Suppress("DEPRECATION")
+        val available = when (providerType) {
             ProviderType.LOCAL, ProviderType.LITE_RT_LM -> {
                 localModelRepository.existsByFilePath(modelId)
             }
@@ -1720,6 +1723,7 @@ class ChatViewModel @Inject constructor(
                 _connection.value.endpoints.any { it.modelId == modelId && it.apiType == providerType }
             }
         }
+        return available
     }
 
     private var lastAutoAppliedModelId: String? = null

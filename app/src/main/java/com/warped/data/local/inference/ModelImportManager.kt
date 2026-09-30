@@ -32,7 +32,7 @@ class ModelImportManager @Inject constructor(
                         val buffer = ByteArray(8192)
                         var bytesRead: Int
                         var totalRead = 0L
-                        val totalSize = context.contentResolver.openFileDescriptor(uri, "r")?.statSize ?: 0
+                        val totalSize = context.contentResolver.openFileDescriptor(uri, "r")?.use { it.statSize } ?: 0
 
                         while (input.read(buffer).also { bytesRead = it } != -1) {
                             output.write(buffer, 0, bytesRead)

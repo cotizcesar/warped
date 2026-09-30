@@ -47,6 +47,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.io.IOException
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 import timber.log.Timber
 
@@ -358,7 +359,7 @@ class LMStudioProvider(
                                             }
                                             if (eventType == "chat.end") {
                                                 event.result?.stats?.let { stats ->
-                                                    statsText = "${stats.totalOutputTokens} tokens · ${stats.inputTokens} in · ${String.format("%.0f", stats.tokensPerSecond)} tok/s · ${String.format("%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first"
+                                                    statsText = "${stats.totalOutputTokens} tokens · ${stats.inputTokens} in · ${String.format(Locale.US, "%.0f", stats.tokensPerSecond)} tok/s · ${String.format(Locale.US, "%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first"
                                                 }
                                             }
                                         } catch (e: Exception) { Timber.e(e, "LMStudio: SSE event parse failed") }
@@ -378,7 +379,7 @@ class LMStudioProvider(
                                 val event = json.decodeFromString<LmStudioSseEvent>(rawBody)
                                 val s = event.stats ?: event.result?.stats
                                 s?.let { stats ->
-                                    statsText = "${stats.totalOutputTokens} tokens · ${stats.inputTokens} in · ${String.format("%.0f", stats.tokensPerSecond)} tok/s · ${String.format("%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first"
+                                    statsText = "${stats.totalOutputTokens} tokens · ${stats.inputTokens} in · ${String.format(Locale.US, "%.0f", stats.tokensPerSecond)} tok/s · ${String.format(Locale.US, "%.1f", stats.timeToFirstTokenSeconds * 1000)}ms first"
                                 }
                                 val out = event.output ?: event.result?.output
                                 out?.forEach { item ->

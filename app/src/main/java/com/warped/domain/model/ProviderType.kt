@@ -6,6 +6,9 @@ import com.warped.R
 enum class ProviderType { OPENAI, ANTHROPIC, OLLAMA, LM_STUDIO, CUSTOM, @Deprecated("Use LITE_RT_LM instead") LOCAL, LITE_RT_LM }
 
 @StringRes
+// ProviderType.LOCAL below is a mandatory exhaustive-branch reference to the
+// deprecated legacy entry (persisted rows may still carry it) — not new use.
+@Suppress("DEPRECATION")
 fun ProviderType.displayNameRes(): Int = when (this) {
     ProviderType.OPENAI -> R.string.provider_openai
     ProviderType.ANTHROPIC -> R.string.provider_anthropic

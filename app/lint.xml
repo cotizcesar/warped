@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- Quick-task (warnings): version availability is project policy, not a
+         code defect. Versions are deliberately pinned in
+         gradle/libs.versions.toml (see HOLD comments: newer artifacts need
+         compileSdk 37, for which no stable android-37 platform exists in the
+         SDK repo) and STACK.md. Upgrades are a separate release decision. -->
+    <issue id="GradleDependency" severity="ignore" />
+    <issue id="NewerVersionAvailable" severity="ignore" />
+    <issue id="AndroidGradlePluginVersion" severity="ignore" />
+    <!-- targetSdk 35 is deliberate per STACK.md (Google Play requirements
+         2026); bumping it changes runtime behavior and is a release decision. -->
+    <issue id="OldTargetApi" severity="ignore" />
+    <!-- net.zetetic:android-database-sqlcipher:4.5.4 is the latest upstream
+         release (verified via Maven Central 2026-09-29) — no 16KB-aligned
+         build exists to upgrade to. Re-enable this check when upgrading
+         SQLCipher past the 16KB-alignment release. -->
+    <issue id="Aligned16KB" severity="ignore" />
+</lint>

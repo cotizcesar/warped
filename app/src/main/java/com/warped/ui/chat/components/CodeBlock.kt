@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -104,10 +105,10 @@ interface SyntaxHighlightingEntryPoint {
 fun CodeBlock(
     language: String,
     code: String,
+    modifier: Modifier = Modifier,
     syntaxTheme: SyntaxTheme = SyntaxTheme.MONOKAI,
     codeFontScale: Float = 1.0f,
     isStreaming: Boolean = false,
-    modifier: Modifier = Modifier,
 ) {
     // ── Syntax highlighting state ────────────────────────────
     var tokens by remember { mutableStateOf<List<SyntaxToken>>(emptyList()) }
@@ -323,7 +324,7 @@ fun CodeBlock(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = stringResource(R.string.code_show_all_fmt, lineCount),
+                        text = pluralStringResource(R.plurals.code_show_all_fmt, lineCount, lineCount),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color.White.copy(alpha = 0.7f),

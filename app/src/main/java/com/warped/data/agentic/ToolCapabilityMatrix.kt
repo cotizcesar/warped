@@ -56,7 +56,11 @@ object ToolCapabilityMatrix {
      * `/v1` shape (Tools:✓ per Ollama docs); LM Studio serves OpenAI-compat
      * `/v1` model-dependently (LOW confidence — the fallback absorbs a wrong
      * pick); `LITE_RT_LM`/`LOCAL` are excluded via the non-remote sentinel.
+     *
+     * The `LOCAL` branch is a mandatory exhaustive reference to the
+     * deprecated legacy entry (persisted rows may still carry it) — not new use.
      */
+    @Suppress("DEPRECATION")
     fun modeFor(type: ProviderType): ToolMode = when (type) {
         ProviderType.OPENAI -> ToolMode.ATTEMPT
         ProviderType.CUSTOM -> ToolMode.ATTEMPT_FALLBACK

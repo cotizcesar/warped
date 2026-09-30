@@ -3,6 +3,7 @@ package com.warped.data.local.security
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -34,7 +35,7 @@ class KeystoreManager @Inject constructor(
 
     fun put(key: String, value: String) {
         try {
-            encryptedPrefs.edit().putString(key, value).commit()
+            encryptedPrefs.edit { putString(key, value) }
             Timber.d("KeystoreManager: put succeeded")
         } catch (e: Exception) {
             Timber.e(e, "KeystoreManager: put failed")
@@ -52,7 +53,7 @@ class KeystoreManager @Inject constructor(
 
     fun remove(key: String) {
         try {
-            encryptedPrefs.edit().remove(key).apply()
+            encryptedPrefs.edit { remove(key) }
         } catch (e: Exception) {
             Timber.e(e, "KeystoreManager: remove failed")
         }
@@ -60,7 +61,7 @@ class KeystoreManager @Inject constructor(
 
     fun clearAll() {
         try {
-            encryptedPrefs.edit().clear().apply()
+            encryptedPrefs.edit { clear() }
         } catch (e: Exception) {
             Timber.e(e, "KeystoreManager: clearAll failed")
         }

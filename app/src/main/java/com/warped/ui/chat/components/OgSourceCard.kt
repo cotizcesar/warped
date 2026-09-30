@@ -22,7 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.OpenInNew
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -172,7 +172,7 @@ fun OgSourceCard(
                 // touch target; the glyph itself is 20dp.
                 IconButton(onClick = { onOpenBrowser(source.url) }) {
                     Icon(
-                        imageVector = Icons.Outlined.OpenInNew,
+                        imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
                         contentDescription = openSourceCd,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp),
@@ -271,7 +271,7 @@ fun CompactSourceCard(
                 // touch target; the glyph itself is 20dp.
                 IconButton(onClick = { onOpenBrowser(source.url) }) {
                     Icon(
-                        imageVector = Icons.Outlined.OpenInNew,
+                        imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
                         contentDescription = openSourceCd,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp),

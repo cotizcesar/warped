@@ -10,7 +10,11 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- tools:ignore DataExtractionRules (on <application>): allowBackup is
+         false, so no backup config takes effect on any API level;
+         dataExtractionRules is future-proofing for API 31+ only. -->
     <application
+        tools:ignore="DataExtractionRules"
         android:name=".WarpedApplication"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
@@ -21,17 +25,13 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Warped.Splash"
         android:dataExtractionRules="@xml/data_extraction_rules"
+        tools:targetApi="31"
         android:extractNativeLibs="false">
 
         <!-- LiteRT-LM GPU backend support (LITE-08) -->
         <uses-native-library android:name="libvndksupport.so" android:required="false" />
         <uses-native-library android:name="libOpenCL.so" android:required="false" />
         <uses-native-library android:name="libcdsprpc.so" android:required="false" />
-
-        <!-- Timer tool receiver -->
-        <receiver
-            android:name="com.warped.data.local.inference.tools.TimerReceiver"
-            android:exported="false" />
 
         <activity
             android:name=".MainActivity"

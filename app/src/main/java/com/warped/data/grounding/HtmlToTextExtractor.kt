@@ -71,7 +71,7 @@ object HtmlToTextExtractor {
         // the prepended newlines and per-line trimming below normalizes.
         doc.select("p, div, h1, h2, h3, h4, h5, h6, li, tr, br, section, article, header, blockquote, pre")
             .prepend("\n")
-        val body = doc.body()?.wholeText().orEmpty()
+        val body = doc.body().wholeText()
         val lines = body.split("\n")
             .map { it.trim() }
             .filter { it.isNotEmpty() }

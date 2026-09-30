@@ -11,8 +11,11 @@
   For users running a HTTPS-fronted LM Studio, the same connection works without this
   exception — cleartextTrafficPermitted="true" is permissive, not exclusive.
 -->
-<network-security-config>
-    <base-config cleartextTrafficPermitted="true">
+<network-security-config xmlns:tools="http://schemas.android.com/tools">
+    <!-- tools:ignore: base-config cleartext is intentional (see ENDPT-06 above):
+         LAN LLM servers (LM Studio/Ollama/custom) expose HTTP-only endpoints on
+         user-entered IPs, which domain-scoped configs cannot enumerate. -->
+    <base-config cleartextTrafficPermitted="true" tools:ignore="InsecureBaseConfiguration">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>

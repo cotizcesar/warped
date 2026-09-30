@@ -3,8 +3,8 @@ package com.warped.ui.chat.components
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
+import androidx.core.net.toUri
 import com.warped.R
 
 /**
@@ -24,7 +24,7 @@ import com.warped.R
  * caller decides whether to dismiss a sheet on success).
  */
 fun openUrlInBrowser(context: Context, url: String): Boolean {
-    val uri = Uri.parse(url)
+    val uri = url.toUri()
     if (!uri.scheme.equals("http", ignoreCase = true) &&
         !uri.scheme.equals("https", ignoreCase = true)) {
         Toast.makeText(

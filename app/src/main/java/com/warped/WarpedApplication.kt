@@ -3,9 +3,7 @@ package com.warped
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.content.ComponentCallbacks2
 import android.content.Context
-import android.os.Build
 import android.os.Process
 import android.os.StrictMode
 
@@ -74,9 +72,17 @@ class WarpedApplication : Application(), Configuration.Provider, SingletonImageL
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
+        // Chain the previous handler (lint DefaultUncaughtExceptionDelegation):
+        // log first, then delegate so crash reporting still fires; only when
+        // no handler was installed do we kill the process ourselves.
+        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             Timber.e(throwable, "Unhandled exception in thread ${thread.name}")
-            Process.killProcess(Process.myPid())
+            if (previousHandler != null) {
+                previousHandler.uncaughtException(thread, throwable)
+            } else {
+                Process.killProcess(Process.myPid())
+            }
         }
         if (BuildConfig.DEBUG) {
             Timber.plant(RedactingTree())
@@ -100,18 +106,17 @@ class WarpedApplication : Application(), Configuration.Provider, SingletonImageL
     }
 
     private fun createNotificationChannels() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_DOWNLOADS,
-                getString(R.string.notif_dl_channel),
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = getString(R.string.notif_dl_channel_desc)
-                setShowBadge(false)
-            }
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+        // minSdk is 28 — NotificationChannel always exists; no version gate.
+        val channel = NotificationChannel(
+            CHANNEL_DOWNLOADS,
+            getString(R.string.notif_dl_channel),
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = getString(R.string.notif_dl_channel_desc)
+            setShowBadge(false)
         }
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(channel)
     }
 
     override fun onTrimMemory(level: Int) {
@@ -125,12 +130,9 @@ class WarpedApplication : Application(), Configuration.Provider, SingletonImageL
         super.onConfigurationChanged(newConfig)
     }
 
-    override fun onLowMemory() {
-        super.onLowMemory()
-        if (::engineManager.isInitialized) {
-            engineManager.handleTrimMemory(android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL)
-        }
-    }
+    // NOTE: no onLowMemory() override — onTrimMemory(level) above already
+    // forwards the real pressure level to EngineManager.handleTrimMemory
+    // (onLowMemory duplicates it with a hardcoded deprecated constant).
 
     companion object {
         const val CHANNEL_DOWNLOADS = "model_downloads"

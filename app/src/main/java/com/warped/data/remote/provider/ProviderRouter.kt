@@ -45,7 +45,11 @@ class ProviderRouter @Inject constructor(
      * Legacy RPC path: returns the per-endpoint [LlmProvider] used for
      * `listModels()` / `testConnection()` calls. Kept for backward compatibility —
      * the chat flow now goes through [resolveHelper] / [resolveLocalHelper].
+     *
+     * The `LOCAL` branch below is a mandatory exhaustive reference to the
+     * deprecated legacy entry (persisted endpoints may still carry it).
      */
+    @Suppress("DEPRECATION")
     fun resolve(endpoint: Endpoint, modelId: String): LlmProvider {
         val key = apiKeyStore.getKey(endpoint.id)
         val keyStr = if (key != null && key.isNotEmpty()) String(key).also { key.fill('0') } else null
@@ -104,6 +108,9 @@ class ProviderRouter @Inject constructor(
         }
     }
 
+    // The `LOCAL` branch below is a mandatory exhaustive reference to the
+    // deprecated legacy entry (persisted rows may still carry it).
+    @Suppress("DEPRECATION")
     fun resolveLocal(providerType: ProviderType, modelId: String): LlmProvider {
         return when (providerType) {
             ProviderType.LOCAL, ProviderType.LITE_RT_LM -> liteRTLmProvider.get()
@@ -122,7 +129,11 @@ class ProviderRouter @Inject constructor(
      * Ollama, Custom) were removed in v1.8 (ENDPT-04) and the LlmModelHelper surface
      * is not yet extended for them. They still work via [resolve] for `listModels` /
      * `testConnection`.
+     *
+     * The `LOCAL` branch below is a mandatory exhaustive reference to the
+     * deprecated legacy entry (persisted endpoints may still carry it).
      */
+    @Suppress("DEPRECATION")
     fun resolveHelper(endpoint: Endpoint, modelId: String): LlmModelHelper {
         return when (endpoint.apiType) {
             ProviderType.LM_STUDIO -> {
@@ -142,7 +153,11 @@ class ProviderRouter @Inject constructor(
     /**
      * Resolve the [LlmModelHelper] for a local provider (LiteRT-LM only). The
      * `modelId` is informational here — the helper loads via [LlmModelHelper.initialize].
+     *
+     * The `LOCAL` branch below is a mandatory exhaustive reference to the
+     * deprecated legacy entry (persisted rows may still carry it).
      */
+    @Suppress("DEPRECATION")
     fun resolveLocalHelper(providerType: ProviderType, modelId: String): LlmModelHelper {
         return when (providerType) {
             ProviderType.LOCAL, ProviderType.LITE_RT_LM -> liteRtLmHelper.get()

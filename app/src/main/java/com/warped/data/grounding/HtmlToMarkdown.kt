@@ -36,7 +36,7 @@ object HtmlToMarkdown {
             "script, style, noscript, iframe, object, embed, nav, footer, aside, form, meta, link"
         ).remove()
         val title = doc.title().trim()
-        val body = doc.body() ?: return ""
+        val body = doc.body()
         val out = StringBuilder()
         for (child in body.children()) {
             renderBlock(child, out)
