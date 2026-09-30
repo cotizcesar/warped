@@ -81,4 +81,30 @@ class OgSourceCardHelpersTest {
         assertThat(ogDisplayTitle("   ", "https://example.com/x"))
             .isEqualTo("example.com")
     }
+
+    // ogDisplayDescription (card description line)
+
+    @Test
+    fun `displayDescription returns trimmed desc capped at 160`() {
+        val long = "a".repeat(200)
+        assertThat(ogDisplayDescription("  $long  "))
+            .isEqualTo("a".repeat(160))
+    }
+
+    @Test
+    fun `displayDescription blank returns null`() {
+        assertThat(ogDisplayDescription("")).isNull()
+        assertThat(ogDisplayDescription("   ")).isNull()
+    }
+
+    @Test
+    fun `displayDescription null returns null`() {
+        assertThat(ogDisplayDescription(null)).isNull()
+    }
+
+    @Test
+    fun `displayDescription short desc passes through untouched`() {
+        assertThat(ogDisplayDescription("A short description."))
+            .isEqualTo("A short description.")
+    }
 }

@@ -80,6 +80,7 @@ fun OgSourceCard(
     modifier: Modifier = Modifier,
 ) {
     val displayTitle = ogDisplayTitle(source.ogTitle, source.url)
+    val desc = ogDisplayDescription(source.ogDescription)
     val gatedImage = gatedHttpImageUrl(source.ogImageUrl)
         ?: faviconFallbackUrl(source.url)?.let(::gatedHttpImageUrl)
     var imageFailed by remember(gatedImage) { mutableStateOf(false) }
@@ -146,6 +147,17 @@ fun OgSourceCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (desc != null) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = desc,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
@@ -174,6 +186,7 @@ fun CompactSourceCard(
     modifier: Modifier = Modifier,
 ) {
     val displayTitle = ogDisplayTitle(source.ogTitle, source.url)
+    val desc = ogDisplayDescription(source.ogDescription)
     val gatedImage = gatedHttpImageUrl(source.ogImageUrl)
         ?: faviconFallbackUrl(source.url)?.let(::gatedHttpImageUrl)
     var imageFailed by remember(gatedImage) { mutableStateOf(false) }
@@ -242,6 +255,17 @@ fun CompactSourceCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (desc != null) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = desc,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
@@ -294,6 +318,18 @@ internal fun OgThumb(
 fun ogDisplayTitle(ogTitle: String?, url: String): String {
     val title = ogTitle?.trim().orEmpty()
     return if (title.isNotEmpty()) title else ogHostOf(url)
+}
+
+/**
+ * Card description line: render-side og:description fallback (null when
+ * blank so the card stays byte-identical Title+URL). Trims and caps at 160
+ * chars for card density (OpenGraphParser.MAX_DESCRIPTION_CHARS is 500, so
+ * the 160-char card cap applies). Render caps at maxLines 2 + ellipsis.
+ */
+fun ogDisplayDescription(ogDescription: String?): String? {
+    val desc = ogDescription?.trim().orEmpty()
+    if (desc.isEmpty()) return null
+    return desc.take(160)
 }
 
 /** Phase 58 (OG-02): host fallback for untitled sources; raw URL when unparseable. */
