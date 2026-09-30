@@ -33,8 +33,8 @@ import kotlin.math.min
  * Light-path by design (NOT a `WebPageFetcher.fetch` reuse — that does a
  * 256 KB full-body read + markdown extraction + sanitization + prompt-block
  * build per URL on ~10-30 s budgets, all wasted for head-meta only): a
- * capped head-fetch (OG tags live in `<head>`, first bytes) + `Jsoup.parse`
- * via [OpenGraphParser.parse] (never `Jsoup.connect`).
+ * capped head-fetch (OG tags live in `<head>`, first bytes) + parse-only
+ * HTML parsing via [OpenGraphParser.parse] (no socket opened here).
  *
  * Merge precedence (locked): scraped `og:title` wins when enrichment
  * succeeds (page-authoritative — `OpenGraphParser.parse` never returns
@@ -71,6 +71,14 @@ class SearchOgEnricher @Inject constructor(
      * [CancellationException] propagates. Null in production.
      */
     internal var headSupplier: (suspend (url: String) -> Pair<String, String?>?)? = null
+
+    /**
+     * Test seam for the YouTube oEmbed fallback: when non-null, supplies
+     * the raw oEmbed JSON body per video URL instead of opening a socket;
+     * a null return (or any throw other than [CancellationException])
+     * keeps the pre-oEmbed row. Null in production (real capped fetch).
+     */
+    internal var oembedSupplier: (suspend (videoUrl: String) -> String?)? = null
 
     /** Test seam for the total fan-out bound; production uses the locked 3 s. */
     internal var totalTimeoutMs: Long = TOTAL_TIMEOUT_MS
@@ -134,17 +142,112 @@ class SearchOgEnricher @Inject constructor(
                 return original
             }
             val scraped = OpenGraphParser.parse(raw, original.url)
-            return original.copy(
+            var merged = original.copy(
                 // Page-authoritative win on success; a blank/failed parse
                 // (all-null OpenGraphData) keeps the threaded search title.
                 ogTitle = scraped.ogTitle ?: original.ogTitle,
                 ogDescription = scraped.ogDescription ?: original.ogDescription,
                 ogImageUrl = scraped.ogImageUrl ?: original.ogImageUrl,
             )
+            // Quick-task (YouTube oEmbed): when normal enrichment still
+            // yielded no real title and no image, YouTube-hosted URLs get
+            // one oEmbed fallback. Note OpenGraphParser falls back
+            // title→host, so a scraped title equal to the URL host means
+            // "no real title" — only then (plus null originals) do we
+            // trigger. Failures keep the pre-oEmbed row (favicon path
+            // untouched); CancellationException still rethrows.
+            val scrapedTitleIsFallback = scraped.ogTitle == null ||
+                scraped.ogTitle == OpenGraphParser.hostOf(original.url)
+            if (original.ogTitle == null &&
+                original.ogImageUrl == null &&
+                scraped.ogImageUrl == null &&
+                scrapedTitleIsFallback &&
+                isHttpUrl(original.url) &&
+                YoutubeOembed.isYouTubeUrl(original.url)
+            ) {
+                merged = fetchOembed(merged, original.url) ?: merged
+            }
+            return merged
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
             return original
+        }
+    }
+
+    /**
+     * YouTube oEmbed fallback: fetches the oEmbed JSON for [videoUrl] and
+     * maps `title`→`ogTitle`, `thumbnail_url`→`ogImageUrl` (each gated).
+     * Returns null when the row should keep its pre-oEmbed values;
+     * rethrows [CancellationException] so Stop / new-turn cancel
+     * propagates out of the fan-out.
+     */
+    private suspend fun fetchOembed(
+        merged: GroundedSource,
+        videoUrl: String,
+    ): GroundedSource? {
+        try {
+            val body = oembedSupplier?.invoke(videoUrl)
+                ?: fetchOembedHttp(videoUrl)
+                ?: return null
+            val (title, thumbnailUrl) = YoutubeOembed.parseOembed(body)
+            val gatedTitle = title
+                ?.takeIf { it.isNotEmpty() }
+                ?.take(OpenGraphParser.MAX_TITLE_CHARS)
+            // Same http(s)-only gate as the render-side gatedHttpImageUrl:
+            // data:, javascript:, and relative URLs resolve to null.
+            val gatedThumb = thumbnailUrl
+                ?.takeIf { it.isNotEmpty() }
+                ?.takeIf { isHttpUrl(it) }
+            if (gatedTitle == null && gatedThumb == null) return null
+            return merged.copy(
+                ogTitle = gatedTitle ?: merged.ogTitle,
+                ogImageUrl = gatedThumb ?: merged.ogImageUrl,
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            return null
+        }
+    }
+
+    /**
+     * Blocking capped oEmbed fetch: single GET against the constant
+     * `https://www.youtube.com/oembed` base (video URL travels as an
+     * encoded query param), at most [MAX_OEMBED_BYTES]. No redirects, no
+     * unbounded reads. Returns the raw JSON body or null. Runs on
+     * [ioDispatcher] via the caller.
+     */
+    private fun fetchOembedHttp(videoUrl: String): String? {
+        if (!isHttpUrl(videoUrl) || !YoutubeOembed.isYouTubeUrl(videoUrl)) return null
+        val request = Request.Builder()
+            .url(YoutubeOembed.oembedRequestUrl(videoUrl))
+            .header("User-Agent", WebPageFetcher.USER_AGENT)
+            .header("Accept", "application/json")
+            .build()
+        val response = try {
+            client.newCall(request).execute()
+        } catch (_: Exception) {
+            return null
+        }
+        try {
+            if (!response.isSuccessful) return null
+            val contentType = response.header("Content-Type")
+            if (contentType != null && !contentType.contains("json", ignoreCase = true)) {
+                return null
+            }
+            val body = response.body ?: return null
+            val sink = Buffer()
+            var remaining = MAX_OEMBED_BYTES.toLong()
+            val source = body.source()
+            while (remaining > 0) {
+                val read = source.read(sink, min(CHUNK_BYTES, remaining))
+                if (read == -1L) break
+                remaining -= read
+            }
+            return sink.readUtf8().takeIf { it.isNotBlank() }
+        } finally {
+            response.close()
         }
     }
 
@@ -224,6 +327,9 @@ class SearchOgEnricher @Inject constructor(
 
         /** Locked head-fetch body cap (OG tags live in `<head>`, first bytes). */
         internal const val MAX_HEAD_BYTES = 65536
+
+        /** Locked oEmbed JSON body cap (title + thumbnail only). */
+        internal const val MAX_OEMBED_BYTES = 16384
 
         internal const val CHUNK_BYTES = 8192L
 

@@ -211,8 +211,7 @@ class SearchOgEnricherTest {
     }
 
     @Test
-    fun `more than five ok urls enriches only the first five`() = runTest {
-        enricher.ioDispatcher = UnconfinedTestDispatcher(testScheduler)
+    fun `more than five ok urls enriches only the first five`() = runTest {        enricher.ioDispatcher = UnconfinedTestDispatcher(testScheduler)
         val called = mutableListOf<String>()
         enricher.headSupplier = { url ->
             called.add(url)
@@ -234,5 +233,129 @@ class SearchOgEnricherTest {
         // Rows past the cap keep their threaded titles.
         assertThat(out[5].ogTitle).isEqualTo("Threaded 5")
         assertThat(out[6].ogTitle).isEqualTo("Threaded 6")
+    }
+
+    // ── Quick-task (YouTube oEmbed fallback) ──────────────────
+    // No sockets: headSupplier returns blank HTML (no OG captured) and
+    // oembedSupplier returns canned JSON, so neither path opens a socket.
+
+    private val youtubeUrl = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+
+    private fun oembedJson(
+        title: String = "Never Gonna Give You Up",
+        thumb: String = "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+    ) = """{"title":"$title","author_name":"Rick Astley","thumbnail_url":"$thumb"}"""
+
+    @Test
+    fun `youtube url with null og gets title and thumb from oembed`() = runTest {
+        enricher.ioDispatcher = UnconfinedTestDispatcher(testScheduler)
+        enricher.headSupplier = { "   " to "text/html" }
+        enricher.oembedSupplier = { oembedJson() }
+
+        val out = enricher.enrich(listOf(okSource(youtubeUrl)))
+
+        assertThat(out).hasSize(1)
+        assertThat(out[0].ogTitle).isEqualTo("Never Gonna Give You Up")
+        assertThat(out[0].ogImageUrl).isEqualTo("https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg")
+        assertThat(out[0].url).isEqualTo(youtubeUrl)
+    }
+
+    @Test
+    fun `oembed transport failure keeps the pre-oembed row`() = runTest {
+        enricher.ioDispatcher = UnconfinedTestDispatcher(testScheduler)
+        enricher.headSupplier = { "   " to "text/html" }
+        enricher.oembedSupplier = { throw java.io.IOException("oembed down") }
+
+        val out = enricher.enrich(listOf(okSource(youtubeUrl)))
+
+        assertThat(out[0].ogTitle).isNull()
+        assertThat(out[0].ogImageUrl).isNull()
+        assertThat(out[0].status).isEqualTo(GroundedSourceStatus.OK)
+    }
+
+    @Test
+    fun `oembed malformed json keeps the pre-oembed row`() = runTest {
+        enricher.ioDispatcher = UnconfinedTestDispatcher(testScheduler)
+        enricher.headSupplier = { "   " to "text/html" }
+        enricher.oembedSupplier = { "not json{" }
+
+        val out = enricher.enrich(listOf(okSource(youtubeUrl)))
+
+        assertThat(out[0].ogTitle).isNull()
+        assertThat(out[0].ogImageUrl).isNull()
+    }
+
+    @Test
+    fun `non-youtube url never calls the oembed path`() = runTest {
+        enricher.ioDispatcher = UnconfinedTestDispatcher(testScheduler)
+        enricher.headSupplier = { "   " to "text/html" }
+        var oembedCalls = 0
+        enricher.oembedSupplier = {
+            oembedCalls++
+            oembedJson()
+        }
+
+        val out = enricher.enrich(listOf(okSource("https://example.com/a")))
+
+        assertThat(oembedCalls).isEqualTo(0)
+        assertThat(out[0].ogTitle).isNull()
+    }
+
+    @Test
+    fun `youtube url with present og never calls the oembed path`() = runTest {
+        enricher.ioDispatcher = UnconfinedTestDispatcher(testScheduler)
+        enricher.headSupplier = { ogHtml() to "text/html" }
+        var oembedCalls = 0
+        enricher.oembedSupplier = {
+            oembedCalls++
+            oembedJson()
+        }
+
+        val out = enricher.enrich(listOf(okSource(youtubeUrl)))
+
+        assertThat(oembedCalls).isEqualTo(0)
+        assertThat(out[0].ogTitle).isEqualTo("Scraped Title")
+        assertThat(out[0].ogImageUrl).isEqualTo("https://img.example/pic.png")
+    }
+
+    @Test
+    fun `non-http thumbnail from oembed is gated to null while title maps`() = runTest {
+        enricher.ioDispatcher = UnconfinedTestDispatcher(testScheduler)
+        enricher.headSupplier = { "   " to "text/html" }
+        enricher.oembedSupplier = { oembedJson(thumb = "data:image/png;base64,AAA") }
+
+        val out = enricher.enrich(listOf(okSource(youtubeUrl)))
+
+        assertThat(out[0].ogTitle).isEqualTo("Never Gonna Give You Up")
+        assertThat(out[0].ogImageUrl).isNull()
+    }
+
+    @Test
+    fun `author-name-only oembed json leaves the row unchanged`() = runTest {
+        enricher.ioDispatcher = UnconfinedTestDispatcher(testScheduler)
+        enricher.headSupplier = { "   " to "text/html" }
+        enricher.oembedSupplier = { """{"author_name":"Rick Astley"}""" }
+
+        val out = enricher.enrich(listOf(okSource(youtubeUrl)))
+
+        // author_name must never land in any column.
+        assertThat(out[0].ogTitle).isNull()
+        assertThat(out[0].ogImageUrl).isNull()
+        assertThat(out[0].ogDescription).isNull()
+    }
+
+    @Test
+    fun `oembed cancellation propagates instead of keeping the row`() = runTest {
+        enricher.ioDispatcher = UnconfinedTestDispatcher(testScheduler)
+        enricher.headSupplier = { "   " to "text/html" }
+        enricher.oembedSupplier = { throw CancellationException("stop") }
+
+        var thrown: CancellationException? = null
+        try {
+            enricher.enrich(listOf(okSource(youtubeUrl)))
+        } catch (e: CancellationException) {
+            thrown = e
+        }
+        assertThat(thrown).isNotNull()
     }
 }
