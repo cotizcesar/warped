@@ -13,6 +13,7 @@ import com.warped.data.grounding.GroundingResult
 import com.warped.data.grounding.ImageIntent
 import com.warped.data.grounding.MultiUrlFetcher
 import com.warped.data.grounding.CodeIntent
+import com.warped.data.grounding.AnaphoraAnchor
 import com.warped.data.grounding.NeedsWeb
 import com.warped.data.grounding.MultiUrlResult
 import com.warped.data.grounding.TavilySearchOutcome
@@ -412,16 +413,19 @@ class ChatViewModel @Inject constructor(
                 // the call's structured rows; they union here (first-seen
                 // order, distinct by URL — same union semantics as the
                 // fetch/search branches) and merge with the pre-search
-                // details on Done below. Armed turns skip the VM
-                // pre-search, so this is normally the only source.
+                // details on Done below. The always-on VM pre-search runs
+                // on every grounded turn INCLUDING armed ones (floor); loop
+                // ToolCompleted rows union with the pre-search details on
+                // Done, so armed turns normally carry both sources.
                 val loopSourceDetails = mutableListOf<GroundedSource>()
                 // Quick-task (loop-images): per-turn loop-image
                 // accumulator. Loop drivers emit one `ToolCompleted` per
                 // executed search call carrying the call's fused Tavily
                 // `images[]`; they union here (first-seen order, distinct)
                 // and merge with the pre-search `groundedImages` on Done
-                // below. Armed turns skip the VM pre-search, so this is
-                // normally the only image source.
+                // below. The always-on VM pre-search runs on every grounded
+                // turn INCLUDING armed ones, so armed turns normally carry
+                // both pre-search and loop image sources.
                 val loopImages = mutableListOf<String>()
                 var modelOnlyNotice: ModelOnlyNotice? = null
                 var modelOnlySourceCount: Int = 1
@@ -626,9 +630,27 @@ class ChatViewModel @Inject constructor(
                             }
                             try {
                                 val contextSize = state.generationParameters.contextSize
+                                // Quick-task (always-presearch-anchored):
+                                // anaphoric follow-ups ("Quien es su
+                                // hermanastro?") search the prior turn's
+                                // topic words, not the bare message — anchor
+                                // = most recent prior USER turn (else last
+                                // assistant), capped + deduped inside
+                                // AnaphoraAnchor. No-history turns return the
+                                // raw message (today's behavior,
+                                // byte-identical). Query-text only: DDG stays
+                                // free/keyless (latency, not credits), Tavily
+                                // keeps its keyed + DDG-empty-only caps (<=1
+                                // call/turn), loop cap untouched.
+                                val priorMessages = _transcript.value.messages.dropLast(1)
+                                val anchoredQuery = AnaphoraAnchor.buildQuery(
+                                    userMessage.content,
+                                    priorMessages.filter { it.role == Role.USER }.map { it.content },
+                                    priorMessages.lastOrNull { it.role == Role.ASSISTANT }?.content,
+                                )
                                 when (
                                     val outcome = ddgSearchRepository.search(
-                                        query = userMessage.content,
+                                        query = anchoredQuery,
                                         maxResults = searchCount,
                                         contextSize = contextSize,
                                         includeImages = wantImages,
