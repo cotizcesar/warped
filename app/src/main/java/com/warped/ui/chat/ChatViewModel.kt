@@ -526,7 +526,22 @@ class ChatViewModel @Inject constructor(
                         } finally {
                             updateInput { it.copy(isFetchingWeb = false, webFetchProgress = null) }
                         }
-                    } else {
+                    // Quick-task (attachments-skip-search): the no-URL
+                    // branch below runs ONLY on attachment-free turns.
+                    // Attachment turns (images/audio) skip the heuristic
+                    // no-URL pre-search entirely — v2.4 Phase 55
+                    // regression: blind text search on image/audio-question
+                    // turns injects junk context about the question words
+                    // while the question is about the attachment, and the
+                    // small model answers from the injected text ignoring
+                    // the attachment. Skipped turns keep requestUserText as
+                    // the original text with grounded*/notice empty/null
+                    // (no augment, no banner — the skip is deliberate, not
+                    // a failure). The URL branch above still fetches with
+                    // attachments; loop arming, the capability media gate,
+                    // and the provider attach path are untouched (the model
+                    // may still tool-search with full multimodal context).
+                    } else if (images.isEmpty() && audioBytes == null) {
                         // Quick-task (DDG-default): DDG-primary search
                         // branch. Runs ONLY when all hold — doGround (the
                         // once-per-send GroundingPrecedence.shouldGround read
