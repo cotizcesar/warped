@@ -19,6 +19,10 @@ data class ChatMessage(
     // hydrated from the grounded_sources table on history load. groundedSources
     // stays as the ephemeral render list; no source columns on MessageEntity.
     val groundedSourceDetails: List<GroundedSource> = emptyList(),
+    // Quick-task (image-grid): ephemeral http(s) image URLs fused from the
+    // Tavily images[] array on image-intent turns. Render-only, like its
+    // siblings — never a Room column (EntityMappers maps field-by-field).
+    val groundedImages: List<String> = emptyList(),
     val modelOnlyNotice: ModelOnlyNotice? = null,
     // Phase 52 (FETCH-02): attempted-URL count behind an all-fail banner so
     // the copy pluralizes for M > 1. Ephemeral, same as its siblings.

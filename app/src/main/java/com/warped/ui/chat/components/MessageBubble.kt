@@ -292,6 +292,13 @@ fun MessageBubble(
                 )
             }
         }
+        // Quick-task (image-grid): image results grid below the Fuentes
+        // carousel on image-intent turns. Ephemeral render-only state
+        // (message.groundedImages) — tap opens the modal + gallery
+        // download. Empty on non-intent turns: renders nothing.
+        if (!isUser && message.groundedImages.isNotEmpty()) {
+            GroundedImageGrid(images = message.groundedImages)
+        }
         // Sheet host: tap an ok item sets previewSource, dismiss nulls it.
         // Reads the sheet props from local state resolved above — zero I/O.
         val currentPreview = previewSource

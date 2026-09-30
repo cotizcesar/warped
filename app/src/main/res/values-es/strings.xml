@@ -235,6 +235,11 @@
     <string name="bubble_show_reasoning">Mostrar razonamiento</string>
     <string name="bubble_hide_reasoning">Ocultar razonamiento</string>
     <string name="sources_title">Fuentes</string>
+    <string name="images_title">Imágenes</string>
+    <string name="image_download">Descargar</string>
+    <string name="image_close">Cerrar</string>
+    <string name="image_saved">Guardada en la galería</string>
+    <string name="image_save_failed">No se pudo guardar la imagen. Revisa tu conexión e inténtalo de nuevo.</string>
     <string name="bubble_offline_queued">Sin conexión. Respuesta solo del modelo, sin contenido de páginas. En cola.</string>
     <string name="bubble_fetch_failed_one">No se pudo leer la página. Respuesta solo del modelo — revisá tu conexión o pegá otro enlace.</string>
     <string name="bubble_fetch_failed_many">No se pudieron leer las páginas. Respuesta solo del modelo — revisá tu conexión o pegá otros enlaces.</string>

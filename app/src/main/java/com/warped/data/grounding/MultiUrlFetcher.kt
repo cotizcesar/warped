@@ -54,6 +54,14 @@ sealed interface MultiUrlResult {
          */
         val pageTexts: Map<String, String> = emptyMap(),
         val details: List<GroundedSource> = emptyList(),
+        /**
+         * Quick-task (image-grid): http(s)-gated image URLs fused from the
+         * Tavily `images[]` array (Tavily leg only — DDG HTML has no image
+         * API, so DDG-served turns carry an empty list). Ephemeral like
+         * every sibling: rendered from the message, never a Room column.
+         * Defaults empty so all pre-image callers compile unchanged.
+         */
+        val images: List<String> = emptyList(),
     ) : MultiUrlResult
 
     data class AllFailed(

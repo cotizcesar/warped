@@ -1,0 +1,25 @@
+package com.warped.data.grounding
+
+/**
+ * Quick-task (image-grid): render-side image-list mapping.
+ *
+ * http(s) gate + trim + distinct + cap. Pure Kotlin — JVM-testable.
+ * Defense-in-depth over the fuse-time gate in
+ * [TavilySearchRepository.fuseImages]; the grid calls this on the
+ * ephemeral message field before rendering.
+ */
+object GroundedImages {
+
+    /** Render-list cap (matches the fuse-time cap). */
+    const val MAX_GRID_IMAGES = 10
+
+    fun visibleImages(images: List<String>): List<String> =
+        images
+            .map { it.trim() }
+            .filter {
+                it.startsWith("http://", ignoreCase = true) ||
+                    it.startsWith("https://", ignoreCase = true)
+            }
+            .distinct()
+            .take(MAX_GRID_IMAGES)
+}

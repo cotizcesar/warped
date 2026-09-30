@@ -21,6 +21,13 @@ data class TavilySearchRequest(
     val max_results: Int = 5,
     val include_answer: Boolean = false,
     val chunks_per_source: Int = 3,
+    /**
+     * Quick-task (image-grid): intent-gated only — the VM sets true when
+     * [com.warped.data.grounding.ImageIntent] fires. Adds a top-level
+     * `images[]` array to the response; default false keeps non-image
+     * turns byte-identical to today (no extra payload).
+     */
+    val include_images: Boolean = false,
 )
 
 @Serializable
@@ -37,4 +44,21 @@ data class TavilySearchResponse(
     val results: List<TavilySearchResult> = emptyList(),
     val answer: String? = null,
     val response_time: Float? = null,
+    /**
+     * Quick-task (image-grid): present only when the request set
+     * `include_images=true`. URLs are http(s)-gated at fuse time
+     * (same precedent as OG image gating) — never fetched here.
+     */
+    val images: List<TavilyImageResult> = emptyList(),
+)
+
+/**
+ * Quick-task (image-grid): one entry of the Tavily `images[]` array.
+ * Shape per the Tavily Search API reference (`url` + optional
+ * `description`); unknown keys ignored by the shared Json instance.
+ */
+@Serializable
+data class TavilyImageResult(
+    val url: String = "",
+    val description: String? = null,
 )

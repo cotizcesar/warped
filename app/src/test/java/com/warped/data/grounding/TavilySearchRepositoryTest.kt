@@ -5,6 +5,7 @@ import com.warped.data.local.security.ApiKeyStore
 import com.warped.data.local.security.KeystoreManager
 import com.warped.data.remote.api.TavilyApi
 import com.warped.data.remote.dto.TavilySearchRequest
+import com.warped.data.remote.dto.TavilyImageResult
 import com.warped.data.remote.dto.TavilySearchResponse
 import com.warped.data.remote.dto.TavilySearchResult
 import com.warped.domain.model.GroundedSourceStatus
@@ -286,5 +287,61 @@ class TavilySearchRepositoryTest {
         repository.search("x".repeat(600))
 
         assertThat(requestSlot.captured.query).hasLength(500)
+    }
+
+    // Image intent gate (quick-task image-grid).
+
+    @Test
+    fun `include-images defaults false - non-image turns unchanged`() = runTest {
+        val requestSlot = slot<TavilySearchRequest>()
+        apiKeyStore.storeTavilyKey("tvly-test-key".toCharArray())
+        coEvery { api.search(any(), capture(requestSlot)) } returns
+            Response.success(TavilySearchResponse(results = listOf(result(1))))
+
+        val outcome = repository.search("kotlin news")
+
+        assertThat(requestSlot.captured.include_images).isFalse()
+        val fused = (outcome as TavilySearchOutcome.Grounded).fused
+        assertThat(fused.images).isEmpty()
+    }
+
+    @Test
+    fun `include-images true threads the flag and fuses gated image urls`() = runTest {
+        val requestSlot = slot<TavilySearchRequest>()
+        apiKeyStore.storeTavilyKey("tvly-test-key".toCharArray())
+        coEvery { api.search(any(), capture(requestSlot)) } returns
+            Response.success(
+                TavilySearchResponse(
+                    results = listOf(result(1)),
+                    images = listOf(
+                        TavilyImageResult("https://img.example/a.png", "A cat"),
+                        TavilyImageResult("data:image/png;base64,AAA", "inline junk"),
+                        TavilyImageResult("javascript:alert(1)", "script junk"),
+                        TavilyImageResult("https://img.example/a.png", "dupe"),
+                        TavilyImageResult("http://img.example/b.jpg", "plain http"),
+                        TavilyImageResult("   ", "blank"),
+                    ),
+                ),
+            )
+
+        val outcome = repository.search("show me pictures of cats", includeImages = true)
+
+        assertThat(requestSlot.captured.include_images).isTrue()
+        assertThat(outcome).isInstanceOf(TavilySearchOutcome.Grounded::class.java)
+        val fused = (outcome as TavilySearchOutcome.Grounded).fused
+        assertThat(fused.images).containsExactly(
+            "https://img.example/a.png",
+            "http://img.example/b.jpg",
+        ).inOrder()
+    }
+
+    @Test
+    fun `fused image list caps at ten`() {
+        val images = (1..15).map { TavilyImageResult("https://img.example/$it.png") }
+
+        val out = repository.fuseImages(images)
+
+        assertThat(out).hasSize(10)
+        assertThat(out.first()).isEqualTo("https://img.example/1.png")
     }
 }

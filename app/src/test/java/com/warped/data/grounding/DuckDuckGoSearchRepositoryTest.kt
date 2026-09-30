@@ -206,7 +206,7 @@ class DuckDuckGoSearchRepositoryTest {
         assertThat(fused.skippedUrls).containsExactly("http://example.org/android")
         assertThat(fused.block).contains("--- Source [1]: https://example.com/kotlin ---")
         assertThat(fused.block).doesNotContain("example.org/android")
-        coVerify(exactly = 0) { tavily.search(any(), any(), any()) }
+        coVerify(exactly = 0) { tavily.search(any(), any(), any(), any()) }
     }
 
     @Test
@@ -217,7 +217,7 @@ class DuckDuckGoSearchRepositoryTest {
         val outcome = repository.search("kotlin news")
 
         assertThat(outcome).isInstanceOf(TavilySearchOutcome.Grounded::class.java)
-        coVerify(exactly = 0) { tavily.search(any(), any(), any()) }
+        coVerify(exactly = 0) { tavily.search(any(), any(), any(), any()) }
     }
 
     @Test
@@ -225,19 +225,45 @@ class DuckDuckGoSearchRepositoryTest {
         apiKeyStore.storeTavilyKey("tvly-test-key".toCharArray())
         repository.htmlSupplier = { "<html><body>No results.</body></html>" }
         val delegated = groundedOutcome(listOf("https://tavily.example/delegate"))
-        coEvery { tavily.search(any(), any(), any()) } returns delegated
+        coEvery { tavily.search(any(), any(), any(), any()) } returns delegated
 
         val outcome = repository.search("kotlin news", maxResults = 5, contextSize = 4096)
 
         assertThat(outcome).isEqualTo(delegated)
         coVerify(exactly = 1) {
-            tavily.search("kotlin news", 5, 4096)
+            tavily.search("kotlin news", 5, 4096, false)
         }
     }
 
     @Test
-    fun `ddg-empty without key collapses to fetch-failed with no key nag`() = runTest {
+    fun `include-images threads through to the tavily delegate only`() = runTest {
+        apiKeyStore.storeTavilyKey("tvly-test-key".toCharArray())
         repository.htmlSupplier = { "<html><body>No results.</body></html>" }
+        val delegated = groundedOutcome(listOf("https://tavily.example/delegate"))
+        coEvery { tavily.search(any(), any(), any(), any()) } returns delegated
+
+        val outcome = repository.search("show me pictures of cats", includeImages = true)
+
+        assertThat(outcome).isEqualTo(delegated)
+        coVerify(exactly = 1) {
+            tavily.search("show me pictures of cats", 5, 4096, true)
+        }
+    }
+
+    @Test
+    fun `ddg-served turn fuses zero images - no image api on the ddg leg`() = runTest {
+        repository.htmlSupplier = { fixtureHtml() }
+
+        val outcome = repository.search("show me pictures of cats", includeImages = true)
+
+        assertThat(outcome).isInstanceOf(TavilySearchOutcome.Grounded::class.java)
+        val fused = (outcome as TavilySearchOutcome.Grounded).fused
+        assertThat(fused.images).isEmpty()
+        coVerify(exactly = 0) { tavily.search(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `ddg-empty without key collapses to fetch-failed with no key nag`() = runTest {        repository.htmlSupplier = { "<html><body>No results.</body></html>" }
 
         val outcome = repository.search("kotlin news")
 
@@ -246,14 +272,14 @@ class DuckDuckGoSearchRepositoryTest {
                 MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
             ),
         )
-        coVerify(exactly = 0) { tavily.search(any(), any(), any()) }
+        coVerify(exactly = 0) { tavily.search(any(), any(), any(), any()) }
     }
 
     @Test
     fun `ddg-throw with key passes the tavily outcome through`() = runTest {
         apiKeyStore.storeTavilyKey("tvly-bad-key".toCharArray())
         repository.htmlSupplier = { throw IOException("socket reset") }
-        coEvery { tavily.search(any(), any(), any()) } returns TavilySearchOutcome.InvalidKey
+        coEvery { tavily.search(any(), any(), any(), any()) } returns TavilySearchOutcome.InvalidKey
 
         assertThat(repository.search("kotlin news")).isEqualTo(TavilySearchOutcome.InvalidKey)
     }
@@ -269,7 +295,7 @@ class DuckDuckGoSearchRepositoryTest {
                 MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
             ),
         )
-        coVerify(exactly = 0) { tavily.search(any(), any(), any()) }
+        coVerify(exactly = 0) { tavily.search(any(), any(), any(), any()) }
     }
 
     @Test
@@ -292,7 +318,7 @@ class DuckDuckGoSearchRepositoryTest {
             ),
         )
         // No key stored → no fallback attempt either.
-        coVerify(exactly = 0) { tavily.search(any(), any(), any()) }
+        coVerify(exactly = 0) { tavily.search(any(), any(), any(), any()) }
     }
 
     // ------------------------------------------------------------------
@@ -313,7 +339,7 @@ class DuckDuckGoSearchRepositoryTest {
             ),
         )
         assertThat(socketOpened).isFalse()
-        coVerify(exactly = 0) { tavily.search(any(), any(), any()) }
+        coVerify(exactly = 0) { tavily.search(any(), any(), any(), any()) }
     }
 
     @Test

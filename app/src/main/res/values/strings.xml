@@ -234,6 +234,11 @@
     <string name="bubble_show_reasoning">Show reasoning</string>
     <string name="bubble_hide_reasoning">Hide reasoning</string>
     <string name="sources_title">Sources</string>
+    <string name="images_title">Images</string>
+    <string name="image_download">Download</string>
+    <string name="image_close">Close</string>
+    <string name="image_saved">Saved to gallery</string>
+    <string name="image_save_failed">Couldn\'t save the image. Check your connection and try again.</string>
     <string name="bubble_offline_queued">Offline. Model-only answer, no page content. Queued.</string>
     <string name="bubble_fetch_failed_one">Couldn\'t read the page. Model-only answer — check your connection or paste another link.</string>
     <string name="bubble_fetch_failed_many">Couldn\'t read the pages. Model-only answer — check your connection or paste other links.</string>

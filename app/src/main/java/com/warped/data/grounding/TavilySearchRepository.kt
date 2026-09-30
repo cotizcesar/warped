@@ -3,6 +3,7 @@ package com.warped.data.grounding
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.data.remote.api.TavilyApi
 import com.warped.data.remote.dto.TavilySearchRequest
+import com.warped.data.remote.dto.TavilyImageResult
 import com.warped.data.remote.dto.TavilySearchResult
 import com.warped.domain.model.GroundedSource
 import com.warped.domain.model.GroundedSourceStatus
@@ -71,6 +72,14 @@ class TavilySearchRepository @Inject constructor(
         query: String,
         maxResults: Int = DEFAULT_MAX_RESULTS,
         contextSize: Int = 4096,
+        /**
+         * Quick-task (image-grid): intent-gated by the caller (the VM sets
+         * true only when ImageIntent fires). Adds `include_images=true` to
+         * the request and fuses the response `images[]` URLs (http(s)-gated)
+         * into [MultiUrlResult.Fused.images]. Default false: non-image
+         * turns are byte-identical to today (no extra payload).
+         */
+        includeImages: Boolean = false,
     ): TavilySearchOutcome = withContext(ioDispatcher) {
         val trimmedQuery = query.take(MAX_QUERY_CHARS)
         if (trimmedQuery.isBlank()) {
@@ -91,6 +100,7 @@ class TavilySearchRepository @Inject constructor(
             val request = TavilySearchRequest(
                 query = trimmedQuery,
                 max_results = count,
+                include_images = includeImages,
             )
             val response = api.search("Bearer $key", request)
             when (response.code()) {
@@ -109,7 +119,7 @@ class TavilySearchRepository @Inject constructor(
                             MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
                         )
                     }
-                    fuse(body.results.take(count), contextSize)
+                    fuse(body.results.take(count), contextSize, body.images)
                 }
             }
         } catch (e: CancellationException) {
@@ -126,6 +136,7 @@ class TavilySearchRepository @Inject constructor(
     private fun fuse(
         results: List<TavilySearchResult>,
         contextSize: Int,
+        images: List<TavilyImageResult> = emptyList(),
     ): TavilySearchOutcome {
         if (results.isEmpty()) {
             return TavilySearchOutcome.ModelOnly(
@@ -183,9 +194,26 @@ class TavilySearchRepository @Inject constructor(
                 skippedUrls = skipped,
                 pageTexts = okPairs.toMap(),
                 details = details,
+                images = fuseImages(images),
             ),
         )
     }
+
+    /**
+     * Quick-task (image-grid): Tavily `images[]` → render list. Accepts
+     * http(s) URLs only (same gate as OG image URLs — data:/javascript:
+     * drop), trims, dedupes, caps at [MAX_IMAGES]. Pure function —
+     * JVM-testable.
+     */
+    internal fun fuseImages(images: List<TavilyImageResult>): List<String> =
+        images
+            .map { it.url.trim() }
+            .filter { url ->
+                url.startsWith("http://", ignoreCase = true) ||
+                    url.startsWith("https://", ignoreCase = true)
+            }
+            .distinct()
+            .take(MAX_IMAGES)
 
     companion object {
         /** Default result count (1 Tavily credit per search at basic depth). */
@@ -196,6 +224,9 @@ class TavilySearchRepository @Inject constructor(
 
         /** Client-side query cap (pass-through, no rewriting — Phase 56 owns that). */
         const val MAX_QUERY_CHARS = 500
+
+        /** Quick-task (image-grid): render-list cap for fused image URLs. */
+        const val MAX_IMAGES = 10
 
         private const val UNKNOWN_SOURCE = "(unknown source)"
     }

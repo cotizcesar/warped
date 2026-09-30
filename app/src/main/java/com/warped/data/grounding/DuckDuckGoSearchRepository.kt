@@ -92,6 +92,15 @@ class DuckDuckGoSearchRepository @Inject constructor(
         query: String,
         maxResults: Int = TavilySearchRepository.DEFAULT_MAX_RESULTS,
         contextSize: Int = 4096,
+        /**
+         * Quick-task (image-grid): pass-through to the Tavily fallback leg
+         * ONLY. The DDG HTML endpoint has no image API, so a turn served by
+         * the DDG leg alone fuses zero images — images arrive only when the
+         * Tavily fallback fires (DDG yields nothing usable AND a key is
+         * stored). Documented honestly: image-intent queries on unkeyed
+         * devices get grounded text with an empty grid.
+         */
+        includeImages: Boolean = false,
     ): TavilySearchOutcome = withContext(ioDispatcher) {
         val trimmedQuery = query.take(TavilySearchRepository.MAX_QUERY_CHARS)
         if (trimmedQuery.isBlank()) {
@@ -144,6 +153,7 @@ class DuckDuckGoSearchRepository @Inject constructor(
             query = trimmedQuery,
             maxResults = maxResults,
             contextSize = contextSize,
+            includeImages = includeImages,
         )
     }
 
