@@ -177,6 +177,7 @@ fun ModelCard(
 
             if (expanded && expandable) {
                 detailsContent()
+                Spacer(Modifier.height(8.dp))
                 CapabilityTable(
                     vision = vision,
                     audio = audio,

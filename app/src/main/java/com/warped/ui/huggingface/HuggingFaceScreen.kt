@@ -358,7 +358,7 @@ private fun CatalogModelCard(
             // lives next to the size pill; the file name is intentionally
             // not shown.
             if (!entry.blurb.isNullOrBlank()) {
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(10.dp))
                 Text(
                     text = entry.blurb,
                     style = MaterialTheme.typography.bodySmall,
@@ -366,7 +366,6 @@ private fun CatalogModelCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(Modifier.height(4.dp))
             }
         }
     )
