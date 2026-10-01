@@ -7,10 +7,10 @@ last_updated: "2026-09-30T00:00:00Z"
 last_activity: 2026-09-30
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
-  percent: 50
+  completed_phases: 4
+  total_plans: 8
+  completed_plans: 8
+  percent: 100
 ---
 
 # Project State: Warped
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-09-30, v2.5 milestone started)
 
 ## Current Position
 
-Phase: 61 (LeakCanary Instrumentation + Guided Audit) — 61-01 complete (harness + tour script), 61-02 device tour pending
+Phase: — (v2.5 all phases complete — lifecycle: audit → complete → cleanup)
 Plan: —
-Status: Phase 60 closed 2026-09-30 (5/5 passed, 5 release-UAT follow-ups); next: 61-02 tour
-Last activity: 2026-09-30 — Phase 60 closed (tablet sw800dp fill proven), 61-01 executed
+Status: Phase 62 closed 2026-10-01 (5/5 passed, G-59-01 closed on 16 KB turn)
+Last activity: 2026-10-01 — v2.5 all 4 phases complete, lifecycle starting
 
 ## Phase Structure (v2.5 — PLANNED)
 
@@ -38,8 +38,8 @@ Last activity: 2026-09-30 — Phase 60 closed (tablet sw800dp fill proven), 61-0
 |-------|------|--------------|--------|------------|
 | 59 | 16 KB Dependency Verification | PAGE-01..04 (4) | Complete (4/5, G-59-01 → release-UAT) | Phase 58 |
 | 60 | API-36 Behavior Audit | API-01..05 (5) | Complete (5/5, 5 release-UAT follow-ups) | Phase 59 |
-| 61 | LeakCanary Instrumentation + Guided Audit | LEAK-01 (1) | 61-01 done, 61-02 tour pending | Phase 60 |
-| 62 | Fix Loop + Release Hardening | LEAK-02..05, REL-01 (5) | Not started | Phase 61 |
+| 61 | LeakCanary Instrumentation + Guided Audit | LEAK-01 (1) | Complete (3/3, 6/6 legs clean, zero leaks) | Phase 60 |
+| 62 | Fix Loop + Release Hardening | LEAK-02..05, REL-01 (5) | Complete (5/5, 932 tests, release hardened) | Phase 61 |
 
 **Total v2.5:** 4 phases, 15 requirements mapped (15/15 ✓). Coarse granularity.
 
@@ -79,8 +79,10 @@ None yet.
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
+| Release-UAT | 61 Leg 1B model-B switch (needs second complete model) | Accepted, release UAT | Phase 61 close |
 | Release-UAT | 60 follow-ups: 3-button nav visuals; light-theme visuals (blocked, no toggle); Play Console target warnings; foldable posture; quota-pressure platform stop | Accepted, release UAT | Phase 60 close |
 | Release-UAT | G-59-01 16KB chat turn (healthy 16 KB system + smallest-model download + local chat turn, zero native failures) | Accepted, release UAT | Phase 59 close |
+| Product idea | Auto-load model after download (chat blocked until manual activation in Models & Endpoints) | Candidate v2.6 | Phase 61 tour |
 | Benchmarks | Pixel 7 reference numbers (PERF-16 + PERF-12/13) | CI-gated | v2.1 close |
 | Device smoke | DEL-06 release smoke (launch → allowlisted model → local + remote turn → legacy TOOL chat) | Accepted, release UAT | v2.2 close |
 | Device smoke | WEB-05 banner visual (offline vs failure copy) | Accepted, release UAT | v2.2 close |
