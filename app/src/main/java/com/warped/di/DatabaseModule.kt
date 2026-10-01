@@ -48,6 +48,11 @@ object DatabaseModule {
         @ApplicationContext context: Context,
         keystoreManager: KeystoreManager
     ): AppDatabase {
+        // Phase 59 (16KB): sqlcipher-android 4.19.1 does NOT auto-load its
+        // native lib — the legacy android-database-sqlcipher 4.5.4 did
+        // (SQLiteDatabase$1 static init). Without this, the first DB open
+        // crashes with UnsatisfiedLinkError in nativeOpen. Idempotent.
+        System.loadLibrary("sqlcipher")
         val passphrase = getOrCreateDbPassphrase(keystoreManager)
         val factory = SupportOpenHelperFactory(passphrase)
         return Room.databaseBuilder(context, AppDatabase::class.java, "warped.db")
