@@ -14,8 +14,8 @@ Previous: v2.4 Agentic Web shipped 2026-09-29 (Phases 55–58, 10/10 verified). 
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
 - [x] **Phase 59: 16 KB Dependency Verification** - 14/14 .so ALIGNED + zipalign OK, CI gate, sqlcipher→4.19.1 bump, release launches clean (G-59-01 chat-turn → release-UAT)
-- [ ] **Phase 60: API-36 Behavior Audit** - targetSdk 36 conformance: edge-to-edge, predictive back, quotas, large screens
-- [ ] **Phase 61: LeakCanary Instrumentation + Guided Audit** - Debug-only harness + scripted leak tour with triaged baseline
+- [x] **Phase 60: API-36 Behavior Audit** - 36/36 + R8 green, insets + BackHandler sweep, stop reasons, tablet sw800dp fill (5 follow-ups → release-UAT)
+- [ ] **Phase 61: LeakCanary Instrumentation + Guided Audit** - 61-01 done (harness + tour script); 61-02 device tour pending
 - [ ] **Phase 62: Fix Loop + Release Hardening** - Owner-local leak fixes with regression tests + all release gates green
 
 ## Phase Details
@@ -96,8 +96,8 @@ Previous: v2.4 Agentic Web shipped 2026-09-29 (Phases 55–58, 10/10 verified). 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 59. 16 KB Dependency Verification | 2/2 | Complete (G-59-01 → release-UAT) | 2026-09-30 |
-| 60. API-36 Behavior Audit | 0/0 | Not started | - |
-| 61. LeakCanary Instrumentation + Guided Audit | 0/0 | Not started | - |
+| 60. API-36 Behavior Audit | 2/2 | Complete (5 follow-ups → release-UAT) | 2026-09-30 |
+| 61. LeakCanary Instrumentation + Guided Audit | 1/2 | 61-01 done, tour pending | - |
 | 62. Fix Loop + Release Hardening | 0/0 | Not started | - |
 
 ---
