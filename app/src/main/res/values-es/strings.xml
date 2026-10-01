@@ -412,6 +412,7 @@
     <string name="notif_bench_channel_desc">Muestra el progreso de los benchmarks de rendimiento</string>
     <string name="dl_err_storage_fmt">Espacio insuficiente. Se necesitan %1$d MB</string>
     <string name="dl_err_no_resume">No se puede reanudar — no se encontró progreso guardado</string>
+    <string name="dl_retry">Reintentar</string>
     <string name="dl_err_401">Descarga fallida (no autorizado). El servidor rechazó la solicitud — revisá tu conexión e intentá de nuevo.</string>
     <string name="dl_err_403_model_fmt">Acceso denegado — visitá huggingface.co/%1$s para aceptar los términos, e intentá de nuevo.</string>
     <string name="dl_err_403_body_fmt">Acceso denegado — %1$s</string>

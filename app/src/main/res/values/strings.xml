@@ -409,6 +409,7 @@
     <string name="notif_bench_channel_desc">Shows progress of model performance benchmarks</string>
     <string name="dl_err_storage_fmt">Not enough storage. Need %1$d MB</string>
     <string name="dl_err_no_resume">Cannot resume — no saved progress found</string>
+    <string name="dl_retry">Retry</string>
     <string name="dl_err_401">Download failed (unauthorized). The server rejected the request — check your connection and try again.</string>
     <string name="dl_err_403_model_fmt">Access denied — visit huggingface.co/%1$s to accept terms, then retry.</string>
     <string name="dl_err_403_body_fmt">Access denied — %1$s</string>

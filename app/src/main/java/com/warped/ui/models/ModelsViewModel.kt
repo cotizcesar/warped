@@ -411,6 +411,19 @@ class ModelsViewModel @Inject constructor(
         modelDownloadManager.resumeDownload(modelId)
     }
 
+    /**
+     * Phase 60-02 (API-04): retry after a platform stop. Delegates to the
+     * checkpoint resume path; the surfaced stop-reason copy that motivated
+     * the tap is cleared once the retry enqueues. The copy itself is English
+     * UI text — safe to log (no tokens, URLs, or headers).
+     */
+    fun retryDownload(modelId: String) {
+        val stopReasonCopy = _uiState.value.activeDownloads
+            .find { it.modelId == modelId }?.stopReasonCopy
+        Timber.d("Models: retry requested — modelId=%s stopReasonCopy=%s", modelId, stopReasonCopy)
+        modelDownloadManager.resumeDownload(modelId)
+    }
+
     fun deleteIncompleteDownload(download: DownloadState) {
         modelDownloadManager.deleteIncompleteDownload(download.modelId, download.fileName)
     }

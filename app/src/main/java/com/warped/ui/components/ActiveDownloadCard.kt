@@ -45,7 +45,13 @@ fun ActiveDownloadContent(
     onCancel: () -> Unit,
     onDeleteIncomplete: () -> Unit,
     onPause: () -> Unit = {},
-    onResume: () -> Unit = {}
+    onResume: () -> Unit = {},
+    /**
+     * Phase 60-02 (API-04): retry after a platform stop (resumes from the
+     * persisted checkpoint). Rendered only when [DownloadState.stopReasonCopy]
+     * is present, so call sites without retry wiring never show a dead button.
+     */
+    onRetry: () -> Unit = {}
 ) {
     Column(modifier = Modifier.padding(16.dp)) {
         Text(
@@ -85,6 +91,14 @@ fun ActiveDownloadContent(
                 style = MaterialTheme.typography.bodySmall,
                 color = Color(0xFFFF9800)
             )
+            if (download.stopReasonCopy != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    download.stopReasonCopy,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
                 IconButton(onClick = onResume) {
@@ -108,8 +122,21 @@ fun ActiveDownloadContent(
                     color = MaterialTheme.colorScheme.error
                 )
             }
+            if (download.stopReasonCopy != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    download.stopReasonCopy,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = onDeleteIncomplete) { Text(stringResource(R.string.delete_partial_file)) }
+            Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                if (download.stopReasonCopy != null) {
+                    OutlinedButton(onClick = onRetry) { Text(stringResource(R.string.dl_retry)) }
+                }
+                OutlinedButton(onClick = onDeleteIncomplete) { Text(stringResource(R.string.delete_partial_file)) }
+            }
         }
     }
 }

@@ -281,7 +281,8 @@ fun ModelsScreen(
                                 onCancel = { viewModel.cancelDownload(download.modelId) },
                                 onDeleteIncomplete = { viewModel.deleteIncompleteDownload(download) },
                                 onPause = { viewModel.pauseDownload(download.modelId) },
-                                onResume = { viewModel.resumeDownload(download.modelId) }
+                                onResume = { viewModel.resumeDownload(download.modelId) },
+                                onRetry = { viewModel.retryDownload(download.modelId) }
                             )
                         }
                     }
@@ -457,7 +458,8 @@ private fun DownloadCard(
     onCancel: () -> Unit,
     onDeleteIncomplete: () -> Unit,
     onPause: () -> Unit,
-    onResume: () -> Unit
+    onResume: () -> Unit,
+    onRetry: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -469,7 +471,8 @@ private fun DownloadCard(
             onCancel = onCancel,
             onDeleteIncomplete = onDeleteIncomplete,
             onPause = onPause,
-            onResume = onResume
+            onResume = onResume,
+            onRetry = onRetry
         )
     }
 }

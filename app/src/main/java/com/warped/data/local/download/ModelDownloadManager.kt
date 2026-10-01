@@ -1,6 +1,7 @@
 package com.warped.data.local.download
 
 import android.content.Context
+import android.os.Build
 import android.os.StatFs
 import androidx.lifecycle.Observer
 import androidx.work.Constraints
@@ -36,7 +37,13 @@ data class DownloadState(
     val isDownloading: Boolean = false,
     val isPaused: Boolean = false,
     val error: String? = null,
-    val progress: Float = 0f
+    val progress: Float = 0f,
+    /**
+     * Phase 60-02 (API-04): mapped [WorkInfo.getStopReason] copy surfaced in
+     * the progress/retry UI. Set when a platform stop is observed, cleared
+     * when a fresh download starts, resumes, or reaches RUNNING again.
+     */
+    val stopReasonCopy: String? = null
 )
 
 @Singleton
@@ -83,6 +90,7 @@ class ModelDownloadManager @Inject constructor(
                 isDownloading = true,
                 isPaused = false,
                 error = null,
+                stopReasonCopy = null,
                 progress = 0f
             )
         }
@@ -191,6 +199,7 @@ class ModelDownloadManager @Inject constructor(
                     totalBytes = checkpoint.totalBytes,
                     downloadedBytes = checkpoint.downloadedBytes,
                     speedBytesPerSecond = 0,
+                    stopReasonCopy = null,
                     progress = if (checkpoint.totalBytes > 0)
                         checkpoint.downloadedBytes.toFloat() / checkpoint.totalBytes.toFloat()
                     else 0f
@@ -272,7 +281,9 @@ class ModelDownloadManager @Inject constructor(
                             progress = progress / 100f,
                             downloadedBytes = downloadedBytes.takeIf { bytes -> bytes > 0 } ?: it.downloadedBytes,
                             totalBytes = totalBytes.takeIf { bytes -> bytes > 0 } ?: it.totalBytes,
-                            speedBytesPerSecond = speedBytesPerSecond
+                            speedBytesPerSecond = speedBytesPerSecond,
+                            // Retry landed — a previous stop copy is stale.
+                            stopReasonCopy = null
                         )
                     }
                 }
@@ -291,19 +302,48 @@ class ModelDownloadManager @Inject constructor(
                 }
                 WorkInfo.State.FAILED -> {
                     val errorMsg = workInfo.outputData.getString("error") ?: "Download failed"
+                    val reason = readStopReason(workInfo)
+                    if (reason != WorkInfo.STOP_REASON_NOT_STOPPED) {
+                        // T-60-03: platform int only — never tokens, URLs, or headers.
+                        Timber.d("ModelDownload: work failed after stop — modelId=%s stopReason=%d", modelId, reason)
+                    }
                     updateState(modelId) {
                         it.copy(
                             isDownloading = false,
                             speedBytesPerSecond = 0,
-                            error = errorMsg
+                            error = errorMsg,
+                            stopReasonCopy = if (reason != WorkInfo.STOP_REASON_NOT_STOPPED) {
+                                DownloadStopReason.stopReasonCopy(reason)
+                            } else {
+                                it.stopReasonCopy
+                            }
                         )
                     }
                     activeWorkIds.remove(modelId)
                     cleanupObserver(workId)
                 }
                 WorkInfo.State.CANCELLED -> {
+                    // Phase 60-02 (API-04): workers cannot read their own
+                    // stop reason, so it is observed here UI-side. User pause
+                    // removes this observer up-front (clean pause UI, no
+                    // copy); a surviving CANCELLED is a genuine platform stop
+                    // (quota, constraints, user cancel) with Copy to surface.
+                    val reason = readStopReason(workInfo)
+                    if (reason != WorkInfo.STOP_REASON_NOT_STOPPED) {
+                        // T-60-03: platform int only — never tokens, URLs, or headers.
+                        Timber.d("ModelDownload: work stopped — modelId=%s stopReason=%d", modelId, reason)
+                    }
                     updateState(modelId) {
-                        it.copy(isDownloading = false, isPaused = true, speedBytesPerSecond = 0)
+                        it.copy(
+                            isDownloading = false,
+                            isPaused = true,
+                            speedBytesPerSecond = 0,
+                            stopReasonCopy = if (reason != WorkInfo.STOP_REASON_NOT_STOPPED) {
+                                DownloadStopReason.stopReasonCopy(reason)
+                            } else {
+                                it.stopReasonCopy
+                            }
+                        )
                     }
                     activeWorkIds.remove(modelId)
                     cleanupObserver(workId)
@@ -320,6 +360,19 @@ class ModelDownloadManager @Inject constructor(
             workManager.getWorkInfoByIdLiveData(workId).removeObserver(observer)
         }
     }
+
+    /**
+     * Phase 60-02 (API-04): `WorkInfo.getStopReason()` is `@RequiresApi(31)`.
+     * Below S the platform never reports a stop, so return NOT_STOPPED.
+     * Reading the property performs no framework call — the value is
+     * materialized by WorkManager itself — so the guarded read is safe.
+     */
+    private fun readStopReason(workInfo: WorkInfo): Int =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            workInfo.stopReason
+        } else {
+            WorkInfo.STOP_REASON_NOT_STOPPED
+        }
 
     private fun updateState(key: String, transform: (DownloadState) -> DownloadState) {
         _downloadStates.update { map ->

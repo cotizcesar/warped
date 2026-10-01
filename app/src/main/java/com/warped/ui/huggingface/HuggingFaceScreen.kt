@@ -121,7 +121,8 @@ fun HuggingFaceScreen(
                         onDownload = { viewModel.startDownload(entry) },
                         onCancel = { viewModel.cancelDownload(downloadId) },
                         onPause = { viewModel.pauseDownload(downloadId) },
-                        onResume = { viewModel.resumeDownload(downloadId) }
+                        onResume = { viewModel.resumeDownload(downloadId) },
+                        onRetry = { viewModel.resumeDownload(downloadId) }
                     )
                 }
             }
@@ -174,7 +175,8 @@ private fun CatalogModelCard(
     onDownload: () -> Unit,
     onCancel: () -> Unit,
     onPause: () -> Unit,
-    onResume: () -> Unit
+    onResume: () -> Unit,
+    onRetry: () -> Unit = {}
 ) {
     // A "Cancelled" error is terminal-idle: the partial file is deleted and a
     // fresh Download restarts cleanly.
@@ -272,7 +274,8 @@ private fun CatalogModelCard(
                     onCancel = { showCancelConfirm = true },
                     onDeleteIncomplete = { showCancelConfirm = true },
                     onPause = onPause,
-                    onResume = onResume
+                    onResume = onResume,
+                    onRetry = onRetry
                 )
             }
             // Retained error text (icon form keeps the message for a11y;
