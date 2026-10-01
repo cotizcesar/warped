@@ -227,10 +227,9 @@
     <string name="badge_audio">Audio</string>
     <string name="badge_thinking">Thinking</string>
     <string name="badge_tools">Tools</string>
-    <string name="badge_vision_desc">Vision — understands images</string>
-    <string name="badge_audio_desc">Audio — understands audio</string>
-    <string name="badge_thinking_desc">Thinking — shows its reasoning</string>
-    <string name="badge_text_desc">Text — chat and Q&amp;A</string>
+    <string name="cap_text">Text</string>
+    <string name="cap_status_input">Input</string>
+    <string name="cap_status_inout">Input &amp; Output</string>
     <string name="cap_tool_use">Tool use</string>
     <string name="cap_reasoning">Reasoning</string>
 

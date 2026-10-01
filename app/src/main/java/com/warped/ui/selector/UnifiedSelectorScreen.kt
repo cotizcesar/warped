@@ -202,6 +202,9 @@ private fun LocalModelSelectorCard(
     onEditParams: () -> Unit
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    // Tap toggles the LM-Studio-style capability table (mirrors the
+    // catalog expanded details). Selection lives in chat only.
+    var expanded by remember { mutableStateOf(false) }
 
     if (showDeleteConfirm) {
         WarpedAlertDialog(
@@ -222,10 +225,11 @@ private fun LocalModelSelectorCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(12.dp),
+        onClick = { expanded = !expanded }
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = if (expanded) 8.dp else 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             ConnectionDot(isConnected = isConnected)
@@ -256,6 +260,15 @@ private fun LocalModelSelectorCard(
             IconButton(onClick = { showDeleteConfirm = true }) {
                 Icon(Icons.Filled.Delete, stringResource(R.string.delete), tint = Color(0xFF6B7280), modifier = Modifier.size(18.dp))
             }
+        }
+        if (expanded) {
+            com.warped.ui.components.CapabilityTable(
+                vision = capabilities.vision,
+                audio = capabilities.audio,
+                reasoning = capabilities.reasoning,
+                tools = capabilities.tools,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+            )
         }
     }
 }

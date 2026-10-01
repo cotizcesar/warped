@@ -347,8 +347,16 @@ class LiteRTLmProvider @Inject constructor(
             )
         }
 
-        // Step 7: Send content — agentic multi-round loop when armed,
-        // single-turn with retry loop otherwise.
+        // Diagnostics: history depth reaching the native layer, reuse inputs.
+        // If turns "start from 0", this line shows whether history was
+        // empty (VM side) or the conversation rebuilt (online flap below).
+        Timber.d(
+            "LiteRTLm: history=%d msgs online=%b armed=%b thinking=%b",
+            conversationConfig.initialMessages.size,
+            armSnapshot.online,
+            armSnapshot.armed,
+            armSnapshot.thinking
+        )
         if (armSnapshot.armed) {
             Timber.d("LiteRTLm: agentic loop armed (model=%s)", armSnapshot.modelPath?.substringAfterLast("/"))
             sendAgenticWithRetry(currentContents, conversationConfig, armSnapshot, params.contextSize, 0)
@@ -431,6 +439,7 @@ class LiteRTLmProvider @Inject constructor(
     ): Conversation = synchronized(this@LiteRTLmProvider) {
         val existing = activeConversation
         if (existing != null && existing.isAlive && activeLoopArm == snapshot) {
+            Timber.d("LiteRTLm: reusing live conversation")
             existing
         } else {
             if (existing != null) {
