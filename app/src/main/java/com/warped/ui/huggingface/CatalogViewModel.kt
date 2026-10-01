@@ -4,14 +4,20 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.warped.data.local.download.DownloadState
 import com.warped.data.local.download.ModelDownloadManager
+import com.warped.data.local.inference.EngineManager
+import com.warped.data.local.inference.ModelImportManager
 import com.warped.data.repository.AllowlistedModel
 import com.warped.data.repository.ModelAllowlistRepository
+import com.warped.domain.model.ActiveModelSelection
 import com.warped.domain.repository.LocalModelRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import timber.log.Timber
 import java.net.URLEncoder
 import javax.inject.Inject
 
@@ -32,7 +38,10 @@ import javax.inject.Inject
 class CatalogViewModel @Inject constructor(
     allowlistRepository: ModelAllowlistRepository,
     private val downloadManager: ModelDownloadManager,
-    localModelRepository: LocalModelRepository,
+    private val localModelRepository: LocalModelRepository,
+    private val activeModelSelection: ActiveModelSelection,
+    private val engineManager: EngineManager,
+    private val modelImportManager: ModelImportManager,
 ) : ViewModel() {
 
     /**
@@ -83,4 +92,38 @@ class CatalogViewModel @Inject constructor(
     fun resumeDownload(downloadId: String) = downloadManager.resumeDownload(downloadId)
 
     fun cancelDownload(downloadId: String) = downloadManager.cancelDownload(downloadId)
+
+    /**
+     * Delete an on-device model from the catalog's red trash icon.
+     * Mirrors the selector delete path: unload + disconnect when it is the
+     * active model, then delete file + library row. Failures are logged —
+     * the confirm dialog already gates the action and the screen has no
+     * error channel.
+     */
+    fun deleteDownloaded(entry: AllowlistedModel) {
+        viewModelScope.launch {
+            try {
+                // Match by file name: the entry carries only the bare name
+                // while the DB row stores the absolute path.
+                val models = localModelRepository.observeModels().first()
+                val model = models.firstOrNull {
+                    it.filePath.substringAfterLast("/") == entry.modelFile
+                } ?: return@launch Timber.w(
+                    "CatalogVM: delete requested for missing file %s",
+                    entry.modelFile
+                )
+                if (activeModelSelection.localSelection.value.modelId == model.filePath) {
+                    try {
+                        engineManager.unloadCurrent()
+                    } catch (e: Exception) {
+                        Timber.w(e, "CatalogVM: unloadCurrent failed")
+                    }
+                    activeModelSelection.disconnectLocal()
+                }
+                modelImportManager.deleteModel(model)
+            } catch (e: Exception) {
+                Timber.e(e, "CatalogVM: deleteDownloaded failed")
+            }
+        }
+    }
 }

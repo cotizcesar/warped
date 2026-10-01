@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Visibility
@@ -132,7 +133,8 @@ fun HuggingFaceScreen(
                             entry = entry,
                             viewModel = viewModel,
                             downloadStates = downloadStates,
-                            isOnDevice = true
+                            isOnDevice = true,
+                            onDeleteDownloaded = { viewModel.deleteDownloaded(entry) }
                         )
                     }
                 }
@@ -184,7 +186,8 @@ private fun CatalogCardItem(
     entry: AllowlistedModel,
     viewModel: CatalogViewModel,
     downloadStates: Map<String, DownloadState>,
-    isOnDevice: Boolean
+    isOnDevice: Boolean,
+    onDeleteDownloaded: () -> Unit = {}
 ) {
     val downloadId = viewModel.downloadId(entry)
     CatalogModelCard(
@@ -195,7 +198,8 @@ private fun CatalogCardItem(
         onCancel = { viewModel.cancelDownload(downloadId) },
         onPause = { viewModel.pauseDownload(downloadId) },
         onResume = { viewModel.resumeDownload(downloadId) },
-        onRetry = { viewModel.resumeDownload(downloadId) }
+        onRetry = { viewModel.resumeDownload(downloadId) },
+        onDeleteDownloaded = onDeleteDownloaded
     )
 }
 
@@ -245,7 +249,8 @@ private fun CatalogModelCard(
     onCancel: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
-    onRetry: () -> Unit = {}
+    onRetry: () -> Unit = {},
+    onDeleteDownloaded: () -> Unit = {}
 ) {
     // A "Cancelled" error is terminal-idle: the partial file is deleted and a
     // fresh Download restarts cleanly.
@@ -256,8 +261,31 @@ private fun CatalogModelCard(
     val failed = !active && !downloaded &&
         downloadState?.error != null && downloadState.error != "Cancelled"
     var showCancelConfirm by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     val details = remember(entry) { expandedText(entry) }
     val expandable = details != null
+
+    if (showDeleteConfirm) {
+        WarpedAlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text(stringResource(R.string.delete_model_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.delete_model_message,
+                        entry.displayName,
+                        formatFileSize(entry.sizeInBytes)
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showDeleteConfirm = false; onDeleteDownloaded() }) {
+                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.cancel)) } }
+        )
+    }
 
     if (showCancelConfirm) {
         WarpedAlertDialog(
@@ -279,6 +307,7 @@ private fun CatalogModelCard(
     com.warped.ui.components.ModelCard(
         title = entry.displayName,
         sizeText = formatFileSize(entry.sizeInBytes),
+        ramText = entry.ramNote,
         vision = entry.capabilities.vision,
         audio = entry.capabilities.audio,
         reasoning = entry.capabilities.supportsThinking,
@@ -286,12 +315,23 @@ private fun CatalogModelCard(
         dotConnected = downloaded,
         expandable = expandable,
         trailingActions = {
-            CatalogDownloadActions(
-                downloadState = downloadState,
-                downloaded = downloaded,
-                failed = failed,
-                onDownload = onDownload
-            )
+            if (downloaded) {
+                IconButton(onClick = { showDeleteConfirm = true }) {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = stringResource(R.string.delete),
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            } else {
+                CatalogDownloadActions(
+                    downloadState = downloadState,
+                    downloaded = false,
+                    failed = failed,
+                    onDownload = onDownload
+                )
+            }
         },
         downloadContent = {
             // Active download: shared linear-bar + status-line + Cancel look.
@@ -313,29 +353,21 @@ private fun CatalogModelCard(
         // retry = download icon tap).
         errorText = if (failed) downloadState?.error else null,
         detailsContent = {
-            // Expanded: Spanish RAM guidance + blurb + retained model file.
-            if (!entry.ramNote.isNullOrBlank()) {
-                Text(
-                    text = entry.ramNote,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
+            // Blurb constrained to two lines, separated above and below so
+            // it never blends into the header or the table. RAM guidance
+            // lives next to the size pill; the file name is intentionally
+            // not shown.
             if (!entry.blurb.isNullOrBlank()) {
+                Spacer(Modifier.height(4.dp))
                 Text(
                     text = entry.blurb,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
+                Spacer(Modifier.height(4.dp))
             }
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = entry.modelFile,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
         }
     )
 }

@@ -82,6 +82,9 @@ class ActiveDownloadPauseTest {
             allowlistRepository = mockk<ModelAllowlistRepository>(relaxed = true),
             downloadManager = downloadManager,
             localModelRepository = localRepo,
+            activeModelSelection = mockk(relaxed = true),
+            engineManager = mockk(relaxed = true),
+            modelImportManager = mockk(relaxed = true),
         )
     }
 

@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Card
@@ -67,6 +68,7 @@ import com.warped.R
 fun ModelCard(
     title: String,
     sizeText: String,
+    ramText: String? = null,
     metaChips: List<String> = emptyList(),
     vision: Boolean = false,
     audio: Boolean = false,
@@ -108,31 +110,45 @@ fun ModelCard(
                     ) {
                         ModelMetaChip(sizeText)
                         metaChips.forEach { ModelMetaChip(it) }
-                    }
-                    if (vision || audio || reasoning || tools) {
-                        Spacer(Modifier.height(4.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            if (vision) CapabilityIconBadge(
-                                icon = Icons.Filled.Visibility,
-                                contentDescription = stringResource(R.string.badge_vision),
-                                color = Color(0xFF64B5F6)
-                            )
-                            if (audio) CapabilityIconBadge(
-                                icon = Icons.Filled.Audiotrack,
-                                contentDescription = stringResource(R.string.badge_audio),
-                                color = Color(0xFF4CAF50)
-                            )
-                            if (reasoning) CapabilityIconBadge(
-                                icon = Icons.Filled.Psychology,
-                                contentDescription = stringResource(R.string.badge_thinking),
-                                color = Color(0xFFFF9800)
-                            )
-                            if (tools) CapabilityIconBadge(
-                                icon = Icons.Filled.Build,
-                                contentDescription = stringResource(R.string.badge_tools),
-                                color = Color(0xFF2196F3)
+                        if (ramText != null) {
+                            // RAM guidance outside the pill, same muted tone
+                            // as the size text.
+                            Text(
+                                text = ramText,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF9CA3AF),
+                                maxLines = 1
                             )
                         }
+                    }
+                    // Text badge always: every model chats (explicit per UX).
+                    Spacer(Modifier.height(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        CapabilityIconBadge(
+                            icon = Icons.Filled.TextFields,
+                            contentDescription = stringResource(R.string.cap_text),
+                            color = Color(0xFF9CA3AF)
+                        )
+                        if (vision) CapabilityIconBadge(
+                            icon = Icons.Filled.Visibility,
+                            contentDescription = stringResource(R.string.badge_vision),
+                            color = Color(0xFF64B5F6)
+                        )
+                        if (audio) CapabilityIconBadge(
+                            icon = Icons.Filled.Audiotrack,
+                            contentDescription = stringResource(R.string.badge_audio),
+                            color = Color(0xFF4CAF50)
+                        )
+                        if (reasoning) CapabilityIconBadge(
+                            icon = Icons.Filled.Psychology,
+                            contentDescription = stringResource(R.string.badge_thinking),
+                            color = Color(0xFFFF9800)
+                        )
+                        if (tools) CapabilityIconBadge(
+                            icon = Icons.Filled.Build,
+                            contentDescription = stringResource(R.string.badge_tools),
+                            color = Color(0xFF2196F3)
+                        )
                     }
                 }
                 if (onParams != null) {
