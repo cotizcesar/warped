@@ -40,3 +40,15 @@ jobs:
 
       - name: Assemble Debug
         run: ./gradlew assembleDebug
+
+      - name: Build Release APK (16KB gate artifact)
+        run: |
+          keytool -genkeypair -keystore /tmp/ci-release.jks -alias ci -keyalg RSA -keysize 2048 -validity 30 -storepass ci-release-pass -keypass ci-release-pass -dname "CN=CI, OU=CI, O=CI, C=US"
+          echo "RELEASE_STORE_FILE=/tmp/ci-release.jks" >> local.properties
+          echo "RELEASE_STORE_PASSWORD=ci-release-pass" >> local.properties
+          echo "RELEASE_KEY_ALIAS=ci" >> local.properties
+          echo "RELEASE_KEY_PASSWORD=ci-release-pass" >> local.properties
+          ./gradlew assembleRelease
+
+      - name: Verify 16KB native alignment
+        run: ./scripts/check_elf_alignment.sh app/build/outputs/apk/release/app-release.apk

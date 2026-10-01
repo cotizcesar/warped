@@ -45,6 +45,9 @@ jobs:
       - name: Build Release Bundle
         run: ./gradlew bundleRelease
 
+      - name: Verify 16KB native alignment
+        run: ./scripts/check_elf_alignment.sh app/build/outputs/bundle/release/app-release.aab
+
       - name: Determine Play Store track
         id: track
         run: |

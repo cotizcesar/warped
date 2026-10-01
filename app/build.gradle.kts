@@ -285,6 +285,16 @@ tasks.register<Exec>("auditDependencies") {
     errorOutput = System.out
 }
 
+tasks.register<Exec>("verify16KbAlignment") {
+    description = "Fails if any shipped .so in the release artifact is not 16 KB-aligned (PAGE-01/03)."
+    group = "verification"
+    dependsOn("bundleRelease")
+    commandLine("./scripts/check_elf_alignment.sh", "app/build/outputs/bundle/release/app-release.aab")
+    workingDir = rootProject.projectDir
+    standardOutput = System.out
+    errorOutput = System.out
+}
+
 tasks.named("check") {
-    dependsOn("auditDependencies")
+    dependsOn("auditDependencies", "verify16KbAlignment")
 }
