@@ -94,13 +94,15 @@ fun StepContent(
 
 @Composable
 private fun ContextBadge(step: WizardStep, contextData: WizardContextData) {
+    // Wizard shows no "nothing yet" empty states — badges render only when
+    // there is something to count; otherwise the card is info-only.
     val text = when (step) {
         WizardStep.LITERT_LM -> {
             if (contextData.litertlmModelCount > 0) {
                 val pluralRes = if (contextData.litertlmModelCount == 1) R.string.wizard_litertlm_singular else R.string.wizard_litertlm_plural
                 stringResource(R.string.wizard_badge_has_litertlm, contextData.litertlmModelCount, stringResource(pluralRes))
             } else {
-                stringResource(R.string.wizard_badge_no_litertlm)
+                ""
             }
         }
         WizardStep.REMOTE_PROVIDERS -> {
@@ -108,7 +110,7 @@ private fun ContextBadge(step: WizardStep, contextData: WizardContextData) {
                 val pluralRes = if (contextData.endpointCount == 1) R.string.wizard_endpoint_singular else R.string.wizard_endpoint_plural
                 stringResource(R.string.wizard_badge_has_endpoints, contextData.endpointCount, stringResource(pluralRes))
             } else {
-                stringResource(R.string.wizard_badge_no_endpoints)
+                ""
             }
         }
         WizardStep.PRESETS -> {
@@ -116,7 +118,7 @@ private fun ContextBadge(step: WizardStep, contextData: WizardContextData) {
                 val pluralRes = if (contextData.presetCount == 1) R.string.wizard_preset_singular else R.string.wizard_preset_plural
                 stringResource(R.string.wizard_badge_has_presets, contextData.presetCount, stringResource(pluralRes))
             } else {
-                stringResource(R.string.wizard_badge_no_presets)
+                ""
             }
         }
         WizardStep.HISTORY -> {
@@ -124,7 +126,7 @@ private fun ContextBadge(step: WizardStep, contextData: WizardContextData) {
                 val pluralRes = if (contextData.chatCount == 1) R.string.wizard_chat_singular else R.string.wizard_chat_plural
                 stringResource(R.string.wizard_badge_has_chats, contextData.chatCount, stringResource(pluralRes))
             } else {
-                stringResource(R.string.wizard_badge_no_chats)
+                ""
             }
         }
         else -> ""
@@ -159,7 +161,7 @@ private fun contextDescription(step: WizardStep, contextData: WizardContextData?
                 val pluralRes = if (contextData.litertlmModelCount == 1) R.string.wizard_litertlm_singular else R.string.wizard_litertlm_plural
                 stringResource(R.string.wizard_step_4_desc_has, contextData.litertlmModelCount, stringResource(pluralRes))
             } else {
-                stringResource(R.string.wizard_step_4_desc_no)
+                stringResource(step.descriptionRes)
             }
         }
         WizardStep.REMOTE_PROVIDERS -> {
@@ -167,7 +169,7 @@ private fun contextDescription(step: WizardStep, contextData: WizardContextData?
                 val pluralRes = if (contextData.endpointCount == 1) R.string.wizard_endpoint_singular else R.string.wizard_endpoint_plural
                 stringResource(R.string.wizard_step_6_desc_has, contextData.endpointCount, stringResource(pluralRes))
             } else {
-                stringResource(R.string.wizard_step_6_desc_no)
+                stringResource(step.descriptionRes)
             }
         }
         WizardStep.PRESETS -> {
@@ -175,7 +177,7 @@ private fun contextDescription(step: WizardStep, contextData: WizardContextData?
                 val pluralRes = if (contextData.presetCount == 1) R.string.wizard_preset_singular else R.string.wizard_preset_plural
                 stringResource(R.string.wizard_step_8_desc_has, contextData.presetCount, stringResource(pluralRes))
             } else {
-                stringResource(R.string.wizard_step_8_desc_no)
+                stringResource(step.descriptionRes)
             }
         }
         WizardStep.HISTORY -> {
@@ -183,7 +185,7 @@ private fun contextDescription(step: WizardStep, contextData: WizardContextData?
                 val pluralRes = if (contextData.chatCount == 1) R.string.wizard_chat_singular else R.string.wizard_chat_plural
                 stringResource(R.string.wizard_step_9_desc_has, contextData.chatCount, stringResource(pluralRes))
             } else {
-                stringResource(R.string.wizard_step_9_desc_no)
+                stringResource(step.descriptionRes)
             }
         }
         else -> stringResource(step.descriptionRes)

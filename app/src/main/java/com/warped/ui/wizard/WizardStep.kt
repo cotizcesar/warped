@@ -33,48 +33,57 @@ enum class WizardStep(
         descriptionRes = R.string.wizard_step_2_desc,
         ctaLabelRes = R.string.wizard_step_2_cta,
         icon = Icons.Filled.Memory,
-        ctaRoute = Screen.Models
+        // Real Models & Endpoints (UnifiedSelector) — the legacy
+        // Screen.Models view is not part of the onboarding flow.
+        ctaRoute = Screen.Selector
     ),
     LITERT_LM(
         titleRes = R.string.wizard_step_4_title,
         descriptionRes = R.string.wizard_step_4_desc,
-        ctaLabelRes = R.string.wizard_step_4_cta,
+        // No import affordance in the wizard: the Models & Endpoints
+        // "+" opens the download catalog. Reuses the View Models label.
+        ctaLabelRes = R.string.wizard_step_2_cta,
         icon = Icons.Filled.Android,
-        ctaRoute = Screen.Models
+        ctaRoute = Screen.Selector
     ),
     LOCAL_CHAT(
         titleRes = R.string.wizard_step_5_title,
         descriptionRes = R.string.wizard_step_5_desc,
         ctaLabelRes = R.string.wizard_step_5_cta,
         icon = Icons.AutoMirrored.Filled.Chat,
-        ctaRoute = Screen.Chat
+        // Info card only — no "Go to Chat" button in the wizard.
+        ctaRoute = null
     ),
     REMOTE_PROVIDERS(
         titleRes = R.string.wizard_step_6_title,
         descriptionRes = R.string.wizard_step_6_desc,
         ctaLabelRes = R.string.wizard_step_6_cta,
         icon = Icons.Filled.Dns,
-        ctaRoute = Screen.Endpoints
+        // Info card only — no endpoint setup CTA in the wizard.
+        ctaRoute = null
     ),
     REMOTE_CHAT(
         titleRes = R.string.wizard_step_7_title,
         descriptionRes = R.string.wizard_step_7_desc,
         ctaLabelRes = R.string.wizard_step_7_cta,
         icon = Icons.Filled.Cloud,
-        ctaRoute = Screen.Chat
+        // Info card only — no remote-chat CTA in the wizard.
+        ctaRoute = null
     ),
     PRESETS(
         titleRes = R.string.wizard_step_8_title,
         descriptionRes = R.string.wizard_step_8_desc,
         ctaLabelRes = R.string.wizard_step_8_cta,
         icon = Icons.Filled.Tune,
-        ctaRoute = Screen.Presets
+        // Info card only — no preset-creation CTA in the wizard.
+        ctaRoute = null
     ),
     HISTORY(
         titleRes = R.string.wizard_step_9_title,
         descriptionRes = R.string.wizard_step_9_desc,
         ctaLabelRes = R.string.wizard_step_9_cta,
         icon = Icons.Filled.History,
-        ctaRoute = Screen.Chat
+        // Info card only — no history CTA in the wizard.
+        ctaRoute = null
     )
 }

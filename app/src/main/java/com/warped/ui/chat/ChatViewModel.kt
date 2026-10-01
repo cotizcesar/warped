@@ -212,6 +212,13 @@ class ChatViewModel @Inject constructor(
                     ?.let { autoPick ->
                         autoSelectedModelPath = autoPick
                         activeModelSelection.markLocalLoading(autoPick)
+                        // Preload immediately: markLocalLoading alone leaves
+                        // the traffic light spinning ("Loading…") with no
+                        // engine behind it. preload carries the memory guard
+                        // and flips to connected (or a real error) on finish.
+                        viewModelScope.launch(coroutineExceptionHandler) {
+                            preloadLocalModel(autoPick)
+                        }
                     }
                 updateConnection { state ->
                     val activeLocalId = state.selectedLocalModelId
@@ -841,6 +848,19 @@ class ChatViewModel @Inject constructor(
                 // reach stopResponse() (transport-level halt).
                 activeHelper = helper
                 helper.initialize(modelId)
+                // Loading-flag heal, selected-but-unconnected ONLY: the
+                // provider lazy-loads the engine without touching
+                // selection, which would leave the traffic light spinning
+                // ("Loading…") forever on an auto-selected model. Reconcile
+                // engine truth into selection. Skipped when already
+                // connected (the historically tested steady state) or
+                // remote — refreshActiveBackend touches the engine manager,
+                // which strict test doubles don't stub.
+                if (selectedProvider == ProviderType.LITE_RT_LM &&
+                    activeModelSelection.localSelection.value.let { it.modelId != null && !it.isConnected }
+                ) {
+                    refreshActiveBackend()
+                }
 
                 // Phase 50: the persisted history keeps original text; the
                 // outgoing request's current message carries the augmented

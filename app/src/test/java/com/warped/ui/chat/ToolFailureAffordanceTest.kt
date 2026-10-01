@@ -95,7 +95,7 @@ class ToolFailureAffordanceTest {
     private val ddg = mockk<DuckDuckGoSearchRepository>()
     private val multiUrlFetcher = mockk<MultiUrlFetcher>()
     private val webPageFetcher = mockk<WebPageFetcher>()
-    private val allowlist = mockk<ModelAllowlistRepository>()
+    private val allowlist = mockk<ModelAllowlistRepository>().also(::stubEffectiveCapabilities)
     private val advancedPreferences = mockk<AdvancedPreferences>()
 
     private fun provider() = LiteRTLmProvider(
@@ -228,7 +228,7 @@ class ToolFailureAffordanceTest {
         val engineManager = mockk<EngineManager>()
         val memoryChecker = mockk<MemoryChecker>()
         val advancedPreferences = mockk<AdvancedPreferences>()
-        val allowlist = mockk<ModelAllowlistRepository>()
+        val allowlist = mockk<ModelAllowlistRepository>().also(::stubEffectiveCapabilities)
         val context = mockk<Context>()
         every { context.getString(any<Int>()) } returns ""
         every { context.getString(any<Int>(), *anyVararg<Any>()) } returns ""

@@ -137,7 +137,7 @@ class ChatAlwaysSearchTest {
         // Allowlist capability: true reproduces the previously-armed turn
         // (capable model + online). The VM no longer consults it for the
         // pre-search decision — the provider owns arming.
-        val allowlist = mockk<ModelAllowlistRepository>()
+        val allowlist = mockk<ModelAllowlistRepository>().also(::stubEffectiveCapabilities)
         every { allowlist.findByModelFile(any()) } returns AllowlistedModel(
             name = "tiny",
             displayName = "Tiny",

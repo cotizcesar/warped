@@ -127,7 +127,7 @@ class ChatCodeIntentGateTest {
         fetcher = mockk()
         every { fetcher.cancel() } just Runs
         every { fetcher.hasValidatedInternet() } returns online
-        val allowlist = mockk<ModelAllowlistRepository>()
+        val allowlist = mockk<ModelAllowlistRepository>().also(::stubEffectiveCapabilities)
         every { allowlist.findByModelFile(any()) } returns AllowlistedModel(
             name = "tiny",
             displayName = "Tiny",

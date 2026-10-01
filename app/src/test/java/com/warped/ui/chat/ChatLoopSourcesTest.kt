@@ -99,7 +99,7 @@ class ChatLoopSourcesTest {
         val engineManager = mockk<EngineManager>()
         val memoryChecker = mockk<MemoryChecker>()
         val advancedPreferences = mockk<AdvancedPreferences>()
-        val allowlist = mockk<ModelAllowlistRepository>()
+        val allowlist = mockk<ModelAllowlistRepository>().also(::stubEffectiveCapabilities)
         val context = mockk<Context>()
         every { context.getString(any<Int>()) } returns ""
         every { context.getString(any<Int>(), *anyVararg<Any>()) } returns ""
