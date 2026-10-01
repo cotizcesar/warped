@@ -86,7 +86,9 @@ Previous: v2.4 Agentic Web shipped 2026-09-29 (Phases 55–58, 10/10 verified). 
   3. Grounding pipeline (5-fan-out + Tavily + SSE accumulators) cancels as one scope per send; retry reuses rows without retaining old jobs
   4. Coil image requests cancel on recycle with bounded cache; shared OkHttp clients never closed; no Activity-context singletons
   5. Release AAB passes all gates — alignment green, `assembleRelease` + R8 green, 16 KB emulator smoke green, zero-leak pass green, Play Console pre-launch clean
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 62-01-PLAN.md — regression tests locking the 5 leak-prone clean paths + full suite green
+- [ ] 62-02-PLAN.md — release hardening: fresh signed build, alignment + R8 gates, hardware smoke, evidence + release-UAT
 
 ## Progress
 
