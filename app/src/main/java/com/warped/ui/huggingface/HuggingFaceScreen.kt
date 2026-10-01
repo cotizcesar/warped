@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -72,6 +73,10 @@ fun HuggingFaceScreen(
     val downloadedFileNames by viewModel.downloadedFileNames.collectAsStateWithLifecycle()
 
     Scaffold(
+        // API-02: explicit system-bars content insets (same as the Scaffold
+        // default) — the catalog list never draws under status/nav bars, in
+        // gesture-nav and 3-button nav alike.
+        contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.hf_catalog)) },
