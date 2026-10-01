@@ -19,8 +19,13 @@
 
 | Artifact | SHA-256 |
 |----------|---------|
-| `app-release.aab` | `082552161a1c1300b7b247fb5a91a753d75c901f9ec659e88abad9ce1ce644d0` |
-| `app-release.apk` | `a25b679e0b3cdebc24eb786beda2d29caf610cc40b6849bb7183c2b3402032d6` |
+| `app-release.aab` (v2.5.0) | `ee89545f189859a9ee9b70da9efd1f325dadd6b5f621f72a9f4b939f54c55b7e` |
+| `app-release.apk` (v2.5.0) | `870ef8d7134c431fc92dc4306eb7ac6becef31e4b309d9bc637d6eb64c8b17aa` |
+
+> v2.5.0 rebuild 2026-10-01: version bump 2.4.0 → 2.5.0
+> (`versionMinor` 4→5, versionCode 20500000) + committed 6-model
+> allowlist. Replaces the 2.4.0 SHAs below for the shippable artifact;
+> all gates re-run green on these SHAs.
 
 - R8: BUILD SUCCESSFUL, no errors (63 tasks, config cache stored).
 - Signing: release keystore `app/keystore/warped-release.jks` via untracked

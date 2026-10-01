@@ -12,9 +12,9 @@ android {
     compileSdk = 36
 
     val versionMajor = 2
-    val versionMinor = 4
+    val versionMinor = 5
     val versionPatch = 0
-    val baseVersionCode = versionMajor * 10000 + versionMinor * 100 + versionPatch // 10701
+    val baseVersionCode = versionMajor * 10000 + versionMinor * 100 + versionPatch // 20500
 
     // CI build number from GitHub Actions (always increments per workflow run)
     val ciBuildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0
