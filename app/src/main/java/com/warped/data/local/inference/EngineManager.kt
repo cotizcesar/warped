@@ -180,16 +180,19 @@ class EngineManager @Inject constructor(
     /**
      * Resolve the vision backend for an init attempt. Vision-capable models
      * (allowlist `capabilities.vision == true`, e.g. gemma-4-E2B-it) probe the
-     * device vision backend (GPU when EGL is present); all other models keep
-     * the legacy explicit CPU — byte-identical to the old hardcoded behavior.
+     * device vision backend (GPU when EGL is present); all other models get
+     * null (vision slot unconfigured). Requesting any explicit vision backend
+     * for a model without TF_LITE_VISION_ENCODER fails conversation creation
+     * with NOT_FOUND (device log 2026-09-30, gemma-3-270m-it) — same
+     * capability-gating precedent as audio and speculative decoding.
      */
     private fun resolveVisionBackend(
         target: ActiveEngine,
         visionCapable: Boolean? = allowlist
             .findByModelFile(target.modelPath.substringAfterLast("/"))
             ?.capabilities?.vision
-    ): BackendType =
-        if (visionCapable == true) backendDetector.probeVisionBackend() else BackendType.CPU
+    ): BackendType? =
+        if (visionCapable == true) backendDetector.probeVisionBackend() else null
 
     /**
      * Resolve the audio backend for an init attempt. Audio-capable models

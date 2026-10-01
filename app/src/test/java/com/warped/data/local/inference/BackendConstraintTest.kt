@@ -148,7 +148,7 @@ class BackendConstraintTest {
     }
 
     @Test
-    fun `initWith keeps CPU vision for non-vision models`() {
+    fun `initWith leaves vision unconfigured for non-vision models`() {
         val m = visionManager(visionCapable = false)
         val file = File(tempDir, "gemma-4-12B-it.litertlm").also { it.writeText("weights") }
         m.switchToLiteRT(file.absolutePath)
@@ -156,7 +156,9 @@ class BackendConstraintTest {
             engineOf(m).init(
                 modelPath = file.absolutePath,
                 backend = BackendType.CPU,
-                visionBackend = BackendType.CPU,
+                // Null vision slot: explicit backends demand
+                // TF_LITE_VISION_ENCODER in the model (NOT_FOUND on 270m).
+                visionBackend = null,
                 audioBackend = null,
                 enableSpeculativeDecoding = false
             )
@@ -172,7 +174,7 @@ class BackendConstraintTest {
             engineOf(m).init(
                 modelPath = file.absolutePath,
                 backend = BackendType.CPU,
-                visionBackend = BackendType.CPU,
+                visionBackend = null,
                 audioBackend = BackendType.CPU,
                 enableSpeculativeDecoding = false
             )
