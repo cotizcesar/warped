@@ -1561,8 +1561,15 @@ class ChatViewModel @Inject constructor(
             if (!needsReload) return
         }
 
-        // Unload previous model
-        if (oldLocalId != null && oldLocalId != modelId) {
+        // Unload previous model. Local->local needs NO explicit unload:
+        // preload's switchToLiteRT unloads the old engine atomically first
+        // (same monitor). A concurrent unload here could win the monitor
+        // AFTER the fresh init and kill the just-mounted engine — the
+        // switch that never finished loading. Local->remote keeps the
+        // explicit unload (nothing else will free the RAM).
+        if (oldLocalId != null && oldLocalId != modelId &&
+            providerType != ProviderType.LITE_RT_LM
+        ) {
             viewModelScope.launch(coroutineExceptionHandler + Dispatchers.Default) {
                 try { engineManager.unloadCurrent() } catch (e: Exception) { Timber.e(e, "Chat: unloadCurrent failed") }
             }
@@ -1780,7 +1787,13 @@ class ChatViewModel @Inject constructor(
             val availMB = memInfo.availableBytes / (1024 * 1024)
             updateConnection {
                 it.copy(
-                    modelLoadError = context.getString(R.string.error_no_memory_fmt, modelMB, availMB)
+                    modelLoadError = context.getString(R.string.error_no_memory_fmt, modelMB, availMB),
+                    // Clear the loading flag: markLocalLoading set it via
+                    // the selection collector, and no engine load follows —
+                    // otherwise the traffic light spins forever. Selection
+                    // is kept so retrying after freeing memory just works.
+                    isLoadingModel = false,
+                    loadingModelName = ""
                 )
             }
             return
