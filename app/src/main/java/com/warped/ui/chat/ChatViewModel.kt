@@ -234,6 +234,18 @@ class ChatViewModel @Inject constructor(
                         state.copy(localModels = models)
                     }
                 }
+                // Recompute capability-driven input flags: the selection
+                // collectors fail open while this list is empty, which would
+                // otherwise stick (e.g. Thinking visible on a text-only
+                // model selected before the repo emitted).
+                updateInput {
+                    it.copy(
+                        supportsThinking = supportsThinkingFor(
+                            _connection.value.selectedLocalModelId,
+                            _connection.value.selectedRemoteModelId
+                        )
+                    )
+                }
             }
         }
         viewModelScope.launch(coroutineExceptionHandler) {

@@ -321,28 +321,39 @@ class GroundingPromptTest {
 
     @Test
     fun `detector throw falls back to the regex`() {
+        LanguageDetectorHolder.resetForTest()
         LanguageDetectorHolder.detectorFactory = { throw IllegalStateException("boom") }
-        LanguageDetectorHolder.ensureLoadedBlocking()
+        try {
+            LanguageDetectorHolder.ensureLoadedBlocking()
 
-        assertThat(LanguageDetectorHolder.detectSpanish("niño")).isNull()
-        // Layer 2 (markers) proves the regex decides with the detector dead…
-        assertThat(GroundingPrompt.isSpanish("niño")).isTrue()
-        assertThat(GroundingPrompt.isSpanish("hello")).isFalse()
-        // …and layer 3 keeps tildeless recall alive without the library:
-        // "hola"+"quien" are function-word tokens, so TRUE even on throw.
-        assertThat(GroundingPrompt.isSpanish("hola quien eres")).isTrue()
+            assertThat(LanguageDetectorHolder.detectSpanish("niño")).isNull()
+            // Layer 2 (markers) proves the regex decides with the detector dead…
+            assertThat(GroundingPrompt.isSpanish("niño")).isTrue()
+            assertThat(GroundingPrompt.isSpanish("hello")).isFalse()
+            // …and layer 3 keeps tildeless recall alive without the library:
+            // "hola"+"quien" are function-word tokens, so TRUE even on throw.
+            assertThat(GroundingPrompt.isSpanish("hola quien eres")).isTrue()
+        } finally {
+            LanguageDetectorHolder.resetForTest()
+        }
     }
 
     @Test
     fun `detector not ready falls back to the regex`() {
         // Simulates a cold start where the detector is unavailable (warm
         // thread still loading, or init failed): NULL → regex decides.
-        // A null-returning factory is deterministic — no timing dependence.
+        // Reset first: a previously-loaded detector in this JVM would
+        // otherwise survive the null factory and answer non-null.
+        LanguageDetectorHolder.resetForTest()
         LanguageDetectorHolder.detectorFactory = { null }
-        LanguageDetectorHolder.ensureLoadedBlocking()
+        try {
+            LanguageDetectorHolder.ensureLoadedBlocking()
 
-        assertThat(LanguageDetectorHolder.detectSpanish("¿Cómo estás?")).isNull()
-        assertThat(GroundingPrompt.isSpanish("¿Cómo estás?")).isTrue()
-        assertThat(GroundingPrompt.isSpanish("hello")).isFalse()
+            assertThat(LanguageDetectorHolder.detectSpanish("¿Cómo estás?")).isNull()
+            assertThat(GroundingPrompt.isSpanish("¿Cómo estás?")).isTrue()
+            assertThat(GroundingPrompt.isSpanish("hello")).isFalse()
+        } finally {
+            LanguageDetectorHolder.resetForTest()
+        }
     }
 }
