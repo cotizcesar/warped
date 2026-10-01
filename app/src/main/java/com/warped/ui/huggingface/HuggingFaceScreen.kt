@@ -104,6 +104,14 @@ fun HuggingFaceScreen(
                 )
             }
         } else {
+            // Smallest-first display order comes from the ViewModel; sections
+            // split downloaded from available within that order.
+            val downloaded = remember(viewModel.models, downloadedFileNames) {
+                viewModel.models.filter { it.modelFile in downloadedFileNames }
+            }
+            val available = remember(viewModel.models, downloadedFileNames) {
+                viewModel.models.filter { it.modelFile !in downloadedFileNames }
+            }
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -112,22 +120,83 @@ fun HuggingFaceScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp)
             ) {
-                items(viewModel.models, key = { it.name }) { entry ->
-                    val downloadId = viewModel.downloadId(entry)
-                    CatalogModelCard(
-                        entry = entry,
-                        downloadState = downloadStates[downloadId],
-                        isOnDevice = entry.modelFile in downloadedFileNames,
-                        onDownload = { viewModel.startDownload(entry) },
-                        onCancel = { viewModel.cancelDownload(downloadId) },
-                        onPause = { viewModel.pauseDownload(downloadId) },
-                        onResume = { viewModel.resumeDownload(downloadId) },
-                        onRetry = { viewModel.resumeDownload(downloadId) }
-                    )
+                if (downloaded.isNotEmpty()) {
+                    item(key = "section-downloaded") {
+                        CatalogSectionHeader(
+                            title = stringResource(R.string.hf_section_downloaded),
+                            count = downloaded.size
+                        )
+                    }
+                    items(downloaded, key = { "dl-${it.name}" }) { entry ->
+                        CatalogCardItem(
+                            entry = entry,
+                            viewModel = viewModel,
+                            downloadStates = downloadStates,
+                            isOnDevice = true
+                        )
+                    }
+                }
+                if (available.isNotEmpty()) {
+                    item(key = "section-available") {
+                        CatalogSectionHeader(
+                            title = stringResource(R.string.hf_section_available),
+                            count = available.size
+                        )
+                    }
+                    items(available, key = { "av-${it.name}" }) { entry ->
+                        CatalogCardItem(
+                            entry = entry,
+                            viewModel = viewModel,
+                            downloadStates = downloadStates,
+                            isOnDevice = false
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun CatalogSectionHeader(title: String, count: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = "$count",
+            style = MaterialTheme.typography.labelMedium,
+            color = Color(0xFF9CA3AF)
+        )
+    }
+}
+
+@Composable
+private fun CatalogCardItem(
+    entry: AllowlistedModel,
+    viewModel: CatalogViewModel,
+    downloadStates: Map<String, DownloadState>,
+    isOnDevice: Boolean
+) {
+    val downloadId = viewModel.downloadId(entry)
+    CatalogModelCard(
+        entry = entry,
+        downloadState = downloadStates[downloadId],
+        isOnDevice = isOnDevice,
+        onDownload = { viewModel.startDownload(entry) },
+        onCancel = { viewModel.cancelDownload(downloadId) },
+        onPause = { viewModel.pauseDownload(downloadId) },
+        onResume = { viewModel.resumeDownload(downloadId) },
+        onRetry = { viewModel.resumeDownload(downloadId) }
+    )
 }
 
 /**
@@ -187,7 +256,6 @@ private fun CatalogModelCard(
     val failed = !active && !downloaded &&
         downloadState?.error != null && downloadState.error != "Cancelled"
     var showCancelConfirm by remember { mutableStateOf(false) }
-    var expanded by remember { mutableStateOf(false) }
     val details = remember(entry) { expandedText(entry) }
     val expandable = details != null
 
@@ -206,68 +274,30 @@ private fun CatalogModelCard(
         )
     }
 
-    Card(
-        modifier = Modifier.fillMaxWidth()
-            .then(
-                if (expandable) {
-                    Modifier.clickable(
-                        role = Role.Button,
-                        onClickLabel = if (expanded) stringResource(R.string.hf_collapse) else stringResource(R.string.hf_expand)
-                    ) { expanded = !expanded }
-                } else {
-                    Modifier
-                }
-            ),
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF2B2B29)
-        )
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            // Collapsed row 1: title + download-state icon cluster (overlay:
-            // title alone defines the row height; actions float centered-end
-            // on top, free to bleed symmetrically into card padding).
-            // Unified download look: the active cluster is gone — active
-            // downloads render in the shared ActiveDownloadContent section
-            // below, so the title always reserves the 52dp idle slot.
-            Box(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = entry.displayName,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(end = titleEndPaddingDp(active).dp)
-                )
-                Box(Modifier.align(Alignment.CenterEnd)) {
-                    CatalogDownloadActions(
-                        downloadState = downloadState,
-                        downloaded = downloaded,
-                        failed = failed,
-                        onDownload = onDownload
-                    )
-                }
-            }
-            Spacer(Modifier.height(4.dp))
-            // Collapsed row 2: capability icons + size.
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                CatalogCapabilityIcons(entry = entry)
-                Spacer(Modifier.weight(1f))
-                Text(
-                    text = formatFileSize(entry.sizeInBytes),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
-                )
-            }
-            // Active download: shared linear-bar + status-line + Cancel look
-            // (identical to the Models screen DownloadCard). Cancel and
-            // Delete both go through the cancel-confirm dialog — cancelling
+    // Unified card shared with Models & Endpoints — only the trailing
+    // action switches (download cluster here, delete there).
+    com.warped.ui.components.ModelCard(
+        title = entry.displayName,
+        sizeText = formatFileSize(entry.sizeInBytes),
+        vision = entry.capabilities.vision,
+        audio = entry.capabilities.audio,
+        reasoning = entry.capabilities.supportsThinking,
+        tools = entry.capabilities.supportsFunctionCalling,
+        dotConnected = downloaded,
+        expandable = expandable,
+        trailingActions = {
+            CatalogDownloadActions(
+                downloadState = downloadState,
+                downloaded = downloaded,
+                failed = failed,
+                onDownload = onDownload
+            )
+        },
+        downloadContent = {
+            // Active download: shared linear-bar + status-line + Cancel look.
+            // Cancel goes through the cancel-confirm dialog — cancelling
             // deletes the partial file (see dialog copy).
-            if (active) {
+            if (active && downloadState != null) {
                 Spacer(Modifier.height(6.dp))
                 ActiveDownloadContent(
                     download = downloadState,
@@ -278,53 +308,36 @@ private fun CatalogModelCard(
                     onRetry = onRetry
                 )
             }
-            // Retained error text (icon form keeps the message for a11y;
-            // retry = download icon tap).
-            if (failed) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = downloadState.error,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
+        },
+        // Retained error text (icon form keeps the message for a11y;
+        // retry = download icon tap).
+        errorText = if (failed) downloadState?.error else null,
+        detailsContent = {
             // Expanded: Spanish RAM guidance + blurb + retained model file.
-            if (expanded && expandable) {
-                Spacer(Modifier.height(8.dp))
-                if (!entry.ramNote.isNullOrBlank()) {
-                    Text(
-                        text = entry.ramNote,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-                if (!entry.blurb.isNullOrBlank()) {
-                    Text(
-                        text = entry.blurb,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                // Capability table (LM-Studio-style): what each badge means.
-                // Modalities the model lacks show "–" instead of a status.
-                Spacer(Modifier.height(4.dp))
-                com.warped.ui.components.CapabilityTable(
-                    vision = entry.capabilities.vision,
-                    audio = entry.capabilities.audio,
-                    reasoning = entry.capabilities.supportsThinking,
-                    tools = entry.capabilities.supportsFunctionCalling
-                )
-                Spacer(Modifier.height(4.dp))
+            if (!entry.ramNote.isNullOrBlank()) {
                 Text(
-                    text = entry.modelFile,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    text = entry.ramNote,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
+            if (!entry.blurb.isNullOrBlank()) {
+                Text(
+                    text = entry.blurb,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = entry.modelFile,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
-    }
+    )
 }
 
 /**
@@ -361,37 +374,6 @@ private fun CatalogDownloadActions(
                 } else {
                     MaterialTheme.colorScheme.primary
                 }
-            )
-        }
-    }
-}
-
-/**
- * Capability icons reusing [CapabilityIconBadge] iconography (vision/audio/
- * thinking only — tools is never shown on catalog cards per Phase 49 DEL-01).
- */
-@Composable
-private fun CatalogCapabilityIcons(entry: AllowlistedModel) {
-    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        if (entry.capabilities.vision) {
-            CapabilityIconBadge(
-                icon = Icons.Filled.Visibility,
-                contentDescription = stringResource(R.string.badge_vision),
-                color = Color(0xFF64B5F6)
-            )
-        }
-        if (entry.capabilities.audio) {
-            CapabilityIconBadge(
-                icon = Icons.Filled.Audiotrack,
-                contentDescription = stringResource(R.string.badge_audio),
-                color = Color(0xFF4CAF50)
-            )
-        }
-        if (entry.capabilities.supportsThinking) {
-            CapabilityIconBadge(
-                icon = Icons.Filled.Psychology,
-                contentDescription = stringResource(R.string.cap_reasoning),
-                color = Color(0xFFFF9800)
             )
         }
     }

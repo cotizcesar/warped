@@ -202,9 +202,6 @@ private fun LocalModelSelectorCard(
     onEditParams: () -> Unit
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    // Tap toggles the LM-Studio-style capability table (mirrors the
-    // catalog expanded details). Selection lives in chat only.
-    var expanded by remember { mutableStateOf(false) }
 
     if (showDeleteConfirm) {
         WarpedAlertDialog(
@@ -222,65 +219,27 @@ private fun LocalModelSelectorCard(
         )
     }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
-        shape = RoundedCornerShape(12.dp),
-        onClick = { expanded = !expanded }
-    ) {
-        Row(
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = if (expanded) 8.dp else 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            ConnectionDot(isConnected = isConnected)
-
-            Spacer(Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(model.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(2.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    ModelMetaChip(formatFileSize(model.sizeBytes))
-                    if (model.quantization.isNotBlank() && model.quantization != "N/A") {
-                        ModelMetaChip(model.quantization)
-                    }
-                    if (model.parameterCount.isNotBlank() && model.parameterCount != "Unknown") {
-                        ModelMetaChip(model.parameterCount)
-                    }
-                }
-                if (capabilities.vision || capabilities.reasoning || capabilities.tools || capabilities.audio) {
-                    Spacer(Modifier.height(4.dp))
-                    com.warped.ui.components.CapabilityIconRow(capabilities)
-                }
-            }
-
-            IconButton(onClick = onEditParams) {
-                Icon(Icons.Filled.Tune, stringResource(R.string.cd_parameters), tint = Color(0xFF9CA3AF), modifier = Modifier.size(18.dp))
-            }
+    // Unified card shared with the Model Catalog — only the trailing
+    // action switches (delete here, download cluster there).
+    val chips = buildList {
+        if (model.quantization.isNotBlank() && model.quantization != "N/A") add(model.quantization)
+        if (model.parameterCount.isNotBlank() && model.parameterCount != "Unknown") add(model.parameterCount)
+    }
+    com.warped.ui.components.ModelCard(
+        title = model.name,
+        sizeText = formatFileSize(model.sizeBytes),
+        metaChips = chips,
+        vision = capabilities.vision,
+        audio = capabilities.audio,
+        reasoning = capabilities.reasoning,
+        tools = capabilities.tools,
+        dotConnected = isConnected,
+        onParams = onEditParams,
+        trailingActions = {
             IconButton(onClick = { showDeleteConfirm = true }) {
                 Icon(Icons.Filled.Delete, stringResource(R.string.delete), tint = Color(0xFF6B7280), modifier = Modifier.size(18.dp))
             }
         }
-        if (expanded) {
-            com.warped.ui.components.CapabilityTable(
-                vision = capabilities.vision,
-                audio = capabilities.audio,
-                reasoning = capabilities.reasoning,
-                tools = capabilities.tools,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun ConnectionDot(isConnected: Boolean) {
-    val color = if (isConnected) Color(0xFF4CAF50) else Color(0xFF6B7280)
-    Box(
-        modifier = Modifier
-            .size(10.dp)
-            .clip(CircleShape)
-            .background(color)
     )
 }
 

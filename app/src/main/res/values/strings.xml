@@ -20,6 +20,8 @@
     <string name="download_model_first">Download this model before using it for local chat.</string>
     <string name="thinking">Thinking</string>
     <string name="use_in_chat">Use in chat</string>
+    <string name="hf_section_downloaded">Downloaded</string>
+    <string name="hf_section_available">Available models</string>
     <string name="active_downloads">Active Downloads</string>
     <string name="local_models">Local Models</string>
     <string name="network_endpoints">Network Endpoints</string>
