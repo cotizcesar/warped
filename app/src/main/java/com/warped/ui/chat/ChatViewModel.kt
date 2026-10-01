@@ -198,6 +198,21 @@ class ChatViewModel @Inject constructor(
         }
         viewModelScope.launch(coroutineExceptionHandler) {
             localModelRepository.observeModels().collect { models ->
+                // Auto-select: a fresh download/import leaves no selection,
+                // which disables the chat input (NoModelSelected) until the
+                // user finds Models & Endpoints. Select the newest model so
+                // chat is immediately usable — the engine loads on first
+                // send (helper.initialize) or on selector pick (preload).
+                // The toggle this replaces is gone: unloading happens
+                // implicitly on switch/delete, never by hand.
+                val selectedId = _connection.value.selectedLocalModelId
+                    ?: activeModelSelection.localSelection.value.modelId
+                pickAutoSelectModel(models, selectedId)
+                    ?.takeIf { it != autoSelectedModelPath }
+                    ?.let { autoPick ->
+                        autoSelectedModelPath = autoPick
+                        activeModelSelection.markLocalLoading(autoPick)
+                    }
                 updateConnection { state ->
                     val activeLocalId = state.selectedLocalModelId
                     if (activeLocalId != null) {
@@ -1881,6 +1896,13 @@ class ChatViewModel @Inject constructor(
 
     private var lastAutoAppliedModelId: String? = null
 
+    /**
+     * Last model auto-selected by the observeModels hook (loop guard — the
+     * selection flow round-trips asynchronously, so the guard above could
+     * re-fire on the next emission before the collector delivers).
+     */
+    private var autoSelectedModelPath: String? = null
+
     private fun autoApplySmartPreset(modelId: String) {
         if (modelId == lastAutoAppliedModelId) return
         lastAutoAppliedModelId = modelId
@@ -1920,4 +1942,15 @@ class ChatViewModel @Inject constructor(
         super.onCleared()
         unloadLocalModels()
     }
+}
+
+/**
+ * Pick the model to auto-select when nothing is selected (fresh
+ * download/import leaves the chat input disabled with NoModelSelected).
+ * Returns the newest model by import time, or null when a selection exists
+ * or the list is empty. Pure — unit-tested without a ViewModel.
+ */
+internal fun pickAutoSelectModel(models: List<LocalModel>, selectedId: String?): String? {
+    if (selectedId != null || models.isEmpty()) return null
+    return models.maxByOrNull { it.importedAt }?.filePath
 }

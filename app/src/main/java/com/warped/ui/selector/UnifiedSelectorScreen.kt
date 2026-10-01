@@ -16,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.warped.R
@@ -24,7 +23,6 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.data.local.download.DownloadState
-import com.warped.data.local.inference.MemoryChecker
 import com.warped.domain.model.Endpoint
 import com.warped.domain.model.LocalModel
 import com.warped.domain.model.ModelCapabilities
@@ -44,34 +42,8 @@ fun UnifiedSelectorScreen(
     onBack: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var showMemoryWarning by remember { mutableStateOf<LocalModel?>(null) }
     var editingModel by remember { mutableStateOf<LocalModel?>(null) }
     val isEndpointFormOpen = uiState.isEndpointFormVisible || uiState.isEditingEndpoint
-
-    if (showMemoryWarning != null) {
-        WarpedAlertDialog(
-            onDismissRequest = { showMemoryWarning = null },
-            title = { Text(stringResource(R.string.memory_warning_title)) },
-            text = {
-                val model = showMemoryWarning!!
-                val context = LocalContext.current
-                val checker = MemoryChecker(context)
-                val memInfo = checker.getMemoryInfo()
-                val neededMB = model.sizeBytes / (1024 * 1024)
-                val availableMB = memInfo.availableBytes / (1024 * 1024)
-                Text(stringResource(R.string.models_memory_msg_fmt, neededMB, availableMB))
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.connectLocal(showMemoryWarning!!)
-                    showMemoryWarning = null
-                }) { Text(stringResource(R.string.continue_text)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showMemoryWarning = null }) { Text(stringResource(R.string.cancel)) }
-            }
-        )
-    }
 
     if (editingModel != null) {
         ModelParamsDialog(
@@ -173,21 +145,10 @@ fun UnifiedSelectorScreen(
                         model = model,
                         capabilities = viewModel.effectiveCapabilities(model),
                         isConnected = uiState.connectedLocalModelId == model.filePath && uiState.isLocalConnected,
-                        isConnecting = uiState.isConnecting && uiState.connectingModelName == model.name,
-                        // Seamless switch: rows stay interactive while another model is
-                        // connected — connectLocal unloads the previous engine itself.
-                        // Locked only while a connection is in flight (avoids racing
-                        // two engine inits); the connected row stays tappable to
-                        // disconnect.
-                        connectLocked = uiState.isConnecting,
-                        onConnect = {
-                            if (viewModel.shouldWarnAboutMemory(model.sizeBytes)) {
-                                showMemoryWarning = model
-                            } else {
-                                viewModel.connectLocal(model)
-                            }
+                        onUseInChat = {
+                            viewModel.useLocalInChat(model)
+                            onNavigateToChat()
                         },
-                        onDisconnect = { viewModel.disconnectLocal() },
                         onDelete = { viewModel.deleteModel(model) },
                         onEditParams = { editingModel = model }
                     )
@@ -241,10 +202,7 @@ private fun LocalModelSelectorCard(
     model: LocalModel,
     capabilities: ModelCapabilities,
     isConnected: Boolean,
-    isConnecting: Boolean,
-    connectLocked: Boolean,
-    onConnect: () -> Unit,
-    onDisconnect: () -> Unit,
+    onUseInChat: () -> Unit,
     onDelete: () -> Unit,
     onEditParams: () -> Unit
 ) {
@@ -272,10 +230,10 @@ private fun LocalModelSelectorCard(
         shape = RoundedCornerShape(12.dp)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            ConnectionDot(isConnected = isConnected, isLoading = isConnecting)
+            ConnectionDot(isConnected = isConnected)
 
             Spacer(Modifier.width(12.dp))
 
@@ -297,18 +255,6 @@ private fun LocalModelSelectorCard(
                 }
             }
 
-            if (isConnecting) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-            } else {
-                Switch(
-                    checked = isConnected,
-                    onCheckedChange = { checked ->
-                        if (checked) onConnect() else onDisconnect()
-                    },
-                    enabled = !connectLocked || isConnected
-                )
-            }
-
             IconButton(onClick = onEditParams) {
                 Icon(Icons.Filled.Tune, stringResource(R.string.cd_parameters), tint = Color(0xFF9CA3AF), modifier = Modifier.size(18.dp))
             }
@@ -316,16 +262,25 @@ private fun LocalModelSelectorCard(
                 Icon(Icons.Filled.Delete, stringResource(R.string.delete), tint = Color(0xFF6B7280), modifier = Modifier.size(18.dp))
             }
         }
+        // No manual connect/disconnect switch: the chat top selector picks
+        // the model and sending a message loads it on demand. Mirrors
+        // EndpointSelectorCard's "Use in chat" pattern.
+        Spacer(Modifier.height(8.dp))
+        Button(
+            onClick = onUseInChat,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Text(stringResource(R.string.use_in_chat), color = Color.White)
+        }
+        Spacer(Modifier.height(16.dp))
     }
 }
 
 @Composable
-private fun ConnectionDot(isConnected: Boolean, isLoading: Boolean) {
-    val color = when {
-        isLoading -> Color(0xFFFFC107)
-        isConnected -> Color(0xFF4CAF50)
-        else -> Color(0xFF6B7280)
-    }
+private fun ConnectionDot(isConnected: Boolean) {
+    val color = if (isConnected) Color(0xFF4CAF50) else Color(0xFF6B7280)
     Box(
         modifier = Modifier
             .size(10.dp)

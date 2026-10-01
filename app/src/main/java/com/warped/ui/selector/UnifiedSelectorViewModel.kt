@@ -8,7 +8,6 @@ import com.warped.data.local.download.DownloadState
 import com.warped.data.local.download.ModelDownloadManager
 import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.InputSanitizer
-import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.inference.ModelImportManager
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.data.remote.provider.LMStudioProvider
@@ -39,7 +38,6 @@ class UnifiedSelectorViewModel @Inject constructor(
     private val modelImportManager: ModelImportManager,
     private val modelDownloadManager: ModelDownloadManager,
     private val providerRouter: ProviderRouter,
-    private val memoryChecker: MemoryChecker,
     private val apiKeyStore: ApiKeyStore,
     private val inputSanitizer: InputSanitizer,
     private val parameterStore: ParameterStore,
@@ -105,35 +103,15 @@ class UnifiedSelectorViewModel @Inject constructor(
         refreshActiveBackend()
     }
 
-    fun connectLocal(model: LocalModel) {
-        val providerType = if (model.modelFormat.equals("LITERTLM", ignoreCase = true)
-            || model.filePath.endsWith(".litertlm", ignoreCase = true)
-        ) ProviderType.LITE_RT_LM else ProviderType.LITE_RT_LM
-
-        _uiState.update { it.copy(isConnecting = true, connectingModelName = model.name) }
-        parameterStore.update(model.parameters)
-        viewModelScope.launch(coroutineExceptionHandler) {
-            try {
-                val activeEngine = engineManager.getActiveEngine()
-                if (activeEngine?.modelPath == model.filePath) {
-                    activeModelSelection.connectLocal(model.filePath, providerType)
-                    _uiState.update { it.copy(isConnecting = false, error = null) }
-                    refreshActiveBackend()
-                    return@launch
-                }
-                activeModelSelection.markLocalLoading(model.filePath)
-                withContext(Dispatchers.Default) {
-                    engineManager.switchToLiteRT(model.filePath)
-                }
-                activeModelSelection.connectLocal(model.filePath, providerType)
-                _uiState.update { it.copy(isConnecting = false, error = null) }
-                refreshActiveBackend()
-            } catch (e: Exception) {
-                Timber.e(e, "UnifiedSelectorVM: connectLocal failed")
-                activeModelSelection.disconnectLocal()
-                _uiState.update { it.copy(isConnecting = false, error = "Failed to load model: ${e.message}") }
-            }
-        }
+    /**
+     * Select a local model for chat (Models & Endpoints "Use in chat").
+     * Selection only — the engine loads on first send (helper.initialize)
+     * or on the chat selector pick (preload). There is no manual
+     * connect/disconnect switch anymore; unloading happens implicitly on
+     * switch-away, delete, or memory pressure.
+     */
+    fun useLocalInChat(model: LocalModel) {
+        activeModelSelection.markLocalLoading(model.filePath)
     }
 
     fun disconnectLocal() {
@@ -146,7 +124,6 @@ class UnifiedSelectorViewModel @Inject constructor(
                 Timber.w(e, "UnifiedSelectorVM: unloadCurrent failed")
             }
             activeModelSelection.disconnectLocal()
-            _uiState.update { it.copy(isConnecting = false) }
             refreshActiveBackend()
         }
     }
@@ -276,9 +253,6 @@ class UnifiedSelectorViewModel @Inject constructor(
             }
         }
     }
-
-    fun shouldWarnAboutMemory(modelSizeBytes: Long): Boolean =
-        memoryChecker.shouldWarn(modelSizeBytes)
 
     fun cancelDownload(modelId: String) {
         modelDownloadManager.cancelDownload(modelId)

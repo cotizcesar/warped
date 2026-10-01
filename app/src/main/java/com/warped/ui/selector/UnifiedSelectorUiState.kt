@@ -14,8 +14,6 @@ data class UnifiedSelectorUiState(
     val selectedRemoteModelId: String? = null,
     val selectedRemoteProvider: ProviderType? = null,
     val selectedRemoteEndpointId: Long? = null,
-    val isConnecting: Boolean = false,
-    val connectingModelName: String = "",
     val isFetchingModels: Boolean = false,
     val fetchingEndpointId: Long? = null,
     val endpointModels: Map<Long, List<com.warped.domain.model.ModelInfo>> = emptyMap(),
