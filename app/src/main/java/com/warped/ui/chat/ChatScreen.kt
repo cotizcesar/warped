@@ -1,6 +1,7 @@
 package com.warped.ui.chat
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -107,6 +108,10 @@ fun ChatScreen(
     var audioBytes by remember { mutableStateOf<ByteArray?>(null) }
     var isRecording by remember { mutableStateOf(false) }
     var showModelPicker by remember { mutableStateOf(false) }
+    // API-03: system back dismisses the model picker through the same
+    // onDismiss path as tap-outside/scrim — gesture and button identical.
+    // (The sheet itself also self-dismisses; this is the explicit contract.)
+    BackHandler(enabled = showModelPicker) { showModelPicker = false }
 
     LaunchedEffect(conversationId) {
         if (conversationId > 0) {

@@ -1,5 +1,6 @@
 package com.warped.ui.chat.components
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,6 +32,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -43,6 +45,7 @@ import com.warped.domain.model.LocalModel
 import com.warped.domain.model.ProviderType
 import com.warped.ui.chat.WebOverrideIndicator
 import com.warped.ui.chat.webOverrideIndicator
+import kotlinx.coroutines.launch
 
 /**
  * CHAT-04 / CHAT-05: ModalBottomSheet model picker.
@@ -71,6 +74,19 @@ fun ModelSelectorSheet(
     // padding hacks). Same value as the ModalBottomSheet default, stated so
     // the edge-to-edge contract is visible at the call site.
     val sheetWindowInsets: WindowInsets = BottomSheetDefaults.windowInsets
+
+    // API-03: system back hides then dismisses via the same onDismiss path
+    // as swipe/scrim — gesture and button identical.
+    val backScope = rememberCoroutineScope()
+    BackHandler {
+        backScope.launch {
+            try {
+                sheetState.hide()
+            } finally {
+                onDismiss()
+            }
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,

@@ -1,5 +1,6 @@
 package com.warped.ui.presets
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -68,6 +69,10 @@ fun PresetsScreen(
     LaunchedEffect(params) {
         onParametersChanged(params)
     }
+
+    // API-03: system back follows the same onBack path as the app-bar arrow —
+    // gesture and button identical, predictive animation free on 36.
+    BackHandler(onBack = onBack)
 
     Scaffold(
         topBar = {

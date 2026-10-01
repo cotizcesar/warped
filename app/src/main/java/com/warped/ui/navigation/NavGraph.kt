@@ -376,7 +376,10 @@ fun WarpedNavGraph() {
                         navController.navigate(Screen.WizardReview(review = true)) {
                             launchSingleTop = true
                         }
-                    }
+                    },
+                    // API-03: system back on Settings pops — same destination
+                    // the drawer back-stack would resolve to.
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable<Screen.Help> {

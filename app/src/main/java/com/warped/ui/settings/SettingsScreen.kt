@@ -1,5 +1,6 @@
 package com.warped.ui.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -47,9 +48,15 @@ import com.warped.ui.components.WarpedAlertDialog
 fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
     onOpenDrawer: () -> Unit = {},
-    onNavigateToWizard: () -> Unit = {}
+    onNavigateToWizard: () -> Unit = {},
+    onBack: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // API-03: system back follows the same onBack path wired in the nav graph
+    // (popBackStack) — gesture and button identical. Delete-confirm dialogs
+    // self-dismiss and keep priority while visible.
+    BackHandler(onBack = onBack)
 
     if (uiState.showDeleteChatsDialog) {
             WarpedAlertDialog(

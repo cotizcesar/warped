@@ -1,5 +1,6 @@
 package com.warped.ui.chat.components
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import com.warped.R
 import com.warped.domain.model.GroundedSource
 import com.warped.domain.model.GroundedSourceStatus
+import kotlinx.coroutines.launch
 
 /**
  * Phase 53 (SRC-01/02/03): bottom-sheet preview of one grounded source.
@@ -61,6 +64,19 @@ fun SourcePreviewSheet(
     // padding hacks). Same value as the ModalBottomSheet default, stated so
     // the edge-to-edge contract is visible at the call site.
     val sheetWindowInsets: WindowInsets = BottomSheetDefaults.windowInsets
+
+    // API-03: system back hides then dismisses via the same onDismiss path
+    // as swipe/scrim — gesture and button identical.
+    val backScope = rememberCoroutineScope()
+    BackHandler {
+        backScope.launch {
+            try {
+                sheetState.hide()
+            } finally {
+                onDismiss()
+            }
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
