@@ -98,7 +98,7 @@ class BackendConstraintTest {
     @TempDir
     lateinit var tempDir: File
 
-    private fun visionManager(visionCapable: Boolean): EngineManager {
+    private fun visionManager(visionCapable: Boolean, audioCapable: Boolean = false): EngineManager {
         val engine = mockk<LiteRTLmEngine>(relaxed = true)
         val detector = mockk<BackendDetector>(relaxed = true)
         val allowlist = mockk<com.warped.data.repository.ModelAllowlistRepository>(relaxed = true)
@@ -111,7 +111,7 @@ class BackendConstraintTest {
             displayName = "Test Model",
             modelFile = fileName,
             sizeInBytes = 10,
-            capabilities = AllowlistCapabilities(vision = visionCapable)
+            capabilities = AllowlistCapabilities(vision = visionCapable, audio = audioCapable)
         )
         return EngineManager(
             liteRTLmEngine = engine,
@@ -138,7 +138,10 @@ class BackendConstraintTest {
                 modelPath = file.absolutePath,
                 backend = BackendType.CPU,
                 visionBackend = BackendType.GPU,
-                audioBackend = BackendType.CPU,
+                // Audio not flagged on this entry: slot stays unconfigured so
+                // models without TF_LITE_AUDIO_ENCODER_HW (e.g. gemma-3-270m-it)
+                // don't fail conversation creation with NOT_FOUND.
+                audioBackend = null,
                 enableSpeculativeDecoding = false
             )
         }
@@ -147,6 +150,22 @@ class BackendConstraintTest {
     @Test
     fun `initWith keeps CPU vision for non-vision models`() {
         val m = visionManager(visionCapable = false)
+        val file = File(tempDir, "gemma-4-12B-it.litertlm").also { it.writeText("weights") }
+        m.switchToLiteRT(file.absolutePath)
+        verify {
+            engineOf(m).init(
+                modelPath = file.absolutePath,
+                backend = BackendType.CPU,
+                visionBackend = BackendType.CPU,
+                audioBackend = null,
+                enableSpeculativeDecoding = false
+            )
+        }
+    }
+
+    @Test
+    fun `initWith probes audio backend for audio-capable allowlist models`() {
+        val m = visionManager(visionCapable = false, audioCapable = true)
         val file = File(tempDir, "gemma-4-12B-it.litertlm").also { it.writeText("weights") }
         m.switchToLiteRT(file.absolutePath)
         verify {

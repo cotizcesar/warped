@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -38,6 +37,11 @@ import com.warped.data.local.download.DownloadState
  * Each call site keeps its own confirm UX via [onCancel]: Models cancels
  * directly, the catalog confirms first ("The partial file will be
  * deleted.").
+ *
+ * Padding: this content applies NO outer padding itself — each call site
+ * provides its own card padding (Models DownloadCard: 16.dp;
+ * CatalogModelCard: its 14.dp column), so the progress bar aligns with the
+ * surrounding rows instead of doubling the inset.
  */
 @Composable
 fun ActiveDownloadContent(
@@ -53,7 +57,7 @@ fun ActiveDownloadContent(
      */
     onRetry: () -> Unit = {}
 ) {
-    Column(modifier = Modifier.padding(16.dp)) {
+    Column {
         Text(
             download.fileName.substringAfterLast("/"),
             style = MaterialTheme.typography.titleMedium,

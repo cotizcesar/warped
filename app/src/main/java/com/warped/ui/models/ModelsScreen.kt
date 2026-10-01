@@ -466,14 +466,16 @@ private fun DownloadCard(
         colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
         shape = RoundedCornerShape(12.dp)
     ) {
-        ActiveDownloadContent(
-            download = download,
-            onCancel = onCancel,
-            onDeleteIncomplete = onDeleteIncomplete,
-            onPause = onPause,
-            onResume = onResume,
-            onRetry = onRetry
-        )
+        Column(modifier = Modifier.padding(16.dp)) {
+            ActiveDownloadContent(
+                download = download,
+                onCancel = onCancel,
+                onDeleteIncomplete = onDeleteIncomplete,
+                onPause = onPause,
+                onResume = onResume,
+                onRetry = onRetry
+            )
+        }
     }
 }
 

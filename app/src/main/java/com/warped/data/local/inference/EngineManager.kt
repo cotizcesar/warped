@@ -86,7 +86,7 @@ class EngineManager @Inject constructor(
                 val current: BackendType? = when (slot) {
                     BackendSlot.MAIN -> target.backend
                     BackendSlot.VISION -> resolveVisionBackend(target)
-                    BackendSlot.AUDIO -> resolveAudioBackend()
+                    BackendSlot.AUDIO -> resolveAudioBackend(target)
                 }
                 // Never retry when the required backend already equals the
                 // current value of the named slot — it would fail identically.
@@ -172,7 +172,7 @@ class EngineManager @Inject constructor(
             modelPath = target.modelPath,
             backend = target.backend!!,
             visionBackend = visionOverride ?: resolveVisionBackend(target, entry?.capabilities?.vision),
-            audioBackend = audioOverride ?: resolveAudioBackend(),
+            audioBackend = audioOverride ?: resolveAudioBackend(target),
             enableSpeculativeDecoding = specDecoding
         )
     }
@@ -192,11 +192,20 @@ class EngineManager @Inject constructor(
         if (visionCapable == true) backendDetector.probeVisionBackend() else BackendType.CPU
 
     /**
-     * Resolve the audio backend for an init attempt. Probed via
-     * [BackendDetector.probeAudioBackend] (CPU today, most compatible).
+     * Resolve the audio backend for an init attempt. Audio-capable models
+     * (allowlist `capabilities.audio == true`, e.g. gemma-4-E2B-it) probe the
+     * device audio backend (CPU today, most compatible); all other models get
+     * null (audio slot unconfigured). Requesting any explicit audio backend
+     * for a model without TF_LITE_AUDIO_ENCODER_HW fails conversation
+     * creation with NOT_FOUND (device log 2026-09-30, gemma-3-270m-it) —
+     * same capability-gating precedent as vision and speculative decoding.
      */
-    private fun resolveAudioBackend(): BackendType =
-        backendDetector.probeAudioBackend()
+    private fun resolveAudioBackend(target: ActiveEngine): BackendType? {
+        val audioCapable = allowlist
+            .findByModelFile(target.modelPath.substringAfterLast("/"))
+            ?.capabilities?.audio
+        return if (audioCapable == true) backendDetector.probeAudioBackend() else null
+    }
 
     /**
      * Which backend slot a native constraint error names. Inspects the JNI
