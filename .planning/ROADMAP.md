@@ -13,7 +13,7 @@ Previous: v2.4 Agentic Web shipped 2026-09-29 (Phases 55–58, 10/10 verified). 
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 59: 16 KB Dependency Verification** - Prove every shipped .so is 16 KB-aligned, CI gate, 16 KB emulator smoke
+- [x] **Phase 59: 16 KB Dependency Verification** - 14/14 .so ALIGNED + zipalign OK, CI gate, sqlcipher→4.19.1 bump, release launches clean (G-59-01 chat-turn → release-UAT)
 - [ ] **Phase 60: API-36 Behavior Audit** - targetSdk 36 conformance: edge-to-edge, predictive back, quotas, large screens
 - [ ] **Phase 61: LeakCanary Instrumentation + Guided Audit** - Debug-only harness + scripted leak tour with triaged baseline
 - [ ] **Phase 62: Fix Loop + Release Hardening** - Owner-local leak fixes with regression tests + all release gates green
@@ -45,7 +45,9 @@ Previous: v2.4 Agentic Web shipped 2026-09-29 (Phases 55–58, 10/10 verified). 
   2. App installs, launches, and completes a local chat turn on a 16 KB emulator image (`getconf PAGE_SIZE` → 16384) with no native load failures
   3. CI fails the build on misalignment — alignment check runs on the release artifact so regressions can't ship silently
   4. Any misaligned dependency is resolved by version bump with re-verification (no hand-patched `.so`, no linker-flag hacks, no `pageSizeCompat`)
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 59-01-PLAN.md — alignment script + per-library evidence, version-bump-only remediation
+- [ ] 59-02-PLAN.md — CI/release gates + 16 KB emulator smoke
 
 ### Phase 60: API-36 Behavior Audit
 **Goal**: App runs correctly under Android 16 platform contracts — edge-to-edge, predictive back, quotas, large screens
@@ -89,7 +91,7 @@ Previous: v2.4 Agentic Web shipped 2026-09-29 (Phases 55–58, 10/10 verified). 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 59. 16 KB Dependency Verification | 0/0 | Not started | - |
+| 59. 16 KB Dependency Verification | 2/2 | Complete (G-59-01 → release-UAT) | 2026-09-30 |
 | 60. API-36 Behavior Audit | 0/0 | Not started | - |
 | 61. LeakCanary Instrumentation + Guided Audit | 0/0 | Not started | - |
 | 62. Fix Loop + Release Hardening | 0/0 | Not started | - |

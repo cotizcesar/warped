@@ -7,10 +7,10 @@ last_updated: "2026-09-30T00:00:00Z"
 last_activity: 2026-09-30
 progress:
   total_phases: 4
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 2
+  completed_plans: 2
+  percent: 25
 ---
 
 # Project State: Warped
@@ -27,16 +27,16 @@ See: .planning/PROJECT.md (updated 2026-09-30, v2.5 milestone started)
 
 ## Current Position
 
-Phase: 59 (16 KB Dependency Verification) — ready to plan
+Phase: 60 (API-36 Behavior Audit) — ready to plan
 Plan: —
-Status: Roadmap approved-pending; next `/gsd-plan-phase 59`
-Last activity: 2026-09-30 — Roadmap created
+Status: Phase 59 closed 2026-09-30 (4/5 verified, G-59-01 accepted as release-UAT); next `/gsd-plan-phase 60`
+Last activity: 2026-09-30 — Phase 59 closed, Phase 60 starting
 
 ## Phase Structure (v2.5 — PLANNED)
 
 | Phase | Name | Requirements | Status | Depends On |
 |-------|------|--------------|--------|------------|
-| 59 | 16 KB Dependency Verification | PAGE-01..04 (4) | Not started | Phase 58 |
+| 59 | 16 KB Dependency Verification | PAGE-01..04 (4) | Complete (4/5, G-59-01 → release-UAT) | Phase 58 |
 | 60 | API-36 Behavior Audit | API-01..05 (5) | Not started | Phase 59 |
 | 61 | LeakCanary Instrumentation + Guided Audit | LEAK-01 (1) | Not started | Phase 60 |
 | 62 | Fix Loop + Release Hardening | LEAK-02..05, REL-01 (5) | Not started | Phase 61 |
@@ -79,6 +79,7 @@ None yet.
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
+| Release-UAT | G-59-01 16KB chat turn (healthy 16 KB system + smallest-model download + local chat turn, zero native failures) | Accepted, release UAT | Phase 59 close |
 | Benchmarks | Pixel 7 reference numbers (PERF-16 + PERF-12/13) | CI-gated | v2.1 close |
 | Device smoke | DEL-06 release smoke (launch → allowlisted model → local + remote turn → legacy TOOL chat) | Accepted, release UAT | v2.2 close |
 | Device smoke | WEB-05 banner visual (offline vs failure copy) | Accepted, release UAT | v2.2 close |
