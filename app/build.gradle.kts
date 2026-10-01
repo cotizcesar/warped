@@ -168,6 +168,8 @@ dependencies {
     implementation(libs.compose.material.icons)
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
+    // LeakCanary 2.14 (Phase 61, LEAK-01): debug-only, auto-installs via ContentProvider
+    debugImplementation(libs.leakcanary.android)
 
     // Lifecycle
     implementation(libs.lifecycle.viewmodel.compose)

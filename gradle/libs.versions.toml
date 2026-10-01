@@ -54,6 +54,8 @@ truth = "1.4.5"
 coroutines-test = "1.11.0"
 uiautomator = "2.3.0"  # held: 2.4.0 needs compileSdk 37 (no stable android-37 platform in SDK repo)
 errorprone = "2.50.0"
+# LeakCanary (Phase 61, LEAK-01): debug-only heap analysis; auto-installs via ContentProvider
+leakcanary = "2.14"
 
 [libraries]
 # Kotlin BOM (governs kotlin-stdlib alignment with the compiler)
@@ -137,6 +139,9 @@ sqlcipher = { group = "net.zetetic", name = "sqlcipher-android", version.ref = "
 
 # Logging
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
+
+# LeakCanary (Phase 61, LEAK-01): debugImplementation ONLY — never release
+leakcanary-android = { group = "com.squareup.leakcanary", name = "leakcanary-android", version.ref = "leakcanary" }
 
 # LiteRT-LM
 litertlm = { group = "com.google.ai.edge.litertlm", name = "litertlm-android", version.ref = "litertlm" }
