@@ -176,7 +176,8 @@ class LiteRTLmLoopTest {
     @Test
     fun `identity line is pinned verbatim`() {
         assertThat(LiteRTLmProvider.IDENTITY_LINE).isEqualTo(
-            "You are Warped, a mobile AI assistant running locally."
+            "You are Warped, a mobile AI assistant running locally. " +
+                "Always reply in the same language the user writes in."
         )
     }
 

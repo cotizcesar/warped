@@ -127,7 +127,8 @@ class LiteRTLmProvider @Inject constructor(
          * (local-only by design — see plan SUMMARY follow-up).
          */
         const val IDENTITY_LINE =
-            "You are Warped, a mobile AI assistant running locally."
+            "You are Warped, a mobile AI assistant running locally. " +
+                "Always reply in the same language the user writes in."
 
         /** `ToolCompleted` transcript summary cap (≤200 chars, remote parity). */
         const val TRANSCRIPT_SUMMARY_MAX_CHARS = 200
