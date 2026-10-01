@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # SUMMARY — Catalog 3n .task → .litertlm swap
 
 **Status:** COMPLETE — all 3 tasks done, build + full unit suite green.

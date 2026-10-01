@@ -17,11 +17,18 @@ key_files:
     - app/src/main/java/com/warped/data/local/inference/LiteRTLmProvider.kt
     - app/src/test/java/com/warped/data/grounding/GroundingPromptTest.kt
     - app/src/test/java/com/warped/data/local/inference/LiteRTLmLoopTest.kt
+
 decisions:
+
   - "Fixed plan's 'leave untouched' instruction for the re-search test (Rule 1): its first assertion pinned the deleted sentence and would have failed; swapped it to the resolve clause, kept the re-search substring assertion"
+
 metrics:
   duration: "~25 min"
   completed: 2026-09-30
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
 ---
 
 # Quick 01: Reference-Resolution Rule Summary
@@ -82,6 +89,7 @@ numbers, so stale [2,5] got grafted onto new claims.
 ### Auto-fixed Issues
 
 **1. [Rule 1 - Bug] Plan's "LEAVE UNTOUCHED" instruction for `system hint carries the per-turn re-search rule` was wrong**
+
 - **Found during:** Task 2
 - **Issue:** The plan claimed that test "still passes" because the re-search
   substring is preserved — but its FIRST assertion pinned "Treat each new user

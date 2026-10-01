@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # SUMMARY — search-result titles + OG enrichment + two-column cards
 
 **Status:** complete — all PLAN.md tasks executed, plus the user-locked layout amendment.
@@ -56,6 +63,7 @@
 ## Deviations from PLAN
 
 ### Auto-fixed issues
+
 1. **[Rule 3 — blocking] `RemoteSecretIsolationTest` ctor:** third construction
    site of `TavilySearchRepository` missed by the plan's grep scope; added the
    null-seam enricher there too. No main-source construction sites exist

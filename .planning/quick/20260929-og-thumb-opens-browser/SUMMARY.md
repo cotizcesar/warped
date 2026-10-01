@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # Summary: OG thumbnail tap opens browser directly
 
 **Status:** COMPLETE (implementation + compile verification; on-device tap run pending — no adb in this environment)

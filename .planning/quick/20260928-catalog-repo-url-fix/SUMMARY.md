@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # EXECUTION SUMMARY — Catalog repo-slug fix + Gemma 4 E4B entry
 
 **Plan:** `.planning/quick/20260928-catalog-repo-url-fix/PLAN.md` (supersedes `20260928-add-gemma4-e4b`)

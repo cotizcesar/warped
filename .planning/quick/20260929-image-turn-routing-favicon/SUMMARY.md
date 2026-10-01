@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # Execution SUMMARY — image-turn routing + favicon fallback
 
 **Date:** 2026-09-29 / 2026-09-30 UTC
@@ -8,6 +15,7 @@
 ## What was built
 
 **Task 1 — image-intent routing straight to Tavily (`6290bcbc`, 14 files):**
+
 - `DuckDuckGoSearchRepository.search()`: when `includeImages=true` AND a
   Tavily key is stored, the DDG leg is skipped entirely and Tavily runs
   direct with `include_images=true` (key presence check follows the existing
@@ -29,6 +37,7 @@
   construction sites wired with an unkeyed `ApiKeyStore` stub.
 
 **Task 2 — S2 favicon fallback (`93d6e91a`, 3 files):**
+
 - `faviconFallbackUrl(pageUrl)` in `OgSourceCard.kt`: host via `URI`, returns
   `https://www.google.com/s2/favicons?domain=<host>&sz=128`, null on
   unparseable/blank host. Adopted in `OgSourceCard`, `CompactSourceCard`,

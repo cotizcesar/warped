@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # SUMMARY: Catalog Card Redesign (dense, expandable)
 
 **Status:** Complete — build + full unit-test suite green.
@@ -15,6 +22,7 @@
 ## Deviations from Plan
 
 None structural. Two minor notes:
+
 1. The `expandedText` blank-string contract test (planned under Task 1) lives in new `CatalogCardTextTest.kt` committed with Task 2, since the helper itself is defined in Task 2's file.
 2. Progress labels rendered in Spanish ("Descargando…/En pausa…") under the plan's "user-facing strings in Spanish" rule; cancel-confirm dialog strings untouched per plan.
 

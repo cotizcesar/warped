@@ -16,13 +16,20 @@ key-files:
     - app/src/test/java/com/warped/ui/chat/ChatAnaphoraAnchorTest.kt
   modified:
     - app/src/main/java/com/warped/ui/chat/ChatViewModel.kt
+
 decisions:
+
   - "Anchor = most-recent prior USER turn, assistant fallback (user topic wins)"
   - "Fail-open over-fire on el/lo/la/le accepted; under-anchoring refused"
   - "Query-text-only change: no gate/call-count/cap/prompt-copy changes"
+
 metrics:
   duration: "~25 min"
   completed: "2026-09-30"
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
 ---
 
 # Phase quick-20260930-always-presearch-anchored Plan 01: Summary
@@ -58,6 +65,7 @@ history sources with recycled citation numbers.
 ### Auto-fixed Issues
 
 **1. [Rule 1 - Bug] Fixed wrong test expectation for attached clitics**
+
 - **Found during:** Task 1 verification
 - **Issue:** `Dale más detalles` expected to anchor on `le`, but `dale` is a
   single letter-token after split — whole-token matching (per locked spec)

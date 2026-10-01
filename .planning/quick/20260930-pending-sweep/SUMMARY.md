@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # Sweep SUMMARY — all code-doable pending follow-ups (2026-09-30)
 
 Status: COMPLETE — 7/7 tasks implemented, committed atomically, full suite green.

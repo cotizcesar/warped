@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # SUMMARY — unified turn status row + honest search progress
 
 **Status:** complete (2/2 tasks)

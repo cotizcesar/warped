@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # SUMMARY: thinking join + live thinking + scroll hardening + hairline hunt
 
 Three fixes shipped (Tasks 1–3) + one bounded hunt reported (Task 4). No new
@@ -7,6 +14,7 @@ throughout.
 ## Per-task status
 
 ### Task 1 — Thinking join: VERIFY-ONLY (no code change)
+
 - Re-read `LiteRTLmProvider.runToolLoop` `onThought`: `thought.append(thinking)`
   with NO separator — the `"\n"`-join premise was stale (already separator-free).
   Site left byte-identical per plan.
@@ -17,6 +25,7 @@ throughout.
 - Verified green in the targeted run.
 
 ### Task 2 — Live thinking: DONE (commit a75ed526)
+
 - Mechanism chosen: **new `StreamToken.Thinking(delta)` type through existing
   when-exhaustiveness** (not provider-side accumulation + periodic VM update).
   Why: the only provider→VM channel is the `StreamToken` flow — a "periodic
@@ -46,6 +55,7 @@ throughout.
   expects the live `Thinking` token ahead of the tool calls).
 
 ### Task 3 — Scroll hardening: DONE (commit 832f089d)
+
 - `pinLastItemEnd`: pin target clamped to `layoutInfo.totalItemsCount - 1`
   (lag → pins current end, never throws); scroll calls wrapped in try/catch
   logging via Timber (`CancellationException` rethrown); clamp math extracted
@@ -56,6 +66,7 @@ throughout.
   byte-identical (verified via diff).
 
 ### Task 4 — Hairline hunt: REPORT-ONLY (no code change, STOP rule applied)
+
 - Full render path read: Thinking header Row (no background/divider/border),
   `AnimatedVisibility` expand/shrink (default clipped — no bleed), inner
   `Surface(Transparent)`, user-bubble `Surface`, fade overlays, `TurnStatusRow`
@@ -74,6 +85,7 @@ throughout.
   - Thinking header text `0xFF545450` (MessageBubble.kt:177,183) — text, not a line.
 
 ## Test results
+
 - `./gradlew :app:assembleDebug` — GREEN.
 - `./gradlew :app:testDebugUnitTest` (full) — GREEN: **858 tests, 0 failures,
   0 errors, 0 skipped** (includes new `ChatLiveThinkingTest` 1/1 and
@@ -82,6 +94,7 @@ throughout.
   token `when`s; no new divider/shadow/elevation/border tokens in message path.
 
 ## Deviations from plan
+
 1. Task 1: regression tests pre-existed (prior "thinking-header-feelings"
    quick-task); added none. Contract verified + locked by existing tests.
 2. Task 2: one existing test expectation extended for the new token
@@ -95,6 +108,7 @@ throughout.
    construction; same 50ms wall-clock idiom.
 
 ## On-device notes (no adb here — needs confirmation)
+
 - Thinking paragraph rendering (Task 1) and live-panel timing/feel (Task 2)
   need a real LiteRT model turn with thought channel.
 - Follow/pin behavior under real layout lag (Task 3) needs a long streaming
@@ -103,4 +117,5 @@ throughout.
   edges; if it reproduces, re-hunt with the exact screenshot position.
 
 ## Self-Check: PASSED
+
 - Commits a75ed526, 832f089d exist; all listed files present; full suite green.

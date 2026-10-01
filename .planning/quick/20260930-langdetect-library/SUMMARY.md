@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # SUMMARY: langdetect-library (CLEAN branch, Tasks 0–3)
 
 **Branch executed:** CLEAN — Optimaize `language-detector:0.6` integrated

@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # Summary: Catalog Downloaded State + Card Spacing
 
 **Phase:** quick-20260928-catalog-downloaded-spacing / Plan 01

@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # Summary — Citation taps + YouTube oEmbed
 
 Date: 2026-09-29
@@ -7,6 +14,7 @@ Status: COMPLETE — both tasks implemented, full suite green (651 tests, 0 fail
 ## What was built
 
 **Task 1 — Clickable citation markers → SourcePreviewSheet** (`432be23d`)
+
 - `MarkdownText.kt`: `parseInlineMarkdownAsAnnotatedString` gained optional
   `onCitationClick` + `citationStyle` params (existing 3-arg callers compile
   unchanged). When the callback is non-null, `[(N)]` / `[1, 5]` markers produce
@@ -29,6 +37,7 @@ Status: COMPLETE — both tasks implemented, full suite green (651 tests, 0 fail
   turns (no annotations, no affordance); reasoning/user bubbles untouched.
 
 **Task 2 — YouTube oEmbed title/thumbnail fallback** (`5adc07e5`)
+
 - New `YoutubeOembed.kt`: locked 4-host allowlist
   (`youtube.com`, `www.youtube.com`, `youtu.be`, `m.youtube.com`, exact match —
   `music.youtube.com` / `youtube-nocookie.com` / `notyoutube.com` rejected,
@@ -91,6 +100,7 @@ faked); `author_name` never lands in any column (test-asserted).
 ## On-device confirmation needed (no adb in this env)
 
 Per plan §Honest notes, still open:
+
 - Tap feel: touch-target size of `[N]` spans, underline visibility in
   light/dark theme, single-tap vs long-press-copy interaction inside
   `SelectionContainer`.

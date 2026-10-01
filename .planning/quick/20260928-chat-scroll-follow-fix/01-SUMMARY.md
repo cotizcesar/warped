@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # 01 — Chat Scroll Follow Fix: Execution Summary
 
 **Status:** Complete — both plan tasks executed, committed, verified green.

@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # Quick 01: Vision-Backend GPU Fix — Summary
 
 **Status:** complete
@@ -20,6 +27,7 @@ Device log 2026-09-28: loading vision-capable gemma-4-E2B-it failed with JNI
 ## Changes
 
 **`app/src/main/java/com/warped/data/local/inference/EngineManager.kt`** (commit `09fe19d7`):
+
 - New `BackendSlot` enum (`MAIN`/`VISION`/`AUDIO`) + pure `parseConstraintSlot`
   function: "vision backend" → VISION, "audio backend" → AUDIO, "main backend"
   → MAIN, any other `requires one of [...]` message → MAIN fallback (preserves

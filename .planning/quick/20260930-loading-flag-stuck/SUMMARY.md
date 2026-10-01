@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # SUMMARY — Stuck "Loading …litertlm" indicator (loading-flag-stuck)
 
 ## One-liner
@@ -27,6 +34,7 @@ No loop risk: the collector only calls `updateConnection` and never calls
 commit `6ab818c0`): 5 tests using the real `ActiveModelSelection`
 (in-memory keystore mock) so emissions flow through the real collector,
 with `refreshActiveBackend` triggered via reflection (it is private):
+
 1. connect transition true→false; 2. stuck-heal (mark-without-connect +
    engine truth → flag clears); 3. still-loading (engine absent or
    different path → flag stays); 4. disconnect clears flag + selection;

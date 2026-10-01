@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # SUMMARY — Always-on pre-search + image grid
 
 **Status:** complete — Task A1 + Task B1 executed, assemble + full unit suite green.
@@ -73,6 +80,7 @@ English copy (`images_title`, `image_download`, `image_close`,
 ### Auto-fixed Issues
 
 **1. [Rule 2 - Missing critical functionality] Bounded ImageSaver reads**
+
 - **Found during:** Task B1 (post-commit review of new code)
 - **Issue:** `ImageSaver` used `body.bytes()` (unbounded) — a hostile
   image host could OOM the app with a multi-GB stream before MediaStore.

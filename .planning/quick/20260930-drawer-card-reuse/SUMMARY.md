@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # Summary — Drawer Card Reuse (same CompactSourceCard in chat + drawer)
 
 **Dir:** `.planning/quick/20260930-drawer-card-reuse/`
@@ -28,6 +35,7 @@ rules (body → sheet, thumb → browser), same title/desc/URL ordering and
 line caps, same container colors, same text-only collapse, same a11y.
 
 **Task 2 — `AllSourcesSheet.kt` + `MessageBubble.kt`:**
+
 - Deleted the private `AllSourcesRow` entirely (function + KDoc) and
   removed 16 now-unused imports (`clickable`, `isSystemInDarkTheme`,
   `IntrinsicSize`, `Row`, `fillMaxHeight`, `width`, `clip`, `Role`,

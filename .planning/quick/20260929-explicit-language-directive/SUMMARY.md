@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # Summary: Explicit Language Directive (EN+ES)
 
 Status: COMPLETE — both tasks executed, full unit suite green.

@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # Execution Summary — Cluster Spacing + English Sweep
 
 **Date:** 2026-09-28 · **Plan:** `.planning/quick/20260928-cluster-spacing-english-sweep/PLAN.md`
@@ -5,11 +12,13 @@
 **Commits:** `e4358efe` (Task 1) · `c5f200a6` (Task 3) · `a8f5599d` (sanitizer fix)
 
 ## Task 1 — Cluster separation (commit e4358efe)
+
 `HuggingFaceScreen.kt` active cluster: ring→pause spacer 4dp→8dp (line 332),
 new 8dp spacer before cancel (line 347, covers playing + paused branches).
 Diff limited to the two spacer lines. `assembleDebug` green.
 
 ## Task 2 — Inventory (no code edits)
+
 Key-parity check: `values/` vs `values-es/` = 155/155 keys, zero diffs → delete approved.
 Actual source paths differ from plan (`data/grounding/`, `data/local/inference/`,
 `ui/chat/components/`) — inventory below uses real paths.
@@ -36,10 +45,12 @@ Actual source paths differ from plan (`data/grounding/`, `data/local/inference/`
 | Asserting tests moved in lockstep | GroundingPromptTest, MultiUrlFusionTest, MultiUrlFetcherTest, SourcePreviewMappingTest (`navegador`→`browser`), ModelAllowlistTest (asset EN + test rename) | — | UPDATED |
 
 ## Task 3 — Conversion (commit c5f200a6)
+
 All TRANSLATE rows applied; `values-es/strings.xml` deleted (parity verified);
 5 asserting test files updated in lockstep. `testDebugUnitTest` green (313/313).
 
 ## Deviation — [Rule 2] sanitizer delimiter gap (commit a8f5599d)
+
 Renaming block markers FIN→END left `WebContextSanitizer` escaping only the old
 `[FIN WEB CONTEXT` delimiter — fetched pages containing `[END WEB CONTEXT` could
 break out of the grounding block (prompt-injection regression). Added
@@ -47,6 +58,7 @@ break out of the grounding block (prompt-injection regression). Added
 depth), extended `delimiter collisions escaped` test to cover both.
 
 ## Task 4 — Verification gates
+
 - `./gradlew :app:assembleDebug` — BUILD SUCCESSFUL
 - `./gradlew :app:testDebugUnitTest` — BUILD SUCCESSFUL, **313 tests, 0 failures, 0 errors, 0 skipped**
 - Accented-char grep over UI + GroundingPrompt + ChatViewModel + values + asset:
@@ -56,6 +68,7 @@ depth), extended `delimiter collisions escaped` test to cover both.
   zero user-facing Spanish outside exclusions.
 
 ## Files changed
+
 - `app/src/main/java/com/warped/ui/huggingface/HuggingFaceScreen.kt` (spacers + EN)
 - `app/src/main/java/com/warped/data/grounding/GroundingPrompt.kt`
 - `app/src/main/java/com/warped/data/grounding/HtmlToTextExtractor.kt`
@@ -71,6 +84,7 @@ depth), extended `delimiter collisions escaped` test to cover both.
   SourcePreviewMappingTest, ModelAllowlistTest, WebContextSanitizerTest
 
 ## Honest note
+
 On-device English confirmation needs a user-provided screenshot — no adb in this
 environment. Out of scope per plan (untouched): download engine, catalog data
 (sizes/repos), layout beyond the two spacers, Theme/colors.

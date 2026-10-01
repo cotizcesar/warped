@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # Quick Task Summary: Card Title Top Spacing (overlay header fix)
 
 **Status:** COMPLETE
@@ -11,6 +18,7 @@ driven by 48dp action touch targets (`IconButton` `minimumInteractiveComponentSi
 vertically centering the title text on top of the 14dp card padding.
 
 Per plan, the header is now an overlay construction in `CatalogModelCard`:
+
 - `Box(Modifier.fillMaxWidth())` where the title `Text` alone defines the row height.
 - Title keeps `maxLines = 1` + `Ellipsis`, adds `Modifier.padding(end = 52.dp)` so
   text never underlaps the actions.

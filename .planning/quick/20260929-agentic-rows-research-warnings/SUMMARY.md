@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # SUMMARY — Agentic-turn Fuentes rows + re-search prompts + warning cleanup
 
 **Status:** COMPLETE — all 3 tasks executed, committed atomically, full gate green.
@@ -48,6 +55,7 @@ interfaces plus a read-vs-Done race. Transient `ToolStatus` handling untouched.
 ## Task 1.2 — Re-search rules + history-semantics decision (commit `a384c0ef`)
 
 Re-search rule in three loop-armed prompt sites (all loop-armed models see ≥1):
+
 1. `LiteRTLmProvider.TOOL_USE_SYSTEM_HINT` (local `systemInstruction`): explicit
    "treat each new user message on its own… call web_search again instead of
    answering from stale results" (pin test updated + dedicated contains-test).
@@ -61,7 +69,9 @@ Re-search rule in three loop-armed prompt sites (all loop-armed models see ≥1)
    every armed loop sees when deciding to call (contains-test added).
 
 **HISTORY-SEMANTICS DECISION (explicit, in code at the request-construction site
+
 + here): KEEP-AS-IS.** Room keeps ORIGINAL user text (saved at send); only the
+
 outgoing request's current message is augmented. Trade-off: (a) history stays
 clean, remote replay stays token-lean — stale fused blocks are never re-sent or
 persisted; (b) the local native conversation DOES reuse `Message.tool` results
@@ -90,10 +100,13 @@ zero code references, deleted (Error) · `ParcelFileDescriptor` leak → `.use{}
 `DataExtractionRules` (below) · `TypographyEllipsis` ×8 (both locales) ·
 `PluralsCandidate` ×3 → real `<plurals>` + `pluralStringResource` (both locales;
 fixes "1 pages/lines/conversations" grammar) · `UnusedResources` ×31 (30 strings
+
 + `splash_bg`, all reference-checked incl. tests) · monochrome launcher layers ·
+
 `logo.png`→`drawable-nodpi` · uiautomator→version catalog.
 
 **Documented suppressions / policy disables (all with in-code justification):**
+
 - 8× `@Suppress("DEPRECATION")` on `ProviderType.LOCAL` branches
   (`ProviderType`, `ToolCapabilityMatrix`, `ProviderRouter` ×4, `ChatViewModel` ×2):
   the deprecated entry is still live and NOTHING produces it anymore — only

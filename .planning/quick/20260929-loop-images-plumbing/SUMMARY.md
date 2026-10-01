@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # Quick Task Summary: Loop web_search image plumbing
 
 **Status:** COMPLETE — all 3 tasks executed, committed, full suite green.

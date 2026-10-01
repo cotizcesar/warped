@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # Code-Intent Pre-Search Gate — Execution Summary
 
 **Dir:** `.planning/quick/20260930-code-intent-gate/`

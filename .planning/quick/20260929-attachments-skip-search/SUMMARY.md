@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # Attachments skip heuristic no-URL search — Summary
 
 **Status:** Complete — both tasks executed, `./gradlew :app:assembleDebug` + FULL `./gradlew :app:testDebugUnitTest` green (665 tests, 0 failures).

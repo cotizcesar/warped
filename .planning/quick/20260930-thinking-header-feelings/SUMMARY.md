@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # SUMMARY — thinking accumulation + header declutter + feelings gate
 
 **Date:** 2026-09-30
@@ -15,16 +22,19 @@
 ## What changed
 
 **Task 1 — Thinking word-per-line (`LiteRTLmProvider.kt:486-491`)**
+
 - `onThought` accumulator now appends each delta directly (mirrors the `onText` path); the `"\n"` join is gone. Interior newlines inside a delta pass through verbatim; empty deltas still skipped.
 - New tests in `LiteRTLmLoopTest`: word deltas `["Cómo"," te"," puedo"," ayudar"]` → `"Cómo te puedo ayudar"`; interior-newline + empty-skip case.
 
 **Task 2 — Header declutter (`ChatScreen.kt`, `ModelSelector.kt`)**
+
 - `InlineModelSelectorBar` keeps ONLY the traffic dot + ∨ arrow. Override dot, ⋮ button, `DropdownMenu`, `webMenuExpanded`, and the dead `WebOverrideMenuItem` are removed; bar no longer takes web params.
 - `ModelSelectorSheet` (single call site) gains a Web section at the bottom: On / No / Heredar rows with the same strings (`web_on/off/inherit`, live `web_inherit_on/off` hint), state dot colors (green/orange/gray — zero purple), check mark on the active value, calling `onWebOverrideSelected(true/false/null)` — same `setWebOverride` values as before.
 - `webOverrideIndicator` mapping + enum stay in `ChatScreen.kt` (cheapest spot: existing `Phase53PolishTrioTest` calls them from package `com.warped.ui.chat`); the sheet imports them. No changes to `ChatViewModel.setWebOverride`, persistence, or toggle resolution.
 - No test changes needed: `ChatGroundingToggleTest` + `Phase53PolishTrioTest` stay valid and green (mapping tests still assert the helper the sheet uses).
 
 **Task 3 — Feelings gate (`NeedsWeb.kt`)**
+
 - PHRASES += `como te sientes`, `como se siente`, `estas bien`, `how are you`, `how do you feel`, `how are you doing` (diacritic-free per file convention; normalization + token-subsequence matching inherited). No WORDS added. No bare `como/esta` bigram — factual `cómo está X` keeps searching.
 - Tests extended: 8 new social entries, 2 new factual entries (`cómo está el clima` + accentless), plus a `como esta X vs feelings` guard test.
 

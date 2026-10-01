@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # SUMMARY — DDG Default Search + Sources Carousel
 
 **Status:** complete — all 4 tasks executed, build + full unit suite green.

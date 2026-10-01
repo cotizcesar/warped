@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # Quick-Task SUMMARY — Needs-Web gate + identity/hint prompt lines
 
 **Status:** complete (3/3 tasks)
@@ -45,6 +52,7 @@ web-searched SpanishDict and cited a translation answer.
 ### Auto-fixed Issues
 
 **1. [Rule 1 - Test] Replaced `hola`-bearing fixtures colliding with the locked social token**
+
 - **Found during:** Task 2 verification (`com.warped.ui.chat.*` run)
 - **Issue:** Two existing tests used `"hola sin urls"` as a neutral no-URL
   fixture while asserting search-time behavior; under the gate `hola` (locked
@@ -67,6 +75,7 @@ web-searched SpanishDict and cited a translation answer.
 - **Commit:** e0cdc05e
 
 **2. [Rule 1 - Test] Updated verbatim `TOOL_USE_SYSTEM_HINT` pin (expected)**
+
 - **Found during:** Task 3 (plan-flagged: the pin WILL fail)
 - **Fix:** Extended the pinned string with the locked no-social-search
   sentence; added identity/hint/composition pins.

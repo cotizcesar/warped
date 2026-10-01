@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # Quick Summary — Active download cluster overlap fix (2026-09-28)
 
 ## Status: COMPLETE

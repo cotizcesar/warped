@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # SUMMARY — Source card description line (Title + URL + description)
 
 **Status:** COMPLETE
@@ -7,6 +14,7 @@
 ## What was built
 
 Carousel and full source cards now read `favicon | Title + URL + description`:
+
 - New pure helper `ogDisplayDescription(ogDescription: String?)` in `OgSourceCard.kt` — trims, returns null when blank, caps at 160 chars (plan's prescribed cap since `OpenGraphParser.MAX_DESCRIPTION_CHARS` is 500 > 160, so no cross-layer import needed).
 - Both `OgSourceCard` and `CompactSourceCard` resolve `desc` alongside `displayTitle` and, only when non-null, render a 2dp `Spacer` + `Text(desc, 12sp, Normal, onSurfaceVariant, maxLines 2, Ellipsis)` after the URL line. When null they render nothing — no spacer, no placeholder — so unenriched rows are byte-identical Title+URL.
 - Untouched: tap handlers, semantics, thumb/favicon logic, container colors, title/URL styling, preview sheet/grid/modal/download path.

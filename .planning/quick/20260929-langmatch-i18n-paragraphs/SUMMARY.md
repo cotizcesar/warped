@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # Execution Summary — langmatch-i18n-paragraphs
 
 Date: 2026-09-30

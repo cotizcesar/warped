@@ -1,3 +1,10 @@
+---
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: unknown
+---
+
 # SUMMARY — WebFetch Parity (OpenCode quality, Android constraints)
 
 **Status:** complete — all 3 tasks executed, atomic commits per task.
