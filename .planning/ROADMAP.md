@@ -72,7 +72,9 @@ Previous: v2.4 Agentic Web shipped 2026-09-29 (Phases 55–58, 10/10 verified). 
   1. LeakCanary 2.14 harness installed as `debugImplementation` only — release APK contains zero LeakCanary classes
   2. Scripted leak tour runs end-to-end: model load/switch/unload, streaming chat + Stop, 5-URL grounding + cancel, offline→retry, OG thumbnail scroll, rotation/process death
   3. Each finding is triaged to its owning layer (native → VM → network → Compose) with heap evidence, ready for owner-local fixes
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 61-01-PLAN.md — LeakCanary 2.14 debugImplementation install + zero-release-footprint proof + scripted LEAK-TOUR.md
+- [ ] 61-02-PLAN.md — guided tour execution on Pixel 8 (human checkpoint) + triaged LEAK-BASELINE.md for Phase 62
 
 ### Phase 62: Fix Loop + Release Hardening
 **Goal**: Zero-application-leak release — all baseline leaks fixed at their owners and every Play gate green
