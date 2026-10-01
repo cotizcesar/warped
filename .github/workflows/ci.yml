@@ -43,6 +43,9 @@ jobs:
 
       - name: Build Release APK (16KB gate artifact)
         run: |
+          # Self-hosted runner persists /tmp across runs — stale keystore
+          # would fail genkeypair with "alias <ci> already exists".
+          rm -f /tmp/ci-release.jks
           keytool -genkeypair -keystore /tmp/ci-release.jks -alias ci -keyalg RSA -keysize 2048 -validity 30 -storepass ci-release-pass -keypass ci-release-pass -dname "CN=CI, OU=CI, O=CI, C=US"
           echo "RELEASE_STORE_FILE=/tmp/ci-release.jks" >> local.properties
           echo "RELEASE_STORE_PASSWORD=ci-release-pass" >> local.properties
