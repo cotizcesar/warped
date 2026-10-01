@@ -6,16 +6,14 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -76,8 +74,6 @@ fun HelpScreen(onNavigateBack: () -> Unit) {
                         stringResource(R.string.help_s1_step5),
                         stringResource(R.string.help_s1_step6),
                         stringResource(R.string.help_s1_step7),
-                        stringResource(R.string.help_s1_step8),
-                        stringResource(R.string.help_s1_step9),
                     )
                 )
             }
@@ -93,8 +89,6 @@ fun HelpScreen(onNavigateBack: () -> Unit) {
                         stringResource(R.string.help_s2_step3),
                         stringResource(R.string.help_s2_step4),
                         stringResource(R.string.help_s2_step5),
-                        stringResource(R.string.help_s2_step6),
-                        stringResource(R.string.help_s2_step7),
                     )
                 )
             }
@@ -128,17 +122,16 @@ fun HelpScreen(onNavigateBack: () -> Unit) {
                 )
             }
 
-            // Section 5: Audio
+            // Section 5: Model Capabilities
             item {
                 HelpSection(
-                    icon = Icons.Filled.Mic,
+                    icon = Icons.AutoMirrored.Filled.List,
                     title = stringResource(R.string.help_s5_title),
                     steps = listOf(
                         stringResource(R.string.help_s5_step1),
                         stringResource(R.string.help_s5_step2),
                         stringResource(R.string.help_s5_step3),
                         stringResource(R.string.help_s5_step4),
-                        stringResource(R.string.help_s5_step5),
                     )
                 )
             }
@@ -158,10 +151,10 @@ fun HelpScreen(onNavigateBack: () -> Unit) {
                 )
             }
 
-            // Section 7: HuggingFace Token
+            // Section 7: Web Grounding
             item {
                 HelpSection(
-                    icon = Icons.Filled.Key,
+                    icon = Icons.Filled.Public,
                     title = stringResource(R.string.help_s7_title),
                     steps = listOf(
                         stringResource(R.string.help_s7_step1),

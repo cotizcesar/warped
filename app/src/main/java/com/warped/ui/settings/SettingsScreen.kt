@@ -19,8 +19,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -130,7 +136,10 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
     ) {
         // Data section
         item {
-            Text(stringResource(R.string.settings_section_data), style = MaterialTheme.typography.titleMedium)
+            SettingsSectionHeader(
+                icon = Icons.Filled.Storage,
+                title = stringResource(R.string.settings_section_data)
+            )
         }
         item {
             Card(
@@ -171,7 +180,10 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
 
         // Web section
         item {
-            Text(stringResource(R.string.settings_section_web), style = MaterialTheme.typography.titleMedium)
+            SettingsSectionHeader(
+                icon = Icons.Filled.Public,
+                title = stringResource(R.string.settings_section_web)
+            )
         }
         item {
             Card(
@@ -208,7 +220,10 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
 
         // Display section
         item {
-            Text(stringResource(R.string.settings_section_display), style = MaterialTheme.typography.titleMedium)
+            SettingsSectionHeader(
+                icon = Icons.Filled.Palette,
+                title = stringResource(R.string.settings_section_display)
+            )
         }
         // Code theme selector
         item {
@@ -307,7 +322,10 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
 
         // App section
         item {
-            Text(stringResource(R.string.settings_section_app), style = MaterialTheme.typography.titleMedium)
+            SettingsSectionHeader(
+                icon = Icons.Filled.Apps,
+                title = stringResource(R.string.settings_section_app)
+            )
         }
         item {
             Card(
@@ -334,7 +352,10 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
         // Web Search section (Phase 55 TAV-01: dedicated card above
         // Security so the Security card stays untouched)
         item {
-            Text(stringResource(R.string.settings_section_websearch), style = MaterialTheme.typography.titleMedium)
+            SettingsSectionHeader(
+                icon = Icons.Filled.Search,
+                title = stringResource(R.string.settings_section_websearch)
+            )
         }
         item {
             TavilyKeyCard(uiState, viewModel)
@@ -342,7 +363,10 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
 
         // Security section
         item {
-            Text(stringResource(R.string.settings_section_security), style = MaterialTheme.typography.titleMedium)
+            SettingsSectionHeader(
+                icon = Icons.Filled.Lock,
+                title = stringResource(R.string.settings_section_security)
+            )
         }
         item {
             Card(
@@ -478,3 +502,28 @@ private fun ThemeSwatchStrip(theme: SyntaxTheme) {
 
 private operator fun <T : Comparable<T>> ClosedFloatingPointRange<T>.component1(): T = start
 private operator fun <T : Comparable<T>> ClosedFloatingPointRange<T>.component2(): T = endInclusive
+
+/**
+ * Section header in the model-card language: muted icon badge + semibold
+ * title, consistent with card headers across the app.
+ */
+@Composable
+private fun SettingsSectionHeader(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = Color(0xFFD97757),
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}

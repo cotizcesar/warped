@@ -2,7 +2,6 @@ package com.warped.ui.navigation
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -200,29 +199,49 @@ fun WarpedNavGraph() {
                                     dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.cancel)) } }
                                 )
                             }
-                            Row(
+                            Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(if (isActive) Color(0xFF121212) else Color.Transparent)
-                                    .clickable {
-                                        activeConversationId = conv.id
-                                        navController.navigate(Screen.ChatDetail(conv.id)) { launchSingleTop = true }
-                                        scope.launch { drawerState.close() }
-                                    }
-                                    .padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isActive) Color(0xFF2B2B29) else Color.Transparent
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                onClick = {
+                                    activeConversationId = conv.id
+                                    navController.navigate(Screen.ChatDetail(conv.id)) { launchSingleTop = true }
+                                    scope.launch { drawerState.close() }
+                                }
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.Chat, null,
-                                    tint = DrawerTextPrimary, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(12.dp))
-                                Text(conv.title, color = DrawerTextPrimary,
-                                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                    fontSize = 15.sp, modifier = Modifier.weight(1f))
-                                IconButton(
-                                    onClick = { showDeleteConfirm = true },
-                                    modifier = Modifier.size(32.dp)
+                                Row(
+                                    modifier = Modifier.padding(
+                                        start = 12.dp, end = 4.dp, top = 10.dp, bottom = 10.dp
+                                    ),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Filled.Close, "Delete", tint = DrawerTextSecondary.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.Chat, null,
+                                        tint = if (isActive) DrawerAccent else DrawerTextPrimary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(Modifier.width(12.dp))
+                                    Text(
+                                        conv.title, color = DrawerTextPrimary,
+                                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                        fontSize = 14.sp,
+                                        fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    IconButton(
+                                        onClick = { showDeleteConfirm = true },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.Close, "Delete",
+                                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
