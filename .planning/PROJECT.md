@@ -91,14 +91,22 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 **Known deferred:** 3 release-UAT device follow-ups (WEB-09 live Tavily E2E, WEB-10 LM Studio smoke + matrix + Stop, WEB-11 Coil images + ellipsis). Tech debt: budget floor, static matrix, ThinkingConfig enablement, Coil 3.4.0 ceiling. Pre-existing carry-overs: v2.3 smokes, UI polish trio, TUNE-01/02, Pixel 7 numbers, v2.2 smokes, Keystore orphan.
 
-## Current Milestone: v2.5 Play Compliance + Leaks
+## Previous Milestone: v2.5 Play Compliance + Leaks — COMPLETE ✅
 
-**Goal:** Ship a Google Play-compliant release targeting API 36 with 16 KB page-size support, plus a full memory-leak audit with fixes.
+**Shipped:** 2026-10-01 | [Archive →](.planning/milestones/v2.5-ROADMAP.md) · [Audit →](milestones/v2.5-MILESTONE-AUDIT.md) (passed)
 
-**Target features:**
-- 16 KB memory page-size support (AGP/NDK alignment, native libs verification)
-- Target Android 16 (API 36) with behavior-change audit
-- Full memory-leak audit (EngineManager, helpers, chat Flows, Coil/OkHttp, grounding pipeline) + fixes
+4 phases (59–62), 8 plans, 15 requirements — 15/15 satisfied:
+- 16 KB page-size compliance: 14/14 `.so` ALIGNED + zipalign OK, sqlcipher 4.5.4→4.19.1 version-bump-only fix, fail-closed CI gates, 16 KB emulator chat turn green (G-59-01 closed by Phase 62)
+- API-36 behavior audit: compileSdk/targetSdk 36 + R8 green, per-screen edge-to-edge insets, predictive-back BackHandler sweep (0 legacy paths), WorkManager stop-reason retry UI, sw800dp tablet fill
+- LeakCanary 2.14 debug-only harness + 6-leg scripted tour on Pixel 8 hardware: 6/6 clean, zero leaks; 32 regression tests lock the clean paths (932/932 green, zero production changes)
+- Tonight's beta extras landed on the same release tree: audio/vision slot gating, same-language reply, toggle removal + auto-select, size-sorted catalog with verified gating
+- Release hardened: fresh signed AAB/APK, all gates green
+
+**Known deferred:** Play Console pre-launch + target-API dashboard reads (human); Leg 1B model-B switch; Phase 60 follow-ups (5); standing device smokes (v2.2–v2.4). 47 closeout acknowledgments recorded in STATE.md Deferred Items.
+
+## Current Milestone: TBD
+
+**Next:** Run `/gsd-new-milestone` to define v2.6 scope (requirements → roadmap). Candidates from v2.5: auto-load model after download (Phase 61 tour feedback), Pixel 7 reference numbers (PERF-16 + PERF-12/13), standing release-UAT smokes.
 
 ## Requirements
 
@@ -153,10 +161,25 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 - ✓ Local models search/fetch autonomously via function calling (5-call cap, Stop, transient rows, channel hygiene) — v2.4
 - ✓ Remote models use the same tools via native tools[] loop with capability gating + fallback notice — v2.4
 - ✓ Every grounded source renders an OpenGraph thumbnail card (Coil, tap → sheet with OG header) — v2.4
+- ✓ Every shipped native library is 16 KB-aligned (check_elf_alignment.sh + zipalign on release AAB/APK) — v2.5
+- ✓ App installs, launches, and runs a local chat turn on a 16 KB system image with no native load failures — v2.5
+- ✓ CI fails the build on misalignment (Gradle check + CI/release gates) — v2.5
+- ✓ Misaligned dependencies fixed by version bump only (sqlcipher-android 4.19.1, no hacks) — v2.5
+- ✓ App targets Android 16 (compileSdk 36 + targetSdk 36) with assembleRelease + R8 green — v2.5
+- ✓ Edge-to-edge insets on chat pill, bottom sheets, Fuentes list (gesture + 3-button nav, light/dark) — v2.5
+- ✓ Back navigation on predictive-back APIs, no dead onBackPressed paths — v2.5
+- ✓ Model downloads + offline retry survive Android 16 quotas (FGS types, stop reasons, retry) — v2.5
+- ✓ App fills large-screen windows (sw ≥ 600dp tablet/foldable) without pillarboxing — v2.5
+- ✓ LeakCanary 2.14 debug-only harness with scripted 6-leg leak tour, 6/6 clean on hardware — v2.5
+- ✓ EngineManager releases native handles on model switch/unload — v2.5
+- ✓ Chat turn-scoped Flows cancel cleanly (single-flight cancel, SSE streams closed on Stop) — v2.5
+- ✓ Grounding pipeline cancels as one scope per send, retry reuses rows without old-job retention — v2.5
+- ✓ Coil + OkHttp scope discipline (recycle-cancel, bounded cache, never-closed shared clients) — v2.5
+- ✓ Release AAB passes all gates (alignment + R8 + 16 KB smoke + zero-leak pass green) — v2.5
 
 ### Active
 
-- [ ] Play-compliant release: 16 KB page-size support, target API 36, memory-leak audit + fixes — v2.5 Play Compliance + Leaks
+(None — v2.6 scope to be defined via `/gsd-new-milestone`)
 
 ### Out of Scope
 
@@ -225,6 +248,9 @@ Warped has shipped 12 milestones (v1.0 through v2.2) across 51 phases and 315 re
 | v2.0 references Google AI Edge Gallery (2026-06-05) | Reference implementation in same domain (Kotlin + LiteRT-LM on Android, 23.6k stars). Largest, most active OSS in the space. | — Pending |
 | v2.1 finishes v2.0 PARTIALs/carry-overs (2026-09-27) | No new features until every shipped feature is fully done — PERF-01, PERF-06, SKILLS-02/03, double-collect, Call.cancel(). PERF-12/13 numbers stay CI-gated (Pixel 7 hardware required). | ✓ Good |
 | v2.2 removes v2.1 Skills surface (2026-09-28) | Calculator/CurrentTime/JsonFormatter + chips/prefs/repo/gating/tool-loops deleted one milestone after introduction — user found no value, simplifies codebase and R8 keeps. Zero new dependencies for web grounding (OkHttp fetch only). | ✓ Good |
+| v2.5 version-bump-only remediation (2026-09-30) | Misaligned sqlcipher 4.5.4 (EOL, p_align 0x1000) → successor artifact sqlcipher-android 4.19.1. Never hand-patch .so, linker-flag hacks, or pageSizeCompat. | ✓ Good |
+| v2.5 LeakCanary debugImplementation-only (2026-09-30) | Zero release footprint proven at classpath + dex level. Clean baseline → Phase 62 is tests-only, zero production changes. | ✓ Good |
+| v2.5 gap back-closure across phases (2026-10-01) | G-59-01 (16 KB chat turn, emulator-blocked) closed by Phase 62's fresh-artifact smoke instead of reopening Phase 59. | ✓ Good |
 
 ## Evolution
 
@@ -244,4 +270,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-30 — v2.5 Play Compliance + Leaks milestone started*
+*Last updated: 2026-10-01 — v2.5 Play Compliance + Leaks milestone complete*

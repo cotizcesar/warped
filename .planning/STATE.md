@@ -2,9 +2,11 @@
 gsd_state_version: "1.0"
 milestone: v2.5
 milestone_name: Play Compliance + Leaks
-status: planning
-last_updated: "2026-09-30T00:00:00Z"
-last_activity: 2026-09-30
+status: Awaiting next milestone
+stopped_at: v2.5 roadmap created (Phases 59–62)
+last_updated: "2026-10-01T05:37:29.251Z"
+last_activity: 2026-10-01
+state_head: 819b4146a722b8ac3fb23ac9e33ad5c06229cb79
 progress:
   total_phases: 4
   completed_phases: 4
@@ -16,21 +18,21 @@ progress:
 # Project State: Warped
 
 **Last updated:** 2026-09-30
-**Last activity:** 2026-09-30 — v2.5 roadmap created (Phases 59–62, 15/15 requirements mapped)
+**Last activity:** 2026-10-01
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-30, v2.5 milestone started)
+See: .planning/PROJECT.md (updated 2026-10-01, v2.5 shipped)
 
 **Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** v2.5 Play Compliance + Leaks — 16 KB page-size support, API 36 target, memory-leak audit + fixes
+**Current focus:** Planning next milestone (v2.5 Play Compliance + Leaks shipped 2026-10-01 — 4 phases, 15/15 requirements satisfied)
 
 ## Current Position
 
-Phase: — (v2.5 all phases complete — lifecycle: audit → complete → cleanup)
+Phase: Milestone v2.5 complete
 Plan: —
-Status: Phase 62 closed 2026-10-01 (5/5 passed, G-59-01 closed on 16 KB turn)
-Last activity: 2026-10-01 — v2.5 all 4 phases complete, lifecycle starting
+Status: Awaiting next milestone
+Last activity: 2026-10-01 — Milestone v2.5 completed and archived
 
 ## Phase Structure (v2.5 — PLANNED)
 
@@ -92,19 +94,37 @@ None yet.
 | Device smoke | v2.4 WEB-09 / WEB-10 / WEB-11 | Accepted, release UAT | v2.4 close |
 | Tech debt | Orphaned Keystore `huggingface_token` entry on upgrades (harmless, never read) | Accepted | v2.2 close |
 | Coverage | Nyquist VALIDATION.md missing for phases 49/50/51 | TODO, not a compliance failure | v2.2 close |
+| Coverage | Nyquist VALIDATION.md missing for v2.5 phases 59-62 (discovery only, not a compliance failure) | TODO | v2.5 close |
+
+### v2.5 Closeout Acknowledgments (2026-10-01, override_closeout)
+
+47 open artifacts acknowledged at milestone close (suppression lapses automatically if artifact state changes):
+
+| Category | Item | Status | Milestone |
+|----------|------|--------|-----------|
+| uat_gaps | 62/62-RELEASE-UAT.md | 0 pending scenarios | v2.5 |
+| verification_gaps | 59/59-VERIFICATION.md (gaps_found, G-59-01 closed by 62 back-closure) | acknowledged | v2.5 |
+| verification_gaps | 51/51-VERIFICATION.md (archived v2.2, gaps_found) | acknowledged | v2.5 |
+| quick_tasks | 20260928 backlog (16): active-cluster-overlap, add-gemma4-e4b, card-title-top-spacing, catalog-3n-litertlm-swap, catalog-card-redesign, catalog-downloaded-spacing, catalog-order, catalog-repo-url-fix, chat-scroll-follow-fix, cluster-spacing-english-sweep, honest-delete-unified-download, kill-purple-theme, remove-sin-web, source-delimiter-rename, vision-backend-gpu, webfetch-parity | idea backlog | v2.5 |
+| quick_tasks | 20260929 backlog (14): agentic-rows-research-warnings, all-sources-sheet, always-search-image-grid, attachments-skip-search, card-description-line, citation-taps-youtube-oembed, ddg-default-sources-carousel, explicit-language-directive, image-history-carry, image-turn-routing-favicon, langmatch-i18n-paragraphs, loop-images-plumbing, og-thumb-opens-browser, search-og-enrichment | idea backlog | v2.5 |
+| quick_tasks | 20260930 backlog (14): always-presearch-anchored, code-intent-gate, drawer-card-reuse, langdetect-library, language-sources-override, loading-flag-stuck, needs-web-gate, pending-sweep, reference-resolution-rule, source-card-density, spanish-word-detection, thinking-header-feelings, thinking-scroll-live-hairline, unified-turn-status | idea backlog | v2.5 |
 
 ## Deferred Verification
 
-None new — v2.5 phases not yet executed. Standing release-UAT deferrals recorded above.
+v2.5 all phases complete (59: 4/5 with G-59-01 closed by 62; 60/61/62 passed). Standing release-UAT deferrals recorded above.
 
 ## Quick Tasks Completed
 
-See prior STATE history for v2.2–v2.4 quick-task log (archived at roadmap rewrite).
+See prior STATE history for v2.2–v2.4 quick-task log (archived at roadmap rewrite). 44 quick-task backlog items acknowledged at v2.5 close (see Deferred Items above) — .planning/quick/ untouched.
 
 ## Session Continuity
 
 **Resume file:** —
 
-Last session: 2026-09-30
-Stopped at: v2.5 roadmap created (Phases 59–62)
-Resume: `/gsd-plan-phase 59`
+Last session: 2026-10-01
+Stopped at: v2.5 milestone complete and archived (tag v2.5)
+Resume: `/gsd-new-milestone` (after `/clear`)
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

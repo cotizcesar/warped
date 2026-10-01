@@ -83,6 +83,45 @@
 
 ---
 
+## Milestone: v2.5 — Play Compliance + Leaks
+
+**Shipped:** 2026-10-01 (override closeout — 47 acknowledged: 44 quick-task backlog + 1 UAT gap + 2 verification gaps; milestone audit passed 15/15)
+**Phases:** 4 (59–62) | **Plans:** 8
+
+### What Was Built
+- 16 KB compliance: `check_elf_alignment.sh` gate (14/14 ALIGNED + zipalign OK), sqlcipher 4.5.4→4.19.1 version-bump-only fix, fail-closed Gradle/CI gates, 16 KB emulator chat turn green
+- API-36 audit: 36/36 + R8 green, per-screen WindowInsets, BackHandler sweep (0 legacy paths), DownloadStopReason mapper + retry UI, sw800dp tablet fill
+- LeakCanary 2.14 debug-only harness + 6-leg LEAK-TOUR.md; Pixel 8 tour 6/6 clean, zero leaks; 32 regression tests locking clean paths (932/932 green, zero production changes)
+- Tonight's beta extras on the release tree: audio/vision slot gating, same-language reply, toggle removal + auto-select, size-sorted catalog with verified gating
+- Fresh signed AAB/APK with all gates green
+
+### What Worked
+- **Version-bump-only remediation:** sqlcipher successor-artifact swap fixed alignment with zero custom native code — the constraint (no hand-patched .so, no linker hacks) kept the fix shippable and re-verifiable.
+- **Baseline-before-fixes sequencing:** the clean LeakCanary baseline legitimately scoped Phase 62 to tests-only, avoiding speculative production churn on a 932-green stack.
+- **Cross-phase gap back-closure:** G-59-01 (emulator-blocked in 59) closed by 62's fresh-artifact smoke instead of reopening 59 — gaps can be owned forward when the evidence lands on the final artifact.
+
+### What Was Inefficient
+- **Sparse SUMMARY frontmatter again:** only 60-01 declared `requirements-completed`; audit had to cross-reference VERIFICATION reports (v2.2 lesson relearned, still not enforced).
+- **Emulator instability cost a phase gap:** 16 KB system-image crash-loop blocked 59's smoke; the fix was retrying on a healthy image in 62, not a code change.
+- **Auto-extracted accomplishments needed rewriting:** `milestone.complete` pulled date strings as accomplishment bullets — MILESTONES.md entry required manual curation.
+
+### Patterns Established
+- **Fail-closed native gates:** ELF alignment script + zipalign wired into Gradle `check` and both CI workflows; regressions can't ship silently.
+- **Phase-to-phase back-closure:** a gap in phase N may be closed by phase N+k when the evidence requires the final artifact — record the forward-ownership explicitly at phase close.
+- **Debug-only observability with dex-level proof:** LeakCanary install paired with release-APK zero-footprint proof (classpath + per-dex strings) as the standard for any debug-only tooling.
+
+### Key Lessons
+1. Keep a healthy 16 KB AVD image available before the compliance phase starts — environment failures shouldn't become milestone gaps.
+2. Enforce `requirements-completed` frontmatter in plan SUMMARYs (third occurrence: v2.2, v2.3 partial, v2.5).
+3. Human-dashboard reads (Play Console pre-launch, target-API warnings) must be release-UAT checklist items with named owners, not open-ended deferrals.
+
+### Cost Observations
+- Timeline: 2026-09-30 → 2026-10-01 (2 days); 8 plans across 4 phases
+- Tests: 900 baseline + 32 new = 932/932 green
+- Notable: zero production changes in the fix loop (tests-only) — cheapest possible hardening outcome
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution

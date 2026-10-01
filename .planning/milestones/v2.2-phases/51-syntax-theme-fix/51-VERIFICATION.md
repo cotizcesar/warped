@@ -1,6 +1,10 @@
 ---
 status: gaps_found
 score: "6/6 must-haves proven by automated gates; on-device 4-preset visual smoke deferred"
+audit_acknowledged:
+  milestone: v2.5
+  at: 2026-10-01
+  status: gaps_found
 ---
 
 # Phase 51 (Syntax-Theme Fix) — Verification

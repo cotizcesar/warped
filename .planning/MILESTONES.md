@@ -1,5 +1,24 @@
 # Milestones
 
+## v2.5 Play Compliance + Leaks (Shipped: 2026-10-01)
+
+**Phases completed:** 4 phases (59-62), 8 plans, 10 tasks
+**Requirements:** 15 defined, 15 satisfied (PAGE-01..04, API-01..05, LEAK-01..05, REL-01)
+**Known verification overrides:** 47 newly acknowledged, 0 carried forward (see STATE.md Deferred Items) — 44 quick-task backlog items + 1 UAT gap (62-RELEASE-UAT, 0 pending scenarios) + 2 verification gaps (59 gaps_found closed by 62 back-closure of G-59-01; 51 archived v2.2). Closeout type: override_closeout.
+**Audit:** [`.planning/milestones/v2.5-MILESTONE-AUDIT.md`](milestones/v2.5-MILESTONE-AUDIT.md) → status: **passed**
+**Archived roadmap:** [`.planning/milestones/v2.5-ROADMAP.md`](milestones/v2.5-ROADMAP.md)
+
+**Key accomplishments:**
+
+- 16 KB page-size compliance: 14/14 native libs ALIGNED + zipalign OK on release artifact, sqlcipher 4.5.4→4.19.1 version-bump-only remediation, fail-closed CI gates, 16 KB emulator chat turn green (G-59-01 closed by Phase 62)
+- Release green on 36/36 with R8, explicit per-screen WindowInsets on pill/sheets/catalog, and BackHandler everywhere in scope with a confirm-clean legacy-back sweep
+- Stop-reason mapper + UI-side observation with surfaced retry copy, dataSync audit clean on every path, large-screen fill audit with zero width-cap hits
+- LeakCanary 2.14 installed as debugImplementation-only (release proven clean at classpath + dex level) with a 6-leg replayable LEAK-TOUR.md, toured on Pixel 8 hardware: 6/6 clean, zero leaks
+- Five JVM regression suites (32 tests) locking the Phase 61 zero-leak baseline across engine load/unload, inference cancel, grounding scope cancel, download observers, and singleton discipline — full suite green at 932 tests, zero production changes
+- Release hardened: fresh signed AAB/APK, all gates green, 932/932 tests, Play Console pre-launch + target-API dashboard reads deferred to human
+
+---
+
 ## v2.4 Agentic Web (Shipped: 2026-09-29)
 
 **Phases completed:** 4 phases (55-58), 9 plans, 10 requirements
@@ -18,11 +37,13 @@
 4. **OG thumbnails** — Parse-only OG scrape, Room v16, Coil 3.4.0 singleton with disk cache, per-source cards + sheet header matching user mock
 
 ### Known Gaps (accepted, release-UAT device follow-ups)
+
 - **WEB-09:** live Tavily E2E on device beyond key check
 - **WEB-10:** LM Studio live smoke + matrix confidence + Stop finger-test
 - **WEB-11:** on-device Coil images + long-text ellipsis pixels
 
 ### Tech debt
+
 - Small-window budget floor; GC key copies; tool-failure affordance; static matrix; ThinkingConfig enablement; Coil 3.4.0 ceiling; hostOf divergence
 - Nyquist: no `VALIDATION.md` in any v2.4 phase — coverage TODO (same as v2.2/v2.3)
 
@@ -46,11 +67,13 @@
 6. **Offline retry** — Queued `En espera` banner + validated-online-gated `Reintentar`; same-entry `fetchAll`, sources-only attach (assistant text byte-identical, inference never runs), same-row `replaceSources`, Stop/overlap/streaming guards
 
 ### Known Gaps (accepted, release-UAT device smokes)
+
 - **MIG-01:** on-device MigrationTest v14→v15 (live SQLite/SQLCipher row survival)
 - **WEB-07:** grounding visuals on hardware, both themes (chip, Fuentes, sheet, queued/Reintentar banner)
 - **WEB-08:** offline→resume→tap→Fuentes E2E with live fetch on hardware
 
 ### Tech debt
+
 - GroundingBudget tiers LOW-confidence until on-device validation (TUNE-01 trigger-gated)
 - Missing UNIQUE index on `grounded_sources(message_id, source_index)` (delete-then-insert covers; hardening follow-up)
 - Phase 53 UI polish trio (override indicator, Fuente-heading redundancy, all-omitida visibility)
@@ -75,12 +98,14 @@
 5. **Syntax-theme fix** — `SyntaxHighlighter.highlight` accepts `theme` (was Monokai-hardcoded); `CodeBlock` threads `syntaxTheme` with theme-keyed `LaunchedEffect`; theme-aware cache key; all-4-preset regression tests (per-preset loop, cache separation, 6-test PresetDistinctness)
 
 ### Known Gaps (accepted, release-UAT device smokes)
+
 - **DEL-06:** on-device release smoke (launch → allowlisted model → local turn → remote turn → legacy TOOL chat)
 - **WEB-05:** rendered model-only banner appearance (offline vs failure copy)
 - **WEB-06:** chip transient behavior, Fuentes rendering, E2E paste-URL flow
 - **THEME-01:** visible per-preset result in light + dark mode
 
 ### Tech debt
+
 - Orphaned Keystore `huggingface_token` entry on upgraded installs (accepted, harmless, never read)
 - 49-01/49-02 SUMMARY.md files lack `requirements-completed` frontmatter (process debt)
 - Live-fetch behaviors code-reviewed/gate-checked but never exercised against a live server
@@ -125,6 +150,7 @@
 10. **Agent Skills Lite** — Sealed `Skill` value object + `SkillCategory { Tool, PromptTemplate }`; 4 hand-curated skills (`Calculator`, `CurrentTime`, `JsonFormatter`, `Summarize`); `SkillPreferences` DataStore (defaults all-on); `SkillRepository` (interface + impl + Hilt bind); `SkillChipsRow` composable under the chat input; `LlmModelHelper.runInference(..., skills: List<Skill>)` plumbed end-to-end; `LmStudioHelper.applySkills` injects `PromptTemplate` skills into the system prompt
 
 ### Deferred
+
 - **PERF-01 (full `ChatUiState` sub-state split):** Current single-state shape is consumed by ~10 subcomposables; the split is a structural improvement for Phase 45+ scale. v2.1.
 - **PERF-06 (LazyColumn `key`):** `ChatScreen` uses a vertically-scrolling `Column` for messages. Switch to `LazyColumn` with `key = { it.id }` if message counts grow past 100 per conversation. v2.1.
 - **PERF-12/13 actual numbers:** Code + procedure ship; `BENCHMARKS.md` cells are `[CI fills in]`. Requires a real Pixel 7 reference device to measure. CI gate.
@@ -134,9 +160,11 @@
 - **`LMStudioProvider` `Call` reference for `Call.cancel()`:** The actual OkHttp `Call` lives inside `LMStudioProvider`; the `activeCall` `AtomicReference` was removed in 43-02 (dead code). Plumbing the `Call` through the provider for true cancellation is v2.1.
 
 ### Tech debt
+
 None introduced. No Gallery anti-patterns. R8 full mode is on; dependency audit is enforced in `check`; all `@Provides` are `@Singleton`; `ProviderRouter` uses `dagger.Lazy<>` for per-helper injection; no eager `LiteRtLlmEngine` SingletonComponent binding.
 
 ### Decisions captured
+
 - v2.0: Reference implementation = google-ai-edge/gallery v1.0.16 (23.6k stars, 91.9% Kotlin). Gallery is the only major OSS in the "LiteRT-LM + Compose + Android" niche, making it the most defensible convergence target.
 - v2.0: Drop Gallery's tech-debt surface — kapt, Moshi, Gson, kotlin-reflect, Firebase, Ktor, MCP SDK, compose-richtext, Proto DataStore, mlkit-genai, AppAuth, CameraX, JS webview skills. Verified by `scripts/audit-dependencies.sh` (RUNTIME-12).
 - v2.0: Warped is **already ahead** of Gallery on several axes (Hilt 2.59.2 vs 2.58, KSP-only, kotlinx-serialization only, per-screen VMs vs Gallery's 850-line mega-VM). v2.0 is a **convergence, not a copy**.
@@ -180,6 +208,7 @@ None introduced. No Gallery anti-patterns. R8 full mode is on; dependency audit 
 8. Compilation verified, monospace coverage audit confirms canonical rendering (all FontFamily.Monospace usage flows through CodeBlock/MarkdownText), HuggingFace model descriptions render with MarkdownText
 
 ### Deferred
+
 - **INTG-03:** README/markdown preview screen with syntax highlighting — requires new HuggingFace API endpoint and preview screen
 - **Phase 29:** 4 human UI verification checks pending (theme dropdown, font scale slider, CodeBlock rendering, expand/collapse) — require device/emulator
 - **Pre-existing:** 6 verification gaps (Phases 06-10, 29) + 12 quick tasks from earlier milestones
