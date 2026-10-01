@@ -59,7 +59,9 @@ Previous: v2.4 Agentic Web shipped 2026-09-29 (Phases 55–58, 10/10 verified). 
   3. Back gesture/button dismisses chat, sheets, and settings/preset screens correctly with no dead `onBackPressed()` paths
   4. Model downloads and offline retry survive Android 16 quotas — progress, cancel, and retry verified with stop reasons logged
   5. Chat, catalog, and sheets fill large-screen windows (sw ≥ 600dp tablet/foldable emulator) without pillarboxing or broken constraints
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 60-01-PLAN.md — SDK36 + R8 confirm, per-screen edge-to-edge insets, predictive-back sweep
+- [ ] 60-02-PLAN.md — quota stop-reason audit + large-screen fill + hardware verification session
 **UI hint**: yes
 
 ### Phase 61: LeakCanary Instrumentation + Guided Audit
