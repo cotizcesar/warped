@@ -766,9 +766,10 @@ class ChatViewModel @Inject constructor(
                 val selectedProvider = effectiveProvider
                 val modelId = effectiveModelId
 
-                // Validate model capabilities
+                // Validate model capabilities (allowlist-verified — never the
+                // raw LocalModel.capabilities all-true default).
                 if (selectedProvider == ProviderType.LITE_RT_LM) {
-                    val capabilities = state.localModels.firstOrNull { it.filePath == modelId }?.capabilities
+                    val capabilities = verifiedLocalCapabilities(modelId)
                     if (capabilities == null) {
                         Timber.w("ChatVM: capabilities unknown for $modelId — skipping media gate")
                     } else {
@@ -1596,12 +1597,26 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
+     * Verified capabilities for a local model file. Uses the allowlist
+     * (verified-only) via [ModelAllowlistRepository.effectiveCapabilities] —
+     * NEVER the raw `LocalModel.capabilities` lazy default (all-true), which
+     * silently disables every capability gate. Null when no local model is
+     * selected or the file is unknown (callers fail open for remote/unknown).
+     */
+    fun verifiedLocalCapabilities(filePath: String?): ModelCapabilities? {
+        if (filePath == null) return null
+        val model = _connection.value.localModels.firstOrNull { it.filePath == filePath }
+            ?: return null
+        return modelAllowlistRepository.effectiveCapabilities(model)
+    }
+
+    /**
      * 41-02: Decide whether the active model supports thinking.
      * Local model id has priority; falls back to the remote model id.
      * Returns false when no model is selected.
      *
      * 48 (WR-03): capability check, not a presence check — consults the
-     * local model's reasoning capability. Fail-open while the model list
+     * allowlist-verified reasoning flag. Fail-open while the model list
      * has not loaded yet (unknown ≠ unsupported). Remote models have no
      * capability data source yet, so presence still gates there.
      */
@@ -1609,7 +1624,7 @@ class ChatViewModel @Inject constructor(
         if (localId != null) {
             val models = _connection.value.localModels
             if (models.isEmpty()) return true
-            return models.firstOrNull { it.filePath == localId }?.capabilities?.reasoning == true
+            return verifiedLocalCapabilities(localId)?.reasoning == true
         }
         return remoteId != null
     }

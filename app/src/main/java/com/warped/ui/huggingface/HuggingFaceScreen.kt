@@ -305,6 +305,26 @@ private fun CatalogModelCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                // Capability descriptions: what each badge on the card
+                // means, so the icons are self-explanatory. Text is always
+                // present (every model chats); modalities only when supported.
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = buildString {
+                        append(stringResource(R.string.badge_text_desc))
+                        if (entry.capabilities.vision) {
+                            append("\n"); append(stringResource(R.string.badge_vision_desc))
+                        }
+                        if (entry.capabilities.audio) {
+                            append("\n"); append(stringResource(R.string.badge_audio_desc))
+                        }
+                        if (entry.capabilities.supportsThinking) {
+                            append("\n"); append(stringResource(R.string.badge_thinking_desc))
+                        }
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = entry.modelFile,

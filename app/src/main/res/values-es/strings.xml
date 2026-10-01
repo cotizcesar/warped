@@ -228,6 +228,10 @@
     <string name="badge_audio">Audio</string>
     <string name="badge_thinking">Razonamiento</string>
     <string name="badge_tools">Herramientas</string>
+    <string name="badge_vision_desc">Visión — entiende imágenes</string>
+    <string name="badge_audio_desc">Audio — entiende audio</string>
+    <string name="badge_thinking_desc">Razonamiento — muestra su razonamiento</string>
+    <string name="badge_text_desc">Texto — chat y preguntas</string>
     <string name="cap_tool_use">Uso de herramientas</string>
     <string name="cap_reasoning">Razonamiento</string>
 

@@ -35,8 +35,13 @@ class CatalogViewModel @Inject constructor(
     localModelRepository: LocalModelRepository,
 ) : ViewModel() {
 
-    /** Synchronous asset parse — first paint shows the populated list, no skeleton. */
-    val models: List<AllowlistedModel> = allowlistRepository.models
+    /**
+     * Synchronous asset parse — first paint shows the populated list, no skeleton.
+     * Display order is smallest-first by file size (user decision 2026-10-01);
+     * the bundled asset keeps its locked sequence for non-display uses.
+     */
+    val models: List<AllowlistedModel> =
+        allowlistRepository.models.sortedBy { it.sizeInBytes }
 
     val downloadStates: StateFlow<Map<String, DownloadState>> =
         downloadManager.downloadStates.stateIn(

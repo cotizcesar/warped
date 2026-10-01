@@ -311,10 +311,16 @@ fun ChatScreen(
                 reasoningEnabled = input.enableThinking,
                 onToggleReasoning = { viewModel.toggleThinking() },
                 modelHasReasoning = input.supportsThinking,
+                // Verified-only capabilities: image/audio buttons hide when
+                // the selected local model lacks the modality. Remote or
+                // unselected → fail open (null → true).
+                modelHasVision = viewModel.verifiedLocalCapabilities(connection.selectedLocalModelId)?.vision
+                    ?: true,
                 onAddImage = { imagePickerLauncher.launch("image/*") },
                 attachedImages = attachedImages,
                 onRemoveImage = { i -> attachedImages = attachedImages.filterIndexed { idx, _ -> idx != i } },
-                modelHasAudio = connection.localModels.firstOrNull { it.filePath == connection.selectedLocalModelId }?.capabilities?.audio == true,
+                modelHasAudio = viewModel.verifiedLocalCapabilities(connection.selectedLocalModelId)?.audio
+                    ?: true,
                 onAudioRecorded = { bytes -> audioBytes = bytes },
                 onAudioRecordingChanged = { isRecording = it },
             )

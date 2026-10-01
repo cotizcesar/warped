@@ -37,7 +37,7 @@ class ModelAllowlistTest {
     fun `shipped asset parses with expected entries`() {
         val models = parseModelAllowlist(shippedAssetText())
 
-        assertThat(models).hasSize(4)
+        assertThat(models).hasSize(6)
         val e2b = models.first { it.name == "gemma-3n-E2B-it-int4" }
         assertThat(e2b.displayName).isEqualTo("Gemma 3n E2B IT (int4)")
         assertThat(e2b.modelFile).isEqualTo("gemma-3n-E2B-it-int4.litertlm")
@@ -54,6 +54,18 @@ class ModelAllowlistTest {
         assertThat(e4b.sizeInBytes).isEqualTo(3659530240L)
         assertThat(e4b.repo).isEqualTo("warped-community/gemma-4-E4B-it-litert-lm")
         assertThat(e4b.taskTypes).contains("chat")
+        val g1b = models.first { it.name == "gemma-3-1b-it" }
+        assertThat(g1b.displayName).isEqualTo("Gemma 3 1B IT")
+        assertThat(g1b.modelFile).isEqualTo("gemma-3-1b-it.litertlm")
+        assertThat(g1b.sizeInBytes).isEqualTo(584417280L)
+        assertThat(g1b.repo).isEqualTo("warped-community/gemma-3-1b-it-litert-lm")
+        assertThat(g1b.taskTypes).contains("chat")
+        val g270m = models.first { it.name == "gemma-3-270m-it" }
+        assertThat(g270m.displayName).isEqualTo("Gemma 3 270M IT")
+        assertThat(g270m.modelFile).isEqualTo("gemma-3-270m-it.litertlm")
+        assertThat(g270m.sizeInBytes).isEqualTo(304005120L)
+        assertThat(g270m.repo).isEqualTo("warped-community/gemma-3-270m-it-litert-lm")
+        assertThat(g270m.taskTypes).contains("chat")
     }
 
     @Test
@@ -89,6 +101,10 @@ class ModelAllowlistTest {
         assertThat(byName["gemma-3n-E4B-it-int4"]?.ramNote)
             .isEqualTo("8 GB or more recommended (approx.)")
         assertThat(byName["gemma-3n-E4B-it-int4"]?.blurb).isEqualTo("Higher multimodal quality.")
+        assertThat(byName["gemma-3-1b-it"]?.ramNote).isEqualTo("From ~2 GB RAM")
+        assertThat(byName["gemma-3-1b-it"]?.blurb).isEqualTo("Fast lightweight chat.")
+        assertThat(byName["gemma-3-270m-it"]?.ramNote).isEqualTo("From ~1 GB RAM")
+        assertThat(byName["gemma-3-270m-it"]?.blurb).isEqualTo("Tiny model for any device.")
     }
 
     @Test
@@ -99,7 +115,9 @@ class ModelAllowlistTest {
             "gemma-4-E2B-it",
             "gemma-4-E4B-it",
             "gemma-3n-E2B-it-int4",
-            "gemma-3n-E4B-it-int4"
+            "gemma-3n-E4B-it-int4",
+            "gemma-3-1b-it",
+            "gemma-3-270m-it"
         ).inOrder()
     }
 
@@ -152,7 +170,9 @@ class ModelAllowlistTest {
             "gemma-3n-E2B-it-int4" to true,
             "gemma-3n-E4B-it-int4" to true,
             "gemma-4-E2B-it" to true,
-            "gemma-4-E4B-it" to true
+            "gemma-4-E4B-it" to true,
+            "gemma-3-1b-it" to true,
+            "gemma-3-270m-it" to true
         )
         // 3n multimodal + speculative decoding verified; gemma-4
         // vision/audio docs-verified, thinking docs-verified. E2B
@@ -162,19 +182,25 @@ class ModelAllowlistTest {
             "gemma-3n-E2B-it-int4" to true,
             "gemma-3n-E4B-it-int4" to true,
             "gemma-4-E2B-it" to true,
-            "gemma-4-E4B-it" to true
+            "gemma-4-E4B-it" to true,
+            "gemma-3-1b-it" to false,
+            "gemma-3-270m-it" to false
         )
         val expectedSpeculativeDecoding = mapOf(
             "gemma-3n-E2B-it-int4" to true,
             "gemma-3n-E4B-it-int4" to true,
             "gemma-4-E2B-it" to false,
-            "gemma-4-E4B-it" to true
+            "gemma-4-E4B-it" to true,
+            "gemma-3-1b-it" to false,
+            "gemma-3-270m-it" to false
         )
         val expectedThinking = mapOf(
             "gemma-3n-E2B-it-int4" to false,
             "gemma-3n-E4B-it-int4" to false,
             "gemma-4-E2B-it" to true,
-            "gemma-4-E4B-it" to true
+            "gemma-4-E4B-it" to true,
+            "gemma-3-1b-it" to false,
+            "gemma-3-270m-it" to false
         )
         // 56-01 FLAG DECISION: supportsFunctionCalling true for the gemma-4
         // pair ONLY (docs basis: Gemma 4 model card built-in function
@@ -186,7 +212,9 @@ class ModelAllowlistTest {
             "gemma-3n-E2B-it-int4" to false,
             "gemma-3n-E4B-it-int4" to false,
             "gemma-4-E2B-it" to true,
-            "gemma-4-E4B-it" to true
+            "gemma-4-E4B-it" to true,
+            "gemma-3-1b-it" to false,
+            "gemma-3-270m-it" to false
         )
         for (model in models) {
             val caps = model.capabilities
@@ -205,7 +233,7 @@ class ModelAllowlistTest {
     fun `repository exposes capability queries`() {
         val repo = repositoryBackedBy(shippedAssetText())
 
-        assertThat(repo.models).hasSize(4)
+        assertThat(repo.models).hasSize(6)
         assertThat(repo.findByModelFile("gemma-3n-E4B-it-int4.litertlm")?.name)
             .isEqualTo("gemma-3n-E4B-it-int4")
         assertThat(repo.findByModelFile("gemma-4-E4B-it.litertlm")?.name)
@@ -288,5 +316,34 @@ class ModelAllowlistTest {
         val other = repo.effectiveCapabilities(local("some-future-model", "some-future-model.litertlm"))
         assertThat(other.vision).isTrue()
         assertThat(other.reasoning).isFalse()
+    }
+
+    @Test
+    fun `shipped asset modality flags match device evidence`() {
+        // gemma-3-270m-it PROVEN text-only on-device 2026-10-01
+        // (NOT_FOUND TF_LITE_AUDIO_ENCODER_HW + TF_LITE_VISION_ENCODER);
+        // gemma-3-1b-it is text-only by the same family design. Both stay
+        // false so the chat hides image/audio/thinking affordances and the
+        // catalog shows no modality badges for them.
+        val byName = parseModelAllowlist(shippedAssetText()).associateBy { it.name }
+        val tiny = byName.getValue("gemma-3-270m-it").capabilities
+        assertThat(tiny.text).isTrue()
+        assertThat(tiny.vision).isFalse()
+        assertThat(tiny.audio).isFalse()
+        assertThat(tiny.supportsThinking).isFalse()
+        val oneB = byName.getValue("gemma-3-1b-it").capabilities
+        assertThat(oneB.text).isTrue()
+        assertThat(oneB.vision).isFalse()
+        assertThat(oneB.audio).isFalse()
+        assertThat(oneB.supportsThinking).isFalse()
+        // Multimodal entries keep their verified flags.
+        val e2b = byName.getValue("gemma-4-E2B-it").capabilities
+        assertThat(e2b.vision).isTrue()
+        assertThat(e2b.audio).isTrue()
+        assertThat(e2b.supportsThinking).isTrue()
+        val n3e2b = byName.getValue("gemma-3n-E2B-it-int4").capabilities
+        assertThat(n3e2b.vision).isTrue()
+        assertThat(n3e2b.audio).isTrue()
+        assertThat(n3e2b.supportsThinking).isFalse()
     }
 }

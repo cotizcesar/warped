@@ -44,6 +44,7 @@ fun ChatInputBar(
     reasoningEnabled: Boolean = true,
     onToggleReasoning: () -> Unit = {},
     modelHasReasoning: Boolean = true,
+    modelHasVision: Boolean = true,
     onAddImage: () -> Unit = {},
     attachedImages: List<Uri> = emptyList(),
     onRemoveImage: (Int) -> Unit = {},
@@ -139,32 +140,35 @@ fun ChatInputBar(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left group
+                // Left group: image moderator (vision-capable models only) +
+                // Thinking toggle (reasoning-capable models only). Unsupported
+                // buttons are hidden, not dimmed — no dead affordances.
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onAddImage, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Filled.AddPhotoAlternate, stringResource(R.string.cd_add_image),
-                            tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
+                    if (modelHasVision) {
+                        IconButton(onClick = onAddImage, modifier = Modifier.size(40.dp)) {
+                            Icon(Icons.Filled.AddPhotoAlternate, stringResource(R.string.cd_add_image),
+                                tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
+                        }
                     }
                     // Think toggle
-                    Spacer(Modifier.width(10.dp))
                     val canThink = modelHasReasoning
-                    Button(
-                        onClick = onToggleReasoning,
-                        enabled = canThink,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (reasoningEnabled && canThink) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent
-                        ),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                        shape = MaterialTheme.shapes.small,
-                        modifier = Modifier.height(28.dp)
-                    ) {
-                        Text(
-                            stringResource(R.string.thinking),
-                            color = if (!canThink) Color.White.copy(alpha = 0.25f)
-                                else if (reasoningEnabled) Color.White
-                                else Color.White.copy(alpha = 0.6f),
-                            fontSize = MaterialTheme.typography.labelSmall.fontSize
-                        )
+                    if (canThink) {
+                        if (modelHasVision) Spacer(Modifier.width(10.dp))
+                        Button(
+                            onClick = onToggleReasoning,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (reasoningEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent
+                            ),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                            shape = MaterialTheme.shapes.small,
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text(
+                                stringResource(R.string.thinking),
+                                color = if (reasoningEnabled) Color.White else Color.White.copy(alpha = 0.6f),
+                                fontSize = MaterialTheme.typography.labelSmall.fontSize
+                            )
+                        }
                     }
                 }
 
