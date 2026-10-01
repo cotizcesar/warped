@@ -11,9 +11,8 @@
     <!-- targetSdk 35 is deliberate per STACK.md (Google Play requirements
          2026); bumping it changes runtime behavior and is a release decision. -->
     <issue id="OldTargetApi" severity="ignore" />
-    <!-- net.zetetic:android-database-sqlcipher:4.5.4 is the latest upstream
-         release (verified via Maven Central 2026-09-29) — no 16KB-aligned
-         build exists to upgrade to. Re-enable this check when upgrading
-         SQLCipher past the 16KB-alignment release. -->
-    <issue id="Aligned16KB" severity="ignore" />
+    <!-- Phase 59 (16KB): Aligned16KB check ENFORCED. sqlcipher-android 4.19.1
+         ships 16KB-aligned natives on all ABIs (verified in
+         59-16KB-ALIGNMENT-EVIDENCE.md); the ignore was removed so lint fails
+         closed on any future misaligned native dependency. -->
 </lint>
