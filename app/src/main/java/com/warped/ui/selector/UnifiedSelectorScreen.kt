@@ -145,10 +145,6 @@ fun UnifiedSelectorScreen(
                         model = model,
                         capabilities = viewModel.effectiveCapabilities(model),
                         isConnected = uiState.connectedLocalModelId == model.filePath && uiState.isLocalConnected,
-                        onUseInChat = {
-                            viewModel.useLocalInChat(model)
-                            onNavigateToChat()
-                        },
                         onDelete = { viewModel.deleteModel(model) },
                         onEditParams = { editingModel = model }
                     )
@@ -202,7 +198,6 @@ private fun LocalModelSelectorCard(
     model: LocalModel,
     capabilities: ModelCapabilities,
     isConnected: Boolean,
-    onUseInChat: () -> Unit,
     onDelete: () -> Unit,
     onEditParams: () -> Unit
 ) {
@@ -230,7 +225,7 @@ private fun LocalModelSelectorCard(
         shape = RoundedCornerShape(12.dp)
     ) {
         Row(
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp),
+            modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             ConnectionDot(isConnected = isConnected)
@@ -262,19 +257,6 @@ private fun LocalModelSelectorCard(
                 Icon(Icons.Filled.Delete, stringResource(R.string.delete), tint = Color(0xFF6B7280), modifier = Modifier.size(18.dp))
             }
         }
-        // No manual connect/disconnect switch: the chat top selector picks
-        // the model and sending a message loads it on demand. Mirrors
-        // EndpointSelectorCard's "Use in chat" pattern.
-        Spacer(Modifier.height(8.dp))
-        Button(
-            onClick = onUseInChat,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-            shape = RoundedCornerShape(8.dp)
-        ) {
-            Text(stringResource(R.string.use_in_chat), color = Color.White)
-        }
-        Spacer(Modifier.height(16.dp))
     }
 }
 

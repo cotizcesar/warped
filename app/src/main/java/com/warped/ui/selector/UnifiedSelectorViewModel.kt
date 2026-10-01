@@ -103,17 +103,6 @@ class UnifiedSelectorViewModel @Inject constructor(
         refreshActiveBackend()
     }
 
-    /**
-     * Select a local model for chat (Models & Endpoints "Use in chat").
-     * Selection only — the engine loads on first send (helper.initialize)
-     * or on the chat selector pick (preload). There is no manual
-     * connect/disconnect switch anymore; unloading happens implicitly on
-     * switch-away, delete, or memory pressure.
-     */
-    fun useLocalInChat(model: LocalModel) {
-        activeModelSelection.markLocalLoading(model.filePath)
-    }
-
     fun disconnectLocal() {
         viewModelScope.launch(coroutineExceptionHandler) {
             try {
