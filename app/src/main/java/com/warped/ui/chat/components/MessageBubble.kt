@@ -858,7 +858,12 @@ private fun VoiceTranscriptCaption(
     if (overflowed) {
         TextButton(
             onClick = { expanded = !expanded },
-            modifier = Modifier.sizeIn(minHeight = 48.dp),
+            modifier = Modifier.sizeIn(minHeight = 48.dp).semantics {
+                stateDescription = stringResource(
+                    if (expanded) R.string.voice_msg_transcript_expanded
+                    else R.string.voice_msg_transcript_collapsed
+                )
+            },
             contentPadding = PaddingValues(0.dp),
         ) {
             Text(

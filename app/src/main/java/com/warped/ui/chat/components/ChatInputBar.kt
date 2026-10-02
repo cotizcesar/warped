@@ -417,7 +417,10 @@ fun ChatInputBar(
                             positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                             tooltip = {
                                 PlainTooltip {
-                                    Text(stringResource(R.string.voice_msg_coachmark))
+                                    Text(
+                                        stringResource(R.string.voice_msg_coachmark),
+                                        style = MaterialTheme.typography.labelLarge,
+                                    )
                                 }
                             },
                             state = voiceTooltipState,
