@@ -1,7 +1,7 @@
 ---
 phase: 70-document-reader-tool
 verified: "2026-10-02"
-status: pass
+status: passed
 score: 9/10
 overrides_applied: []
 re_verification: false
