@@ -3,15 +3,14 @@ package com.warped.data.agentic
 import com.google.common.truth.Truth.assertThat
 import com.warped.data.grounding.GroundingResult
 import com.warped.data.grounding.MultiUrlResult
-import com.warped.data.grounding.TavilySearchOutcome
+import com.warped.data.grounding.SearchOutcome
 import org.junit.jupiter.api.Test
 
 /**
  * Phase 56 (56-01): exit gates for the pure loop policy.
  *
  * Every case is JVM-local (no engine, no network, no key): the policy maps
- * outcomes and validates args without ever opening a socket or burning a
- * Tavily credit.
+ * outcomes and validates args without ever opening a socket.
  */
 class LocalToolLoopTest {
 
@@ -60,7 +59,7 @@ class LocalToolLoopTest {
     @Test
     fun `grounded search outcome passes fused block verbatim`() {
         val block = "Source [1] (https://a.example): one\nSource [2] (https://b.example): two"
-        val out = TavilySearchOutcome.Grounded(fusedBlock(block))
+        val out = SearchOutcome.Grounded(fusedBlock(block))
 
         assertThat(LocalToolLoop.mapSearchOutcome(out)).isEqualTo(block)
     }
@@ -69,7 +68,7 @@ class LocalToolLoopTest {
     fun `every search outcome maps to its expected string class`() {
         assertThat(
             LocalToolLoop.mapSearchOutcome(
-                TavilySearchOutcome.ModelOnly(
+                SearchOutcome.ModelOnly(
                     MultiUrlResult.AllFailed(GroundingResult.Reason.OFFLINE),
                 ),
             ),
@@ -77,20 +76,11 @@ class LocalToolLoopTest {
 
         assertThat(
             LocalToolLoop.mapSearchOutcome(
-                TavilySearchOutcome.ModelOnly(
+                SearchOutcome.ModelOnly(
                     MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
                 ),
             ),
         ).isEqualTo(LocalToolLoop.MODEL_ONLY_STRING)
-
-        assertThat(LocalToolLoop.mapSearchOutcome(TavilySearchOutcome.MissingKey))
-            .contains("Settings > Web Search")
-        assertThat(LocalToolLoop.mapSearchOutcome(TavilySearchOutcome.MissingKey))
-            .contains("tavily.com")
-        assertThat(LocalToolLoop.mapSearchOutcome(TavilySearchOutcome.InvalidKey))
-            .contains("Settings > Web Search")
-        assertThat(LocalToolLoop.mapSearchOutcome(TavilySearchOutcome.UsageLimit))
-            .contains("plan usage")
     }
 
     // Fetch result mapping (OFFLINE collapse preserved).
@@ -120,8 +110,7 @@ class LocalToolLoopTest {
     @Test
     fun `blank query short-circuits without calling search`() {
         // Pure policy: a non-null return means the executor feeds the
-        // string back and never touches the repository (no socket, no
-        // Tavily credit burn).
+        // string back and never touches the repository (no socket).
         assertThat(
             LocalToolLoop.validateArgs("web_search", mapOf("query" to "   ")),
         ).isEqualTo(LocalToolLoop.MODEL_ONLY_STRING)
@@ -237,7 +226,7 @@ class LocalToolLoopTest {
                 status = com.warped.domain.model.GroundedSourceStatus.OMITIDA,
             ),
         )
-        val outcome = TavilySearchOutcome.Grounded(
+        val outcome = SearchOutcome.Grounded(
             MultiUrlResult.Fused(
                 block = "BLOQUE",
                 okUrls = listOf("https://a.example/uno"),
@@ -254,14 +243,11 @@ class LocalToolLoopTest {
     fun `non-grounded search outcomes yield no sources`() {
         assertThat(
             LocalToolLoop.searchSources(
-                TavilySearchOutcome.ModelOnly(
+                SearchOutcome.ModelOnly(
                     MultiUrlResult.AllFailed(GroundingResult.Reason.OFFLINE),
                 ),
             ),
         ).isEmpty()
-        assertThat(LocalToolLoop.searchSources(TavilySearchOutcome.MissingKey)).isEmpty()
-        assertThat(LocalToolLoop.searchSources(TavilySearchOutcome.InvalidKey)).isEmpty()
-        assertThat(LocalToolLoop.searchSources(TavilySearchOutcome.UsageLimit)).isEmpty()
     }
 
     @Test
@@ -291,11 +277,11 @@ class LocalToolLoopTest {
         ).isEmpty()
     }
 
-    // Quick-task (loop-images): fused Tavily `images[]` carried verbatim.
+    // Quick-task (loop-images): fused search `images[]` carried verbatim.
 
     @Test
     fun `grounded search outcome yields fused images verbatim`() {
-        val outcome = TavilySearchOutcome.Grounded(
+        val outcome = SearchOutcome.Grounded(
             MultiUrlResult.Fused(
                 block = "BLOQUE",
                 okUrls = listOf("https://a.example/uno"),
@@ -317,18 +303,15 @@ class LocalToolLoopTest {
     fun `non-grounded search outcomes yield no images`() {
         assertThat(
             LocalToolLoop.searchImages(
-                TavilySearchOutcome.ModelOnly(
+                SearchOutcome.ModelOnly(
                     MultiUrlResult.AllFailed(GroundingResult.Reason.OFFLINE),
                 ),
             ),
         ).isEmpty()
-        assertThat(LocalToolLoop.searchImages(TavilySearchOutcome.MissingKey)).isEmpty()
-        assertThat(LocalToolLoop.searchImages(TavilySearchOutcome.InvalidKey)).isEmpty()
-        assertThat(LocalToolLoop.searchImages(TavilySearchOutcome.UsageLimit)).isEmpty()
-        // Grounded without a Tavily image leg carries an empty list.
+        // Grounded without an image leg carries an empty list.
         assertThat(
             LocalToolLoop.searchImages(
-                TavilySearchOutcome.Grounded(
+                SearchOutcome.Grounded(
                     MultiUrlResult.Fused(
                         block = "BLOQUE",
                         okUrls = listOf("https://a.example/uno"),

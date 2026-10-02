@@ -7,12 +7,11 @@ import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.GroundingPrompt
 import com.warped.data.grounding.MultiUrlFetcher
 import com.warped.data.grounding.MultiUrlResult
-import com.warped.data.grounding.TavilySearchOutcome
+import com.warped.data.grounding.SearchOutcome
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.preferences.AdvancedPreferences
-import com.warped.data.local.security.ApiKeyStore
 import com.warped.data.remote.provider.ProviderRouter
 import com.warped.data.repository.AllowlistCapabilities
 import com.warped.data.repository.AllowlistedModel
@@ -91,7 +90,6 @@ class ChatNeedsWebGateTest {
         modelPath: String,
         online: Boolean = true,
         supportsFunctionCalling: Boolean = true,
-        tavilyKey: CharArray? = null,
     ): ChatViewModel {
         chatRepository = mockk()
         val endpointRepository = mockk<EndpointRepository>()
@@ -137,8 +135,6 @@ class ChatNeedsWebGateTest {
             ),
         )
         ddgSearchRepository = mockk()
-        val apiKeyStore = mockk<ApiKeyStore>()
-        every { apiKeyStore.getTavilyKey() } answers { tavilyKey?.copyOf() }
         multiUrlFetcher = mockk()
 
         return ChatViewModel(
@@ -155,7 +151,6 @@ class ChatNeedsWebGateTest {
             fetcher = fetcher,
             multiUrlFetcher = multiUrlFetcher,
             ddgSearchRepository = ddgSearchRepository,
-            apiKeyStore = apiKeyStore,
             modelAllowlistRepository = allowlist,
             context = context,
         )
@@ -174,7 +169,7 @@ class ChatNeedsWebGateTest {
         return helper
     }
 
-    private fun groundedOutcome() = TavilySearchOutcome.Grounded(
+    private fun groundedOutcome() = SearchOutcome.Grounded(
         MultiUrlResult.Fused(
             block = "--- Source [1]: https://a.example/uno ---\nTexto a.\n--- End of sources ---",
             okUrls = listOf("https://a.example/uno"),

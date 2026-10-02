@@ -47,11 +47,10 @@ class SingletonScopeRegressionTest {
         val singletonBindings = setOf(
             "provideOkHttpClient",
             "provideSseOkHttpClient",
-            "provideTavilyOkHttpClient",
         )
         val methods = NetworkModule::class.java.declaredMethods
             .filter { it.name in singletonBindings }
-        // Positive control: all three bindings must exist to be pinned.
+        // Positive control: both bindings must exist to be pinned.
         assertThat(methods.map { it.name }).containsExactlyElementsIn(singletonBindings)
         for (method in methods) {
             assertThat(method.getAnnotation(Singleton::class.java)).isNotNull()

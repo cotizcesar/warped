@@ -4,9 +4,6 @@ import com.google.common.truth.Truth.assertThat
 import com.warped.data.local.db.dao.ConversationDao
 import com.warped.data.local.db.dao.GroundedSourceDao
 import com.warped.data.local.db.dao.MessageDao
-import com.warped.data.local.security.ApiKeyStore
-import com.warped.data.local.security.KeystoreManager
-import com.warped.data.remote.api.TavilyApi
 import com.warped.data.repository.ChatRepositoryImpl
 import com.warped.domain.model.GroundedSource
 import com.warped.domain.model.GroundedSourceStatus
@@ -38,17 +35,17 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  * The per-send grounding fan-out runs in ONE cancellable scope
  * ([MultiUrlFetcher.fetchAll] uses `coroutineScope`, NOT `supervisorScope`;
- * [TavilySearchRepository.search] rethrows [CancellationException] instead
+ * [DuckDuckGoSearchRepository.search] rethrows [CancellationException] instead
  * of converting it to model-only): cancelling the send cancels the fan-out
- * children, the Tavily call, and the SSE accumulators as a unit. Retry
+ * children, the DDG call, and the SSE accumulators as a unit. Retry
  * reuses the existing assistant row via [ChatRepositoryImpl.replaceSources]
  * (delete-then-insert, never a re-save that would CASCADE-wipe sources or
  * retain the old job reference).
  *
  * Mutation-sanity (by inspection): switching `fetchAll` to `supervisorScope`
  * fails `cancelling the per-send scope...` (a child would survive); catching
- * `CancellationException` as model-only in `TavilySearchRepository.search`
- * fails `tavily search in the same scope...`; re-saving the message instead
+ * `CancellationException` as model-only in `DuckDuckGoSearchRepository.search`
+ * fails `ddg search in the same scope...`; re-saving the message instead
  * of `replaceSources` fails `retry reuses...` via the `insert(exactly = 0)`
  * check.
  */
@@ -100,60 +97,54 @@ class GroundingScopeRegressionTest {
     }
 
     // ------------------------------------------------------------------
-    // Tavily in the same scope: cancel propagates, never model-only.
+    // DDG search in the same scope: cancel propagates, never model-only.
     // ------------------------------------------------------------------
 
-    private fun blockingTavily(): Pair<TavilySearchRepository, AtomicInteger> {
+    private fun blockingDdg(): Pair<DuckDuckGoSearchRepository, AtomicInteger> {
         val started = AtomicInteger(0)
-        val backingStore = mutableMapOf<String, String>()
-        val keystoreManager = mockk<KeystoreManager>()
-        every { keystoreManager.put(any(), any()) } answers {
-            backingStore[firstArg<String>()] = secondArg<String>()
-        }
-        every { keystoreManager.get(any()) } answers { backingStore[firstArg<String>()] }
-        every { keystoreManager.remove(any()) } answers {
-            backingStore.remove(firstArg<String>()); Unit
-        }
-        val apiKeyStore = ApiKeyStore(keystoreManager)
-        apiKeyStore.storeTavilyKey("tvly-test".toCharArray())
-        val api = mockk<TavilyApi>()
-        coEvery { api.search(any(), any()) } coAnswers {
-            started.incrementAndGet()
-            awaitCancellation()
-        }
+        val webPageFetcher = mockk<WebPageFetcher>()
+        every { webPageFetcher.hasValidatedInternet() } returns true
         val enricher = SearchOgEnricher(OkHttpClient()).apply {
             headSupplier = { null }
             ioDispatcher = Dispatchers.Unconfined
         }
-        val repository = TavilySearchRepository(api, apiKeyStore, enricher).apply {
+        val repository = DuckDuckGoSearchRepository(
+            OkHttpClient(),
+            webPageFetcher,
+            enricher,
+        ).apply {
             ioDispatcher = Dispatchers.Unconfined
+            htmlSupplier = {
+                started.incrementAndGet()
+                awaitCancellation()
+            }
         }
         return repository to started
     }
 
     @Test
-    fun `tavily search in the same scope cancels with the fan-out never model-only`() = runTest {
+    fun `ddg search in the same scope cancels with the fan-out never model-only`() = runTest {
         val startedFanOut = AtomicInteger(0)
         val fetcher = MultiUrlFetcher(blockingFetcher(startedFanOut)).apply {
             ioDispatcher = Dispatchers.Unconfined
         }
-        val (tavily, startedTavily) = blockingTavily()
+        val (ddg, startedDdg) = blockingDdg()
 
         val sendScope = CoroutineScope(coroutineContext + SupervisorJob())
         val fanOut = sendScope.async {
             fetcher.fetchAll(listOf("https://a.example/"), 4096)
         }
         val search = sendScope.async {
-            tavily.search(query = "android release", maxResults = 5, contextSize = 4096)
+            ddg.search(query = "android release", maxResults = 5, contextSize = 4096)
         }
         advanceTimeBy(500)
         assertThat(startedFanOut.get()).isEqualTo(1)
-        assertThat(startedTavily.get()).isEqualTo(1)
+        assertThat(startedDdg.get()).isEqualTo(1)
 
         sendScope.cancel()
         advanceUntilIdle()
 
-        // Both children cancelled — the Tavily CancellationException
+        // Both children cancelled — the DDG CancellationException
         // propagated (rethrow, never ModelOnly), so `await()` throws rather
         // than returning a stale outcome.
         assertThat(fanOut.isCancelled).isTrue()

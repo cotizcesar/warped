@@ -6,10 +6,8 @@ import com.google.common.truth.Truth.assertThat
 import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.MultiUrlResult
 import com.warped.data.grounding.GroundingResult
-import com.warped.data.grounding.TavilySearchOutcome
-import com.warped.data.grounding.TavilySearchRepository
+import com.warped.data.grounding.SearchOutcome
 import com.warped.data.grounding.WebPageFetcher
-import com.warped.data.local.security.ApiKeyStore
 import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.preferences.AdvancedPreferences
@@ -64,9 +62,9 @@ import java.io.File
  * arming lives provider-side and the VM never consults it.
  *
  * Wallet bounds (locked): exactly 1 `ddgSearchRepository.search` invocation
- * per eligible turn; the VM holds no Tavily client (Tavily fires only inside
- * DuckDuckGoSearchRepository when DDG yields nothing usable AND a key is
- * stored). Query-text only — never call count, never gate conditions.
+ * per eligible turn; the VM holds the DDG-only repository collaborator and
+ * no key-store field. Query-text only — never call count, never gate
+ * conditions.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatAnaphoraAnchorTest {
@@ -94,7 +92,6 @@ class ChatAnaphoraAnchorTest {
     private fun buildViewModel(
         modelPath: String,
         online: Boolean = true,
-        tavilyKey: CharArray? = null,
     ): ChatViewModel {
         chatRepository = mockk()
         val endpointRepository = mockk<EndpointRepository>()
@@ -138,9 +135,6 @@ class ChatAnaphoraAnchorTest {
             capabilities = AllowlistCapabilities(supportsFunctionCalling = true),
         )
         ddgSearchRepository = mockk()
-        val apiKeyStore = mockk<ApiKeyStore>()
-        every { apiKeyStore.getTavilyKey() } answers { tavilyKey?.copyOf() }
-
         return ChatViewModel(
             chatRepository = chatRepository,
             endpointRepository = endpointRepository,
@@ -155,7 +149,6 @@ class ChatAnaphoraAnchorTest {
             fetcher = fetcher,
             multiUrlFetcher = mockk(),
             ddgSearchRepository = ddgSearchRepository,
-            apiKeyStore = apiKeyStore,
             modelAllowlistRepository = allowlist,
             context = context,
         )
@@ -174,7 +167,7 @@ class ChatAnaphoraAnchorTest {
         return helper
     }
 
-    private fun groundedOutcome() = TavilySearchOutcome.Grounded(
+    private fun groundedOutcome() = SearchOutcome.Grounded(
         MultiUrlResult.Fused(
             block = "--- Source [1]: https://a.example/uno ---\nTexto a.\n--- End of sources ---",
             okUrls = listOf("https://a.example/uno"),
@@ -365,14 +358,16 @@ class ChatAnaphoraAnchorTest {
     }
 
     @Test
-    fun `vm holds no direct tavily client`() {
-        // Grep gate: the VM still calls only ddgSearchRepository.search —
-        // Tavily fires only inside DuckDuckGoSearchRepository (DDG-empty +
-        // keyed). TavilySearchRepository stays imported for its constants
-        // (DEFAULT_MAX_RESULTS) — never as a VM dependency field.
-        val tavilyClientFields = ChatViewModel::class.java.declaredFields.filter {
-            it.type == TavilySearchRepository::class.java
+    fun `vm holds the ddg-only search collaborator and no key store`() {
+        // DDG-only posture: the VM calls ddgSearchRepository.search
+        // keylessly — no key-store field exists on the ViewModel.
+        val ddgFields = ChatViewModel::class.java.declaredFields.filter {
+            it.type == DuckDuckGoSearchRepository::class.java
         }
-        assertThat(tavilyClientFields).isEmpty()
+        assertThat(ddgFields).hasSize(1)
+        val keyStoreFields = ChatViewModel::class.java.declaredFields.filter {
+            it.type == com.warped.data.local.security.ApiKeyStore::class.java
+        }
+        assertThat(keyStoreFields).isEmpty()
     }
 }

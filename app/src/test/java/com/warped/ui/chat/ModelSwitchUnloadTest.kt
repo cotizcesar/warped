@@ -119,7 +119,6 @@ class ModelSwitchUnloadTest {
             fetcher = mockk<com.warped.data.grounding.WebPageFetcher>(),
             multiUrlFetcher = mockk<com.warped.data.grounding.MultiUrlFetcher>(),
             ddgSearchRepository = mockk(),
-            apiKeyStore = mockk<com.warped.data.local.security.ApiKeyStore>(),
             modelAllowlistRepository = mockk<com.warped.data.repository.ModelAllowlistRepository>(),
             context = context,
         )
@@ -185,7 +184,6 @@ class ModelSwitchUnloadTest {
             fetcher = mockk<com.warped.data.grounding.WebPageFetcher>(),
             multiUrlFetcher = mockk<com.warped.data.grounding.MultiUrlFetcher>(),
             ddgSearchRepository = mockk(),
-            apiKeyStore = mockk<com.warped.data.local.security.ApiKeyStore>(),
             modelAllowlistRepository = mockk<com.warped.data.repository.ModelAllowlistRepository>(),
             context = context,
         )

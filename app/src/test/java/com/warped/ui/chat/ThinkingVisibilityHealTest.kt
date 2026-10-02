@@ -99,7 +99,6 @@ class ThinkingVisibilityHealTest {
             fetcher = mockk<com.warped.data.grounding.WebPageFetcher>(),
             multiUrlFetcher = mockk<com.warped.data.grounding.MultiUrlFetcher>(),
             ddgSearchRepository = mockk(),
-            apiKeyStore = mockk<com.warped.data.local.security.ApiKeyStore>(),
             modelAllowlistRepository = allowlist,
             context = context,
         )

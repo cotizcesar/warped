@@ -12,7 +12,7 @@ import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.GroundingResult
 import com.warped.data.grounding.MultiUrlFetcher
 import com.warped.data.grounding.MultiUrlResult
-import com.warped.data.grounding.TavilySearchOutcome
+import com.warped.data.grounding.SearchOutcome
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.inference.AgenticTurn
 import com.warped.data.local.inference.AgenticTurnTransport
@@ -173,7 +173,7 @@ class ToolFailureAffordanceTest {
     @Test
     fun `successful search emits ToolCompleted with no note`() = runTest {
         every { webPageFetcher.hasValidatedInternet() } returns true
-        coEvery { ddg.search(any(), any(), any(), any()) } returns TavilySearchOutcome.Grounded(
+        coEvery { ddg.search(any(), any(), any(), any()) } returns SearchOutcome.Grounded(
             MultiUrlResult.Fused(
                 block = "Source [1] search",
                 okUrls = listOf("https://s1.example/a"),
@@ -271,7 +271,7 @@ class ToolFailureAffordanceTest {
         val ddgSearchRepository = mockk<DuckDuckGoSearchRepository>()
         coEvery {
             ddgSearchRepository.search(any(), any(), any(), any())
-        } returns TavilySearchOutcome.ModelOnly(
+        } returns SearchOutcome.ModelOnly(
             MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
         )
 
@@ -289,9 +289,6 @@ class ToolFailureAffordanceTest {
             fetcher = fetcher,
             multiUrlFetcher = mockk(),
             ddgSearchRepository = ddgSearchRepository,
-            apiKeyStore = mockk<com.warped.data.local.security.ApiKeyStore>().apply {
-                every { getTavilyKey() } returns null
-            },
             modelAllowlistRepository = allowlist,
             context = context,
         )

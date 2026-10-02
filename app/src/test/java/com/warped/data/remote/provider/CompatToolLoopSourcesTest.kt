@@ -6,7 +6,7 @@ import com.warped.data.agentic.LocalToolLoop
 import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.MultiUrlFetcher
 import com.warped.data.grounding.MultiUrlResult
-import com.warped.data.grounding.TavilySearchOutcome
+import com.warped.data.grounding.SearchOutcome
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.remote.dto.OpenAiMessage
 import com.warped.domain.model.ChatMessage
@@ -92,7 +92,7 @@ class CompatToolLoopSourcesTest {
 
     @Test
     fun `compat turn emits ToolCompleted carrying structured sources`() = runTest {
-        coEvery { ddg.search(any(), any(), any(), any()) } returns TavilySearchOutcome.Grounded(
+        coEvery { ddg.search(any(), any(), any(), any()) } returns SearchOutcome.Grounded(
             MultiUrlResult.Fused(
                 block = "Source [1] remote",
                 okUrls = listOf("https://r.example/news"),
@@ -133,14 +133,14 @@ class CompatToolLoopSourcesTest {
         assertThat(completed.single().toolId).isEqualTo("call_1")
         // Same row shape incl. OG columns, same order.
         assertThat(completed.single().sources).isEqualTo(searchDetails)
-        // Quick-task (loop-images): fused Tavily images[] carried verbatim.
+        // Quick-task (loop-images): fused search images[] carried verbatim.
         assertThat(completed.single().images).containsExactly("https://r.example/grid1.png")
         // Turn still answers normally from gathered context.
         assertThat(tokens.filterIsInstance<StreamToken.Delta>().map { it.content })
             .contains("done answer")
         assertThat(tokens.last()).isInstanceOf(StreamToken.Done::class.java)
         // Quick-task (loop-images): includeImages=true ALWAYS (DDG leg
-        // ignores it; only the keyed Tavily fallback leg uses it).
+        // ignores it — no image API).
         coVerify(exactly = 1) { ddg.search(any(), any(), any(), includeImages = true) }
     }
 
@@ -182,7 +182,7 @@ class CompatToolLoopSourcesTest {
     fun `shared mapping helpers keep text and sources in sync`() {
         // The OpenAI/Anthropic inline loops use these same helpers, so this
         // pins the text/sources contract for all three remote drivers.
-        val outcome = TavilySearchOutcome.Grounded(
+        val outcome = SearchOutcome.Grounded(
             MultiUrlResult.Fused(
                 block = "BLOQUE",
                 okUrls = listOf("https://r.example/news"),

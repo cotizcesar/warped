@@ -7,7 +7,7 @@ import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.GroundingResult
 import com.warped.data.grounding.MultiUrlFetcher
 import com.warped.data.grounding.MultiUrlResult
-import com.warped.data.grounding.TavilySearchOutcome
+import com.warped.data.grounding.SearchOutcome
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.MemoryChecker
@@ -146,7 +146,7 @@ class ChatLoopSourcesTest {
         // of the Done union (no fused rows to merge).
         coEvery {
             ddgSearchRepository.search(any(), any(), any(), any())
-        } returns TavilySearchOutcome.ModelOnly(
+        } returns SearchOutcome.ModelOnly(
             MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
         )
 
@@ -164,9 +164,6 @@ class ChatLoopSourcesTest {
             fetcher = fetcher,
             multiUrlFetcher = mockk(),
             ddgSearchRepository = ddgSearchRepository,
-            apiKeyStore = mockk<com.warped.data.local.security.ApiKeyStore>().apply {
-                every { getTavilyKey() } returns null
-            },
             modelAllowlistRepository = allowlist,
             context = context,
         )

@@ -1,50 +1,44 @@
 package com.warped.data.agentic
 
 import com.google.common.truth.Truth.assertThat
+import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.GroundingResult
 import com.warped.data.grounding.MultiUrlFetcher
 import com.warped.data.grounding.MultiUrlResult
 import com.warped.data.grounding.SearchOgEnricher
-import com.warped.data.grounding.TavilySearchOutcome
-import com.warped.data.grounding.TavilySearchRepository
+import com.warped.data.grounding.SearchOutcome
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.data.local.security.KeystoreManager
-import com.warped.data.remote.api.TavilyApi
-import com.warped.data.remote.dto.TavilySearchRequest
-import com.warped.data.remote.dto.TavilySearchResponse
-import com.warped.data.remote.dto.TavilySearchResult
 import com.warped.data.remote.dto.defaultAnthropicTools
 import com.warped.data.remote.dto.defaultRemoteTools
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.slot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import retrofit2.Response
 
 /**
  * Phase 57 (57-02): endpoint-key isolation proof for the remote agentic
- * loop (AGENT-03, threats T-57-02/T-57-07).
+ * loop (AGENT-03, threats T-57-02/T-57-07), updated to the Phase 63
+ * DDG-only posture.
  *
- * The loop executes tools through the Phase 55/52 singletons ONLY: search
- * travels on the dedicated Tavily client with a per-call
- * `Authorization: Bearer <tavily-key>` header, fetch is keyless, and the
- * endpoint Authorization key (which lives on each provider's own OkHttp
- * interceptor) is never in scope in loop code. These tests pin that with
- * DISTINCT fake keys — any cross-contamination fails loudly:
+ * The loop executes tools through the keyless DDG singleton ONLY: search
+ * is a plain keyless GET (no Bearer-key search client exists), fetch is
+ * keyless, and the endpoint Authorization key (which lives on each
+ * provider's own OkHttp interceptor) is never in scope in loop code.
+ * These tests pin that with a DISTINCT fake endpoint key — any
+ * cross-contamination fails loudly:
  *
- * - search: the captured `Authorization` header equals the Tavily Bearer
- *   exactly and never contains the endpoint key; the request body carries
- *   no key material at all;
+ * - search: runs with an EMPTY keystore (no key stored anywhere) and the
+ *   fused output carries no key material;
  * - fetch: the fetcher entry takes `(url, budget)` only — no key
- *   parameter exists — and fused outputs contain neither key;
+ *   parameter exists — and fused outputs contain no key material;
  * - tool schemas (`tools[]`/`input_schema`) serialize with zero key
  *   material (they are static shapes, never per-call secrets);
  * - the remote executor policy (the exact pure functions every provider
@@ -53,17 +47,14 @@ import retrofit2.Response
  *
  * Static companion: the plan's verify step greps the agentic loop files
  * for `apiKey` references (must match only pre-existing endpoint-scoped
- * interceptor lines). JVM-local: no network, no Android Keystore (the
- * `TavilySearchRepositoryTest` MockK-backed map fake), no real keys.
+ * interceptor lines). JVM-local: no network, no Android Keystore (a
+ * MockK-backed map fake), no real keys.
  */
 class RemoteSecretIsolationTest {
 
     companion object {
-        /** Fake endpoint Authorization key — must NEVER reach Tavily/fetch. */
+        /** Fake endpoint Authorization key — must NEVER reach search/fetch. */
         const val ENDPOINT_FAKE_KEY = "ENDPOINT-FAKE-KEY-aaa111"
-
-        /** Fake Tavily key — the ONLY secret the search path may carry. */
-        const val TAVILY_FAKE_KEY = "TAVILY-FAKE-KEY-bbb222"
 
         /** Unrelated endpoint id for the fake endpoint key (alias separation). */
         const val ENDPOINT_ID = 99L
@@ -71,10 +62,19 @@ class RemoteSecretIsolationTest {
 
     private lateinit var backingStore: MutableMap<String, String>
     private lateinit var apiKeyStore: ApiKeyStore
-    private lateinit var tavilyApi: TavilyApi
-    private lateinit var searchRepository: TavilySearchRepository
+    private lateinit var webPageFetcher: WebPageFetcher
+    private lateinit var searchRepository: DuckDuckGoSearchRepository
 
-    private val json = Json { ignoreUnknownKeys = true }
+    private fun fixtureHtml(): String = """
+        <html><body>
+        <div class="result results_links web-result">
+          <h2 class="result__title">
+            <a rel="nofollow" class="result__a" href="https://example.com/paris">Paris</a>
+          </h2>
+          <a class="result__snippet" href="https://example.com/paris">Paris is the capital of France, with details.</a>
+        </div>
+        </body></html>
+    """.trimIndent()
 
     @BeforeEach
     fun setUp() {
@@ -88,81 +88,64 @@ class RemoteSecretIsolationTest {
             backingStore.remove(firstArg<String>()); Unit
         }
         apiKeyStore = ApiKeyStore(keystoreManager)
-        // Both keys live in the store under SEPARATE aliases — exactly
-        // like production (endpoint keys per endpoint id, Tavily under
-        // the dedicated alias).
-        apiKeyStore.storeTavilyKey(TAVILY_FAKE_KEY.toCharArray())
+        // The endpoint key lives in the store under its own alias —
+        // exactly like production. The search path must never read it.
         apiKeyStore.storeKey(ENDPOINT_ID, ENDPOINT_FAKE_KEY.toCharArray())
 
-        tavilyApi = mockk()
+        webPageFetcher = mockk()
+        every { webPageFetcher.hasValidatedInternet() } returns true
         // Enrichment no-op seam (no sockets in unit tests — same pattern
         // as the repository tests).
         val enricher = SearchOgEnricher(OkHttpClient()).apply {
             headSupplier = { null }
             ioDispatcher = Dispatchers.Unconfined
         }
-        searchRepository = TavilySearchRepository(tavilyApi, apiKeyStore, enricher)
+        searchRepository = DuckDuckGoSearchRepository(
+            OkHttpClient(),
+            webPageFetcher,
+            enricher,
+        )
         searchRepository.ioDispatcher = Dispatchers.Unconfined
+        searchRepository.htmlSupplier = { fixtureHtml() }
     }
 
-    // Search path: Tavily Bearer only.
+    // Search path: keyless DDG only — no Bearer-key client exists.
 
     @Test
-    fun `search Authorization carries only the Tavily Bearer`() = runTest {
-        val authSlot = slot<String>()
-        val bodySlot = slot<TavilySearchRequest>()
-        coEvery {
-            tavilyApi.search(capture(authSlot), capture(bodySlot))
-        } returns Response.success(
-            TavilySearchResponse(
-                query = "capital of France",
-                results = listOf(
-                    TavilySearchResult(
-                        title = "Paris",
-                        url = "https://example.com/paris",
-                        content = "Paris is the capital of France.",
-                        score = 0.9,
-                    ),
-                ),
-            ),
-        )
+    fun `search grounds with an empty keystore and no bearer header`() = runTest {
+        backingStore.clear()
 
         val outcome = searchRepository.search(
             query = "capital of France",
-            maxResults = TavilySearchRepository.DEFAULT_MAX_RESULTS,
+            maxResults = DuckDuckGoSearchRepository.DEFAULT_MAX_RESULTS,
             contextSize = 4096,
         )
 
-        assertThat(authSlot.captured).isEqualTo("Bearer $TAVILY_FAKE_KEY")
-        assertThat(authSlot.captured).doesNotContain(ENDPOINT_FAKE_KEY)
-        assertThat(outcome).isInstanceOf(TavilySearchOutcome.Grounded::class.java)
+        assertThat(outcome).isInstanceOf(SearchOutcome.Grounded::class.java)
+        val fused = (outcome as SearchOutcome.Grounded).fused
+        assertThat(fused.okUrls).containsExactly("https://example.com/paris")
+        assertThat(fused.block).doesNotContain(ENDPOINT_FAKE_KEY)
     }
 
     @Test
-    fun `search body carries no key material`() = runTest {
-        val bodySlot = slot<TavilySearchRequest>()
-        coEvery {
-            tavilyApi.search(any(), capture(bodySlot))
-        } returns Response.success(TavilySearchResponse(query = "q"))
-
-        searchRepository.search(
-            query = "q",
-            maxResults = TavilySearchRepository.DEFAULT_MAX_RESULTS,
+    fun `search output carries no key material`() = runTest {
+        val outcome = searchRepository.search(
+            query = "capital of France",
+            maxResults = DuckDuckGoSearchRepository.DEFAULT_MAX_RESULTS,
             contextSize = 4096,
         )
 
-        val bodyJson = json.encodeToString(
-            TavilySearchRequest.serializer(),
-            bodySlot.captured,
-        )
-        assertThat(bodyJson).doesNotContain(TAVILY_FAKE_KEY)
-        assertThat(bodyJson).doesNotContain(ENDPOINT_FAKE_KEY)
+        assertThat(outcome).isInstanceOf(SearchOutcome.Grounded::class.java)
+        val fused = (outcome as SearchOutcome.Grounded).fused
+        assertThat(fused.block).doesNotContain(ENDPOINT_FAKE_KEY)
+        assertThat(fused.details.map { it.url to it.extractedText }.toString())
+            .doesNotContain(ENDPOINT_FAKE_KEY)
     }
 
     // Fetch path: keyless by construction.
 
     @Test
-    fun `fetch executes with url and budget only and leaks neither key`() = runTest {
+    fun `fetch executes with url and budget only and leaks no key`() = runTest {
         val pageFetcher: WebPageFetcher = mockk()
         coEvery { pageFetcher.fetch(any(), any()) } answers {
             GroundingResult.Grounded(
@@ -181,11 +164,10 @@ class RemoteSecretIsolationTest {
         )
 
         // The entry takes (url, budget) only — there is no key parameter
-        // that could carry either secret to a fetched page.
+        // that could carry the endpoint secret to a fetched page.
         coVerify(exactly = 1) { pageFetcher.fetch("https://example.com/page", any()) }
         assertThat(result).isInstanceOf(MultiUrlResult.Fused::class.java)
         val fused = result as MultiUrlResult.Fused
-        assertThat(fused.block).doesNotContain(TAVILY_FAKE_KEY)
         assertThat(fused.block).doesNotContain(ENDPOINT_FAKE_KEY)
     }
 
@@ -203,7 +185,6 @@ class RemoteSecretIsolationTest {
 
         assertThat(wire).contains("\"web_search\"")
         assertThat(wire).contains("\"web_fetch\"")
-        assertThat(wire).doesNotContain(TAVILY_FAKE_KEY)
         assertThat(wire).doesNotContain(ENDPOINT_FAKE_KEY)
         // Locked loose schemas: no strict flag, no tool_choice anywhere.
         assertThat(wire).doesNotContain("strict")
@@ -223,7 +204,6 @@ class RemoteSecretIsolationTest {
         assertThat(wire).contains("\"web_search\"")
         assertThat(wire).contains("\"web_fetch\"")
         assertThat(wire).contains("input_schema")
-        assertThat(wire).doesNotContain(TAVILY_FAKE_KEY)
         assertThat(wire).doesNotContain(ENDPOINT_FAKE_KEY)
     }
 
@@ -254,13 +234,18 @@ class RemoteSecretIsolationTest {
 
         // Outcome mapping across every variant — never throws, never null.
         assertThat(
-            LocalToolLoop.mapSearchOutcome(TavilySearchOutcome.MissingKey),
+            LocalToolLoop.mapSearchOutcome(
+                SearchOutcome.ModelOnly(
+                    MultiUrlResult.AllFailed(GroundingResult.Reason.OFFLINE),
+                ),
+            ),
         ).isNotNull()
         assertThat(
-            LocalToolLoop.mapSearchOutcome(TavilySearchOutcome.InvalidKey),
-        ).isNotNull()
-        assertThat(
-            LocalToolLoop.mapSearchOutcome(TavilySearchOutcome.UsageLimit),
+            LocalToolLoop.mapSearchOutcome(
+                SearchOutcome.ModelOnly(
+                    MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
+                ),
+            ),
         ).isNotNull()
         assertThat(
             LocalToolLoop.mapFetchResult(

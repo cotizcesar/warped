@@ -11,7 +11,6 @@ import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.EngineType
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.preferences.AdvancedPreferences
-import com.warped.data.local.security.ApiKeyStore
 import com.warped.data.local.security.KeystoreManager
 import com.warped.data.remote.provider.ProviderRouter
 import com.warped.data.repository.ModelAllowlistRepository
@@ -142,9 +141,6 @@ class ChatLoadingFlagHealTest {
             fetcher = fetcher,
             multiUrlFetcher = multiUrlFetcher,
             ddgSearchRepository = mockk<DuckDuckGoSearchRepository>(),
-            apiKeyStore = mockk<ApiKeyStore>().apply {
-                every { getTavilyKey() } returns null
-            },
             modelAllowlistRepository = mockk<ModelAllowlistRepository>(),
             context = context,
         )

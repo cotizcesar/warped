@@ -1,12 +1,7 @@
 package com.warped.data.grounding
 
 import com.google.common.truth.Truth.assertThat
-import com.warped.data.local.security.ApiKeyStore
-import com.warped.data.local.security.KeystoreManager
-import com.warped.domain.model.GroundedSource
 import com.warped.domain.model.GroundedSourceStatus
-import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
@@ -18,39 +13,23 @@ import org.junit.jupiter.api.Test
 import java.io.IOException
 
 /**
- * DDG-default search exit gates: `uddg` unwrap + http(s) validation,
- * snippet tolerance, fuse parity with Tavily (OK/OMITIDA/all-blank), and
- * the DDG-primary/Tavily-fallback policy matrix.
+ * DDG-only search exit gates: `uddg` unwrap + http(s) validation,
+ * snippet tolerance, fuse parity (OK/OMITIDA/all-blank), and the
+ * DDG-only policy matrix (keyless: empty/throw collapse to model-only).
  *
  * No network, no key, no Android: the HTML layer is faked via
- * [DuckDuckGoSearchRepository.htmlSupplier], the Tavily delegate and the
- * connectivity gate are MockK fakes, and the repository runs on
- * Unconfined for determinism.
+ * [DuckDuckGoSearchRepository.htmlSupplier], the connectivity gate is a
+ * MockK fake, and the repository runs on Unconfined for determinism.
  */
 class DuckDuckGoSearchRepositoryTest {
 
-    private lateinit var keystoreManager: KeystoreManager
-    private lateinit var backingStore: MutableMap<String, String>
-    private lateinit var apiKeyStore: ApiKeyStore
     private lateinit var webPageFetcher: WebPageFetcher
-    private lateinit var tavily: TavilySearchRepository
     private lateinit var repository: DuckDuckGoSearchRepository
 
     @BeforeEach
     fun setUp() {
-        backingStore = mutableMapOf()
-        keystoreManager = mockk()
-        every { keystoreManager.put(any(), any()) } answers {
-            backingStore[firstArg<String>()] = secondArg()
-        }
-        every { keystoreManager.get(any()) } answers { backingStore[firstArg()] }
-        every { keystoreManager.remove(any()) } answers {
-            backingStore.remove(firstArg<String>()); Unit
-        }
-        apiKeyStore = ApiKeyStore(keystoreManager)
         webPageFetcher = mockk()
         every { webPageFetcher.hasValidatedInternet() } returns true
-        tavily = mockk()
         // Real client instance (never used — every test sets htmlSupplier
         // or asserts the no-socket path, so no socket ever opens).
         // The enricher seam returns null for every URL (enrichment no-op):
@@ -63,8 +42,6 @@ class DuckDuckGoSearchRepositoryTest {
         repository = DuckDuckGoSearchRepository(
             OkHttpClient(),
             webPageFetcher,
-            apiKeyStore,
-            tavily,
             enricher,
         )
         repository.ioDispatcher = Dispatchers.Unconfined
@@ -113,25 +90,6 @@ class DuckDuckGoSearchRepositoryTest {
             )
         }
         append("</body></html>")
-    }
-
-    private fun groundedOutcome(urls: List<String>): TavilySearchOutcome.Grounded {
-        val pairs = urls.map { it to "Text for $it with details." }
-        return TavilySearchOutcome.Grounded(
-            MultiUrlResult.Fused(
-                block = GroundingPrompt.buildFusedBlock(pairs),
-                okUrls = urls,
-                skippedUrls = emptyList(),
-                pageTexts = pairs.toMap(),
-                details = urls.map {
-                    GroundedSource(
-                        url = it,
-                        extractedText = "Text for $it with details.",
-                        status = GroundedSourceStatus.OK,
-                    )
-                },
-            ),
-        )
     }
 
     // ------------------------------------------------------------------
@@ -196,17 +154,17 @@ class DuckDuckGoSearchRepositoryTest {
     }
 
     // ------------------------------------------------------------------
-    // Policy matrix: DDG-primary / Tavily-fallback
+    // Policy matrix: DDG-only (keyless)
     // ------------------------------------------------------------------
 
     @Test
-    fun `ddg-ok without key grounds silently and never calls tavily`() = runTest {
+    fun `ddg-ok grounds silently`() = runTest {
         repository.htmlSupplier = { fixtureHtml() }
 
         val outcome = repository.search("kotlin news")
 
-        assertThat(outcome).isInstanceOf(TavilySearchOutcome.Grounded::class.java)
-        val fused = (outcome as TavilySearchOutcome.Grounded).fused
+        assertThat(outcome).isInstanceOf(SearchOutcome.Grounded::class.java)
+        val fused = (outcome as SearchOutcome.Grounded).fused
         assertThat(fused.okUrls).containsExactly(
             "https://example.com/kotlin",
             "https://bare.example/direct",
@@ -214,18 +172,6 @@ class DuckDuckGoSearchRepositoryTest {
         assertThat(fused.skippedUrls).containsExactly("http://example.org/android")
         assertThat(fused.block).contains("--- Source [1]: https://example.com/kotlin ---")
         assertThat(fused.block).doesNotContain("example.org/android")
-        coVerify(exactly = 0) { tavily.search(any(), any(), any(), any()) }
-    }
-
-    @Test
-    fun `ddg-ok with key grounds without spending a tavily call`() = runTest {
-        apiKeyStore.storeTavilyKey("tvly-test-key".toCharArray())
-        repository.htmlSupplier = { fixtureHtml() }
-
-        val outcome = repository.search("kotlin news")
-
-        assertThat(outcome).isInstanceOf(TavilySearchOutcome.Grounded::class.java)
-        coVerify(exactly = 0) { tavily.search(any(), any(), any(), any()) }
     }
 
     // ------------------------------------------------------------------
@@ -238,8 +184,8 @@ class DuckDuckGoSearchRepositoryTest {
 
         val outcome = repository.search("kotlin news")
 
-        assertThat(outcome).isInstanceOf(TavilySearchOutcome.Grounded::class.java)
-        val fused = (outcome as TavilySearchOutcome.Grounded).fused
+        assertThat(outcome).isInstanceOf(SearchOutcome.Grounded::class.java)
+        val fused = (outcome as SearchOutcome.Grounded).fused
         assertThat(fused.details).hasSize(3)
         assertThat(fused.details[0].ogTitle).isEqualTo("Kotlin News")
         assertThat(fused.details[1].status).isEqualTo(GroundedSourceStatus.OMITIDA)
@@ -263,40 +209,10 @@ class DuckDuckGoSearchRepositoryTest {
 
         val outcome = repository.search("blank title")
 
-        assertThat(outcome).isInstanceOf(TavilySearchOutcome.Grounded::class.java)
-        val fused = (outcome as TavilySearchOutcome.Grounded).fused
+        assertThat(outcome).isInstanceOf(SearchOutcome.Grounded::class.java)
+        val fused = (outcome as SearchOutcome.Grounded).fused
         assertThat(fused.details).hasSize(1)
         assertThat(fused.details[0].ogTitle).isNull()
-    }
-
-    @Test
-    fun `ddg-empty with key delegates to tavily verbatim`() = runTest {
-        apiKeyStore.storeTavilyKey("tvly-test-key".toCharArray())
-        repository.htmlSupplier = { "<html><body>No results.</body></html>" }
-        val delegated = groundedOutcome(listOf("https://tavily.example/delegate"))
-        coEvery { tavily.search(any(), any(), any(), any()) } returns delegated
-
-        val outcome = repository.search("kotlin news", maxResults = 5, contextSize = 4096)
-
-        assertThat(outcome).isEqualTo(delegated)
-        coVerify(exactly = 1) {
-            tavily.search("kotlin news", 5, 4096, false)
-        }
-    }
-
-    @Test
-    fun `include-images threads through to the tavily delegate only`() = runTest {
-        apiKeyStore.storeTavilyKey("tvly-test-key".toCharArray())
-        repository.htmlSupplier = { "<html><body>No results.</body></html>" }
-        val delegated = groundedOutcome(listOf("https://tavily.example/delegate"))
-        coEvery { tavily.search(any(), any(), any(), any()) } returns delegated
-
-        val outcome = repository.search("show me pictures of cats", includeImages = true)
-
-        assertThat(outcome).isEqualTo(delegated)
-        coVerify(exactly = 1) {
-            tavily.search("show me pictures of cats", 5, 4096, true)
-        }
     }
 
     @Test
@@ -305,46 +221,35 @@ class DuckDuckGoSearchRepositoryTest {
 
         val outcome = repository.search("show me pictures of cats", includeImages = true)
 
-        assertThat(outcome).isInstanceOf(TavilySearchOutcome.Grounded::class.java)
-        val fused = (outcome as TavilySearchOutcome.Grounded).fused
+        assertThat(outcome).isInstanceOf(SearchOutcome.Grounded::class.java)
+        val fused = (outcome as SearchOutcome.Grounded).fused
         assertThat(fused.images).isEmpty()
-        coVerify(exactly = 0) { tavily.search(any(), any(), any(), any()) }
     }
 
     @Test
-    fun `ddg-empty without key collapses to fetch-failed with no key nag`() = runTest {        repository.htmlSupplier = { "<html><body>No results.</body></html>" }
+    fun `ddg-empty collapses to fetch-failed`() = runTest {
+        repository.htmlSupplier = { "<html><body>No results.</body></html>" }
 
         val outcome = repository.search("kotlin news")
 
         assertThat(outcome).isEqualTo(
-            TavilySearchOutcome.ModelOnly(
+            SearchOutcome.ModelOnly(
                 MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
             ),
         )
-        coVerify(exactly = 0) { tavily.search(any(), any(), any(), any()) }
     }
 
     @Test
-    fun `ddg-throw with key passes the tavily outcome through`() = runTest {
-        apiKeyStore.storeTavilyKey("tvly-bad-key".toCharArray())
-        repository.htmlSupplier = { throw IOException("socket reset") }
-        coEvery { tavily.search(any(), any(), any(), any()) } returns TavilySearchOutcome.InvalidKey
-
-        assertThat(repository.search("kotlin news")).isEqualTo(TavilySearchOutcome.InvalidKey)
-    }
-
-    @Test
-    fun `ddg-throw without key collapses to fetch-failed`() = runTest {
+    fun `ddg-throw collapses to fetch-failed`() = runTest {
         repository.htmlSupplier = { throw IOException("socket reset") }
 
         val outcome = repository.search("kotlin news")
 
         assertThat(outcome).isEqualTo(
-            TavilySearchOutcome.ModelOnly(
+            SearchOutcome.ModelOnly(
                 MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
             ),
         )
-        coVerify(exactly = 0) { tavily.search(any(), any(), any(), any()) }
     }
 
     @Test
@@ -362,12 +267,10 @@ class DuckDuckGoSearchRepositoryTest {
         val outcome = repository.search("kotlin news")
 
         assertThat(outcome).isEqualTo(
-            TavilySearchOutcome.ModelOnly(
+            SearchOutcome.ModelOnly(
                 MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
             ),
         )
-        // No key stored → no fallback attempt either.
-        coVerify(exactly = 0) { tavily.search(any(), any(), any(), any()) }
     }
 
     // ------------------------------------------------------------------
@@ -383,12 +286,11 @@ class DuckDuckGoSearchRepositoryTest {
         val outcome = repository.search("kotlin news")
 
         assertThat(outcome).isEqualTo(
-            TavilySearchOutcome.ModelOnly(
+            SearchOutcome.ModelOnly(
                 MultiUrlResult.AllFailed(GroundingResult.Reason.OFFLINE),
             ),
         )
         assertThat(socketOpened).isFalse()
-        coVerify(exactly = 0) { tavily.search(any(), any(), any(), any()) }
     }
 
     @Test
@@ -399,7 +301,7 @@ class DuckDuckGoSearchRepositoryTest {
         val outcome = repository.search("   ")
 
         assertThat(outcome).isEqualTo(
-            TavilySearchOutcome.ModelOnly(
+            SearchOutcome.ModelOnly(
                 MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
             ),
         )
@@ -433,88 +335,35 @@ class DuckDuckGoSearchRepositoryTest {
     }
 
     // ------------------------------------------------------------------
-    // Image-turn routing: image-intent + key skips the DDG leg
+    // Image-turn routing: DDG text grounds the turn, grid stays empty
     // ------------------------------------------------------------------
 
     @Test
-    fun `image-intent with key skips ddg and goes straight to tavily`() = runTest {
-        apiKeyStore.storeTavilyKey("tvly-test-key".toCharArray())
-        var ddgLegRan = false
-        repository.htmlSupplier = { ddgLegRan = true; fixtureHtml() }
-        val withImages = groundedOutcome(listOf("https://tavily.example/delegate"))
-        coEvery { tavily.search(any(), any(), any(), any()) } returns withImages
-
-        val outcome = repository.search(
-            "show me pictures of cats",
-            maxResults = 5,
-            contextSize = 4096,
-            includeImages = true,
-        )
-
-        assertThat(outcome).isEqualTo(withImages)
-        // DDG would have served this turn (fixture parses) — the direct
-        // leg must skip it so the grid is never starved by a DDG-OK.
-        assertThat(ddgLegRan).isFalse()
-        coVerify(exactly = 1) {
-            tavily.search("show me pictures of cats", 5, 4096, true)
-        }
-    }
-
-    @Test
-    fun `image-intent with key passes truncated query to tavily direct`() = runTest {
-        apiKeyStore.storeTavilyKey("tvly-test-key".toCharArray())
-        repository.htmlSupplier = { fixtureHtml() }
-        val delegated = groundedOutcome(listOf("https://tavily.example/delegate"))
-        coEvery { tavily.search(any(), any(), any(), any()) } returns delegated
-
-        repository.search("x".repeat(600), includeImages = true)
-
-        coVerify(exactly = 1) {
-            tavily.search("x".repeat(500), any(), any(), true)
-        }
-    }
-
-    @Test
-    fun `image-intent without key falls through to ddg text grounding`() = runTest {
+    fun `image-intent grounds via ddg text with empty images`() = runTest {
         var ddgLegRan = false
         repository.htmlSupplier = { ddgLegRan = true; fixtureHtml() }
 
         val outcome = repository.search("show me pictures of cats", includeImages = true)
 
         // DDG text grounds the turn; the grid stays empty (no image API on
-        // the DDG leg); the caller attaches the images-need-key notice.
-        assertThat(outcome).isInstanceOf(TavilySearchOutcome.Grounded::class.java)
-        val fused = (outcome as TavilySearchOutcome.Grounded).fused
+        // the DDG leg).
+        assertThat(outcome).isInstanceOf(SearchOutcome.Grounded::class.java)
+        val fused = (outcome as SearchOutcome.Grounded).fused
         assertThat(fused.okUrls).isNotEmpty()
         assertThat(fused.images).isEmpty()
         assertThat(ddgLegRan).isTrue()
-        coVerify(exactly = 0) { tavily.search(any(), any(), any(), any()) }
     }
 
     @Test
-    fun `image-intent without key and ddg-empty collapses to fetch-failed`() = runTest {
+    fun `image-intent and ddg-empty collapses to fetch-failed`() = runTest {
         repository.htmlSupplier = { "<html><body>No results.</body></html>" }
 
         val outcome = repository.search("show me pictures of cats", includeImages = true)
 
         assertThat(outcome).isEqualTo(
-            TavilySearchOutcome.ModelOnly(
+            SearchOutcome.ModelOnly(
                 MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
             ),
         )
-        coVerify(exactly = 0) { tavily.search(any(), any(), any(), any()) }
-    }
-
-    @Test
-    fun `non-image with key keeps ddg-primary even when ddg serves`() = runTest {
-        apiKeyStore.storeTavilyKey("tvly-test-key".toCharArray())
-        var ddgLegRan = false
-        repository.htmlSupplier = { ddgLegRan = true; fixtureHtml() }
-
-        val outcome = repository.search("kotlin news")
-
-        assertThat(outcome).isInstanceOf(TavilySearchOutcome.Grounded::class.java)
-        assertThat(ddgLegRan).isTrue()
-        coVerify(exactly = 0) { tavily.search(any(), any(), any(), any()) }
     }
 }

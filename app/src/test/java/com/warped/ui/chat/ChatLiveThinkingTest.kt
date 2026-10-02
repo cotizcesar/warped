@@ -119,9 +119,6 @@ class ChatLiveThinkingTest {
             fetcher = fetcher,
             multiUrlFetcher = multiUrlFetcher,
             ddgSearchRepository = mockk(),
-            apiKeyStore = mockk<com.warped.data.local.security.ApiKeyStore>().apply {
-                every { getTavilyKey() } returns null
-            },
             modelAllowlistRepository = mockk<com.warped.data.repository.ModelAllowlistRepository>().also(::stubEffectiveCapabilities),
             context = context,
         )
