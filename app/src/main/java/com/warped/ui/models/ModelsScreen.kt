@@ -36,6 +36,7 @@ import com.warped.domain.model.LocalModel
 import com.warped.ui.endpoints.components.EndpointForm
 import com.warped.ui.components.ActiveDownloadContent
 import com.warped.ui.components.WarpedAlertDialog
+import com.warped.ui.theme.WarpedAccent
 import com.warped.ui.components.formatFileSize
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -263,7 +264,7 @@ fun ModelsScreen(
                         ) {
                             Button(
                                 onClick = onOpenHuggingFace,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97757)),
+                                colors = ButtonDefaults.buttonColors(containerColor = WarpedAccent),
                                 shape = RoundedCornerShape(8.dp)
                             ) { Text(stringResource(R.string.models_empty_download_cta), color = Color.White) }
                             OutlinedButton(

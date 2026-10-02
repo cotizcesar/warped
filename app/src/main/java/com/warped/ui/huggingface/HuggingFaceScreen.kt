@@ -60,6 +60,7 @@ import com.warped.ui.components.ActiveDownloadContent
 import com.warped.ui.components.CapabilityIconBadge
 import com.warped.ui.components.WarpedAlertDialog
 import com.warped.ui.components.formatFileSize
+import com.warped.ui.theme.WarpedAccent
 
 /**
  * Phase 49 (DEL-05): static model catalog.
@@ -358,7 +359,7 @@ private fun CatalogModelCard(
                     Button(
                         onClick = onUseInChat,
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97757)),
+                        colors = ButtonDefaults.buttonColors(containerColor = WarpedAccent),
                         shape = RoundedCornerShape(8.dp)
                     ) { Text(stringResource(R.string.use_in_chat), color = Color.White) }
                     IconButton(onClick = { showDeleteConfirm = true }) {

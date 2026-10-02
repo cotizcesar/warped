@@ -20,6 +20,13 @@ val UserBubbleDark = Color(0xFF121212)
 val AssistantBubbleLight = Color(0xFFF3F4F6)
 val AssistantBubbleDark = Color.Transparent
 
+/**
+ * Shared warm-accent token (IN-04, phase 64 funnel CTAs). Same
+ * `0xFFD97757` value previously hardcoded at each CTA call site —
+ * reference this so a future accent change touches one line.
+ */
+val WarpedAccent = Color(0xFFD97757)
+
 // Phase 58 (OG-02): OG card tokens. Dark container is the locked 2B2B29
 // neutral (darkColorScheme surfaceVariant is 1F2937 — not a match, so a
 // dedicated token); light reuses M3 surfaceVariant. Shimmer is a neutral

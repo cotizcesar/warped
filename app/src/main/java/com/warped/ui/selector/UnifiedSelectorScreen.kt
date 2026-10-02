@@ -29,6 +29,7 @@ import com.warped.domain.model.ModelCapabilities
 import com.warped.domain.model.ProviderType
 import com.warped.ui.components.WarpedAlertDialog
 import com.warped.ui.components.ModelParamsDialog
+import com.warped.ui.theme.WarpedAccent
 import com.warped.ui.endpoints.components.EndpointForm
 import com.warped.domain.model.GenerationParameters
 
@@ -122,7 +123,7 @@ fun UnifiedSelectorScreen(
                             ) {
                                 Button(
                                     onClick = onOpenHuggingFace,
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97757)),
+                                    colors = ButtonDefaults.buttonColors(containerColor = WarpedAccent),
                                     shape = RoundedCornerShape(8.dp)
                                 ) { Text(stringResource(R.string.models_empty_download_cta), color = Color.White) }
                                 OutlinedButton(

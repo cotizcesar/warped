@@ -42,6 +42,7 @@ import com.warped.R
 import com.warped.domain.model.Endpoint
 import com.warped.domain.model.LocalModel
 import com.warped.domain.model.ProviderType
+import com.warped.ui.theme.WarpedAccent
 import kotlinx.coroutines.launch
 
 /**
@@ -172,7 +173,7 @@ fun ModelSelectorSheet(
                             onDismiss()
                             onNavigateToCatalog()
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97757)),
+                        colors = ButtonDefaults.buttonColors(containerColor = WarpedAccent),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
