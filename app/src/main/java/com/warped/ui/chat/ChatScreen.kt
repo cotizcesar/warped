@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -124,6 +125,11 @@ fun ChatScreen(
     // Phase 65 (VOICE-02): first-tap rationale visibility. Shown only when
     // RECORD_AUDIO is ungranted; confirm fires the system request.
     var showVoiceRationale by remember { mutableStateOf(false) }
+    // IN-02: first-tap rationale per UI-SPEC section 4. The dialog shows
+    // once; later ungranted taps request the permission directly.
+    // rememberSaveable so rotation does not re-trigger it (process death
+    // re-shows once — the safe direction).
+    var voiceRationaleSeen by rememberSaveable { mutableStateOf(false) }
     // API-03: system back dismisses the model picker through the same
     // onDismiss path as tap-outside/scrim — gesture and button identical.
     // (The sheet itself also self-dismisses; this is the explicit contract.)
@@ -290,15 +296,18 @@ fun ChatScreen(
 
     // Phase 65 (VOICE-01): mic tap gate. The permission check runs inside
     // the click lambda — never on the composition hot path, so the input
-    // bar never janks. Granted toggles start/stop; ungranted opens the
-    // in-context rationale (whose confirm fires the launcher above).
+    // bar never janks. Granted toggles start/stop; first ungranted tap
+    // opens the in-context rationale (IN-02), later ungranted taps request
+    // directly (whose confirm fires the launcher above).
     val onMicClick = {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
         ) {
             if (isListening) viewModel.stopDictation() else viewModel.startDictation()
-        } else {
+        } else if (!voiceRationaleSeen) {
             showVoiceRationale = true
+        } else {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
@@ -622,7 +631,10 @@ fun ChatScreen(
             // reuses the existing dismiss string.
             if (showVoiceRationale) {
                 WarpedAlertDialog(
-                    onDismissRequest = { showVoiceRationale = false },
+                    onDismissRequest = {
+                        voiceRationaleSeen = true
+                        showVoiceRationale = false
+                    },
                     title = { Text(stringResource(R.string.voice_rationale_title)) },
                     text = {
                         Text(
@@ -632,6 +644,7 @@ fun ChatScreen(
                     },
                     confirmButton = {
                         TextButton(onClick = {
+                            voiceRationaleSeen = true
                             showVoiceRationale = false
                             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                         }) {
@@ -639,7 +652,10 @@ fun ChatScreen(
                         }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showVoiceRationale = false }) {
+                        TextButton(onClick = {
+                            voiceRationaleSeen = true
+                            showVoiceRationale = false
+                        }) {
                             Text(stringResource(R.string.dismiss))
                         }
                     }
