@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
@@ -36,10 +38,17 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
 import coil3.compose.AsyncImage
 import com.warped.R
 import com.warped.ui.chat.voice.GateState
@@ -355,50 +364,52 @@ fun ChatInputBar(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left group: image moderator (vision-capable models only) +
-                // Thinking toggle (reasoning-capable models only). Unsupported
-                // buttons are hidden, not dimmed — no dead affordances.
+                // Left group: unified attach menu + Thinking toggle
+                // (reasoning-capable models only). Unsupported entries are
+                // hidden, not dimmed — no dead affordances. A single "+"
+                // opens an upward menu (Photos on vision-capable models,
+                // Files always); with Files as the only option the button
+                // attaches directly instead of opening a one-item menu.
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (modelHasVision) {
-                        IconButton(onClick = onAddImage, enabled = !inputLocked, modifier = Modifier.size(40.dp)) {
-                            Icon(Icons.Filled.AddPhotoAlternate, stringResource(R.string.cd_add_image),
-                                tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
-                        }
-                    }
-                    // Phase 70 (70-02): document attach — same left icon row,
-                    // same 40dp size and inputLocked gating as the image
-                    // sibling, sibling tint (neutral affordance, never
-                    // accent). Ungated by model (same UX local + remote);
-                    // description swaps to replace when attached (a new pick
-                    // replaces); the attached filename rides
-                    // stateDescription (Phase 65 pattern).
-                    if (modelHasVision) Spacer(Modifier.width(10.dp))
-                    // Hoisted out of semantics{}: stringResource is
-                    // @Composable and cannot run inside the semantics lambda.
-                    val attachedStateDesc = attachedDocName?.let {
-                        stringResource(R.string.doc_reader_attached, it)
-                    }
-                    IconButton(
-                        onClick = onAttachDocument,
-                        enabled = !inputLocked,
-                        modifier = Modifier.size(40.dp).semantics {
-                            attachedStateDesc?.let { stateDescription = it }
-                        },
-                    ) {
-                        Icon(
-                            Icons.Filled.AttachFile,
-                            stringResource(
-                                if (attachedDocName != null) R.string.doc_reader_replace
-                                else R.string.doc_reader_attach
-                            ),
-                            tint = Color.White.copy(alpha = 0.6f),
-                            modifier = Modifier.size(24.dp),
+                    val showPhotosItem = modelHasVision
+                    if (showPhotosItem) {
+                        AttachMenuButton(
+                            enabled = !inputLocked,
+                            onPickPhotos = onAddImage,
+                            onPickFiles = onAttachDocument,
                         )
+                    } else {
+                        // Files-only: direct attach, no menu detour.
+                        // description swaps to replace when attached (a new
+                        // pick replaces); the attached filename rides
+                        // stateDescription (Phase 65 pattern).
+                        // Hoisted out of semantics{}: stringResource is
+                        // @Composable and cannot run inside the semantics lambda.
+                        val attachedStateDesc = attachedDocName?.let {
+                            stringResource(R.string.doc_reader_attached, it)
+                        }
+                        IconButton(
+                            onClick = onAttachDocument,
+                            enabled = !inputLocked,
+                            modifier = Modifier.size(48.dp).semantics {
+                                attachedStateDesc?.let { stateDescription = it }
+                            },
+                        ) {
+                            Icon(
+                                Icons.Filled.AttachFile,
+                                stringResource(
+                                    if (attachedDocName != null) R.string.doc_reader_replace
+                                    else R.string.doc_reader_attach
+                                ),
+                                tint = Color.White.copy(alpha = 0.6f),
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
                     }
                     // Think toggle
                     val canThink = modelHasReasoning
                     if (canThink) {
-                        if (modelHasVision) Spacer(Modifier.width(10.dp))
+                        Spacer(Modifier.width(10.dp))
                         Button(
                             onClick = onToggleReasoning,
                             enabled = !inputLocked,
@@ -540,6 +551,133 @@ fun ChatInputBar(
                 }
             }
         }
+    }
+}
+
+/**
+ * Unified attach affordance: a single "+" button opening an upward menu
+ * with Photos + Files. The menu is a [Popup] with a custom
+ * [PopupPositionProvider] (pinned above the anchor, left-aligned) instead
+ * of a [androidx.compose.material3.DropdownMenu] — DropdownMenu only
+ * offers a fixed below-anchor offset, while the input row sits at the
+ * screen bottom. Outside-tap and back-press dismiss via Popup defaults.
+ */
+@Composable
+private fun AttachMenuButton(
+    enabled: Boolean,
+    onPickPhotos: () -> Unit,
+    onPickFiles: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
+    val positionProvider = remember(density) {
+        AboveAnchorPositionProvider(marginPx = with(density) { 8.dp.roundToPx() })
+    }
+    Box {
+        IconButton(
+            onClick = { expanded = !expanded },
+            enabled = enabled,
+            modifier = Modifier.size(48.dp),
+        ) {
+            Icon(
+                Icons.Filled.Add,
+                stringResource(R.string.attach_menu_content_desc),
+                tint = Color.White.copy(alpha = 0.6f),
+                modifier = Modifier.size(24.dp),
+            )
+        }
+        if (expanded) {
+            Popup(
+                popupPositionProvider = positionProvider,
+                onDismissRequest = { expanded = false },
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    tonalElevation = 3.dp,
+                    shadowElevation = 8.dp,
+                ) {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        AttachMenuRow(
+                            icon = Icons.Filled.AddPhotoAlternate,
+                            label = stringResource(R.string.attach_menu_photos),
+                            onClick = {
+                                expanded = false
+                                onPickPhotos()
+                            },
+                        )
+                        AttachMenuRow(
+                            icon = Icons.Filled.AttachFile,
+                            label = stringResource(R.string.attach_menu_files),
+                            onClick = {
+                                expanded = false
+                                onPickFiles()
+                            },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AttachMenuRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+) {
+    DropdownMenuItem(
+        text = {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        },
+        leadingIcon = {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                        CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+        },
+        onClick = onClick,
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+    )
+}
+
+/**
+ * Pins popup content above the anchor's top edge (minus [marginPx]),
+ * left-aligned, clamped on-screen. [DropdownMenu]'s built-in provider
+ * only supports below-anchor placement, unusable at the screen bottom.
+ */
+private class AboveAnchorPositionProvider(
+    private val marginPx: Int,
+) : PopupPositionProvider {
+    override fun calculatePosition(
+        anchorBounds: IntRect,
+        windowSize: IntSize,
+        layoutDirection: LayoutDirection,
+        popupContentSize: IntSize,
+    ): IntOffset {
+        val x = anchorBounds.left.coerceIn(
+            0,
+            (windowSize.width - popupContentSize.width).coerceAtLeast(0),
+        )
+        val y = (anchorBounds.top - popupContentSize.height - marginPx).coerceAtLeast(0)
+        return IntOffset(x, y)
     }
 }
 

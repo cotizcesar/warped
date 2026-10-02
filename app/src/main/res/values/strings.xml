@@ -280,6 +280,9 @@
     <string name="doc_reader_failed">Couldn\'t read %1$s — answering without it</string>
     <string name="doc_reader_showing_first">Showing first %1$d chars</string>
     <string name="doc_reader_attached">Document attached: %1$s</string>
+    <string name="attach_menu_content_desc">Attach photos or files</string>
+    <string name="attach_menu_photos">Photos</string>
+    <string name="attach_menu_files">Files</string>
 
     <!-- Capability badges -->
     <string name="badge_vision">Vision</string>
