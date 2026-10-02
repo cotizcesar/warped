@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.net.Uri
 import android.util.Base64
+import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -322,6 +323,12 @@ class ChatViewModel @Inject constructor(
                         isLocalModelLoaded = connected,
                         isLoadingModel = loading,
                         loadingModelName = modelId?.substringAfterLast("/") ?: it.loadingModelName,
+                        // First-time copy (user decision 2026-10-02): true
+                        // only when this path never completed a load in this
+                        // process and the engine isn't already serving it.
+                        loadingFirstTime = loading && modelId != null &&
+                            modelId !in everLoadedPaths &&
+                            engineManager.getActiveEngine()?.modelPath != modelId,
                         loadedInstanceId = local.instanceId ?: it.loadedInstanceId,
                     )
                 }
@@ -2082,6 +2089,7 @@ class ChatViewModel @Inject constructor(
                 engineManager.switchToLiteRT(filePath)
             }
             activeModelSelection.connectLocal(filePath, ProviderType.LITE_RT_LM)
+            everLoadedPaths.add(filePath)
             refreshActiveBackend()
         } catch (e: Exception) {
             activeModelSelection.markLocalDisconnected()
@@ -2233,6 +2241,16 @@ class ChatViewModel @Inject constructor(
      * re-fire on the next emission before the collector delivers).
      */
     private var autoSelectedModelPath: String? = null
+
+    /**
+     * Model paths that completed at least one engine load in this process
+     * (user decision 2026-10-02: the loading row says "for the first time"
+     * only for paths never loaded before). Main-thread confined: written in
+     * [preloadLocalModel]'s post-load continuation, read by the selection
+     * collector — both on the main dispatcher.
+     */
+    @VisibleForTesting
+    internal val everLoadedPaths = mutableSetOf<String>()
 
     private fun autoApplySmartPreset(modelId: String) {
         if (modelId == lastAutoAppliedModelId) return

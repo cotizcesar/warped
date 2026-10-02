@@ -123,6 +123,7 @@ data class ChatConnectionState(
     val generationParameters: GenerationParameters = GenerationParameters(),
     val isLoadingModel: Boolean = false,
     val loadingModelName: String = "",
+    val loadingFirstTime: Boolean = false,
     val modelLoadError: String? = null,
     val loadedInstanceId: String? = null,
     val activeBackend: BackendType? = null,  // null unless LITE_RT_LM is loaded
@@ -191,6 +192,7 @@ data class ChatUiState(
     val toolCallActive: String? = null,
     val isLoadingModel: Boolean = false,
     val loadingModelName: String = "",
+    val loadingFirstTime: Boolean = false,
     val modelLoadError: String? = null,
     val loadedInstanceId: String? = null,
     val reasoningEnabled: Boolean = true,
@@ -242,6 +244,7 @@ fun combineSnapshot(
     generationParameters = connection.generationParameters,
     isLoadingModel = connection.isLoadingModel,
     loadingModelName = connection.loadingModelName,
+    loadingFirstTime = connection.loadingFirstTime,
     modelLoadError = connection.modelLoadError,
     loadedInstanceId = connection.loadedInstanceId,
     reasoningEnabled = input.reasoningEnabled,

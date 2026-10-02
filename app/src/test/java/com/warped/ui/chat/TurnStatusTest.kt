@@ -32,8 +32,9 @@ class TurnStatusTest {
                 isStreamingGap = true,
                 isLoadingModel = true,
                 loadingModelName = "gemma-3-1b.itertlm",
+                loadingFirstTime = true,
             ),
-        ).isEqualTo(TurnStatus.LoadingModel("gemma-3-1b.itertlm"))
+        ).isEqualTo(TurnStatus.LoadingModel("gemma-3-1b.itertlm", true))
     }
 
     @Test
@@ -46,7 +47,22 @@ class TurnStatusTest {
                 isStreamingGap = false,
                 isLoadingModel = true,
             ),
-        ).isEqualTo(TurnStatus.LoadingModel(""))
+        ).isEqualTo(TurnStatus.LoadingModel("", false))
+    }
+
+    @Test
+    fun `repeat load carries firstTime false`() {
+        assertThat(
+            resolveTurnStatus(
+                toolCallActive = null,
+                isFetchingWeb = false,
+                progress = null,
+                isStreamingGap = false,
+                isLoadingModel = true,
+                loadingModelName = "gemma-3-1b.itertlm",
+                loadingFirstTime = false,
+            ),
+        ).isEqualTo(TurnStatus.LoadingModel("gemma-3-1b.itertlm", false))
     }
 
     @Test

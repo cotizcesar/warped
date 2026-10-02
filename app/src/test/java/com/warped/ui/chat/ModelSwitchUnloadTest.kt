@@ -225,6 +225,22 @@ class ModelSwitchUnloadTest {
     }
 
     @Test
+    fun `mounted path is remembered so reloads are not first time`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val path = File(tempDir, "tiny.litertlm").apply { writeText("fake") }.absolutePath
+        val fixture = buildFixture(listOf(model(path, Instant.EPOCH)), helper = idleHelper())
+        runCurrent()
+        advanceUntilIdle()
+
+        fixture.vm.launchModelSelection(path, ProviderType.LITE_RT_LM)
+        advanceUntilIdle()
+        fixture.vm.sendMessage("hello")
+        awaitMount(fixture)
+
+        assertThat(fixture.vm.everLoadedPaths).contains(path)
+    }
+
+    @Test
     fun `first send with pending model loads it then generates`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val path = File(tempDir, "tiny.litertlm").apply { writeText("fake") }.absolutePath

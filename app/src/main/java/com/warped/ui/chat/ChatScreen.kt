@@ -398,6 +398,7 @@ fun ChatScreen(
                     isStreamingGap = isStreamingGap,
                     isLoadingModel = connection.isLoadingModel,
                     loadingModelName = connection.loadingModelName,
+                    loadingFirstTime = connection.loadingFirstTime,
                 )
                 TurnStatusRow(status = turnStatus)
                 ChatInputBar(
@@ -935,7 +936,11 @@ private fun TurnStatusRow(status: TurnStatus?) {
         TurnStatus.FetchSingle -> stringResource(R.string.reading_page)
         TurnStatus.Searching -> stringResource(R.string.searching)
         TurnStatus.ThinkingGap -> stringResource(R.string.thinking_ellipsis)
-        is TurnStatus.LoadingModel -> stringResource(R.string.loading_model, status.modelName.substringAfterLast("/"))
+        is TurnStatus.LoadingModel -> if (status.firstTime) {
+            stringResource(R.string.loading_model_first, status.modelName.substringAfterLast("/"))
+        } else {
+            stringResource(R.string.loading_model, status.modelName.substringAfterLast("/"))
+        }
     }
     val statusCd = when (status) {
         is TurnStatus.Tool -> stringResource(R.string.cd_running_tool, status.text)
@@ -943,6 +948,9 @@ private fun TurnStatusRow(status: TurnStatus?) {
         TurnStatus.FetchSingle -> stringResource(R.string.reading_page_cd)
         TurnStatus.Searching -> stringResource(R.string.searching_cd)
         TurnStatus.ThinkingGap -> stringResource(R.string.cd_thinking_generating)
+        is TurnStatus.LoadingModel -> stringResource(
+            if (status.firstTime) R.string.loading_model_first_cd else R.string.loading_model_cd
+        )
         is TurnStatus.LoadingModel -> stringResource(R.string.loading_model_cd)
     }
     Row(

@@ -26,7 +26,7 @@ sealed interface TurnStatus {
     data object FetchSingle : TurnStatus
     data object Searching : TurnStatus
     data object ThinkingGap : TurnStatus
-    data class LoadingModel(val modelName: String) : TurnStatus
+    data class LoadingModel(val modelName: String, val firstTime: Boolean) : TurnStatus
 }
 
 fun resolveTurnStatus(
@@ -36,8 +36,9 @@ fun resolveTurnStatus(
     isStreamingGap: Boolean,
     isLoadingModel: Boolean = false,
     loadingModelName: String = "",
+    loadingFirstTime: Boolean = false,
 ): TurnStatus? {
-    if (isLoadingModel) return TurnStatus.LoadingModel(loadingModelName)
+    if (isLoadingModel) return TurnStatus.LoadingModel(loadingModelName, loadingFirstTime)
     if (toolCallActive != null) return TurnStatus.Tool(toolCallActive)
     if (isFetchingWeb) {
         if (progress == null) return TurnStatus.FetchSingle
