@@ -30,6 +30,7 @@ import com.warped.domain.model.*
 import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.LocalModelRepository
+import com.warped.ui.chat.voice.VoiceDictationManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -152,6 +153,30 @@ class ChatViewModel @Inject constructor(
      */
     private val _events = MutableSharedFlow<ChatEvent>(extraBufferCapacity = 4)
     val events: SharedFlow<ChatEvent> = _events.asSharedFlow()
+
+    /**
+     * Phase 65 (VOICE-03): speech-recognition availability, resolved once at
+     * init on Dispatchers.IO via the manager's isAvailable so the input bar
+     * never pays the PackageManager cost on the main thread. The mic
+     * affordance renders only while true (graceful no-recognizer fallback).
+     */
+    private val _speechAvailable = MutableStateFlow(false)
+    val speechAvailable: StateFlow<Boolean> = _speechAvailable.asStateFlow()
+
+    /**
+     * Phase 65 (VOICE-01): true while the platform recognizer is listening.
+     * Drives the mic/stop toggle plus the listening indicator (plan 65-02).
+     */
+    private val _isListening = MutableStateFlow(false)
+    val isListening: StateFlow<Boolean> = _isListening.asStateFlow()
+
+    /**
+     * Phase 65 (VOICE-03): lazily created platform recognizer wrapper.
+     * Created on first startDictation (and once at init for the
+     * availability probe, then reused). Destroyed in [onCleared] so no
+     * recognizer leaks past the screen or ViewModel.
+     */
+    private var dictationManager: VoiceDictationManager? = null
 
     /**
      * Phase 53 (TOGGLE-01): override chosen before the first send (no
@@ -317,6 +342,11 @@ class ChatViewModel @Inject constructor(
         // Phase 54 (RETRY-01): seed the validated-online flag from the same
         // NET_CAPABILITY_VALIDATED gate the fetcher uses.
         refreshConnectivity()
+        // Phase 65 (VOICE-03): resolve recognizer availability off the main
+        // thread; the input bar reads the cached speechAvailable flow.
+        viewModelScope.launch(Dispatchers.IO) {
+            _speechAvailable.value = getDictationManager().isAvailable()
+        }
     }
 
     /**
@@ -1376,6 +1406,74 @@ class ChatViewModel @Inject constructor(
         updateInput { it.copy(inputText = text) }
     }
 
+    /**
+     * Phase 65 (VOICE-01): append recognized dictation text into the
+     * existing draft. Routes exclusively through the private single-owner
+     * [updateInput] op helper (never writes `_input` directly). Appends with
+     * a separating space, never replaces, never auto-sends — the user
+     * reviews and sends manually.
+     */
+    fun appendDictation(text: String) {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return
+        updateInput { state ->
+            val current = state.inputText
+            val appended = if (current.isBlank()) {
+                trimmed
+            } else {
+                "${current.trimEnd()} $trimmed"
+            }
+            state.copy(inputText = appended)
+        }
+    }
+
+    private fun getDictationManager(): VoiceDictationManager {
+        return dictationManager ?: VoiceDictationManager(
+            context = context,
+            onPartial = { appendDictation(it) },
+            onFinal = { appendDictation(it) },
+            // Silent-error policy (UI-SPEC section 3): recognition failures
+            // (network, no-speech, timeout) only clear listening state. No
+            // event emission, no error copy — the draft keeps whatever
+            // partial text arrived.
+            onError = { _isListening.value = false },
+        ).also { dictationManager = it }
+    }
+
+    /**
+     * Phase 65 (VOICE-01): start platform dictation. Creates the manager
+     * lazily, flips listening on, and streams partial/final results into
+     * [appendDictation]. Callers own the RECORD_AUDIO runtime-permission
+     * gate (plan 65-02).
+     */
+    fun startDictation() {
+        getDictationManager().start()
+        _isListening.value = true
+    }
+
+    /** Phase 65 (VOICE-01): stop platform dictation and clear listening. */
+    fun stopDictation() {
+        dictationManager?.stop()
+        _isListening.value = false
+    }
+
+    /**
+     * Phase 65 (VOICE-02): emit the permanent-denial Snackbar event carrying
+     * the voice_denied copy plus the voice_open_settings action label. Call
+     * ONLY on permanent denial (shouldShowRequestPermissionRationale ==
+     * false after denial, resolved by the screen in plan 65-02) — transient
+     * denial stays silent.
+     */
+    fun emitMicDenied() {
+        _events.tryEmit(
+            ChatEvent.SnackbarWithAction(
+                message = context.getString(R.string.voice_denied),
+                actionLabel = context.getString(R.string.voice_open_settings),
+                action = SnackbarAction.OPEN_APP_SETTINGS,
+            ),
+        )
+    }
+
     fun launchModelSelection(modelId: String, providerType: ProviderType, endpointId: Long? = null) {
         val state = snapshot()
 
@@ -1936,6 +2034,8 @@ class ChatViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
+        dictationManager?.destroy()
+        dictationManager = null
         unloadLocalModels()
     }
 }

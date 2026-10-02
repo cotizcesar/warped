@@ -188,6 +188,17 @@ fun ChatScreen(
             when (event) {
                 is ChatEvent.Snackbar ->
                     snackbarHostState.showSnackbar(event.message, duration = SnackbarDuration.Short)
+                // Phase 65 (VOICE-01 foundation): render the denial event
+                // through the same host. The Settings action wiring
+                // (OPEN_APP_SETTINGS deep-link) lands in plan 65-02 with
+                // the permission flow — this branch only keeps the
+                // exhaustive when compiling until then.
+                is ChatEvent.SnackbarWithAction ->
+                    snackbarHostState.showSnackbar(
+                        message = event.message,
+                        actionLabel = event.actionLabel,
+                        duration = SnackbarDuration.Long,
+                    )
             }
         }
     }

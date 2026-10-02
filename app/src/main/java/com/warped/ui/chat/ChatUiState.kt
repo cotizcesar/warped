@@ -285,9 +285,27 @@ data class ModelSwitchRequest(
  * Phase 53 (TOGGLE-01/SRC-02): one-shot UI events from ChatViewModel to
  * ChatScreen. Emitted with tryEmit (never suspends the turn); the screen
  * renders them as Snackbars. Chat continues regardless (non-blocking).
+ *
+ * Phase 65 (VOICE-01): [SnackbarWithAction] carries the permanent-denial
+ * escape — the Settings deep-link is resolved by the screen from the
+ * stable [SnackbarAction] identifier. Same tryEmit non-blocking contract.
  */
 sealed interface ChatEvent {
     data class Snackbar(val message: String) : ChatEvent
+    data class SnackbarWithAction(
+        val message: String,
+        val actionLabel: String,
+        val action: SnackbarAction,
+    ) : ChatEvent
+}
+
+/**
+ * Phase 65 (VOICE-01): stable identifiers for [ChatEvent.SnackbarWithAction]
+ * actions. The screen maps each value to its platform intent (no intents
+ * cross the ViewModel boundary).
+ */
+enum class SnackbarAction {
+    OPEN_APP_SETTINGS,
 }
 
 /**
