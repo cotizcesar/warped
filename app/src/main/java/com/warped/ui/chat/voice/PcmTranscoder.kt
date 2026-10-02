@@ -8,6 +8,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import timber.log.Timber
 
 /**
@@ -187,7 +188,9 @@ object PcmTranscoder {
                     outIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> {
                         if (inputEos) {
                             // No more progress possible — avoid a hot spin.
-                            Thread.sleep(2)
+                            // WR-01: coroutine delay (never Thread.sleep in
+                            // a suspend function on Dispatchers.IO).
+                            delay(2)
                         }
                     }
                 }
