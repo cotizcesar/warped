@@ -76,6 +76,7 @@ import timber.log.Timber
 import com.warped.ui.chat.components.ChatInputBar
 import com.warped.ui.chat.components.MessageBubble
 import com.warped.ui.chat.components.ModelSelectorSheet
+import com.warped.ui.chat.voice.GateState
 import com.warped.ui.components.WarpedAlertDialog
 
 /**
@@ -114,6 +115,10 @@ fun ChatScreen(
     // granted for the tracer path (check before start, no-op otherwise,
     // no crash); the full rationale/Snackbar flow lands in Plan 02.
     val isVoiceRecording by viewModel.isVoiceRecording.collectAsStateWithLifecycle()
+    // Phase 69 Plan 01 (VMSG-04/08): the VM voiceSendGate flow is the
+    // single gate source — the button, hint, and send-block all read it
+    // and flip live on model switch (no screen-local capability read).
+    val voiceGate by viewModel.voiceSendGate.collectAsStateWithLifecycle()
     val hasVoiceClip by viewModel.hasVoiceClip.collectAsStateWithLifecycle()
     // Phase 67 (VMSG-01 full): recording-row state (timer + amplitude).
     val voiceElapsedSec by viewModel.voiceElapsedSec.collectAsStateWithLifecycle()
@@ -399,38 +404,59 @@ fun ChatScreen(
         }
     }
 
-    // Phase 67 (VMSG-01 full): voice-send tap gate. Order: capability
-    // guards first (feedback toasts, never dead buttons), then the
-    // permission flow carrying the VOICE intent, then the toggle.
-    // isLoadingModel locks the whole bar via inputLocked (existing gate —
-    // verified, not duplicated), so the button is unreachable mid-load.
+    // Phase 69 Plan 01 (VMSG-04/08): gate-driven voice explainer. Gated
+    // taps never dead-end: text-only links to the model catalog, remote
+    // re-shows the reason until Plan 03 wires Learn more to Help.
+    val showVoiceGateExplainer: (GateState) -> Unit = { gate ->
+        scope.launch {
+            when (gate) {
+                GateState.GatedTextOnly -> {
+                    val result = snackbarHostState.showSnackbar(
+                        message = context.getString(R.string.voice_msg_gate_audio),
+                        actionLabel = context.getString(R.string.voice_msg_view_models),
+                        duration = SnackbarDuration.Long,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) onNavigateToCatalog()
+                }
+                GateState.GatedRemote -> {
+                    val result = snackbarHostState.showSnackbar(
+                        message = context.getString(R.string.voice_msg_gate_remote),
+                        actionLabel = context.getString(R.string.voice_msg_learn_more),
+                        duration = SnackbarDuration.Long,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        // TODO(69-03): route Learn more to the Help voice
+                        // section; re-show the reason until then.
+                        snackbarHostState.showSnackbar(
+                            context.getString(R.string.voice_msg_gate_remote),
+                            duration = SnackbarDuration.Short,
+                        )
+                    }
+                }
+                GateState.Allowed -> Unit
+            }
+        }
+    }
+
+    // Phase 67 (VMSG-01 full): voice-send tap gate. Order: the VM gate
+    // first (explainer, never a dead button), then the permission flow
+    // carrying the VOICE intent, then the toggle. isLoadingModel locks the
+    // whole bar via inputLocked (existing gate — verified, not duplicated),
+    // so the button is unreachable mid-load.
     val onVoiceClick = {
-        val localId = connection.selectedLocalModelId
-        val audioCapable = viewModel.verifiedLocalCapabilities(localId)?.audio ?: true
-        val remoteSelected = localId == null && connection.selectedRemoteModelId != null
-        when {
-            !audioCapable -> {
-                Toast.makeText(context, R.string.error_no_audio, Toast.LENGTH_SHORT).show()
-            }
-            remoteSelected -> {
-                Toast.makeText(
-                    context,
-                    R.string.voice_msg_remote_blocked,
-                    Toast.LENGTH_SHORT,
-                ).show()
-            }
-            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-                PackageManager.PERMISSION_GRANTED -> {
-                if (isVoiceRecording) viewModel.stopVoiceRecording() else viewModel.startVoiceRecording()
-            }
-            !voiceRationaleSeen -> {
-                pendingVoiceRequestName = PendingVoiceRequest.VOICE.name
-                showVoiceRationale = true
-            }
-            else -> {
-                pendingVoiceRequestName = PendingVoiceRequest.VOICE.name
-                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-            }
+        val gate = voiceGate
+        if (gate != GateState.Allowed) {
+            showVoiceGateExplainer(gate)
+        } else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            if (isVoiceRecording) viewModel.stopVoiceRecording() else viewModel.startVoiceRecording()
+        } else if (!voiceRationaleSeen) {
+            pendingVoiceRequestName = PendingVoiceRequest.VOICE.name
+            showVoiceRationale = true
+        } else {
+            pendingVoiceRequestName = PendingVoiceRequest.VOICE.name
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
     // Phase 67 (VMSG-01 full): 60 s auto-stop toast. Collects the one-shot
@@ -535,8 +561,12 @@ fun ChatScreen(
                     hasNewContentBelow = false
                     // Phase 67 (VMSG-05 tracer): a kept voice clip routes
                     // through the transcode-and-send path with the caption.
+                    // Phase 69 Plan 01 (VMSG-04/08): a gated config with a
+                    // kept draft routes to the explainer instead — the
+                    // draft is kept, the send never attempted.
                     if (hasVoiceClip) {
-                        viewModel.sendVoiceMessage(input.inputText)
+                        if (voiceGate != GateState.Allowed) showVoiceGateExplainer(voiceGate)
+                        else viewModel.sendVoiceMessage(input.inputText)
                     } else {
                         viewModel.sendMessage(input.inputText, attachedImages, audioBytes)
                     }
@@ -561,8 +591,12 @@ fun ChatScreen(
                 onAddImage = { imagePickerLauncher.launch("image/*") },
                 attachedImages = attachedImages,
                 onRemoveImage = { i -> attachedImages = attachedImages.filterIndexed { idx, _ -> idx != i } },
-                modelHasAudio = viewModel.verifiedLocalCapabilities(connection.selectedLocalModelId)?.audio
-                    ?: true,
+                // Phase 69 Plan 01 (VMSG-04/08): the collected VM gate
+                // drives the button + hint (no screen-local capability
+                // read); gated taps open the explainer (never a dead
+                // button).
+                voiceGate = voiceGate,
+                onGatedVoiceClick = { showVoiceGateExplainer(voiceGate) },
                 onAudioRecorded = { bytes -> audioBytes = bytes },
                 onAudioRecordingChanged = { isRecording = it },
                 speechAvailable = speechAvailable,

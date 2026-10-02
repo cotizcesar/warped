@@ -38,6 +38,8 @@ import com.warped.ui.chat.voice.VoiceDictationManager
 import com.warped.ui.chat.voice.VoiceMessagePlayer
 import com.warped.ui.chat.voice.VoiceMessageRecorder
 import com.warped.ui.chat.voice.PcmTranscoder
+import com.warped.ui.chat.voice.VoiceSendGate
+import com.warped.ui.chat.voice.GateState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -99,6 +101,35 @@ class ChatViewModel @Inject constructor(
 
     private val _connection = MutableStateFlow(ChatConnectionState())
     val connectionState: StateFlow<ChatConnectionState> = _connection.asStateFlow()
+
+    /**
+     * Phase 69 Plan 01 (VMSG-04/08): derived voice-send gate. Combines the
+     * connection selection (local id → LITE_RT_LM, else the remote provider)
+     * with the allowlist-verified audio capability into one [GateState] —
+     * the button, hint, and send-block all read this single source and flip
+     * live on model switch. Computed off-composition in a combine transform
+     * (no IO — the allowlist is in-memory); fail-open while unknown.
+     */
+    val voiceSendGate: StateFlow<GateState> = _connection
+        .map { conn ->
+            val providerType = if (conn.selectedLocalModelId != null) ProviderType.LITE_RT_LM
+            else conn.selectedRemoteProvider
+            VoiceSendGate.evaluate(
+                providerType,
+                verifiedLocalCapabilities(conn.selectedLocalModelId)?.audio,
+            )
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, GateState.Allowed)
+
+    /**
+     * Phase 69 Plan 01 (VMSG-04/08): gate-reason copy for a blocked voice
+     * send. Null when [voiceSendGate] is Allowed (callers check first).
+     */
+    private fun voiceGateReason(): String? = when (voiceSendGate.value) {
+        GateState.GatedTextOnly -> context.getString(R.string.voice_msg_gate_audio)
+        GateState.GatedRemote -> context.getString(R.string.voice_msg_gate_remote)
+        GateState.Allowed -> null
+    }
 
     @Deprecated("PERF-14 shim: collect transcriptState/inputState/connectionState instead")
     @Suppress("DEPRECATION")
@@ -490,6 +521,15 @@ class ChatViewModel @Inject constructor(
         }
 
         val imageDataUrls = images.mapNotNull { uriToBase64(it) }
+        // Phase 69 Plan 01 (VMSG-04/08): gated voice-send block. A voice
+        // turn on a gated configuration is blocked with reason — this runs
+        // BEFORE holder consumption so the holders and draft state are
+        // untouched on block (draft kept, identical for text-only and
+        // remote). Text/image turns bypass the block.
+        if (audioBytes != null && voiceSendGate.value != GateState.Allowed) {
+            voiceGateReason()?.let { _events.tryEmit(ChatEvent.Snackbar(it)) }
+            return
+        }
         // Phase 68 Plan 02 (VMSG-06): stamp the kept clip's path + duration
         // (captured by sendVoiceMessage into the send-time holders) onto the
         // user message so the persisted Room row carries playback metadata.
@@ -1700,6 +1740,10 @@ class ChatViewModel @Inject constructor(
         // Phase 67 (VMSG-01): single live input mode — starting dictation
         // stops an active voice recording (keeps the clip for send).
         if (_isVoiceRecording.value) stopVoiceRecording()
+        // Phase 69 Plan 01 extension point (VMSG-07, Plan 02 owns): starting
+        // dictation must also stop the transcript STT session first —
+        // dictation and transcript STT never overlap (strictly sequential,
+        // ERROR_RECOGNIZER_BUSY avoidance).
         lastPartial = ""
         partialAnchor = null
         _isListening.value = getDictationManager().start()
@@ -1940,6 +1984,10 @@ class ChatViewModel @Inject constructor(
     fun startVoiceRecording() {
         if (voiceStarting || _isVoiceRecording.value) return
         stopDictation()
+        // Phase 69 Plan 01 extension point (VMSG-07, Plan 02 owns): the
+        // transcript STT session must start only AFTER the stopDictation()
+        // above (strictly sequential — never concurrent with dictation) and
+        // stop on every recording end (stop/cancel/auto-stop/delete).
         voiceStarting = true
         viewModelScope.launch(Dispatchers.IO + coroutineExceptionHandler) {
             try {
@@ -2179,6 +2227,14 @@ class ChatViewModel @Inject constructor(
      * for retry; failed sends keep the file (Phase 68 draft basis).
      */
     fun sendVoiceMessage(caption: String) {
+        // Phase 69 Plan 01 (VMSG-04/08): gated draft-send block. A kept
+        // draft on a gated configuration is blocked with reason BEFORE
+        // draft state is cleared — the card, clip file, and holders survive
+        // (draft kept, identical for text-only and remote).
+        if (voiceSendGate.value != GateState.Allowed) {
+            voiceGateReason()?.let { _events.tryEmit(ChatEvent.Snackbar(it)) }
+            return
+        }
         val file = voiceClipFile ?: return
         // Phase 68: stamp the send-time holders Plan 02 persists into the
         // Room row, stop draft playback, then clear draft state. The file

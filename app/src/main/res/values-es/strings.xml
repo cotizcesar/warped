@@ -244,7 +244,13 @@
     <string name="voice_msg_rationale_body">Permite el acceso al micrófono para grabar mensajes de voz. Los clips se guardan en este dispositivo y los primeros 30 segundos se envían al modelo de audio.</string>
     <string name="voice_msg_stop">Detener grabación</string>
     <string name="voice_msg_recording_state">Grabando, %1$d:%2$02d</string>
-    <string name="voice_msg_remote_blocked">Los mensajes de voz necesitan un modelo de audio en el dispositivo.</string>
+    <!-- Gating de envío de voz (Phase 69: copy del explicador) -->
+    <string name="voice_msg_gate_audio_hint">Necesita un modelo de audio</string>
+    <string name="voice_msg_gate_audio">Los mensajes de voz necesitan un modelo de audio. Cambiá a un modelo con capacidad de audio para enviar voz.</string>
+    <string name="voice_msg_gate_remote_hint">Solo en el dispositivo por ahora</string>
+    <string name="voice_msg_gate_remote">Los mensajes de voz quedan en este dispositivo por ahora.</string>
+    <string name="voice_msg_view_models">Ver modelos</string>
+    <string name="voice_msg_learn_more">Más información</string>
     <string name="voice_msg_transcode_failed">No se pudo procesar el mensaje de voz.</string>
     <!-- Borrador de voz (Phase 68) -->
     <string name="voice_msg_too_short">Grabación muy corta</string>

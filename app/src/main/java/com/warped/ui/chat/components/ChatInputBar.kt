@@ -39,6 +39,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.warped.R
+import com.warped.ui.chat.voice.GateState
 
 @Composable
 fun ChatInputBar(
@@ -55,7 +56,13 @@ fun ChatInputBar(
     onAddImage: () -> Unit = {},
     attachedImages: List<Uri> = emptyList(),
     onRemoveImage: (Int) -> Unit = {},
-    modelHasAudio: Boolean = false,
+    // Phase 69 Plan 01 (VMSG-04/08): voice-send gate. Replaces the dead
+    // modelHasAudio flag (declared, passed, consumed nowhere) — the VM
+    // voiceSendGate flow is the single source of truth. A gated button
+    // RENDERS (never hidden) at reduced opacity with an inline hint and
+    // stays TAPPABLE into onGatedVoiceClick (never a dead button).
+    voiceGate: GateState = GateState.Allowed,
+    onGatedVoiceClick: () -> Unit = {},
     onAudioRecorded: ((ByteArray) -> Unit)? = null,
     onAudioRecordingChanged: ((Boolean) -> Unit)? = null,
     // Phase 65 (VOICE-02 UI): dictation mic affordance. speechAvailable
@@ -344,6 +351,12 @@ fun ChatInputBar(
                 // dictation mic, same visibility conditions. Waveform
                 // glyph (GraphicEq family), never a mic. Hidden while
                 // recording — the Row-1 recording row owns stop/cancel.
+                // Phase 69 Plan 01 (VMSG-04/08): gated rendering — the same
+                // GraphicEq glyph at reduced opacity (~38% onSurface, no
+                // container recolor, no error-red) with the inline hint in
+                // onSurfaceVariant. Tappable into the explainer (never
+                // enabled=false with no handler). Allowed keeps the
+                // Phase 67/68 rendering untouched.
                 if (speechAvailable && !isGenerating && !isLoadingModel && !isVoiceRecording) {
                     // Adopt the pre-existing dead onAudioRecordingChanged
                     // channel: it now fires with the live recording flag so
@@ -351,15 +364,40 @@ fun ChatInputBar(
                     LaunchedEffect(isVoiceRecording) {
                         onAudioRecordingChanged?.invoke(isVoiceRecording)
                     }
-                    IconButton(
-                        onClick = onVoiceClick,
-                        modifier = Modifier.size(48.dp),
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = if (isVoiceRecording) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent
+                    if (voiceGate != GateState.Allowed) {
+                        val gatedHint = stringResource(
+                            if (voiceGate == GateState.GatedTextOnly) R.string.voice_msg_gate_audio_hint
+                            else R.string.voice_msg_gate_remote_hint
                         )
-                    ) {
-                        Icon(Icons.Filled.GraphicEq, stringResource(R.string.voice_msg_record),
-                            tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                gatedHint,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            IconButton(
+                                onClick = onGatedVoiceClick,
+                                modifier = Modifier.size(48.dp).semantics {
+                                    stateDescription = gatedHint
+                                },
+                            ) {
+                                Icon(Icons.Filled.GraphicEq, stringResource(R.string.voice_msg_record),
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                                    modifier = Modifier.size(24.dp))
+                            }
+                        }
+                    } else {
+                        IconButton(
+                            onClick = onVoiceClick,
+                            modifier = Modifier.size(48.dp),
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = if (isVoiceRecording) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent
+                            )
+                        ) {
+                            Icon(Icons.Filled.GraphicEq, stringResource(R.string.voice_msg_record),
+                                tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
+                        }
                     }
                     Spacer(Modifier.width(8.dp))
                 }

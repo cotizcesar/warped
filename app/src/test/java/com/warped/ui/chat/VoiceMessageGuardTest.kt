@@ -185,10 +185,20 @@ class VoiceMessageGuardTest {
         runCurrent()
         advanceUntilIdle()
 
-        vm.sendMessage("hello", audioBytes = byteArrayOf(1, 2, 3))
+        // Phase 69 Plan 01 (VMSG-04/08): the VM gate blocks gated voice
+        // sends with a reason Snackbar BEFORE the turn starts — the legacy
+        // model-side error_no_audio backstop no longer fires for
+        // known-text-only models (it still guards the fail-open path where
+        // capabilities are unknown). The send is a no-op: no message, no
+        // error, never generating.
+        vm.events.test {
+            vm.sendMessage("hello", audioBytes = byteArrayOf(1, 2, 3))
+            assertThat(awaitItem()).isInstanceOf(ChatEvent.Snackbar::class.java)
+        }
         advanceUntilIdle()
 
-        assertThat(vm.transcriptState.value.error).isInstanceOf(ChatError.Unknown::class.java)
+        assertThat(vm.transcriptState.value.messages).isEmpty()
+        assertThat(vm.transcriptState.value.error).isNull()
         assertThat(vm.transcriptState.value.isStreaming).isFalse()
         assertThat(vm.inputState.value.isGenerating).isFalse()
     }
