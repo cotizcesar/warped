@@ -209,6 +209,7 @@
     </plurals>
     <string name="searching">Searching…</string>
     <string name="searching_cd">Searching. Tap Stop to cancel.</string>
+    <string name="loading_model_cd">Loading model.</string>
 
     <!-- Chat errors and dialogs -->
     <string name="error_model_unavailable">This model is no longer available. Please select a different model or re-download it.</string>

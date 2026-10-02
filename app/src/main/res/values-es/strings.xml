@@ -210,6 +210,7 @@
     </plurals>
     <string name="searching">Buscando…</string>
     <string name="searching_cd">Buscando. Tocá Detener para cancelar.</string>
+    <string name="loading_model_cd">Cargando modelo.</string>
 
     <!-- Errores y diálogos del chat -->
     <string name="error_model_unavailable">Este modelo ya no está disponible. Elegí otro modelo o descargalo de nuevo.</string>

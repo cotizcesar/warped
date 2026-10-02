@@ -5,8 +5,8 @@ import org.junit.jupiter.api.Test
 
 /**
  * Quick-task (unified-turn-status): truth table for [resolveTurnStatus].
- * Priority under test: tool > fetch/search > streaming gap; null renders
- * nothing.
+ * Priority under test: model loading > tool > fetch/search > streaming
+ * gap; null renders nothing.
  */
 class TurnStatusTest {
 
@@ -21,6 +21,33 @@ class TurnStatusTest {
     // Search-path shape: done/total set, perSource EMPTY (the "0 of N" lie —
     // the resolver must never surface these counts).
     private fun searchProgress() = WebFetchProgress(done = 0, total = 5, perSource = emptyList())
+
+    @Test
+    fun `loading model wins over tool fetch and gap`() {
+        assertThat(
+            resolveTurnStatus(
+                toolCallActive = "Searching for cats…",
+                isFetchingWeb = true,
+                progress = fanoutProgress(),
+                isStreamingGap = true,
+                isLoadingModel = true,
+                loadingModelName = "gemma-3-1b.itertlm",
+            ),
+        ).isEqualTo(TurnStatus.LoadingModel("gemma-3-1b.itertlm"))
+    }
+
+    @Test
+    fun `loading model without name still resolves`() {
+        assertThat(
+            resolveTurnStatus(
+                toolCallActive = null,
+                isFetchingWeb = false,
+                progress = null,
+                isStreamingGap = false,
+                isLoadingModel = true,
+            ),
+        ).isEqualTo(TurnStatus.LoadingModel(""))
+    }
 
     @Test
     fun `tool set wins over fetch and gap`() {

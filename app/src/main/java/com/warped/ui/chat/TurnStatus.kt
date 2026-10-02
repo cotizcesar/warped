@@ -5,8 +5,8 @@ package com.warped.ui.chat
  * row above the input bar. No Compose imports — truth-table tested in
  * [TurnStatusTest].
  *
- * Priority: toolCallActive > isFetchingWeb > streaming gap. Returns null when
- * nothing is active (null renders nothing).
+ * Priority: model loading > toolCallActive > isFetchingWeb > streaming
+ * gap. Returns null when nothing is active (null renders nothing).
  *
  * Fetch branch mirrors today's slot logic:
  * - `perSource` non-empty → real fan-out progress ([FetchFanout] when
@@ -26,6 +26,7 @@ sealed interface TurnStatus {
     data object FetchSingle : TurnStatus
     data object Searching : TurnStatus
     data object ThinkingGap : TurnStatus
+    data class LoadingModel(val modelName: String) : TurnStatus
 }
 
 fun resolveTurnStatus(
@@ -33,7 +34,10 @@ fun resolveTurnStatus(
     isFetchingWeb: Boolean,
     progress: WebFetchProgress?,
     isStreamingGap: Boolean,
+    isLoadingModel: Boolean = false,
+    loadingModelName: String = "",
 ): TurnStatus? {
+    if (isLoadingModel) return TurnStatus.LoadingModel(loadingModelName)
     if (toolCallActive != null) return TurnStatus.Tool(toolCallActive)
     if (isFetchingWeb) {
         if (progress == null) return TurnStatus.FetchSingle

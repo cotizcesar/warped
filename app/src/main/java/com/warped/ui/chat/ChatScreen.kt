@@ -387,8 +387,8 @@ fun ChatScreen(
         bottomBar = {
             Column {
                 // Unified turn status (quick-turn-status): ONE transient row
-                // above the input bar — priority tool > fetch/search >
-                // streaming gap. Never a transcript message, never
+                // above the input bar — priority model loading > tool >
+                // fetch/search > streaming gap. Never a transcript message, never
                 // persisted; unmounts on completion/failure/Stop. Null
                 // status renders nothing (and no spacer).
                 val turnStatus = resolveTurnStatus(
@@ -396,6 +396,8 @@ fun ChatScreen(
                     isFetchingWeb = input.isFetchingWeb,
                     progress = input.webFetchProgress,
                     isStreamingGap = isStreamingGap,
+                    isLoadingModel = connection.isLoadingModel,
+                    loadingModelName = connection.loadingModelName,
                 )
                 TurnStatusRow(status = turnStatus)
                 ChatInputBar(
@@ -467,11 +469,6 @@ fun ChatScreen(
                 },
                 onOpenDrawer = onOpenDrawer,
             )
-
-            // CHAT-07: Model loading indicator
-            if (connection.isLoadingModel) {
-                ModelLoadingIndicator(loadingModelName = connection.loadingModelName)
-            }
 
             if (isEmpty) {
                 // Empty state
@@ -920,8 +917,8 @@ private fun InlineModelSelectorBar(
 
 /**
  * Unified turn status row (quick-turn-status): the single transient row in
- * the bottomBar slot above the input bar — tool > fetch/search > streaming
- * gap. Same slot visuals as the rows it replaces (16dp ring + 8dp gap +
+ * the bottomBar slot above the input bar — model loading > tool >
+ * fetch/search > streaming gap. Same slot visuals as the rows it replaces (16dp ring + 8dp gap +
  * 14sp text, single-line ellipsis so long queries/hosts can't push the
  * input bar, trailing 8dp spacer when non-null; null renders nothing).
  * Single semantics contentDescription per resolved state. Copy reuse:
@@ -938,6 +935,7 @@ private fun TurnStatusRow(status: TurnStatus?) {
         TurnStatus.FetchSingle -> stringResource(R.string.reading_page)
         TurnStatus.Searching -> stringResource(R.string.searching)
         TurnStatus.ThinkingGap -> stringResource(R.string.thinking_ellipsis)
+        is TurnStatus.LoadingModel -> stringResource(R.string.loading_model, status.modelName.substringAfterLast("/"))
     }
     val statusCd = when (status) {
         is TurnStatus.Tool -> stringResource(R.string.cd_running_tool, status.text)
@@ -945,6 +943,7 @@ private fun TurnStatusRow(status: TurnStatus?) {
         TurnStatus.FetchSingle -> stringResource(R.string.reading_page_cd)
         TurnStatus.Searching -> stringResource(R.string.searching_cd)
         TurnStatus.ThinkingGap -> stringResource(R.string.cd_thinking_generating)
+        is TurnStatus.LoadingModel -> stringResource(R.string.loading_model_cd)
     }
     Row(
         modifier = Modifier
@@ -970,29 +969,4 @@ private fun TurnStatusRow(status: TurnStatus?) {
         )
     }
     Spacer(Modifier.height(8.dp))
-}
-
-/**
- * CHAT-07: "Cargando modelo" indicator shown in the chat while a local model is loading.
- */
-@Composable
-private fun ModelLoadingIndicator(loadingModelName: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(14.dp),
-            strokeWidth = 2.dp,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text = stringResource(R.string.loading_model, loadingModelName.substringAfterLast("/")),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
 }
