@@ -282,7 +282,7 @@
     <string name="connect_api_title">Connect to an API</string>
     <string name="models_catalog_hint">Choose from the built-in catalog</string>
     <string name="models_importing_fmt">Importing model… %1$d%%</string>
-    <string name="models_empty_hint">Tap Add Model to download one from the catalog or import a file.</string>
+    <string name="models_empty_hint">Download a model from the catalog, or connect a remote endpoint.</string>
     <string name="models_memory_msg_fmt">This model needs ~%1$d MB, your device has %2$d MB available. Loading may cause instability.</string>
     <string name="selector_no_models">No models available. Download one to get started.</string>
     <string name="drawer_empty_download_cta">Download a model</string>
