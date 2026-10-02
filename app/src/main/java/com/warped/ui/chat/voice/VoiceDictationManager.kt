@@ -79,6 +79,16 @@ class VoiceDictationManager(
             }
         }
         try {
+            // WR-02: reset any error/busy state before (re)starting. After
+            // an error the platform typically requires cancel() before the
+            // next startListening, or it fails with ERROR_RECOGNIZER_BUSY
+            // (stopListening alone does not reset the error state). Best
+            // effort: a missing instance means nothing to reset.
+            try {
+                recognizer?.cancel()
+            } catch (e: Exception) {
+                Timber.w(e, "Voice: pre-start cancel failed")
+            }
             var current = recognizer
             if (current == null) {
                 current = SpeechRecognizer.createSpeechRecognizer(context)
