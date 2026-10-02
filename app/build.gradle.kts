@@ -29,6 +29,14 @@ android {
         this.versionName = versionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "LITERTLM_VERSION", "\"${libs.versions.litertlm.get()}\"")
+        // 32-bit ABIs excluded (2026-10-01): litertlm-android ships .so ONLY
+        // for arm64-v8a/x86_64 — a 32-bit install would crash with
+        // UnsatisfiedLinkError on first local-model load (the 1.7.1 vitals
+        // crash class). 32-bit devices can't run multi-GB local models
+        // anyway; x86_64 stays for emulators. Play serves per-ABI splits.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
 
     }
 
