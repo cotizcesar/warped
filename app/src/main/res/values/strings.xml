@@ -284,7 +284,7 @@
     <string name="models_importing_fmt">Importing model… %1$d%%</string>
     <string name="models_empty_hint">Tap Add Model to download one from the catalog or import a file.</string>
     <string name="models_memory_msg_fmt">This model needs ~%1$d MB, your device has %2$d MB available. Loading may cause instability.</string>
-    <string name="selector_no_models">No models available. Download a .litertlm model or add an endpoint.</string>
+    <string name="selector_no_models">No models available. Download one to get started.</string>
     <string name="drawer_empty_download_cta">Download a model</string>
     <string name="models_empty_download_cta">Download a local model</string>
     <string name="models_empty_add_endpoint_cta">Add a new Endpoint</string>

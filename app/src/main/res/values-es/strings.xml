@@ -286,7 +286,7 @@
     <string name="models_importing_fmt">Importando modelo… %1$d%%</string>
     <string name="models_empty_hint">Tocá Agregar modelo para descargar uno del catálogo o importar un archivo.</string>
     <string name="models_memory_msg_fmt">Este modelo necesita ~%1$d MB, tu dispositivo tiene %2$d MB disponibles. Cargarlo puede causar inestabilidad.</string>
-    <string name="selector_no_models">No hay modelos disponibles. Descargá un modelo .litertlm o agregá un endpoint.</string>
+    <string name="selector_no_models">No hay modelos disponibles. Descargá uno para empezar.</string>
     <string name="drawer_empty_download_cta">Descargar un modelo</string>
     <string name="models_empty_download_cta">Descargar un modelo local</string>
     <string name="models_empty_add_endpoint_cta">Agregar un endpoint</string>
