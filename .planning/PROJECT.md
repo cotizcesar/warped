@@ -104,9 +104,20 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 **Known deferred:** Play Console pre-launch + target-API dashboard reads (human); Leg 1B model-B switch; Phase 60 follow-ups (5); standing device smokes (v2.2–v2.4). 47 closeout acknowledgments recorded in STATE.md Deferred Items.
 
-## Current Milestone: TBD
+## Current Milestone: v3.0 Chat UX + Voice Dictation
 
-**Next:** Run `/gsd-new-milestone` to define v2.6 scope (requirements → roadmap). Candidates from v2.5: auto-load model after download (Phase 61 tour feedback), Pixel 7 reference numbers (PERF-16 + PERF-12/13), standing release-UAT smokes.
+**Goal:** Polish chat drawers, settings, catalog and help surfaces, simplify web search to DuckDuckGo-only, and add voice dictation + Play in-app rating.
+
+**Target features:**
+- Play in-app star rating from within the app
+- Model drawer empty-state: "Download a model" CTA → Model Catalog; Web Options removed from drawer (stays in Settings)
+- Chat drawer footer parity: Models/Help/Settings same text size as New Chat; Delete-all-chats moved to drawer bottom above Models
+- Help screen rewrite: short, minimal, to-the-point
+- Search simplification: remove Tavily integration, DuckDuckGo only
+- Settings cleanup: remove Keystore key-deletion ability; remove Data section + delete-chats
+- Models & Endpoints empty-states: "Download a local model" + "Add a new Endpoint" CTAs
+- Model Catalog: "Use in Chat" button on downloaded models
+- Voice dictation into chat input (speech-to-text only, no audio messages yet)
 
 ## Requirements
 
@@ -179,7 +190,15 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 ### Active
 
-(None — v2.6 scope to be defined via `/gsd-new-milestone`)
+- [ ] Play in-app rating — v3.0
+- [ ] Model drawer empty-state CTA + Web Options relocation — v3.0
+- [ ] Chat drawer footer parity + delete-all-chats relocation — v3.0
+- [ ] Help screen rewrite (short/minimal) — v3.0
+- [ ] Tavily removal, DuckDuckGo-only search — v3.0
+- [ ] Settings cleanup (no key-delete, no Data section) — v3.0
+- [ ] Models & Endpoints empty-state CTAs — v3.0
+- [ ] Model Catalog "Use in Chat" on downloaded models — v3.0
+- [ ] Voice dictation into chat input — v3.0
 
 ### Out of Scope
 
@@ -251,6 +270,8 @@ Warped has shipped 12 milestones (v1.0 through v2.2) across 51 phases and 315 re
 | v2.5 version-bump-only remediation (2026-09-30) | Misaligned sqlcipher 4.5.4 (EOL, p_align 0x1000) → successor artifact sqlcipher-android 4.19.1. Never hand-patch .so, linker-flag hacks, or pageSizeCompat. | ✓ Good |
 | v2.5 LeakCanary debugImplementation-only (2026-09-30) | Zero release footprint proven at classpath + dex level. Clean baseline → Phase 62 is tests-only, zero production changes. | ✓ Good |
 | v2.5 gap back-closure across phases (2026-10-01) | G-59-01 (16 KB chat turn, emulator-blocked) closed by Phase 62's fresh-artifact smoke instead of reopening Phase 59. | ✓ Good |
+| v3.0 major bump for UX + removals (2026-10-02) | User chose v3.0 over v2.6: Tavily removal + settings surface removals are breaking-behavior changes justifying a major. | — Pending |
+| v3.0 DuckDuckGo-only search (2026-10-02) | Remove Tavily integration entirely (key, client, producer, UI); single DDG path reduces keys, clients, and test matrix. | — Pending |
 
 ## Evolution
 
@@ -270,4 +291,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-01 — v2.5 Play Compliance + Leaks milestone complete*
+*Last updated: 2026-10-02 — v3.0 Chat UX + Voice Dictation milestone started*

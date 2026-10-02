@@ -1,18 +1,16 @@
 ---
 gsd_state_version: "1.0"
-milestone: v2.5
-milestone_name: Play Compliance + Leaks
-status: Awaiting next milestone
-stopped_at: v2.5 roadmap created (Phases 59–62)
-last_updated: "2026-10-01T05:37:29.251Z"
-last_activity: 2026-10-01
-state_head: 819b4146a722b8ac3fb23ac9e33ad5c06229cb79
+milestone: v3.0
+milestone_name: Chat UX + Voice Dictation
+status: planning
+last_updated: "2026-10-02T13:30:10.823Z"
+last_activity: 2026-10-02
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 8
-  completed_plans: 8
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State: Warped
@@ -29,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-10-01, v2.5 shipped)
 
 ## Current Position
 
-Phase: Milestone v2.5 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-10-01 — Milestone v2.5 completed and archived
+Status: Defining requirements
+Last activity: 2026-10-02 — Milestone v3.0 started
 
 ## Phase Structure (v2.5 — PLANNED)
 
