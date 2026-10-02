@@ -3,8 +3,7 @@ name: Release
 on:
   push:
     branches:
-      - beta
-      - production
+      - main
 
 jobs:
   release:
@@ -51,12 +50,10 @@ jobs:
       - name: Determine Play Store track
         id: track
         run: |
-          BRANCH="${{ github.ref_name }}"
-          if [ "$BRANCH" = "production" ]; then
-            echo "track=production" >> "$GITHUB_OUTPUT"
-          else
-            echo "track=$BRANCH" >> "$GITHUB_OUTPUT"
-          fi
+          # Single-branch flow: main always ships to the Beta track (where
+          # beta deployed before the restructure). Promotion to Production
+          # is manual in Play Console (promote the beta release).
+          echo "track=beta" >> "$GITHUB_OUTPUT"
 
       - name: Upload to Google Play Store
         uses: r0adkll/upload-google-play@v1

@@ -1,13 +1,15 @@
 # Branch Protection Setup
 
-This project uses **track-based branches** that map directly to Google Play Store release tracks.
+This project uses a **single-branch flow**: `main` ships to the Google Play
+**Beta** track on every push. Promotion to **Production** is manual in
+Play Console (promote the tested beta release) — there is no production
+branch.
 
 ## Branches
 
-| Branch      | Play Store Track | Purpose                        |
-|-------------|------------------|--------------------------------|
-| `beta`      | Beta             | Pre-release testing            |
-| `production`| Production       | Public release                 |
+| Branch | Play Store Track | Purpose                        |
+|--------|------------------|--------------------------------|
+| `main` | Beta             | Single development + pre-release line |
 
 ## Required GitHub Repository Settings
 
@@ -15,7 +17,7 @@ You must manually configure branch protection rules in the GitHub UI. Go to:
 
 **Settings → Branches → Add rule**
 
-Apply the following to `beta` and `production`:
+Apply the following to `main`:
 
 - [x] **Require a pull request before merging**
   - [x] Require approvals: `1`
@@ -27,9 +29,11 @@ Apply the following to `beta` and `production`:
 
 ## Release Flow
 
-1. Open a PR from `beta` → `production`
-2. Merge → CI runs → Release workflow uploads to **Production** track
-3. Or push to `beta` → CI runs → uploads to **Beta** track
+1. Push/merge to `main` → CI runs → Release workflow uploads to **Beta** track
+2. Test the beta release → in Play Console, **promote it to Production manually**
+
+(Retired 2026-10-01: the old `beta` → `production` PR flow and both
+branch names. `main` deploys exactly where `beta` deployed.)
 
 ## Required Secrets
 
