@@ -76,7 +76,12 @@ class VoiceDictationManager(
             }
 
             override fun onResults(results: Bundle?) {
-                firstResult(results)?.let { onFinal(it) }
+                // CR-02: an empty final still ends the session — forward it
+                // blank so the owner clears its listening flag. The
+                // platform recognizer is single-shot: on silence/timeout
+                // it stops by itself, and without this the UI stays stuck
+                // on the stop toggle for a dead recognizer.
+                onFinal(firstResult(results).orEmpty())
             }
 
             override fun onError(error: Int) {
