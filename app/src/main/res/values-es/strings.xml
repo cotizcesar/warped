@@ -37,7 +37,7 @@
     <string name="memory_warning_message">Este modelo requiere %1$d MB. Tu dispositivo tiene %2$d MB disponibles. Cargarlo puede causar inestabilidad. ¿Continuar?</string>
     <string name="continue_text">Continuar</string>
     <string name="dismiss">Descartar</string>
-    <string name="loading_model">Cargando %1$s…</string>
+    <string name="loading_model">Cargando %1$s por primera vez…</string>
     <string name="recents">Recientes</string>
     <string name="empty_state_message">Selecciona el modelo y empieza a escribir…</string>
     <string name="import_model_file">Importar archivo de modelo</string>
@@ -210,7 +210,7 @@
     </plurals>
     <string name="searching">Buscando…</string>
     <string name="searching_cd">Buscando. Tocá Detener para cancelar.</string>
-    <string name="loading_model_cd">Cargando modelo.</string>
+    <string name="loading_model_cd">Cargando modelo por primera vez.</string>
 
     <!-- Errores y diálogos del chat -->
     <string name="error_model_unavailable">Este modelo ya no está disponible. Elegí otro modelo o descargalo de nuevo.</string>
