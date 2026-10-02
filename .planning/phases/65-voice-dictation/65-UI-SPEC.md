@@ -33,7 +33,7 @@ Single-button feature. No new design language, no new screens, no new type roles
 ### 4. Rationale UI shape (first-tap, VOICE-02)
 
 - **Component:** `WarpedAlertDialog` (`ui/components/WarpedAlertDialog.kt`) — the same dialog used by all 19 existing call sites (model switch, delete confirm, image picker). Standard confirm/dismiss slot signature.
-- **Trigger:** first mic tap when `RECORD_AUDIO` not yet granted. Title `R.string.voice_rationale_title` (EN "Voice dictation" / ES "Dictado por voz"), body `R.string.voice_rationale_body` (EN "Allow microphone access to dictate messages. Your speech is processed by the system's speech service." / ES "Permite el acceso al micrófono para dictar mensajes. Tu voz la procesa el servicio de voz del sistema."). Confirm `R.string.voice_rationale_allow` (EN "Allow" / ES "Permitir") → fires the system permission request; dismiss `R.string.dismiss` (existing string, reused).
+- **Trigger:** first mic tap when `RECORD_AUDIO` not yet granted. Title `R.string.voice_rationale_title` (EN "Voice dictation" / ES "Dictado por voz"), body `R.string.voice_rationale_body` (EN "Allow microphone access to dictate messages. Your speech is processed by the system's speech service." / ES "Permite el acceso al micrófono para dictar mensajes. Tu voz la procesa el servicio de voz del sistema."). Confirm `R.string.voice_rationale_allow` (EN "Allow Microphone" / ES "Permitir micrófono") → fires the system permission request; dismiss `R.string.dismiss` (existing string, reused).
 - **No custom layout.** Title + body + two buttons, dialog width and type roles per WarpedAlertDialog defaults.
 
 ### 5. Denial Snackbar + Settings escape (VOICE-02)
@@ -48,7 +48,7 @@ Single-button feature. No new design language, no new screens, no new type roles
 - **Motion:** zero animation. Icon swap is instant (same as send↔stop swap today). Partial text appears at recognizer cadence — no debounce, no shimmer.
 - **Dark-mode:** all tints derive from `MaterialTheme.colorScheme.primary` + white-alpha overlays already used in this bar — works in both schemes with no hardcoded branch. Bar surface stays `Color(0xFF2B2B29)` (`OgCardDark`) untouched.
 - **Touch target:** 40.dp IconButton (matches siblings; executor notes existing 40.dp vs 48.dp guideline deviation is pre-existing bar convention, not this phase's to change).
-- **TalkBack:** `cd_dictate` / `cd_stop_listening` content-descriptions; listening state announced via content-description change only.
+- **TalkBack:** `cd_dictate` / `cd_stop_listening` content-descriptions; listening state additionally exposed via localized `stateDescription` (`voice_listening_state`) on the mic button while `isListening`.
 
 ## Contract Summary
 
@@ -58,7 +58,7 @@ Single-button feature. No new design language, no new screens, no new type roles
 | Typography | Zero new roles. Dialog text via WarpedAlertDialog defaults; new strings are plain body copy. (Phase 64 checker constraint: 5 surveyed M3 roles only.) |
 | Color | 60/30/10 unchanged. Accent `primary` (#D97757 both schemes) reserved for: (a) listening container tint @0.5 alpha, (b) rationale confirm button (dialog default). Snackbar uses default surface. No error-red anywhere in this phase. |
 | Icons | `Icons.Filled.Mic` (idle) + `Icons.Filled.Stop` (listening, already imported). No new icon dependency. |
-| Copy (EN+ES) | 5 new strings: `cd_dictate`, `cd_stop_listening`, `voice_rationale_title`, `voice_rationale_body`, `voice_rationale_allow`, `voice_denied`, `voice_open_settings` (7 keys); `dismiss` reused. |
+| Copy (EN+ES) | 7 new strings: `cd_dictate`, `cd_stop_listening`, `voice_rationale_title`, `voice_rationale_body`, `voice_rationale_allow`, `voice_denied`, `voice_open_settings` (7 keys); `dismiss` reused. |
 | States | idle-mic / listening-stop / hidden (no recognizer) / generating (mic yields to generation-stop) / rationale dialog / denial Snackbar / silent recognition-error |
 
 ## Non-Goals (explicitly out of contract)

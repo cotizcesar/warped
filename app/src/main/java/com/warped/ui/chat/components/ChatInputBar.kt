@@ -29,6 +29,8 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.warped.R
@@ -201,9 +203,16 @@ fun ChatInputBar(
                 // (speechAvailable) and while generating so no two stop
                 // icons ever appear together.
                 if (speechAvailable && !isGenerating) {
+                    // Phase 65 UI-review: localized stateDescription so
+                    // TalkBack announces the listening state beyond the
+                    // content-description swap (which is not reliably
+                    // re-announced on a stable node). Cleared when idle.
+                    val listeningState = stringResource(R.string.voice_listening_state)
                     IconButton(
                         onClick = onMicClick,
-                        modifier = Modifier.size(40.dp),
+                        modifier = Modifier.size(40.dp).semantics {
+                            if (isListening) stateDescription = listeningState
+                        },
                         colors = IconButtonDefaults.iconButtonColors(
                             containerColor = if (isListening) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent
                         )

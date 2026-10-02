@@ -191,6 +191,7 @@
     <string name="cd_send">Send</string>
     <string name="cd_dictate">Dictate</string>
     <string name="cd_stop_listening">Stop listening</string>
+    <string name="voice_listening_state">Listening</string>
     <string name="cd_parameters">Parameters</string>
 
     <!-- Reading progress -->
