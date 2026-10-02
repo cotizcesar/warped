@@ -48,6 +48,12 @@ object LocalToolLoop {
     const val TOOL_WEB_FETCH = "web_fetch"
 
     /**
+     * Phase 70 (70-01): third allowlist entry — the document-reader tool.
+     * Dispatch is exact-match only (ASVS V4), same as the web tools.
+     */
+    const val TOOL_READ_TEXT = "read_text_file"
+
+    /**
      * Step cap: max TOOL CALLS per message (not rounds). Call-counting
      * bounds worst-case work 1:1 (5 keyless DDG calls max per message);
      * multi-call rounds cannot multiply the work.
@@ -71,6 +77,14 @@ object LocalToolLoop {
             "check your connection or paste another link."
     const val MODEL_ONLY_STRING =
         "Search returned no usable results. Answer from model knowledge."
+
+    /**
+     * Phase 70 (70-01): degradation fed when `read_text_file` fires with no
+     * document bound to the current turn (T-70-04: never a previous turn's
+     * content, never a throw — the model answers without the document).
+     */
+    const val DOCUMENT_READ_FAILED_STRING =
+        "Couldn't read the attached document — answering without it."
 
     /** True once the call budget is exhausted — the next tool result must be [CAP_REACHED_STRING]. */
     fun isCapReached(callsUsed: Int): Boolean = callsUsed >= MAX_TOOL_CALLS
@@ -113,6 +127,11 @@ object LocalToolLoop {
                 val url = (args["url"] as? String)?.trim().orEmpty()
                 if (url.isEmpty()) "Reading…" else "Reading ${urlHost(url)}…"
             }
+            TOOL_READ_TEXT -> {
+                val filename = (args["filename"] as? String)?.trim().orEmpty()
+                if (filename.isEmpty()) "Reading document…"
+                else "Reading document \"${filename.take(MAX_STATUS_ARG_CHARS)}\"…"
+            }
             else -> null
         }
 
@@ -134,18 +153,19 @@ object LocalToolLoop {
 
     /**
      * Exact-name dispatch (AGENT-04, ASVS V4): returns the canonical tool
-     * name for `web_search`/`web_fetch`, null for anything else. Unknown
-     * names are never executed — the caller feeds [unknownToolMessage].
+     * name for `web_search`/`web_fetch`/`read_text_file`, null for anything
+     * else. Unknown names are never executed — the caller feeds
+     * [unknownToolMessage].
      */
     fun mapToolCallName(name: String): String? =
         when (name) {
-            TOOL_WEB_SEARCH, TOOL_WEB_FETCH -> name
+            TOOL_WEB_SEARCH, TOOL_WEB_FETCH, TOOL_READ_TEXT -> name
             else -> null
         }
 
     /** Concise English error for unknown tool names — never executed, never thrown. */
     fun unknownToolMessage(name: String): String =
-        "Unknown tool \"$name\". Available tools: $TOOL_WEB_SEARCH, $TOOL_WEB_FETCH."
+        "Unknown tool \"$name\". Available tools: $TOOL_WEB_SEARCH, $TOOL_WEB_FETCH, $TOOL_READ_TEXT."
 
     /**
      * Quick-task (agentic-rows): the richer tool-call record threaded from
@@ -231,6 +251,15 @@ object LocalToolLoop {
         }
 
     /**
+     * Maps the turn-bound document block back to the model-facing result
+     * string. Passes through VERBATIM — already sanitized
+     * (`DocumentPrompt.sanitize`) + budgeted (`DocumentReader.capFor`)
+     * upstream (AGENT-02 trust falls out for free, same shape as
+     * [mapFetchResult] — never raw file bytes).
+     */
+    fun mapDocumentResult(text: String): String = text
+
+    /**
      * Validates model-authored tool args BEFORE any socket or credit burn
      * (AGENT-02 input validation). Returns null when valid; otherwise the
      * short-circuit/error string the executor feeds back WITHOUT calling
@@ -243,6 +272,10 @@ object LocalToolLoop {
             TOOL_WEB_SEARCH -> {
                 val query = args["query"] as? String
                 if (query.isNullOrBlank()) MODEL_ONLY_STRING else null
+            }
+            TOOL_READ_TEXT -> {
+                val filename = args["filename"] as? String
+                if (!filename.isNullOrBlank()) null else MODEL_ONLY_STRING
             }
             TOOL_WEB_FETCH -> {
                 val url = (args["url"] as? String)?.trim().orEmpty()

@@ -7,9 +7,9 @@ import com.google.ai.edge.litertlm.ToolSet
 /**
  * Phase 56 (56-01): `web_fetch` tool schema for the local agentic loop.
  *
- * Fixed two-tool allowlist (AGENT-04): this file plus [WebSearchToolSet]
- * are the ONLY tool schemas in the app — no file/system/shell surface
- * exists.
+ * Fixed three-tool allowlist (AGENT-04): this file plus [WebSearchToolSet]
+ * and [ReadTextToolSet] are the ONLY tool schemas in the app — no
+ * file/system/shell surface exists.
  *
  * The body is schema-only: the manual loop (plan 02) executes
  * `MultiUrlFetcher.fetchAll()` as a suspend call on `Dispatchers.IO` and

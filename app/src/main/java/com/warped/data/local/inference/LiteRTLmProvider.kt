@@ -11,6 +11,7 @@ import com.google.ai.edge.litertlm.ThinkingConfig
 import com.google.ai.edge.litertlm.LiteRtLmJniException
 import com.google.ai.edge.litertlm.tool
 import com.warped.data.agentic.LocalToolLoop
+import com.warped.data.agentic.ReadTextToolSet
 import com.warped.data.agentic.WebFetchToolSet
 import com.warped.data.agentic.WebSearchToolSet
 import com.warped.data.grounding.DuckDuckGoSearchRepository
@@ -34,6 +35,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.first
@@ -160,6 +162,22 @@ class LiteRTLmProvider @Inject constructor(
 
     @Volatile
     private var activeConversationConfig: ConversationConfig? = null
+
+    /**
+     * Phase 70 (70-01): turn-bound document block for the `read_text_file`
+     * executor branch. Set per turn by the caller that fuses the VM's
+     * attachment into the turn text (Plan 02 threads it — same fused
+     * `DocumentPrompt` block string, so an explicit model call re-feeds
+     * identical content, still bounded by the same cap and the loop call
+     * budget, never a second full-size copy); null when no document is
+     * attached. Volatile because the loop reads it off the collection
+     * context while the VM writes it from its own scope. Turn-scoped by
+     * contract (T-70-04: a missing attachment feeds the degradation
+     * string, never a previous turn's content — the writer clears it after
+     * send).
+     */
+    @Volatile
+    var attachedDocumentBlock: String? = null
 
     /**
      * Phase 56 (56-02, T-56-10): arming inputs baked into
@@ -331,7 +349,7 @@ class LiteRTLmProvider @Inject constructor(
                 initialMessages = historyMessages,
                 samplerConfig = samplerConfig,
                 // 47 precedent: FRESH ToolSet instances per creation — never singletons.
-                tools = listOf(tool(WebSearchToolSet()), tool(WebFetchToolSet())),
+                tools = listOf(tool(WebSearchToolSet()), tool(WebFetchToolSet()), tool(ReadTextToolSet())),
                 automaticToolCalling = false,
                 systemInstruction = Contents.of("$IDENTITY_LINE $TOOL_USE_SYSTEM_HINT"),
                 extraContext = emptyMap()
@@ -652,6 +670,26 @@ class LiteRTLmProvider @Inject constructor(
                     throw e
                 } catch (e: Exception) {
                     Timber.w(e, "LiteRTLm: web_fetch failed")
+                    LocalToolLoop.ToolCallOutcome(LocalToolLoop.toolFailureMessage(e.message.orEmpty()), failed = true)
+                }
+            }
+            LocalToolLoop.TOOL_READ_TEXT -> {
+                // No internet gate: a local file read needs no socket
+                // (the no-op gate is satisfied by construction). Reads the
+                // turn-bound block on Dispatchers.IO and feeds it back via
+                // ToolResponse exactly like fetch; null/blank attachment
+                // degrades to the failed-read string, never a throw.
+                try {
+                    val block = withContext(Dispatchers.IO) { attachedDocumentBlock }
+                    if (block.isNullOrBlank()) {
+                        LocalToolLoop.ToolCallOutcome(LocalToolLoop.DOCUMENT_READ_FAILED_STRING)
+                    } else {
+                        LocalToolLoop.ToolCallOutcome(LocalToolLoop.mapDocumentResult(block))
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Timber.w(e, "LiteRTLm: read_text_file failed")
                     LocalToolLoop.ToolCallOutcome(LocalToolLoop.toolFailureMessage(e.message.orEmpty()), failed = true)
                 }
             }
