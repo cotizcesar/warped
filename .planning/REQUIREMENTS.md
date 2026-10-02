@@ -9,8 +9,8 @@ Requirements for v3.0 Chat UX + Voice Dictation. Each maps to roadmap phases.
 
 ### Play Rating
 
-- [ ] **RATE-01**: User gets an ambient Play In-App Review prompt at success moments (completed turns + cooldown, silent no-show on quota) — never behind a visible "Rate" button
-- [ ] **RATE-02**: User can open the Play Store listing from an in-app entry so rating is always reachable even when the Review dialog is quota-suppressed
+- [x] **RATE-01**: User gets an ambient Play In-App Review prompt at success moments (completed turns + cooldown, silent no-show on quota) — never behind a visible "Rate" button
+- [x] **RATE-02**: User can open the Play Store listing from an in-app entry so rating is always reachable even when the Review dialog is quota-suppressed
 
 ### Chat Drawer
 
@@ -72,8 +72,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RATE-01 | Phase 66 | Pending |
-| RATE-02 | Phase 66 | Pending |
+| RATE-01 | Phase 66 | Complete |
+| RATE-02 | Phase 66 | Complete |
 | DRAWER-01 | Phase 64 | Complete |
 | DRAWER-02 | Phase 64 | Complete |
 | DRAWER-03 | Phase 64 | Complete |
