@@ -122,6 +122,50 @@
 
 ---
 
+## Milestone: v3.1 — Voice Messages + New Tool
+
+**Shipped:** 2026-10-02
+**Phases:** 4 (67–70) | **Plans:** 10 (2+3+3+2)
+
+### What Was Built
+- Voice capture + send: VM-owned recorder/transcoder, 60 s cap, first-30 s PCM via audioBytes (67)
+- Draft preview + history playback: sub-1 s guard, single-player, Room 17→18 (68)
+- Differentiation + gating + transcript: provider-keyed gate, disabled-with-reason, parallel STT captions, coachmark, Help §9 (69)
+- Document reader: SAF pick, [DOCUMENT CONTEXT] envelope, local loop + remote tools[]; TOOL-03 unbuilt by FIT verdict (70)
+
+### What Worked
+- **Autonomous discuss→plan→execute held for 4/4 phases:** smart-discuss grey-area tables accepted with zero overrides across 16 areas — upfront contracts (zero-new-deps, filesDir/voice, VM-owned, read-only tool) eliminated re-decision downstream.
+- **Research-first scoping paid off twice:** 70-RESEARCH proved tool infrastructure already existed (phase became extension, not construction) and settled TOOL-03 FIT with evidence before any plan was written.
+- **Review-fix loop caught real blockers:** 67 CR-01/CR-02, 68 CR-01 + 7 concurrency races, 69 CR-01 dictation/transcript collision, 70 CR-01/02/03 injection + envelope bugs — all fixed pre-ship, suite stayed green throughout.
+- **Audit-time integration check earned its keep:** the cross-phase checker found the IME/row-2 voice-draft gap no phase review caught; fixed inline at audit.
+- **House-precedent deferrals scaled cleanly:** 4 device smokes → release-UAT with runbooks, zero phase failures, audit passed.
+
+### What Was Inefficient
+- **Stash-A/B flake proofs cost 3+ full-suite runs:** GroundingPromptTest order-dependence needed baseline/with-fix/re-run triangulation (~2 min each) — cheap per run but disruptive; a documented flake quarantine list would skip re-proof.
+- **VERIFICATION frontmatter drift:** 70's `status: pass` (vs canonical `passed`) blocked `phase.complete` — a second occurrence of the shape problem (67 needed frontmatter added too). Template enforcement would kill this class.
+- **Quick-task scanner false positives:** 2 completed quick tasks flagged [unknown] for missing frontmatter — fixed with 10 inserted lines, but the close halted on it.
+- **Acknowledge-call transients:** 2 of 12 deferred-item acknowledges failed first attempt, succeeded on retry — no idempotency concern, but the HALT-on-failure rule needs a retry before halting.
+
+### Patterns Established
+- **Contingency-scoped requirements:** TOOL-03's FIT-with-evidence verdict (recorded as code comment + grep-verified zero artifacts) is the pattern for "prove unfit or stay unbuilt" scope control.
+- **Delete-path confinement as security evidence:** canonical-path `filesDir/voice` checks on delete (68/69) double as both bug fix and threat mitigation — write the check once, cite it twice.
+- **Spec amendment over code churn for convention conflicts:** when shipped convention (active-mode container) contradicts new spec wording (tint-only), amend the spec with rationale — consistency across modes beats spec literalism.
+- **Audit-inline gap fixes:** integration WARNINGs found at audit get fixed in the audit (not a new phase) when they're one-liners with existing test coverage.
+
+### Key Lessons
+1. Enforce VERIFICATION.md canonical frontmatter (`status: passed|gaps_found|human_needed`) at execute-phase write time — post-hoc repair blocks transitions.
+2. Enforce `status: complete` frontmatter in quick-task SUMMARYs at creation — the audit scanner only reads frontmatter.
+3. Keep a running flake-quarantine list (ModelSwitchUnloadTest, GroundingPromptTest, turbine timeouts) so future phases cite instead of re-proving via stash A/B.
+4. Retry acknowledge calls once before HALT — transient writer failures shouldn't stop a close.
+
+### Cost Observations
+- Timeline: 2026-10-02 (single day); 10 plans across 4 phases
+- Tests: 935 pre-existing → 1047 green (+112: voice 60+, doc 27, regression alignments)
+- Security: SECURED 31/31 threats (8+8+8+7); UI reviews advisory 17–20/24 with all priority fixes applied
+- Notable: zero new Gradle dependencies across the milestone; TOOL-03 deliberately unbuilt
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution

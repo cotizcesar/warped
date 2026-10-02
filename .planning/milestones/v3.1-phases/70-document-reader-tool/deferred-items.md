@@ -14,6 +14,7 @@ are green (see VERIFICATION.md).
   "Attach document" (then "Replace attached document"), chip remove announces
   "Remove attached document", attached state announces the filename.
 - **Expect:** Matches 70-UI-SPEC Surface 1 + Surface 2.
+  status: acknowledged
 
 ## UAT-70-02 — Grounding + truncation notice (device, local model)
 
@@ -24,6 +25,7 @@ are green (see VERIFICATION.md).
   chars at 4K window) → chip shows `· showing first N chars` + Snackbar
   "Showing first N chars of {filename}" on send; answer still arrives.
 - **Expect:** Never silent, never blocked (70-CONTEXT boundary).
+  status: acknowledged
 
 ## UAT-70-03 — Degradation paths (device)
 
@@ -33,6 +35,7 @@ are green (see VERIFICATION.md).
   send → Snackbar "Couldn't read {name} — answering without it", text-only
   answer arrives. Send is never dead-ended in any path.
 - **Expect:** 70-UI-SPEC Surface 3 copy, SnackbarDuration.Short.
+  status: acknowledged
 
 ## UAT-70-04 — Remote E2E per provider
 
@@ -43,6 +46,7 @@ are green (see VERIFICATION.md).
   rejects `tools[]` (400 naming tools) → exactly-one retry without tools +
   the tools-unsupported notice, turn completes (existing fallback path).
 - **Expect:** Same cap, envelope, and fallback as local.
+  status: acknowledged
 
 ## UAT-70-05 — Fuentes card + preview + rotation + locale
 
@@ -52,6 +56,7 @@ are green (see VERIFICATION.md).
   with the bounded text start and NO browser button. Rotate with attachment →
   chip survives. Switch to ES locale → all chip/Snackbar copy translated.
 - **Expect:** 70-UI-SPEC copy table EN+ES.
+  status: acknowledged
 
 ## NOTE-70-06 — Pre-existing test flake (not UAT, tracked here for visibility)
 
@@ -64,3 +69,4 @@ are green (see VERIFICATION.md).
 - **Runbook:** Re-run `./gradlew :app:testDebugUnitTest`; if still red, run
   the single class to confirm, then file a stability fix (raise poll attempts
   or await the error via Turbine-style condition instead of fixed attempts).
+  status: acknowledged
