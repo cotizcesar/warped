@@ -245,6 +245,17 @@
     <string name="voice_msg_recording_state">Recording, %1$d:%2$02d</string>
     <string name="voice_msg_remote_blocked">Voice messages need an on-device audio model.</string>
     <string name="voice_msg_transcode_failed">Voice message could not be processed.</string>
+    <!-- Voice draft preview (Phase 68) -->
+    <string name="voice_msg_too_short">Recording too short</string>
+    <string name="voice_msg_play_draft">Play voice draft</string>
+    <string name="voice_msg_pause_draft">Pause voice draft</string>
+    <string name="voice_msg_send_voice">Send voice message</string>
+    <string name="voice_msg_delete_draft">Delete voice draft</string>
+    <string name="voice_msg_draft_state">Voice draft, %1$d:%2$02d, %3$s</string>
+    <string name="voice_msg_draft_playing">playing</string>
+    <string name="voice_msg_draft_paused">paused</string>
+    <!-- Voice history playback (Phase 68; resource ships in Plan 01 so Wave 2 compiles) -->
+    <string name="voice_msg_clip_unavailable">Voice clip unavailable</string>
 
     <!-- Capability badges -->
     <string name="badge_vision">Vision</string>

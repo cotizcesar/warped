@@ -118,6 +118,10 @@ fun ChatScreen(
     // Phase 67 (VMSG-01 full): recording-row state (timer + amplitude).
     val voiceElapsedSec by viewModel.voiceElapsedSec.collectAsStateWithLifecycle()
     val voiceAmplitude by viewModel.voiceAmplitude.collectAsStateWithLifecycle()
+    // Phase 68 (VMSG-02): draft preview state (clip duration + playback).
+    val isDraftPlaying by viewModel.isDraftPlaying.collectAsStateWithLifecycle()
+    val draftPositionMs by viewModel.draftPositionMs.collectAsStateWithLifecycle()
+    val draftDurationMs by viewModel.draftDurationMs.collectAsStateWithLifecycle()
     // 48-01 (PERF-15): keyed LazyColumn state. isAtBottom follows 48-UI-SPEC
     // §3 ("last item visible and within 48dp of the end").
     val listState = rememberLazyListState()
@@ -179,12 +183,20 @@ fun ChatScreen(
             }
         }
     }
+    // Phase 68: screen Context hoisted above the lifecycle observer (the
+    // ON_PAUSE branch reads isChangingConfigurations for the
+    // rotation-vs-background playback distinction).
+    val context = LocalContext.current
     DisposableEffect(Unit) {
         onDispose {
             // Phase 65 (VOICE-03): stop dictation when leaving the screen so
             // the recognizer never outlives the UI (destroy itself happens
             // in ChatViewModel.onCleared).
             viewModel.stopDictation()
+            // Phase 68 (VMSG-02): stop draft playback on chat exit — the
+            // player never leaks past the screen (destroy itself happens
+            // in ChatViewModel.onCleared).
+            viewModel.stopPlayback()
             viewModel.unloadLocalModels()
         }
     }
@@ -208,6 +220,15 @@ fun ChatScreen(
             // survives it.
             if (event == Lifecycle.Event.ON_PAUSE) {
                 viewModel.autoStopVoiceRecording(announceCap = false)
+                // Phase 68 (VMSG-02): pause draft playback without a
+                // foreground service. Rotation (config change) stops via
+                // stopPlayback so the position resets to 0 by construction
+                // (VM keeps no saved position — recreation restarts at 0
+                // and the user resumes with one tap); plain backgrounding
+                // pauses and keeps the position. The draft file stays
+                // on disk either way.
+                val changing = (context as? Activity)?.isChangingConfigurations == true
+                if (changing) viewModel.stopPlayback() else viewModel.pauseVoiceDraft()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -242,7 +263,6 @@ fun ChatScreen(
         )
     }
 
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -501,12 +521,10 @@ fun ChatScreen(
                     loadingFirstTime = connection.loadingFirstTime,
                 )
                 TurnStatusRow(status = turnStatus)
-                ChatInputBar(
-                text = input.inputText,
-                isGenerating = input.isGenerating,
-                canSend = (connection.selectedLocalModelId ?: connection.selectedRemoteModelId) != null,
-                onTextChange = { viewModel.updateInput(it) },
-                onSend = {
+                // Phase 68 (VMSG-02): the draft card sends voice + caption
+                // through the same route as the input-row send (a kept clip
+                // always takes the transcode-and-send path).
+                val onSendMessage = {
                     // CR-03: never leave the mic live without its indicator
                     // — the mic hides while generating, so stop first.
                     if (isListening) viewModel.stopDictation()
@@ -521,7 +539,13 @@ fun ChatScreen(
                     }
                     attachedImages = emptyList()
                     audioBytes = null
-                },
+                }
+                ChatInputBar(
+                text = input.inputText,
+                isGenerating = input.isGenerating,
+                canSend = (connection.selectedLocalModelId ?: connection.selectedRemoteModelId) != null,
+                onTextChange = { viewModel.updateInput(it) },
+                onSend = onSendMessage,
                 onStop = { viewModel.stopGeneration() },
                 reasoningEnabled = input.enableThinking,
                 onToggleReasoning = { viewModel.toggleThinking() },
@@ -548,6 +572,15 @@ fun ChatScreen(
                 voiceElapsedSec = voiceElapsedSec,
                 voiceAmplitude = voiceAmplitude,
                 onCancelRecording = { viewModel.cancelVoiceRecording() },
+                // Phase 68 (VMSG-02): draft preview card state + callbacks.
+                hasVoiceClip = hasVoiceClip,
+                isDraftPlaying = isDraftPlaying,
+                draftPositionMs = draftPositionMs,
+                draftDurationMs = draftDurationMs,
+                onPlayDraft = { viewModel.playVoiceDraft() },
+                onPauseDraft = { viewModel.pauseVoiceDraft() },
+                onSendDraft = onSendMessage,
+                onDeleteDraft = { viewModel.deleteVoiceDraft() },
                 // WR-03: report the caret so dictation inserts at cursor.
                 onCursorChange = { viewModel.updateInputCursor(it) },
                 // Model-loading gate: the whole bar locks while loading.

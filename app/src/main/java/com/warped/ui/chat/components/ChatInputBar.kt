@@ -11,8 +11,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.foundation.text.KeyboardActions
@@ -76,6 +79,17 @@ fun ChatInputBar(
     voiceElapsedSec: Int = 0,
     voiceAmplitude: Int = 0,
     onCancelRecording: () -> Unit = {},
+    // Phase 68 (VMSG-02): draft preview card state. Shown when a kept clip
+    // exists and no recording is running; the caption input stays live
+    // alongside the card and send transmits voice + caption as one bubble.
+    hasVoiceClip: Boolean = false,
+    isDraftPlaying: Boolean = false,
+    draftPositionMs: Int = 0,
+    draftDurationMs: Long = 0L,
+    onPlayDraft: () -> Unit = {},
+    onPauseDraft: () -> Unit = {},
+    onSendDraft: () -> Unit = {},
+    onDeleteDraft: () -> Unit = {},
     // Model-loading gate (2026-10-02): while a model loads, the WHOLE
     // input is disabled — text field, image/think buttons, mic, and send.
     isLoadingModel: Boolean = false,
@@ -124,6 +138,23 @@ fun ChatInputBar(
                         }
                     }
                 }
+            }
+
+            // Phase 68 (VMSG-02): persistent draft preview card above the
+            // input row — play/pause + progress + total duration + send +
+            // delete. Unlike the recording row it never replaces the text
+            // field: the caption stays editable and sends with the voice.
+            if (hasVoiceClip && !isVoiceRecording) {
+                DraftPreviewCard(
+                    isPlaying = isDraftPlaying,
+                    positionMs = draftPositionMs,
+                    durationMs = draftDurationMs,
+                    onPlay = onPlayDraft,
+                    onPause = onPauseDraft,
+                    onSend = onSendDraft,
+                    onDelete = onDeleteDraft,
+                )
+                Spacer(Modifier.height(8.dp))
             }
 
             // Row 1: Input only. WR-03: TextFieldValue (not raw String) so
@@ -357,6 +388,103 @@ fun ChatInputBar(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Phase 68 (VMSG-02): persistent voice-draft preview card. Rendered above
+ * the input row while a kept clip exists (never while recording).
+ *
+ * Duration convention (locked): the readout is ALWAYS the total m:ss —
+ * position shows only as progress fill. TalkBack announces total +
+ * playing/paused, so the description changes only on play/pause toggles
+ * (never per-tick) — the Phase 67 5 s throttle discipline holds by
+ * construction with zero live-region spam.
+ */
+@Composable
+private fun DraftPreviewCard(
+    isPlaying: Boolean,
+    positionMs: Int,
+    durationMs: Long,
+    onPlay: () -> Unit,
+    onPause: () -> Unit,
+    onSend: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val totalSec = (durationMs / 1000).toInt().coerceAtLeast(0)
+    val stateWord = stringResource(
+        if (isPlaying) R.string.voice_msg_draft_playing else R.string.voice_msg_draft_paused
+    )
+    val announceText = stringResource(
+        R.string.voice_msg_draft_state,
+        totalSec / 60,
+        totalSec % 60,
+        stateWord,
+    )
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { stateDescription = announceText },
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(
+                onClick = { if (isPlaying) onPause() else onPlay() },
+                modifier = Modifier.size(48.dp),
+            ) {
+                Icon(
+                    if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    stringResource(
+                        if (isPlaying) R.string.voice_msg_pause_draft
+                        else R.string.voice_msg_play_draft
+                    ),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            Spacer(Modifier.width(4.dp))
+            LinearProgressIndicator(
+                progress = {
+                    if (durationMs > 0) {
+                        (positionMs.toFloat() / durationMs).coerceIn(0f, 1f)
+                    } else {
+                        0f
+                    }
+                },
+                modifier = Modifier.weight(1f),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "%d:%02d".format(totalSec / 60, totalSec % 60),
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontFeatureSettings = "tnum"
+                ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.width(8.dp))
+            IconButton(onClick = onSend, modifier = Modifier.size(48.dp)) {
+                Icon(
+                    Icons.AutoMirrored.Filled.Send,
+                    stringResource(R.string.voice_msg_send_voice),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
+                Icon(
+                    Icons.Filled.Delete,
+                    stringResource(R.string.voice_msg_delete_draft),
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(24.dp),
+                )
             }
         }
     }

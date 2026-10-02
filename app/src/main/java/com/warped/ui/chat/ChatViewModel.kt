@@ -2,6 +2,7 @@ package com.warped.ui.chat
 
 import android.app.Activity
 import android.content.Context
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Base64
 import androidx.annotation.VisibleForTesting
@@ -34,6 +35,7 @@ import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.LocalModelRepository
 import com.warped.ui.chat.voice.VoiceDictationManager
+import com.warped.ui.chat.voice.VoiceMessagePlayer
 import com.warped.ui.chat.voice.VoiceMessageRecorder
 import com.warped.ui.chat.voice.PcmTranscoder
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -1812,6 +1814,78 @@ class ChatViewModel @Inject constructor(
         voiceRecorderOverride ?: voiceRecorder
 
     /**
+     * Phase 68 (VMSG-02): draft playback state. The player is VM-owned
+     * (same lazy-holder + override-seam discipline as the recorder),
+     * destroyed in [onCleared] so playback never leaks past the screen.
+     * Position is VM memory only — never rememberSaveable/SavedStateHandle —
+     * so rotation and process death restart it at 0 by construction.
+     */
+    private val _draftDurationMs = MutableStateFlow(0L)
+    val draftDurationMs: StateFlow<Long> = _draftDurationMs.asStateFlow()
+
+    private val _isDraftPlaying = MutableStateFlow(false)
+    val isDraftPlaying: StateFlow<Boolean> = _isDraftPlaying.asStateFlow()
+
+    private val _draftPositionMs = MutableStateFlow(0)
+    val draftPositionMs: StateFlow<Int> = _draftPositionMs.asStateFlow()
+
+    private var voicePlayer: VoiceMessagePlayer? = null
+
+    @VisibleForTesting
+    internal var voicePlayerOverride: VoiceMessagePlayer? = null
+
+    /**
+     * Phase 68: MediaMetadataRetriever is framework-only (unavailable under
+     * JVM unit tests), so duration reads go through this seam — tests inject
+     * fixed durations, production reads the just-stopped file on IO.
+     */
+    @VisibleForTesting
+    internal var voiceDurationReader: (java.io.File) -> Long = { readClipDurationMs(it) }
+
+    /**
+     * Rapid-toggle debounce mirroring [voiceStarting]: play/pause taps
+     * while a play is in flight are ignored.
+     */
+    @Volatile
+    private var draftPlayStarting = false
+
+    private var draftPollJob: Job? = null
+
+    /**
+     * Phase 68: send-time voice holders. [sendVoiceMessage] stamps the kept
+     * clip's absolute path + draft duration here before clearing draft
+     * state; Plan 02 reads them when building the persisted Room message.
+     */
+    @VisibleForTesting
+    internal var lastSentVoicePath: String? = null
+
+    @VisibleForTesting
+    internal var lastSentVoiceDurationMs: Long = 0L
+
+    private fun getVoicePlayer(): VoiceMessagePlayer {
+        val fresh = voicePlayerOverride ?: voicePlayer ?: VoiceMessagePlayer(context).also {
+            voicePlayer = it
+        }
+        // (Re)attached on every access so injected test fakes get the same
+        // completion/error wiring as the real holder. Completion/error
+        // callbacks fire on player-internal threads — they only touch
+        // thread-safe StateFlows, never Compose state directly.
+        fresh.onCompletion = {
+            _isDraftPlaying.value = false
+            _draftPositionMs.value = 0
+            draftPollJob?.cancel()
+            draftPollJob = null
+        }
+        fresh.onError = {
+            _isDraftPlaying.value = false
+            _draftPositionMs.value = 0
+            draftPollJob?.cancel()
+            draftPollJob = null
+        }
+        return fresh
+    }
+
+    /**
      * Start voice capture. Stops dictation first (single live input mode).
      * The recording flag flips only when the platform accepted the start;
      * RECORD_AUDIO gating is owned by the caller (ChatScreen).
@@ -1839,8 +1913,9 @@ class ChatViewModel @Inject constructor(
                             Timber.w(e, "VoiceMsg: pending-stop failed")
                             null
                         }
-                        voiceClipFile = kept
-                        _hasVoiceClip.value = kept != null
+                        // Phase 68: spin-up stops validate through the same
+                        // sub-1 s choke point as every other stop path.
+                        keepClipAfterDurationCheck(kept, announceCap = false)
                     } else {
                         try {
                             peekVoiceRecorder()?.cancel()
@@ -1910,9 +1985,69 @@ class ChatViewModel @Inject constructor(
             if (voiceStarting) pendingVoiceStop = PendingVoiceStop.KEEP
             return
         }
-        val file = keepAndStopVoice()
-        voiceClipFile = file
-        _hasVoiceClip.value = file != null
+        // Phase 68: the recorder stop stays synchronous (the recording row
+        // flips at once); duration validation hops to IO via the choke.
+        keepClipAfterDurationCheck(keepAndStopVoice(), announceCap = false)
+    }
+
+    /**
+     * Phase 68 (VMSG-02): single stop-and-keep choke point for the sub-1 s
+     * guard. Manual stop, spin-up pending-stop, 60 s auto-stop, and
+     * background auto-stop all land here. Clips under 1 s — or whose
+     * duration cannot be read — are deleted with a graceful Short Snackbar;
+     * the draft card never appears for them.
+     */
+    private fun keepClipAfterDurationCheck(file: java.io.File?, announceCap: Boolean) {
+        if (file == null) {
+            voiceClipFile = null
+            _hasVoiceClip.value = false
+            _draftDurationMs.value = 0L
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO + coroutineExceptionHandler) {
+            val durationMs = try {
+                voiceDurationReader(file)
+            } catch (e: Exception) {
+                Timber.w(e, "VoiceMsg: duration check failed")
+                0L
+            }
+            if (durationMs < 1_000L) {
+                try {
+                    if (file.exists()) file.delete()
+                } catch (e: Exception) {
+                    Timber.w(e, "VoiceMsg: too-short delete failed")
+                }
+                voiceClipFile = null
+                _hasVoiceClip.value = false
+                _draftDurationMs.value = 0L
+                _events.tryEmit(ChatEvent.Snackbar(context.getString(R.string.voice_msg_too_short)))
+            } else {
+                voiceClipFile = file
+                _draftDurationMs.value = durationMs
+                _hasVoiceClip.value = true
+                if (announceCap) _voiceCapEvent.tryEmit(Unit)
+            }
+        }
+    }
+
+    /** Accurate clip duration via MediaMetadataRetriever (caller is on IO). */
+    private fun readClipDurationMs(file: java.io.File): Long {
+        return try {
+            val retriever = MediaMetadataRetriever()
+            try {
+                retriever.setDataSource(file.absolutePath)
+                retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                    ?.toLongOrNull() ?: 0L
+            } finally {
+                try {
+                    retriever.release()
+                } catch (_: Exception) {
+                }
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "VoiceMsg: duration read failed")
+            0L
+        }
     }
 
     /**
@@ -1927,10 +2062,9 @@ class ChatViewModel @Inject constructor(
             if (voiceStarting) pendingVoiceStop = PendingVoiceStop.KEEP
             return
         }
-        val file = keepAndStopVoice()
-        voiceClipFile = file
-        _hasVoiceClip.value = file != null
-        if (announceCap && file != null) _voiceCapEvent.tryEmit(Unit)
+        // Phase 68: validates through the sub-1 s choke (a 60 s clip is
+        // never sub-1 s, but the guard owns the single choke point).
+        keepClipAfterDurationCheck(keepAndStopVoice(), announceCap)
     }
 
     /**
@@ -1960,6 +2094,10 @@ class ChatViewModel @Inject constructor(
         }
         voiceClipFile = null
         _hasVoiceClip.value = false
+        // Phase 68: cancel also tears down draft playback state so no
+        // player or duration outlives the discarded clip.
+        _draftDurationMs.value = 0L
+        stopPlaybackInternal()
         _isVoiceRecording.value = false
         _voiceAmplitude.value = 0
     }
@@ -1973,8 +2111,15 @@ class ChatViewModel @Inject constructor(
      */
     fun sendVoiceMessage(caption: String) {
         val file = voiceClipFile ?: return
+        // Phase 68: stamp the send-time holders Plan 02 persists into the
+        // Room row, stop draft playback, then clear draft state. The file
+        // stays on disk — it becomes the history playback source of truth.
+        lastSentVoicePath = file.absolutePath
+        lastSentVoiceDurationMs = _draftDurationMs.value
+        stopPlaybackInternal()
         voiceClipFile = null
         _hasVoiceClip.value = false
+        _draftDurationMs.value = 0L
         viewModelScope.launch(Dispatchers.IO + coroutineExceptionHandler) {
             val result = try {
                 PcmTranscoder.transcodeFirst30s(file.absolutePath)
@@ -1982,6 +2127,7 @@ class ChatViewModel @Inject constructor(
                 Timber.w(e, "VoiceMsg: transcode failed")
                 voiceClipFile = file
                 _hasVoiceClip.value = true
+                _draftDurationMs.value = lastSentVoiceDurationMs
                 _events.tryEmit(ChatEvent.Snackbar(context.getString(R.string.voice_msg_transcode_failed)))
                 return@launch
             }
@@ -1990,6 +2136,103 @@ class ChatViewModel @Inject constructor(
             }
             sendMessage(caption, audioBytes = result.bytes)
         }
+    }
+
+    /**
+     * Phase 68 (VMSG-02): play the kept draft — resume when paused,
+     * restart otherwise. Stops any other playback first (the player is
+     * shared with Plan 02 history: single-player discipline). No-op
+     * without a clip, while already playing, or while a play is in flight.
+     */
+    fun playVoiceDraft() {
+        val file = voiceClipFile ?: return
+        if (_isDraftPlaying.value || draftPlayStarting) return
+        draftPlayStarting = true
+        viewModelScope.launch(Dispatchers.IO + coroutineExceptionHandler) {
+            try {
+                stopPlaybackInternal()
+                val player = getVoicePlayer()
+                var started = if (player.hasClip) player.resume() else player.play(file.absolutePath)
+                if (!started) {
+                    // Stale handle (released under us) — one fresh attempt.
+                    player.stop()
+                    started = player.play(file.absolutePath)
+                }
+                if (!started) return@launch
+                _isDraftPlaying.value = true
+                startDraftPoll(player)
+            } finally {
+                draftPlayStarting = false
+            }
+        }
+    }
+
+    /** Phase 68: pause draft playback, keeping the position for resume. */
+    fun pauseVoiceDraft() {
+        if (!_isDraftPlaying.value) return
+        viewModelScope.launch(Dispatchers.IO + coroutineExceptionHandler) {
+            try {
+                getVoicePlayer().pause()
+            } catch (e: Exception) {
+                Timber.w(e, "VoiceMsg: pause draft failed")
+            }
+            _isDraftPlaying.value = false
+            draftPollJob?.cancel()
+            draftPollJob = null
+        }
+    }
+
+    /**
+     * Phase 68: single stop-playback entry shared by draft and (Plan 02)
+     * history. Stops the shared player, clears playing state, resets
+     * positions. Draft clip and history rows are untouched.
+     */
+    fun stopPlayback() {
+        stopPlaybackInternal()
+    }
+
+    private fun stopPlaybackInternal() {
+        draftPollJob?.cancel()
+        draftPollJob = null
+        try {
+            voicePlayerOverride?.stop() ?: voicePlayer?.stop()
+        } catch (e: Exception) {
+            Timber.w(e, "VoiceMsg: stopPlayback failed")
+        }
+        _isDraftPlaying.value = false
+        _draftPositionMs.value = 0
+    }
+
+    private fun startDraftPoll(player: VoiceMessagePlayer) {
+        draftPollJob?.cancel()
+        draftPollJob = viewModelScope.launch(Dispatchers.Default + coroutineExceptionHandler) {
+            while (_isDraftPlaying.value) {
+                delay(250)
+                _draftPositionMs.value = try {
+                    player.positionMs()
+                } catch (e: Exception) {
+                    Timber.w(e, "VoiceMsg: draft poll failed")
+                    0
+                }
+            }
+        }
+    }
+
+    /**
+     * Phase 68: discard the draft — stop playback, delete the audio file
+     * immediately (no confirmation, Phase 67 cancel-discards precedent),
+     * clear draft state.
+     */
+    fun deleteVoiceDraft() {
+        stopPlaybackInternal()
+        try {
+            voiceClipFile?.takeIf { it.exists() }?.delete()
+        } catch (e: Exception) {
+            Timber.w(e, "VoiceMsg: delete draft failed")
+        }
+        voiceClipFile = null
+        _hasVoiceClip.value = false
+        _draftDurationMs.value = 0L
     }
 
     fun launchModelSelection(modelId: String, providerType: ProviderType, endpointId: Long? = null) {
@@ -2573,6 +2816,12 @@ class ChatViewModel @Inject constructor(
         voiceSessionJob = null
         voiceRecorder?.destroy()
         voiceRecorder = null
+        // Phase 68 (VMSG-02): stop draft playback and destroy the player
+        // (mirrors the recorder teardown — nothing leaks past the screen).
+        draftPollJob?.cancel()
+        draftPollJob = null
+        voicePlayer?.destroy()
+        voicePlayer = null
         unloadLocalModels()
     }
 }

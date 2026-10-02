@@ -246,6 +246,17 @@
     <string name="voice_msg_recording_state">Grabando, %1$d:%2$02d</string>
     <string name="voice_msg_remote_blocked">Los mensajes de voz necesitan un modelo de audio en el dispositivo.</string>
     <string name="voice_msg_transcode_failed">No se pudo procesar el mensaje de voz.</string>
+    <!-- Borrador de voz (Phase 68) -->
+    <string name="voice_msg_too_short">Grabación muy corta</string>
+    <string name="voice_msg_play_draft">Escuchar borrador de voz</string>
+    <string name="voice_msg_pause_draft">Pausar borrador de voz</string>
+    <string name="voice_msg_send_voice">Enviar mensaje de voz</string>
+    <string name="voice_msg_delete_draft">Eliminar borrador de voz</string>
+    <string name="voice_msg_draft_state">Borrador de voz, %1$d:%2$02d, %3$s</string>
+    <string name="voice_msg_draft_playing">reproduciendo</string>
+    <string name="voice_msg_draft_paused">en pausa</string>
+    <!-- Reproducción del historial (Phase 68) -->
+    <string name="voice_msg_clip_unavailable">Clip de voz no disponible</string>
 
     <!-- Insignias de capacidad -->
     <string name="badge_vision">Visión</string>

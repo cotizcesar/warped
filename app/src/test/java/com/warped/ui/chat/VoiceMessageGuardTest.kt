@@ -214,6 +214,10 @@ class VoiceMessageGuardTest {
         val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
         val vm = buildViewModel(idleHelper(), modelFile.absolutePath)
         runCurrent()
+        // Phase 68: stop validates the clip duration off-Main (sub-1 s
+        // guard) — inject a long clip so the keep lands, then park on the
+        // keep instead of asserting it synchronously.
+        vm.voiceDurationReader = { 3_000L }
 
         val outDir = File(tempDir, "voice")
         val handle = FakeHandle()
@@ -226,6 +230,7 @@ class VoiceMessageGuardTest {
         )
         vm.voiceRecorderOverride = recorder
 
+        var clip: File? = null
         vm.isVoiceRecording.test {
             assertThat(awaitItem()).isFalse()
             vm.startVoiceRecording()
@@ -234,19 +239,24 @@ class VoiceMessageGuardTest {
             assertThat(awaitItem()).isTrue()
 
             // Simulate the platform having written the clip file.
-            val clip = File(requireNotNull(handle.outputPath))
-            clip.parentFile?.mkdirs()
-            clip.writeText("fake-audio")
+            clip = File(requireNotNull(handle.outputPath))
+            clip!!.parentFile?.mkdirs()
+            clip!!.writeText("fake-audio")
 
             vm.stopVoiceRecording()
             assertThat(awaitItem()).isFalse()
-            assertThat(vm.hasVoiceClip.value).isTrue()
-            assertThat(clip.exists()).isTrue()
-
-            // Cancel after stop discards the kept clip from disk.
-            vm.cancelVoiceRecording()
-            assertThat(vm.hasVoiceClip.value).isFalse()
-            assertThat(clip.exists()).isFalse()
         }
+        // Park until the IO-side guard keeps the clip.
+        vm.hasVoiceClip.test {
+            var kept = awaitItem()
+            while (!kept) kept = awaitItem()
+        }
+        assertThat(vm.hasVoiceClip.value).isTrue()
+        assertThat(requireNotNull(clip).exists()).isTrue()
+
+        // Cancel after stop discards the kept clip from disk.
+        vm.cancelVoiceRecording()
+        assertThat(vm.hasVoiceClip.value).isFalse()
+        assertThat(requireNotNull(clip).exists()).isFalse()
     }
 }
