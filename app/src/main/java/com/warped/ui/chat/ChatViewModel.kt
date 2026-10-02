@@ -1817,7 +1817,10 @@ class ChatViewModel @Inject constructor(
                 _hasVoiceClip.value = false
                 voiceSessionJob?.cancel()
                 voiceSessionJob = viewModelScope.launch(coroutineExceptionHandler) {
-                    launch {
+                    // WR-03: the 100 ms amplitude sampler is binder IPC —
+                    // never on Main. The ticker below only touches
+                    // StateFlows (cheap) so it stays on the Main scope.
+                    launch(Dispatchers.Default) {
                         while (true) {
                             delay(100)
                             _voiceAmplitude.value = recorder.maxAmplitude()
