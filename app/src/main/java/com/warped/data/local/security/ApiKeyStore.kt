@@ -27,5 +27,8 @@ class ApiKeyStore @Inject constructor(
 
     fun deleteAllKeys(endpointIds: List<Long>) {
         endpointIds.forEach { deleteKey(it) }
+        // Legacy alias orphaned by the Phase 63 DDG-only migration; remove
+        // is idempotent so this is harmless when already absent.
+        keystoreManager.remove(KeystoreManager.LEGACY_SEARCH_ALIAS)
     }
 }

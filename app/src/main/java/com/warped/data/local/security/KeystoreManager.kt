@@ -66,4 +66,14 @@ class KeystoreManager @Inject constructor(
             Timber.e(e, "KeystoreManager: clearAll failed")
         }
     }
+
+    companion object {
+        /**
+         * Phase 63: legacy search-provider alias orphaned by the DDG-only
+         * migration. Single source of truth so writer/remover typo drift is
+         * caught at compile time (see ApiKeyStore.deleteAllKeys and
+         * WarpedApplication cleanup).
+         */
+        const val LEGACY_SEARCH_ALIAS = "tavily_api_key"
+    }
 }
