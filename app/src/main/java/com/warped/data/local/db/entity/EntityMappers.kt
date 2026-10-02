@@ -34,6 +34,12 @@ fun MessageEntity.toDomain(): ChatMessage = ChatMessage(
     createdAt = Instant.ofEpochMilli(createdAt),
     stats = stats,
     reasoning = reasoning,
+    // Phase 68: blank stored paths degrade to no-player (same drop-unknown
+    // precedent as toRoleSafe) — a hand-edited or legacy row never crashes
+    // history load.
+    audioPath = audioPath?.takeIf { it.isNotBlank() },
+    audioDurationMs = audioDurationMs,
+    transcript = transcript,
     imageUris = images?.let { 
         try { mapperJson.decodeFromString<List<String>>(it) } catch (_: Exception) { emptyList() }
     } ?: emptyList()
@@ -47,6 +53,9 @@ fun ChatMessage.toEntity(conversationId: Long): MessageEntity = MessageEntity(
     createdAt = createdAt.toEpochMilli(),
     stats = stats,
     reasoning = reasoning,
+    audioPath = audioPath,
+    audioDurationMs = audioDurationMs,
+    transcript = transcript,
     images = if (imageUris.isNotEmpty()) mapperJson.encodeToString(imageUris) else null
 )
 

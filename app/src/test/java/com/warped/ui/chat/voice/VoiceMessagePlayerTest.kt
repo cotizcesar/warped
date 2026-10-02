@@ -239,6 +239,22 @@ class VoiceMessagePlayerTest {
     }
 
     @Test
+    fun `currentPath tracks the loaded clip and clears on stop`() {
+        val player = player()
+
+        assertThat(player.currentPath).isNull()
+        assertThat(player.play("/voice/a.m4a")).isTrue()
+        assertThat(player.currentPath).isEqualTo("/voice/a.m4a")
+
+        player.pause()
+        // Pause keeps the handle — the path stays for same-path resume.
+        assertThat(player.currentPath).isEqualTo("/voice/a.m4a")
+
+        player.stop()
+        assertThat(player.currentPath).isNull()
+    }
+
+    @Test
     fun `position and duration default to zero when idle`() {
         val player = player()
 

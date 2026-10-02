@@ -27,5 +27,11 @@ data class MessageEntity(
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "images") val images: String? = null,
     @ColumnInfo(name = "stats") val stats: String? = null,
-    @ColumnInfo(name = "reasoning") val reasoning: String? = null
+    @ColumnInfo(name = "reasoning") val reasoning: String? = null,
+    // Phase 68 (VMSG-06): voice-message metadata. NULL path = non-voice
+    // message; duration 0 = unknown; transcript is the Phase 69 (VMSG-07)
+    // placeholder — write-never/read-never in Phase 68, NULL = none yet.
+    @ColumnInfo(name = "audio_path") val audioPath: String? = null,
+    @ColumnInfo(name = "audio_duration_ms") val audioDurationMs: Long = 0,
+    @ColumnInfo(name = "transcript") val transcript: String? = null
 )

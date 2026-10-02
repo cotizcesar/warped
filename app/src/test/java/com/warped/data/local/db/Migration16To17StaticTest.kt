@@ -155,14 +155,22 @@ class Migration16To17StaticTest {
     }
 
     @Test
-    fun `registration - version 17 annotation, single 16-17 migration, wired into database builder`() {
+    fun `registration - version at-least 17 annotation, single 16-17 migration, wired into database builder`() {
+        // Phase 68: the head version moved to 18 — this gate pins the
+        // 16→17 link, not the current head (mirrors the 15→16 at-least
+        // precedent in Migration15To16StaticTest).
         AppDatabase::class.java.getAnnotation(Database::class.java)?.let { annotation ->
-            assertThat(annotation.version).isEqualTo(17)
+            assertWithMessage("AppDatabase version must never move below 17")
+                .that(annotation.version).isAtLeast(17)
         }
         val appDatabaseSource =
             mainSource("com/warped/data/local/db/AppDatabase.kt")
-        assertWithMessage("AppDatabase @Database annotation must declare version = 17")
-            .that(appDatabaseSource.contains("version = 17")).isTrue()
+        val declaredVersion = "version = (\\d+)".toRegex()
+            .find(appDatabaseSource)?.groupValues?.getOrNull(1)?.toIntOrNull()
+        assertWithMessage("AppDatabase @Database annotation must declare a version")
+            .that(declaredVersion).isNotNull()
+        assertWithMessage("AppDatabase version must never move below 17, found %s", declaredVersion)
+            .that(declaredVersion!!).isAtLeast(17)
 
         val migrationsSource =
             mainSource("com/warped/data/local/db/Migrations.kt")

@@ -155,3 +155,17 @@ val MIGRATION_16_17 = object : Migration(16, 17) {
         db.execSQL("ALTER TABLE grounded_sources ADD COLUMN snippet TEXT")
     }
 }
+
+// Phase 68 (VMSG-06): voice-message columns on messages. audio_path NULL =
+// non-voice message; audio_duration_ms 0 = unknown; transcript NULL = no
+// transcript yet (Phase 69 VMSG-07 placeholder — write-never/read-never in
+// Phase 68). No index (no query filters on voice columns), no backfill
+// (legacy rows read NULL/0/NULL = non-voice). Mirrors the 15_16/16_17
+// ALTER-only shape.
+val MIGRATION_17_18 = object : Migration(17, 18) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE messages ADD COLUMN audio_path TEXT")
+        db.execSQL("ALTER TABLE messages ADD COLUMN audio_duration_ms INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE messages ADD COLUMN transcript TEXT")
+    }
+}

@@ -27,6 +27,13 @@ data class ChatMessage(
     // Phase 52 (FETCH-02): attempted-URL count behind an all-fail banner so
     // the copy pluralizes for M > 1. Ephemeral, same as its siblings.
     val modelOnlySourceCount: Int = 1,
+    // Phase 68 (VMSG-06): voice-message metadata — Room-PERSISTED (unlike
+    // the ephemeral grounding siblings above), hydrated into domain on
+    // history load. transcript is Phase-69-owned (VMSG-07): write-never and
+    // render-never in Phase 68, NULL = no transcript yet.
+    val audioPath: String? = null,
+    val audioDurationMs: Long = 0,
+    val transcript: String? = null,
 )
 
 /** Phase 50 (WEB-06): why a grounded turn fell back to the model-only path. */

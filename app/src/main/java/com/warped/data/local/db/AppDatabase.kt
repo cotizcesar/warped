@@ -30,7 +30,7 @@ import com.warped.data.local.db.entity.RemoteEndpointEntity
         BenchmarkResultEntity::class,
         GroundedSourceEntity::class
     ],
-    version = 17,
+    version = 18,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {

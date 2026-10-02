@@ -490,7 +490,24 @@ class ChatViewModel @Inject constructor(
         }
 
         val imageDataUrls = images.mapNotNull { uriToBase64(it) }
-        val userMessage = ChatMessage(role = Role.USER, content = text.trim(), imageUris = imageDataUrls)
+        // Phase 68 Plan 02 (VMSG-06): stamp the kept clip's path + duration
+        // (captured by sendVoiceMessage into the send-time holders) onto the
+        // user message so the persisted Room row carries playback metadata.
+        // Text/image sends leave the fields null/0. Consumed only for audio
+        // turns — a text send racing a voice send never steals the holders.
+        val voicePath = if (audioBytes != null) lastSentVoicePath else null
+        val voiceDuration = if (audioBytes != null) lastSentVoiceDurationMs else 0L
+        if (audioBytes != null) {
+            lastSentVoicePath = null
+            lastSentVoiceDurationMs = 0L
+        }
+        val userMessage = ChatMessage(
+            role = Role.USER,
+            content = text.trim(),
+            imageUris = imageDataUrls,
+            audioPath = voicePath,
+            audioDurationMs = voiceDuration,
+        )
         updateTranscript { it.copy(messages = it.messages + userMessage, isStreaming = true) }
         // 56-02: fresh turn clears any stale tool row (same position as the
         // 47 toolCallActive reset).
@@ -1873,14 +1890,24 @@ class ChatViewModel @Inject constructor(
         fresh.onCompletion = {
             _isDraftPlaying.value = false
             _draftPositionMs.value = 0
+            _isHistoryPlaying.value = false
+            _playingMessageId.value = null
+            _historyPositionMs.value = 0
             draftPollJob?.cancel()
             draftPollJob = null
+            historyPollJob?.cancel()
+            historyPollJob = null
         }
         fresh.onError = {
             _isDraftPlaying.value = false
             _draftPositionMs.value = 0
+            _isHistoryPlaying.value = false
+            _playingMessageId.value = null
+            _historyPositionMs.value = 0
             draftPollJob?.cancel()
             draftPollJob = null
+            historyPollJob?.cancel()
+            historyPollJob = null
         }
         return fresh
     }
@@ -2150,9 +2177,16 @@ class ChatViewModel @Inject constructor(
         draftPlayStarting = true
         viewModelScope.launch(Dispatchers.IO + coroutineExceptionHandler) {
             try {
-                stopPlaybackInternal()
                 val player = getVoicePlayer()
-                var started = if (player.hasClip) player.resume() else player.play(file.absolutePath)
+                // Same-path resume (paused draft) vs stop-then-play (a
+                // history clip — or nothing — is loaded): the shared player
+                // only ever resumes the path it holds.
+                var started = if (player.hasClip && player.currentPath == file.absolutePath) {
+                    player.resume()
+                } else {
+                    stopPlaybackInternal()
+                    player.play(file.absolutePath)
+                }
                 if (!started) {
                     // Stale handle (released under us) — one fresh attempt.
                     player.stop()
@@ -2194,6 +2228,8 @@ class ChatViewModel @Inject constructor(
     private fun stopPlaybackInternal() {
         draftPollJob?.cancel()
         draftPollJob = null
+        historyPollJob?.cancel()
+        historyPollJob = null
         try {
             voicePlayerOverride?.stop() ?: voicePlayer?.stop()
         } catch (e: Exception) {
@@ -2201,6 +2237,11 @@ class ChatViewModel @Inject constructor(
         }
         _isDraftPlaying.value = false
         _draftPositionMs.value = 0
+        // Phase 68 Plan 02: history state clears on the same entry —
+        // starting any clip stops the other (single-player discipline).
+        _isHistoryPlaying.value = false
+        _playingMessageId.value = null
+        _historyPositionMs.value = 0
     }
 
     private fun startDraftPoll(player: VoiceMessagePlayer) {
@@ -2233,6 +2274,136 @@ class ChatViewModel @Inject constructor(
         voiceClipFile = null
         _hasVoiceClip.value = false
         _draftDurationMs.value = 0L
+    }
+
+    /**
+     * Phase 68 Plan 02 (VMSG-06): history playback state. Shares the single
+     * [VoiceMessagePlayer] with draft preview — starting any clip stops the
+     * other (single-player discipline via [stopPlayback]).
+     *
+     * Rotation note (CONTEXT): all playback state is VM memory and the VM
+     * survives rotation by construction; the VM does NOT save/restore the
+     * position, so post-rotation state is paused-at-0 by construction
+     * (ChatScreen stops playback on config-change pause, pauses-and-keeps
+     * on plain backgrounding).
+     */
+    private val _playingMessageId = MutableStateFlow<String?>(null)
+    val playingMessageId: StateFlow<String?> = _playingMessageId.asStateFlow()
+
+    private val _isHistoryPlaying = MutableStateFlow(false)
+    val isHistoryPlaying: StateFlow<Boolean> = _isHistoryPlaying.asStateFlow()
+
+    private val _historyPositionMs = MutableStateFlow(0)
+    val historyPositionMs: StateFlow<Int> = _historyPositionMs.asStateFlow()
+
+    private val _historyDurationMs = MutableStateFlow(0L)
+    val historyDurationMs: StateFlow<Long> = _historyDurationMs.asStateFlow()
+
+    private var historyPollJob: Job? = null
+
+    /**
+     * Rapid-toggle debounce mirroring [draftPlayStarting]: history taps
+     * while a play is in flight are ignored (UI-SPEC single-player
+     * backstop).
+     */
+    @Volatile
+    private var historyPlayStarting = false
+
+    /**
+     * Play a sent voice bubble. Missing file renders the graceful
+     * unavailable Snackbar and never touches the player (T-68-05:
+     * audioPath is untrusted stored text — existence-checked before
+     * setDataSource, blank path is a no-op).
+     */
+    fun playHistoryVoice(message: ChatMessage) {
+        val path = message.audioPath?.takeIf { it.isNotBlank() } ?: return
+        if (historyPlayStarting) return
+        historyPlayStarting = true
+        viewModelScope.launch(Dispatchers.IO + coroutineExceptionHandler) {
+            try {
+                val file = java.io.File(path)
+                if (!file.exists()) {
+                    _events.tryEmit(
+                        ChatEvent.Snackbar(context.getString(R.string.voice_msg_clip_unavailable))
+                    )
+                    return@launch
+                }
+                val player = getVoicePlayer()
+                // Same-path resume (paused bubble) vs stop-then-play.
+                var started = if (player.hasClip && player.currentPath == file.absolutePath) {
+                    player.resume()
+                } else {
+                    stopPlaybackInternal()
+                    player.play(file.absolutePath)
+                }
+                if (!started) {
+                    player.stop()
+                    started = player.play(file.absolutePath)
+                }
+                if (!started) return@launch
+                _playingMessageId.value = message.id
+                _isHistoryPlaying.value = true
+                _historyDurationMs.value = message.audioDurationMs
+                startHistoryPoll(player)
+            } finally {
+                historyPlayStarting = false
+            }
+        }
+    }
+
+    /** Phase 68: pause history playback, keeping the position for resume. */
+    fun pauseHistoryVoice() {
+        if (_playingMessageId.value == null) return
+        viewModelScope.launch(Dispatchers.IO + coroutineExceptionHandler) {
+            try {
+                getVoicePlayer().pause()
+            } catch (e: Exception) {
+                Timber.w(e, "VoiceMsg: pause history failed")
+            }
+            // playingMessageId + position are KEPT — one tap resumes.
+            _isHistoryPlaying.value = false
+            historyPollJob?.cancel()
+            historyPollJob = null
+        }
+    }
+
+    /** Phase 68: bubble-toggle convenience — pause this clip if playing, else play. */
+    fun toggleHistoryVoice(message: ChatMessage) {
+        if (_playingMessageId.value == message.id && _isHistoryPlaying.value) {
+            pauseHistoryVoice()
+        } else {
+            playHistoryVoice(message)
+        }
+    }
+
+    private fun startHistoryPoll(player: VoiceMessagePlayer) {
+        historyPollJob?.cancel()
+        historyPollJob = viewModelScope.launch(Dispatchers.Default + coroutineExceptionHandler) {
+            while (_isHistoryPlaying.value) {
+                delay(250)
+                _historyPositionMs.value = try {
+                    player.positionMs()
+                } catch (e: Exception) {
+                    Timber.w(e, "VoiceMsg: history poll failed")
+                    0
+                }
+            }
+        }
+    }
+
+    /**
+     * Phase 68: clip-file existence for history bubbles. Exists-check only
+     * (no streams) — call sites remember it per message so composition never
+     * performs IO directly (T-68-08).
+     */
+    fun hasVoiceFile(path: String?): Boolean {
+        if (path.isNullOrBlank()) return false
+        return try {
+            java.io.File(path).exists()
+        } catch (e: Exception) {
+            Timber.w(e, "VoiceMsg: hasVoiceFile failed")
+            false
+        }
     }
 
     fun launchModelSelection(modelId: String, providerType: ProviderType, endpointId: Long? = null) {
@@ -2492,10 +2663,22 @@ class ChatViewModel @Inject constructor(
      * matches on the String id so the bubble disappears immediately.
      */
     fun deleteMessage(messageId: String) {
+        // Phase 68 Plan 02: deleting a voice message orphans its clip — the
+        // row is the source of truth, so the file goes best-effort right
+        // after the DB delete (draft-or-bubble delete removes the file
+        // immediately, per CONTEXT).
+        val audioPath = _transcript.value.messages.firstOrNull { it.id == messageId }?.audioPath
         viewModelScope.launch(coroutineExceptionHandler) {
             messageId.toLongOrNull()?.let { chatRepository.deleteMessage(it) }
             updateTranscript { state ->
                 state.copy(messages = state.messages.filter { it.id != messageId })
+            }
+            if (!audioPath.isNullOrBlank()) {
+                try {
+                    java.io.File(audioPath).takeIf { it.exists() }?.delete()
+                } catch (e: Exception) {
+                    Timber.w(e, "VoiceMsg: voice message file delete failed")
+                }
             }
         }
     }
@@ -2820,6 +3003,8 @@ class ChatViewModel @Inject constructor(
         // (mirrors the recorder teardown — nothing leaks past the screen).
         draftPollJob?.cancel()
         draftPollJob = null
+        historyPollJob?.cancel()
+        historyPollJob = null
         voicePlayer?.destroy()
         voicePlayer = null
         unloadLocalModels()

@@ -88,6 +88,15 @@ class VoiceMessagePlayer(
     val hasClip: Boolean
         get() = handle != null
 
+    /**
+     * Absolute path of the loaded clip (null when no handle is alive).
+     * Lets the ViewModel resume only the SAME path — starting a different
+     * clip always stops first (single-player discipline across draft and
+     * history sharing this one instance).
+     */
+    var currentPath: String? = null
+        private set
+
     private var handle: PlayerHandle? = null
 
     /** Fired on natural completion (internal threads — route via StateFlow). */
@@ -138,6 +147,7 @@ class VoiceMessagePlayer(
             requestFocus()
             fresh.start()
             handle = fresh
+            currentPath = path
             isPlaying = true
             return true
         } catch (e: Exception) {
@@ -148,6 +158,7 @@ class VoiceMessagePlayer(
                 // Best effort.
             }
             handle = null
+            currentPath = null
             isPlaying = false
             return false
         }
@@ -244,6 +255,7 @@ class VoiceMessagePlayer(
             Timber.w(e, "VoicePlay: release failed")
         } finally {
             handle = null
+            currentPath = null
             isPlaying = false
         }
         abandonFocus()
