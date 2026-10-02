@@ -285,7 +285,7 @@ fun ChatScreen(
             // composes under MainActivity.
             val activity = context as? Activity
             val permanent = if (activity != null) {
-                !ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.RECORD_AUDIO)
+                !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.RECORD_AUDIO)
             } else {
                 Timber.w("Voice: non-Activity context, assuming transient denial")
                 false
