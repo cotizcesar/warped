@@ -374,13 +374,16 @@ fun ChatInputBar(
                     // replaces); the attached filename rides
                     // stateDescription (Phase 65 pattern).
                     if (modelHasVision) Spacer(Modifier.width(10.dp))
+                    // Hoisted out of semantics{}: stringResource is
+                    // @Composable and cannot run inside the semantics lambda.
+                    val attachedStateDesc = attachedDocName?.let {
+                        stringResource(R.string.doc_reader_attached, it)
+                    }
                     IconButton(
                         onClick = onAttachDocument,
                         enabled = !inputLocked,
                         modifier = Modifier.size(40.dp).semantics {
-                            attachedDocName?.let {
-                                stateDescription = stringResource(R.string.doc_reader_attached, it)
-                            }
+                            attachedStateDesc?.let { stateDescription = it }
                         },
                     ) {
                         Icon(
