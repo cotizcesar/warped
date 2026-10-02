@@ -52,6 +52,7 @@ fun ModelsScreen(
     var showAddWizard by remember { mutableStateOf(false) }
     val isEndpointFormOpen = uiState.isEndpointFormVisible || uiState.isEditingEndpoint
     val snackbarHostState = remember { SnackbarHostState() }
+    val dismissLabel = stringResource(R.string.dismiss)
 
     // Quick-task (activation-new-chat): activation creates the bound
     // conversation row asynchronously — navigate once its id lands, then
@@ -66,7 +67,7 @@ fun ModelsScreen(
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let { msg ->
-            snackbarHostState.showSnackbar(message = msg, actionLabel = "Dismiss", withDismissAction = true)
+            snackbarHostState.showSnackbar(message = msg, actionLabel = dismissLabel, withDismissAction = true)
             viewModel.clearError()
         }
     }

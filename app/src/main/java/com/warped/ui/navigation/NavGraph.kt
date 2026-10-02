@@ -238,7 +238,7 @@ fun WarpedNavGraph() {
                                         modifier = Modifier.size(32.dp)
                                     ) {
                                         Icon(
-                                            Icons.Filled.Close, "Delete",
+                                            Icons.Filled.Close, stringResource(R.string.delete),
                                             tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
                                             modifier = Modifier.size(16.dp)
                                         )
