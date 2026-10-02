@@ -352,7 +352,11 @@ fun WarpedNavGraph() {
                             launchSingleTop = true
                         }
                     },
-                    onNavigateToCatalog = { navController.navigate(Screen.HuggingFace) }
+                    onNavigateToCatalog = {
+                        navController.navigate(Screen.HuggingFace) {
+                            launchSingleTop = true
+                        }
+                    }
                 )
             }
             composable<Screen.NewChat> {
@@ -365,7 +369,11 @@ fun WarpedNavGraph() {
                             launchSingleTop = true
                         }
                     },
-                    onNavigateToCatalog = { navController.navigate(Screen.HuggingFace) }
+                    onNavigateToCatalog = {
+                        navController.navigate(Screen.HuggingFace) {
+                            launchSingleTop = true
+                        }
+                    }
                 )
             }
             composable<Screen.ChatDetail> { backStackEntry ->
@@ -382,7 +390,11 @@ fun WarpedNavGraph() {
                             launchSingleTop = true
                         }
                     },
-                    onNavigateToCatalog = { navController.navigate(Screen.HuggingFace) }
+                    onNavigateToCatalog = {
+                        navController.navigate(Screen.HuggingFace) {
+                            launchSingleTop = true
+                        }
+                    }
                 )
             }
             composable<Screen.Selector> {
@@ -392,7 +404,11 @@ fun WarpedNavGraph() {
                             popUpTo(Screen.Chat) { inclusive = true }
                         }
                     },
-                    onOpenHuggingFace = { navController.navigate(Screen.HuggingFace) },
+                    onOpenHuggingFace = {
+                        navController.navigate(Screen.HuggingFace) {
+                            launchSingleTop = true
+                        }
+                    },
                     onNavigateToPresets = {
                         navController.navigate(Screen.Presets) {
                             launchSingleTop = true
@@ -408,7 +424,11 @@ fun WarpedNavGraph() {
                             popUpTo(Screen.Chat) { inclusive = true }
                         }
                     },
-                    onOpenHuggingFace = { navController.navigate(Screen.HuggingFace) },
+                    onOpenHuggingFace = {
+                        navController.navigate(Screen.HuggingFace) {
+                            launchSingleTop = true
+                        }
+                    },
                     onOpenDrawer = { scope.launch { drawerState.open() } }
                 )
             }
