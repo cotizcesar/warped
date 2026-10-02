@@ -189,6 +189,8 @@
     <string name="cd_add_image">Agregar imagen</string>
     <string name="cd_stop">Detener</string>
     <string name="cd_send">Enviar</string>
+    <string name="cd_dictate">Dictar</string>
+    <string name="cd_stop_listening">Dejar de escuchar</string>
     <string name="cd_parameters">Parámetros</string>
 
     <!-- Progreso de lectura -->
@@ -216,6 +218,13 @@
     <string name="snack_sources_not_saved">No se pudieron guardar las fuentes. La vista previa puede no estar disponible al reiniciar.</string>
     <string name="toast_invalid_link">Enlace inválido.</string>
     <string name="toast_no_browser">No se encontró un navegador para abrir el enlace.</string>
+
+    <!-- Dictado por voz (Phase 65) -->
+    <string name="voice_rationale_title">Dictado por voz</string>
+    <string name="voice_rationale_body">Permite el acceso al micrófono para dictar mensajes. Tu voz la procesa el servicio de voz del sistema.</string>
+    <string name="voice_rationale_allow">Permitir micrófono</string>
+    <string name="voice_denied">Micrófono bloqueado. Actívalo en Ajustes para dictar.</string>
+    <string name="voice_open_settings">Ajustes</string>
 
     <!-- Insignias de capacidad -->
     <string name="badge_vision">Visión</string>

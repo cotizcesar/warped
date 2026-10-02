@@ -6,10 +6,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Removed 2026-10-01 (pre-public audit): RECORD_AUDIO (dead
-         AudioRecorder, no runtime-permission flow), SCHEDULE_EXACT_ALARM
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Removed 2026-10-01 (pre-public audit): SCHEDULE_EXACT_ALARM
          (no alarm code), ACCESS_FINE/COARSE_LOCATION (zero code usage).
-         Re-add only with a real feature + runtime request. -->
+         Re-add only with a real feature + runtime request. RECORD_AUDIO
+         re-added 2026-10-02 (Phase 65 voice dictation, the real feature
+         this comment demands, with an in-context runtime request on
+         first mic tap). -->
     <!-- tools:ignore DataExtractionRules (on <application>): allowBackup is
          false, so no backup config takes effect on any API level;
          dataExtractionRules is future-proofing for API 31+ only. -->

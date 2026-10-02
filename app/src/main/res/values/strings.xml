@@ -189,6 +189,8 @@
     <string name="cd_add_image">Add image</string>
     <string name="cd_stop">Stop</string>
     <string name="cd_send">Send</string>
+    <string name="cd_dictate">Dictate</string>
+    <string name="cd_stop_listening">Stop listening</string>
     <string name="cd_parameters">Parameters</string>
 
     <!-- Reading progress -->
@@ -215,6 +217,13 @@
     <string name="snack_sources_not_saved">Couldn\'t save the sources. Preview may be unavailable after restart.</string>
     <string name="toast_invalid_link">Invalid link.</string>
     <string name="toast_no_browser">No browser found to open the link.</string>
+
+    <!-- Voice dictation (Phase 65) -->
+    <string name="voice_rationale_title">Voice dictation</string>
+    <string name="voice_rationale_body">Allow microphone access to dictate messages. Your speech is processed by the system\'s speech service.</string>
+    <string name="voice_rationale_allow">Allow Microphone</string>
+    <string name="voice_denied">Microphone blocked. Enable it in Settings to dictate.</string>
+    <string name="voice_open_settings">Settings</string>
 
     <!-- Capability badges -->
     <string name="badge_vision">Vision</string>
