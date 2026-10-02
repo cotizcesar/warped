@@ -311,7 +311,7 @@
         <item quantity="many">Esto eliminará permanentemente las %1$d conversaciones y sus mensajes. No se puede deshacer.</item>
         <item quantity="other">Esto eliminará permanentemente las %1$d conversaciones y sus mensajes. No se puede deshacer.</item>
     </plurals>
-    <string name="settings_delete_all">Eliminar todo</string>
+    <string name="settings_delete_all">Eliminar todos los chats</string>
 
     <!-- Presets -->
     <string name="preset_params_title">Parámetros de generación</string>

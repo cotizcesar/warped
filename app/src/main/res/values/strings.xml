@@ -308,7 +308,7 @@
         <item quantity="one">This will permanently delete all %1$d conversation and its messages. This cannot be undone.</item>
         <item quantity="other">This will permanently delete all %1$d conversations and their messages. This cannot be undone.</item>
     </plurals>
-    <string name="settings_delete_all">Delete All</string>
+    <string name="settings_delete_all">Delete all chats</string>
 
     <!-- Presets -->
     <string name="preset_params_title">Generation Parameters</string>
