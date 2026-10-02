@@ -762,7 +762,13 @@ fun ChatScreen(
                     title = { Text(stringResource(R.string.voice_rationale_title)) },
                     text = {
                         Text(
-                            stringResource(R.string.voice_rationale_body),
+                            stringResource(
+                                if (pendingVoiceRequestName == PendingVoiceRequest.VOICE.name) {
+                                    R.string.voice_msg_rationale_body
+                                } else {
+                                    R.string.voice_rationale_body
+                                }
+                            ),
                             style = MaterialTheme.typography.bodyMedium
                         )
                     },

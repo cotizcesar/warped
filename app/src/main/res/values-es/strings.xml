@@ -241,6 +241,7 @@
     <string name="voice_msg_denied">Se necesita acceso al micrófono: concede permiso para grabar mensajes de voz</string>
     <string name="voice_msg_cancel">Cancelar grabación</string>
     <string name="voice_msg_record">Grabar mensaje de voz</string>
+    <string name="voice_msg_rationale_body">Permite el acceso al micrófono para grabar mensajes de voz. Los clips se guardan en este dispositivo y los primeros 30 segundos se envían al modelo de audio.</string>
     <string name="voice_msg_stop">Detener grabación</string>
     <string name="voice_msg_recording_state">Grabando, %1$d:%2$02d</string>
     <string name="voice_msg_remote_blocked">Los mensajes de voz necesitan un modelo de audio en el dispositivo.</string>

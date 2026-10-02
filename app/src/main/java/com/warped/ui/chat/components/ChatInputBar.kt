@@ -311,9 +311,9 @@ fun ChatInputBar(
 
                 // Phase 67 (VMSG-01 tracer): voice-send button beside the
                 // dictation mic, same visibility conditions. Waveform
-                // glyph (GraphicEq family), never a mic; doubles as the
-                // stop toggle while recording.
-                if (speechAvailable && !isGenerating && !isLoadingModel) {
+                // glyph (GraphicEq family), never a mic. Hidden while
+                // recording — the Row-1 recording row owns stop/cancel.
+                if (speechAvailable && !isGenerating && !isLoadingModel && !isVoiceRecording) {
                     // Adopt the pre-existing dead onAudioRecordingChanged
                     // channel: it now fires with the live recording flag so
                     // the screen-level isRecording state stays real.
@@ -322,18 +322,13 @@ fun ChatInputBar(
                     }
                     IconButton(
                         onClick = onVoiceClick,
-                        modifier = Modifier.size(40.dp),
+                        modifier = Modifier.size(48.dp),
                         colors = IconButtonDefaults.iconButtonColors(
                             containerColor = if (isVoiceRecording) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent
                         )
                     ) {
-                        if (isVoiceRecording) {
-                            Icon(Icons.Filled.Stop, stringResource(R.string.voice_msg_stop),
-                                tint = Color.White, modifier = Modifier.size(24.dp))
-                        } else {
-                            Icon(Icons.Filled.GraphicEq, stringResource(R.string.voice_msg_record),
-                                tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
-                        }
+                        Icon(Icons.Filled.GraphicEq, stringResource(R.string.voice_msg_record),
+                            tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
                     }
                     Spacer(Modifier.width(8.dp))
                 }
