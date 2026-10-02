@@ -10,8 +10,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
@@ -32,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
@@ -101,6 +104,15 @@ fun ChatInputBar(
     // Model-loading gate (2026-10-02): while a model loads, the WHOLE
     // input is disabled — text field, image/think buttons, mic, and send.
     isLoadingModel: Boolean = false,
+    // Phase 70 (70-02): document attachment. onAttachDocument opens the
+    // SAF picker at the call site; attachedDocName != null shows the chip
+    // above the input (filename + size + truncation marker); remove is
+    // single-tap, no dialog. Send includes the document (hasContent).
+    onAttachDocument: () -> Unit = {},
+    attachedDocName: String? = null,
+    attachedDocSize: String? = null,
+    attachedDocTruncatedAt: Int? = null,
+    onRemoveDocument: () -> Unit = {},
     // Phase 69 Plan 03 (VMSG-03): first-use coachmark. When true AND the
     // voice button renders enabled, a one-shot M3 PlainTooltip anchors to
     // it; ANY tap through either button or outside dismisses via
@@ -153,6 +165,61 @@ fun ChatInputBar(
                         }
                     }
                 }
+            }
+
+            // Phase 70 (70-02): document attachment chip — same above-input
+            // slot as the image previews. SurfaceContainer background;
+            // Description icon + filename (Label 14sp, single-line
+            // ellipsis) + size readout (+ inline truncation marker) +
+            // remove X (14dp glyph, 48dp hit target, single tap, no
+            // dialog). Caption stays editable; send transmits text +
+            // document as one turn.
+            if (attachedDocName != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Filled.Description,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = attachedDocName,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        val truncMarker = attachedDocTruncatedAt?.let { n ->
+                            " · " + stringResource(R.string.doc_reader_showing_first, n)
+                        }.orEmpty()
+                        Text(
+                            text = "· ${attachedDocSize.orEmpty()}$truncMarker",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                        IconButton(onClick = onRemoveDocument, modifier = Modifier.size(48.dp)) {
+                            Icon(
+                                Icons.Filled.Close,
+                                stringResource(R.string.doc_reader_remove),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(14.dp),
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
             }
 
             // Phase 68 (VMSG-02): persistent draft preview card above the
@@ -257,7 +324,7 @@ fun ChatInputBar(
                     .fillMaxWidth()
                     .onFocusChanged { inputFocused = it.isFocused }
                     .onKeyEvent { event ->
-                        val hasContent = text.isNotBlank() || attachedImages.isNotEmpty()
+                        val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null
                         if (event.key == Key.Enter && canSend && !isGenerating && !isLoadingModel && hasContent) {
                             onSend()
                             true
@@ -268,7 +335,7 @@ fun ChatInputBar(
                 maxLines = 4,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = {
-                    val hasContent = text.isNotBlank() || attachedImages.isNotEmpty()
+                    val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null
                     if (canSend && !isGenerating && !isLoadingModel && hasContent) onSend()
                 }),
                 shape = MaterialTheme.shapes.medium,
@@ -298,6 +365,31 @@ fun ChatInputBar(
                             Icon(Icons.Filled.AddPhotoAlternate, stringResource(R.string.cd_add_image),
                                 tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
                         }
+                    }
+                    // Phase 70 (70-02): document attach — same left icon row,
+                    // same 40dp size and inputLocked gating as the image
+                    // sibling, sibling tint (neutral affordance, never
+                    // accent). Ungated by model (same UX local + remote);
+                    // description swaps to replace when attached (a new pick
+                    // replaces); the attached filename rides
+                    // stateDescription (Phase 65 pattern).
+                    if (modelHasVision) Spacer(Modifier.width(10.dp))
+                    IconButton(
+                        onClick = onAttachDocument,
+                        enabled = !inputLocked,
+                        modifier = Modifier.size(40.dp).semantics {
+                            if (attachedDocName != null) stateDescription = attachedDocName
+                        },
+                    ) {
+                        Icon(
+                            Icons.Filled.AttachFile,
+                            stringResource(
+                                if (attachedDocName != null) R.string.doc_reader_replace
+                                else R.string.doc_reader_attach
+                            ),
+                            tint = Color.White.copy(alpha = 0.6f),
+                            modifier = Modifier.size(24.dp),
+                        )
                     }
                     // Think toggle
                     val canThink = modelHasReasoning
@@ -449,7 +541,7 @@ fun ChatInputBar(
                         Icon(Icons.Filled.Stop, stringResource(R.string.cd_stop), tint = Color.White, modifier = Modifier.size(24.dp))
                     }
                 } else {
-                    val hasContent = text.isNotBlank() || attachedImages.isNotEmpty()
+                    val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null
                     if (hasContent && canSend && !isLoadingModel) {
                         IconButton(
                             onClick = onSend,

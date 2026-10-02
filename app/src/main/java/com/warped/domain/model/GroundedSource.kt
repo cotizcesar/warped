@@ -8,6 +8,19 @@ package com.warped.domain.model
 const val GROUNDED_SNIPPET_MAX_CHARS = 500
 
 /**
+ * Phase 70 (70-02): display-label convention for document rows — the VM
+ * stores `url = "doc:{filename}"` (filename where a web card shows
+ * title/host; document rows never attempt OG enrichment). Render code
+ * keys off this prefix for the filename label and for hiding web-only
+ * affordances (browser button); the filename itself is display-only
+ * (never a path, T-70-06).
+ */
+const val DOCUMENT_SOURCE_PREFIX = "doc:"
+
+/** True for document rows (Phase 70 `doc:{filename}` convention). */
+fun GroundedSource.isDocumentSource(): Boolean = url.startsWith(DOCUMENT_SOURCE_PREFIX)
+
+/**
  * Phase 53 (SRC-01/02): ephemeral per-source detail for the Fuentes list and
  * the SourcePreviewSheet. Hydrated from the `grounded_sources` table on
  * history load; never persisted into [ChatMessage] columns.

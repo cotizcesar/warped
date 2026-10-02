@@ -273,6 +273,14 @@
     <string name="voice_msg_transcript_fallback">%1$d:%2$02d voice message</string>
     <!-- First-use coachmark (Phase 69) -->
     <string name="voice_msg_coachmark">Voice message</string>
+    <!-- Document reader (Phase 70) -->
+    <string name="doc_reader_attach">Attach document</string>
+    <string name="doc_reader_replace">Replace attached document</string>
+    <string name="doc_reader_remove">Remove attached document</string>
+    <string name="doc_reader_truncated">Showing first %1$d chars of %2$s</string>
+    <string name="doc_reader_unsupported">Can\'t read %1$s yet — text files (.txt, .md) only</string>
+    <string name="doc_reader_failed">Couldn\'t read %1$s — answering without it</string>
+    <string name="doc_reader_showing_first">Showing first %1$d chars</string>
 
     <!-- Capability badges -->
     <string name="badge_vision">Vision</string>

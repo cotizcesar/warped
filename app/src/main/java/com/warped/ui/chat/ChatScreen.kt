@@ -124,6 +124,11 @@ fun ChatScreen(
     // voice-send button (VM persists dismissal — never re-shows).
     val showVoiceCoachmark by viewModel.showVoiceCoachmark.collectAsStateWithLifecycle()
     val hasVoiceClip by viewModel.hasVoiceClip.collectAsStateWithLifecycle()
+    // Phase 70 (70-02): per-turn document attachment → chip params below.
+    // Only READY attachments surface (chip); other statuses keep the text
+    // sendable with their contracted Snackbar notices (VM-owned).
+    val attachedDoc by viewModel.attachedDocument.collectAsStateWithLifecycle()
+    val readyDoc = attachedDoc?.takeIf { it.status == ChatViewModel.AttachStatus.READY }
     // Phase 67 (VMSG-01 full): recording-row state (timer + amplitude).
     val voiceElapsedSec by viewModel.voiceElapsedSec.collectAsStateWithLifecycle()
     val voiceAmplitude by viewModel.voiceAmplitude.collectAsStateWithLifecycle()
@@ -342,6 +347,16 @@ fun ChatScreen(
                 )
             }
         }
+    }
+
+    // Phase 70 (70-02): document picker (SAF OpenDocument, text-MIME
+    // filter — system picker only, per-file read-only grant, no storage
+    // permission). A null result (dismissed picker) is a no-op; a new pick
+    // replaces the previous attachment in the VM (one document per turn).
+    val documentPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { viewModel.attachDocument(it) }
     }
 
     // Phase 65 (VOICE-02): RECORD_AUDIO runtime request. Follows the
@@ -626,6 +641,16 @@ fun ChatScreen(
                 onCursorChange = { viewModel.updateInputCursor(it) },
                 // Model-loading gate: the whole bar locks while loading.
                 isLoadingModel = connection.isLoadingModel,
+                // Phase 70 (70-02): document attach affordance + chip. The
+                // existing SnackbarHost (Short) serves the VM
+                // unsupported/failed/truncation notices — no new channel.
+                onAttachDocument = {
+                    documentPickerLauncher.launch(arrayOf("text/plain", "text/markdown", "text/*"))
+                },
+                attachedDocName = readyDoc?.filename,
+                attachedDocSize = readyDoc?.let { formatDocumentSize(it.sizeBytes) },
+                attachedDocTruncatedAt = readyDoc?.truncatedAt,
+                onRemoveDocument = { viewModel.clearDocument() },
             )
             }
         }

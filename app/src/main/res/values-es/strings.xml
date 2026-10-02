@@ -274,6 +274,14 @@
     <string name="voice_msg_transcript_fallback">%1$d:%2$02d mensaje de voz</string>
     <!-- Coachmark de primer uso (Phase 69) -->
     <string name="voice_msg_coachmark">Mensaje de voz</string>
+    <!-- Lector de documentos (Phase 70) -->
+    <string name="doc_reader_attach">Adjuntar documento</string>
+    <string name="doc_reader_replace">Reemplazar documento adjunto</string>
+    <string name="doc_reader_remove">Quitar documento adjunto</string>
+    <string name="doc_reader_truncated">Mostrando los primeros %1$d caracteres de %2$s</string>
+    <string name="doc_reader_unsupported">Aún no se puede leer %1$s — solo archivos de texto (.txt, .md)</string>
+    <string name="doc_reader_failed">No se pudo leer %1$s — respondiendo sin él</string>
+    <string name="doc_reader_showing_first">Mostrando los primeros %1$d caracteres</string>
 
     <!-- Insignias de capacidad -->
     <string name="badge_vision">Visión</string>

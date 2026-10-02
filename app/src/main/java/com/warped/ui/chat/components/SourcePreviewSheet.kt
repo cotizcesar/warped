@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import com.warped.R
 import com.warped.domain.model.GroundedSource
 import com.warped.domain.model.GroundedSourceStatus
+import com.warped.domain.model.isDocumentSource
 import kotlinx.coroutines.launch
 
 /**
@@ -173,15 +174,19 @@ fun SourcePreviewSheet(
                 )
             }
 
-            // Sticky bottom action row.
-            FilledTonalButton(
-                onClick = { onOpenBrowser(source.url) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp)
-                    .heightIn(min = 44.dp),
-            ) {
-                Text(text = stringResource(R.string.cd_open_in_browser))
+            // Sticky bottom action row. Document rows (Phase 70 `doc:`
+            // convention) have no browser target — the guarded gate would
+            // only toast, so the dead button stays hidden.
+            if (!source.isDocumentSource()) {
+                FilledTonalButton(
+                    onClick = { onOpenBrowser(source.url) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp)
+                        .heightIn(min = 44.dp),
+                ) {
+                    Text(text = stringResource(R.string.cd_open_in_browser))
+                }
             }
         }
     }

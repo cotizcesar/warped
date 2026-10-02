@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.warped.R
+import com.warped.domain.model.DOCUMENT_SOURCE_PREFIX
 import com.warped.domain.model.GroundedSource
 import com.warped.ui.theme.OgCardDark
 import com.warped.ui.theme.OgShimmer
@@ -353,6 +354,11 @@ fun ogDisplayDescription(ogDescription: String?, snippet: String? = null): Strin
 
 /** Phase 58 (OG-02): host fallback for untitled sources; raw URL when unparseable. */
 fun ogHostOf(url: String): String {
+    // Phase 70 (70-02): document rows carry no host — the filename (prefix
+    // stripped) is the card label.
+    if (url.startsWith(DOCUMENT_SOURCE_PREFIX)) {
+        return url.removePrefix(DOCUMENT_SOURCE_PREFIX).ifBlank { url }
+    }
     val host = try {
         URI(url).host
     } catch (_: Exception) {
