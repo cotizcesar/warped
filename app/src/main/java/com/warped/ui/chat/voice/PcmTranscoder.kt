@@ -3,6 +3,7 @@ package com.warped.ui.chat.voice
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
+import android.media.AudioFormat
 import kotlinx.coroutines.withContext
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -81,6 +82,22 @@ object PcmTranscoder {
     class TranscodeException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
     /**
+     * Best-effort read of the decoder's PCM encoding. Absent key or any
+     * read failure falls back to 16-bit (the historical behavior on
+     * devices that never report it).
+     */
+    private fun readPcmEncoding(codec: MediaCodec): Int = try {
+        val outFormat = codec.outputFormat
+        if (outFormat.containsKey(MediaFormat.KEY_PCM_ENCODING)) {
+            outFormat.getInteger(MediaFormat.KEY_PCM_ENCODING)
+        } else {
+            AudioFormat.ENCODING_PCM_16BIT
+        }
+    } catch (_: Exception) {
+        AudioFormat.ENCODING_PCM_16BIT
+    }
+
+    /**
      * Decode [path] (m4a/AAC) to mono 16 kHz PCM, keeping only the first
      * 30 s. Runs fully on [ioDispatcher] (caller passes Dispatchers.IO).
      * Throws [TranscodeException] on corrupt/empty input — the caller maps
@@ -131,6 +148,11 @@ object PcmTranscoder {
 
             var actualRate = 0
             var actualChannels = 0
+            // WR-02: never assume 16-bit shorts — resolve KEY_PCM_ENCODING
+            // once (format-changed, or lazily at the first output buffer
+            // when the codec reports buffers first) and reject anything
+            // else instead of misdecoding it as PCM_16BIT.
+            var actualEncoding = -1
             val samples = mutableListOf<Short>()
             val bufferInfo = MediaCodec.BufferInfo()
             var inputEos = false
@@ -162,6 +184,15 @@ object PcmTranscoder {
                     outIndex >= 0 -> {
                         val outBuf = codec.getOutputBuffer(outIndex)
                         if (outBuf != null && bufferInfo.size > 0) {
+                            if (actualEncoding == -1) {
+                                actualEncoding = readPcmEncoding(codec)
+                            }
+                            if (actualEncoding != AudioFormat.ENCODING_PCM_16BIT) {
+                                codec.releaseOutputBuffer(outIndex, false)
+                                throw TranscodeException(
+                                    "unsupported PCM encoding: $actualEncoding",
+                                )
+                            }
                             val dup = outBuf.duplicate().order(ByteOrder.LITTLE_ENDIAN)
                             dup.position(bufferInfo.offset)
                             dup.limit(bufferInfo.offset + bufferInfo.size)
@@ -184,6 +215,9 @@ object PcmTranscoder {
                         actualChannels = if (outFormat.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) {
                             outFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
                         } else 0
+                        if (outFormat.containsKey(MediaFormat.KEY_PCM_ENCODING)) {
+                            actualEncoding = outFormat.getInteger(MediaFormat.KEY_PCM_ENCODING)
+                        }
                     }
                     outIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> {
                         if (inputEos) {
