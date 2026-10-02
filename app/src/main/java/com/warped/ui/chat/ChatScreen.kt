@@ -122,6 +122,10 @@ fun ChatScreen(
     val isDraftPlaying by viewModel.isDraftPlaying.collectAsStateWithLifecycle()
     val draftPositionMs by viewModel.draftPositionMs.collectAsStateWithLifecycle()
     val draftDurationMs by viewModel.draftDurationMs.collectAsStateWithLifecycle()
+    // Phase 68 Plan 03 (VMSG-06): history playback state for voice bubbles.
+    val playingMessageId by viewModel.playingMessageId.collectAsStateWithLifecycle()
+    val isHistoryPlaying by viewModel.isHistoryPlaying.collectAsStateWithLifecycle()
+    val historyPositionMs by viewModel.historyPositionMs.collectAsStateWithLifecycle()
     // 48-01 (PERF-15): keyed LazyColumn state. isAtBottom follows 48-UI-SPEC
     // §3 ("last item visible and within 48dp of the end").
     val listState = rememberLazyListState()
@@ -193,9 +197,9 @@ fun ChatScreen(
             // the recognizer never outlives the UI (destroy itself happens
             // in ChatViewModel.onCleared).
             viewModel.stopDictation()
-            // Phase 68 (VMSG-02): stop draft playback on chat exit — the
-            // player never leaks past the screen (destroy itself happens
-            // in ChatViewModel.onCleared).
+            // Phase 68 (VMSG-02 + Plan 03): stop draft AND history playback
+            // on chat exit — the player never leaks past the screen
+            // (destroy itself happens in ChatViewModel.onCleared).
             viewModel.stopPlayback()
             viewModel.unloadLocalModels()
         }
@@ -228,7 +232,15 @@ fun ChatScreen(
                 // pauses and keeps the position. The draft file stays
                 // on disk either way.
                 val changing = (context as? Activity)?.isChangingConfigurations == true
-                if (changing) viewModel.stopPlayback() else viewModel.pauseVoiceDraft()
+                // Phase 68 Plan 03: history playback pauses alongside the
+                // draft (same keep-position, one-tap-resume contract);
+                // rotation stops both via stopPlayback (positions to 0).
+                if (changing) {
+                    viewModel.stopPlayback()
+                } else {
+                    viewModel.pauseVoiceDraft()
+                    viewModel.pauseHistoryVoice()
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -652,6 +664,13 @@ fun ChatScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         items(transcript.messages, key = { it.id }) { message ->
+                            // Phase 68 Plan 03: voice-bubble playback state.
+                            // The file-exists check is remembered per
+                            // message (VM helper, no streams) so composition
+                            // never performs IO directly (T-68-08).
+                            val voiceFileAvailable = remember(message.audioPath) {
+                                viewModel.hasVoiceFile(message.audioPath)
+                            }
                             MessageBubble(
                                 message = message,
                                 codeTheme = connection.codeTheme,
@@ -659,7 +678,12 @@ fun ChatScreen(
                                 isValidatedOnline = input.isValidatedOnline,
                                 isFetchingWeb = input.isFetchingWeb,
                                 isGenerating = input.isGenerating,
-                                onRetry = { viewModel.retryGrounding(it) }
+                                onRetry = { viewModel.retryGrounding(it) },
+                                isVoicePlaying = playingMessageId == message.id && isHistoryPlaying,
+                                voicePositionMs = if (playingMessageId == message.id) historyPositionMs else 0,
+                                voiceFileMissing = message.audioPath != null && !voiceFileAvailable,
+                                onPlayVoice = { viewModel.toggleHistoryVoice(message) },
+                                onPauseVoice = { viewModel.pauseHistoryVoice() },
                             )
                         }
                         if (showStreamingBubble) {

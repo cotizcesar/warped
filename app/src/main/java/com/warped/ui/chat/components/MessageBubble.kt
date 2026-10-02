@@ -24,7 +24,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Close
@@ -70,6 +74,15 @@ fun MessageBubble(
     isFetchingWeb: Boolean = false,
     isGenerating: Boolean = false,
     onRetry: (messageId: String) -> Unit = {},
+    // Phase 68 (VMSG-06): history voice playback. Resolved by the caller
+    // (ChatScreen compares playingMessageId == message.id); per-row
+    // duration reads message.audioDurationMs. Defaults keep previews and
+    // non-voice callers compiling unchanged.
+    isVoicePlaying: Boolean = false,
+    voicePositionMs: Int = 0,
+    voiceFileMissing: Boolean = false,
+    onPlayVoice: () -> Unit = {},
+    onPauseVoice: () -> Unit = {},
 ) {
     val isUser = message.role == Role.USER
     // Phase 49 (DEL-01): persisted tool rows render as collapsed transcript
@@ -229,6 +242,22 @@ fun MessageBubble(
                 // doesn't churn the image bitmaps.
                 if (isUser && message.imageUris.isNotEmpty()) {
                     MessageImageStack(imageUris = message.imageUris)
+                }
+
+                // Phase 68 (VMSG-06): own-voice bubble player row — after
+                // images, above the caption Text so Phase 69 transcript
+                // captions slot underneath without re-layout. Players ONLY
+                // on own (USER) sent bubbles; received/model-side audio is
+                // future VF-03, out of scope.
+                if (isUser && message.audioPath != null) {
+                    VoicePlayerRow(
+                        durationMs = message.audioDurationMs,
+                        isPlaying = isVoicePlaying,
+                        positionMs = voicePositionMs,
+                        fileMissing = voiceFileMissing,
+                        onPlay = onPlayVoice,
+                        onPause = onPauseVoice,
+                    )
                 }
 
                 if (message.content.isNotBlank()) {
@@ -667,5 +696,84 @@ private fun MessageImageStack(imageUris: List<String>) {    Column(verticalArran
             }
         }
         Spacer(Modifier.height(6.dp))
+    }
+}
+
+/**
+ * Phase 68 (VMSG-06): own-voice bubble player row. Renders inside the exact
+ * same user-bubble chrome (container, shape, padding untouched).
+ *
+ * Duration convention (locked, same as the draft card): the readout is
+ * ALWAYS the total m:ss — live position shows only as progress fill
+ * (0 for non-playing rows, clamped 0..1 against absurd stored durations).
+ * A missing file renders the informational unavailable row in the same
+ * chrome — onSurfaceVariant icon + text, no play button, never error-red,
+ * never a silent drop, never a crash.
+ */
+@Composable
+private fun VoicePlayerRow(
+    durationMs: Long,
+    isPlaying: Boolean,
+    positionMs: Int,
+    fileMissing: Boolean,
+    onPlay: () -> Unit,
+    onPause: () -> Unit,
+) {
+    if (fileMissing) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Filled.VolumeOff,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = stringResource(R.string.voice_msg_clip_unavailable),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+    val totalSec = (durationMs / 1000).toInt().coerceAtLeast(0)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        IconButton(
+            onClick = { if (isPlaying) onPause() else onPlay() },
+            modifier = Modifier.size(48.dp),
+        ) {
+            Icon(
+                if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                stringResource(
+                    if (isPlaying) R.string.voice_msg_pause_message
+                    else R.string.voice_msg_play_message,
+                    totalSec / 60,
+                    totalSec % 60,
+                ),
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+        Spacer(Modifier.width(4.dp))
+        LinearProgressIndicator(
+            progress = {
+                if (isPlaying && durationMs > 0) {
+                    (positionMs.toFloat() / durationMs).coerceIn(0f, 1f)
+                } else {
+                    0f
+                }
+            },
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            "%d:%02d".format(totalSec / 60, totalSec % 60),
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontFeatureSettings = "tnum"
+            ),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
