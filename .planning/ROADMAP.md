@@ -62,62 +62,74 @@
 
 ## Phases
 
-- [ ] **Phase 67: Voice Capture + Send Path** - Record with 60 s cap and send to audio-capable local models
-- [ ] **Phase 68: Voice Draft + Playback History** - Preview-before-send draft and replayable history bubbles
+- [x] **Phase 67: Voice Capture + Send Path** - Record with 60 s cap and send to audio-capable local models (completed 2026-10-02)
+- [x] **Phase 68: Voice Draft + Playback History** - Preview-before-send draft and replayable history bubbles (completed 2026-10-02)
 - [ ] **Phase 69: Voice Differentiation + Gating + Transcript** - Distinct icons, model gating, transcript captions
 - [ ] **Phase 70: Document Reader Tool** - readTextFile grounding locally and on remote endpoints
 
 ## Phase Details
 
 ### Phase 67: Voice Capture + Send Path
+
 **Goal**: Users can record a voice message and send it to an audio-capable local model
 **Depends on**: Phase 66 (v3.0 complete)
 **Requirements**: VMSG-01, VMSG-05
 **Success Criteria** (what must be TRUE):
+
   1. User records voice from the chat input with live timer + amplitude feedback, auto-stops at 60 s keeping the clip, and cancel discards the file
   2. User sends the voice message to an audio-capable local model — full 60 s kept for playback, first 30 s transcoded to mono 16 kHz PCM via the existing audioBytes path, with a user-visible note
   3. Record → send → model response completes on-device against an audio-capable allowlist model (device smoke)
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 68: Voice Draft + Playback History
+
 **Goal**: Users can preview drafts before sending and replay voice messages from history
 **Depends on**: Phase 67
 **Requirements**: VMSG-02, VMSG-06
 **Success Criteria** (what must be TRUE):
+
   1. User previews the recorded draft before sending (play/pause + send + delete); clips under 1 second are rejected with a graceful message
   2. User replays sent voice messages from history (bubble with play + duration + progress) across app restarts
   3. Recording/draft state survives rotation; backgrounding auto-stops and keeps the draft
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 69: Voice Differentiation + Gating + Transcript
+
 **Goal**: Users can tell voice-send apart from dictation and understand when voice-send is unavailable
 **Depends on**: Phase 68
 **Requirements**: VMSG-03, VMSG-04, VMSG-07, VMSG-08
 **Success Criteria** (what must be TRUE):
+
   1. User sees a voice-send icon visually distinct from the STT dictation mic (waveform/audio-clip vs mic glyph); starting one input mode stops the other
   2. User on a text-only model gets a gated voice-send affordance (hidden or disabled with reason — never a dead button)
   3. User on a remote endpoint gets a gated voice-send with a local-only explanation
   4. User sees a transcript caption under their own voice bubble (parallel on-device STT during recording; duration-only fallback when STT unavailable)
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 70: Document Reader Tool
+
 **Goal**: Users can ground answers in a picked text document, locally and on remote endpoints
 **Depends on**: Nothing (independent tool track, parallelizable with Phases 67-69)
 **Requirements**: TOOL-01, TOOL-02, TOOL-03
 **Success Criteria** (what must be TRUE):
+
   1. User picks a text document via the system picker and its bounded content grounds the answer (size cap + truncation envelope, least-privilege read-only)
   2. User invokes the document reader on remote endpoints too (remote tools[] mapping alongside the local loop)
   3. TOOL-03 fallback (unit converter) stays contingency-only — implemented only if readTextFile proves unfit at plan time
+
 **Plans**: TBD
 
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 67. Voice Capture + Send Path | 0/TBD | Not started | - |
-| 68. Voice Draft + Playback History | 0/TBD | Not started | - |
+| 67. Voice Capture + Send Path | 2/2 | Complete    | 2026-10-02 |
+| 68. Voice Draft + Playback History | 3/3 | Complete    | 2026-10-02 |
 | 69. Voice Differentiation + Gating + Transcript | 0/TBD | Not started | - |
 | 70. Document Reader Tool | 0/TBD | Not started | - |

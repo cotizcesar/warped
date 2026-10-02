@@ -1,33 +1,33 @@
 {
   "contract": "1.0.0",
   "flavor": "core",
-  "milestone": "v2.5 — Play Compliance + Leaks",
+  "milestone": "v3.1 — Voice Messages + New Tool",
   "phases": [
     {
-      "number": "59",
-      "name": "16 KB Dependency Verification",
-      "status": "pending"
-    },
-    {
-      "number": "60",
-      "name": "API-36 Behavior Audit",
-      "status": "pending"
-    },
-    {
-      "number": "61",
-      "name": "LeakCanary Instrumentation + Guided Audit",
-      "status": "pending"
-    },
-    {
-      "number": "62",
-      "name": "Fix Loop + Release Hardening",
+      "number": "67",
+      "name": "Voice Capture + Send Path",
       "status": "complete"
+    },
+    {
+      "number": "68",
+      "name": "Voice Draft + Playback History",
+      "status": "complete"
+    },
+    {
+      "number": "69",
+      "name": "Voice Differentiation + Gating + Transcript",
+      "status": "pending"
+    },
+    {
+      "number": "70",
+      "name": "Document Reader Tool",
+      "status": "pending"
     }
   ],
   "next": {
-    "command": "/gsd:progress",
-    "label": "Show progress",
-    "reason": "Unsure of state — showing progress"
+    "command": "/gsd:progress --next",
+    "label": "Advance to the next step (plan phase 69)",
+    "reason": "Phase 69 of 4 — needs a plan"
   },
-  "updated_at": "2026-10-01T05:37:29.259Z"
+  "updated_at": "2026-10-02T20:39:58.792Z"
 }

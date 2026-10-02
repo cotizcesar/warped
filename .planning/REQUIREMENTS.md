@@ -9,12 +9,12 @@ Requirements for v3.1 Voice Messages + New Tool. Each maps to roadmap phases.
 
 ### Voice Messages
 
-- [ ] **VMSG-01**: User records a voice message from the chat input with live timer + amplitude feedback, a 60-second hard cap with auto-stop-and-keep, and cancel that discards the file
-- [ ] **VMSG-02**: User previews the recorded draft before sending (play/pause + send + delete); clips under 1 second are rejected with a graceful message
+- [x] **VMSG-01**: User records a voice message from the chat input with live timer + amplitude feedback, a 60-second hard cap with auto-stop-and-keep, and cancel that discards the file
+- [x] **VMSG-02**: User previews the recorded draft before sending (play/pause + send + delete); clips under 1 second are rejected with a graceful message
 - [ ] **VMSG-03**: User sees a voice-send icon visually distinct from the STT dictation mic (waveform/audio-clip vs mic glyph); starting one input mode stops the other
 - [ ] **VMSG-04**: User on a text-only model gets a gated voice-send affordance (hidden or disabled with reason — never a dead button)
-- [ ] **VMSG-05**: User sends the voice message to an audio-capable local model (full 60 s kept for playback, first 30 s transcoded to mono 16 kHz PCM via the existing audioBytes path, with a user-visible note)
-- [ ] **VMSG-06**: User replays sent voice messages from history (bubble with play + duration + progress) across app restarts
+- [x] **VMSG-05**: User sends the voice message to an audio-capable local model (full 60 s kept for playback, first 30 s transcoded to mono 16 kHz PCM via the existing audioBytes path, with a user-visible note)
+- [x] **VMSG-06**: User replays sent voice messages from history (bubble with play + duration + progress) across app restarts
 - [ ] **VMSG-07**: User sees a transcript caption under their own voice bubble (captured via parallel on-device STT during recording; duration-only fallback when STT unavailable)
 - [ ] **VMSG-08**: User on a remote endpoint gets a gated voice-send with explanation (voice-send is local-only at launch — remote providers drop audioBytes)
 
@@ -49,10 +49,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| VMSG-01 | Phase 67 | Pending |
-| VMSG-05 | Phase 67 | Pending |
-| VMSG-02 | Phase 68 | Pending |
-| VMSG-06 | Phase 68 | Pending |
+| VMSG-01 | Phase 67 | Complete |
+| VMSG-05 | Phase 67 | Complete |
+| VMSG-02 | Phase 68 | Complete |
+| VMSG-06 | Phase 68 | Complete |
 | VMSG-03 | Phase 69 | Pending |
 | VMSG-04 | Phase 69 | Pending |
 | VMSG-07 | Phase 69 | Pending |
