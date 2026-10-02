@@ -4,11 +4,14 @@ import android.app.Activity
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.util.Base64
 import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.warped.data.grounding.DocumentPrompt
+import com.warped.data.grounding.DocumentReader
 import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.GroundingPrecedence
 import com.warped.data.grounding.GroundingPrompt
@@ -54,7 +57,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.warped.R
 import timber.log.Timber
+import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
+import java.util.Locale
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 
@@ -111,6 +116,14 @@ class ChatViewModel @Inject constructor(
 
     private val _connection = MutableStateFlow(ChatConnectionState())
     val connectionState: StateFlow<ChatConnectionState> = _connection.asStateFlow()
+
+    /**
+     * Phase 70 (70-02): per-turn document attachment. Null = no chip.
+     * VM-owned (rotation keeps the chip + the already-read bounded block
+     * in memory); never Room (per-turn only, cleared after send).
+     */
+    private val _attachedDocument = MutableStateFlow<AttachedDocument?>(null)
+    val attachedDocument: StateFlow<AttachedDocument?> = _attachedDocument.asStateFlow()
 
     /**
      * Phase 69 Plan 01 (VMSG-04/08): derived voice-send gate. Combines the
@@ -546,12 +559,17 @@ class ChatViewModel @Inject constructor(
         // stays in the draft and is sent normally.
         stopDictation()
         val state = snapshot()
+        // Phase 70 (70-02): capture the attachment synchronously — the
+        // turn consumes this instance (a mid-turn re-pick replaces state
+        // for the NEXT send, never the in-flight one).
+        val sentDocument = _attachedDocument.value
+        val sendableDocument = sentDocument?.takeIf { it.status == AttachStatus.READY }
 
         val effectiveModelId = state.selectedLocalModelId ?: state.selectedRemoteModelId
         val effectiveProvider = state.selectedLocalModelId?.let { ProviderType.LITE_RT_LM }
             ?: state.selectedRemoteProvider
 
-        if (text.isBlank() && images.isEmpty() && audioBytes == null) return
+        if (text.isBlank() && images.isEmpty() && audioBytes == null && sendableDocument == null) return
         if (effectiveModelId == null || effectiveProvider == null) {
             updateTranscript { it.copy(error = ChatError.NoModelSelected) }
             return
@@ -656,7 +674,10 @@ class ChatViewModel @Inject constructor(
                         return@launch
                     }
                 }
-                val conversationId = ensureConversation(text, hasMedia = images.isNotEmpty() || audioBytes != null)
+                val conversationId = ensureConversation(
+                    text,
+                    hasMedia = images.isNotEmpty() || audioBytes != null || sendableDocument != null,
+                )
                 chatRepository.saveMessage(conversationId, userMessage)
 
                 // Phase 52 (FETCH-01..FETCH-03): multi-URL grounding fan-out —
@@ -1069,6 +1090,45 @@ class ChatViewModel @Inject constructor(
                 // model must treat each new message independently and
                 // re-search instead of answering from stale results.
                 // On-device multi-turn confirmation still pending.
+                // Phase 70 (70-02): document attachment fusion — the SAME
+                // fused string feeds the local path and the remote
+                // ChatRequest path below (provider differences stay behind
+                // the capability matrix). READY fuses the block, registers
+                // the Fuentes row (filename label + truncation metadata,
+                // preview on the bounded text), and binds the turn block
+                // for explicit `read_text_file` calls; UNSUPPORTED/FAILED
+                // send text-only — the unsupported notice already fired at
+                // pick time, the failed/empty notice fires here at send
+                // time (UI-SPEC Surface 3 contract). Send is never
+                // dead-ended.
+                if (sentDocument?.status == AttachStatus.FAILED) {
+                    _events.tryEmit(
+                        ChatEvent.Snackbar(
+                            context.getString(R.string.doc_reader_failed, sentDocument.filename),
+                        ),
+                    )
+                }
+                val sentDocBlock: String? = sendableDocument?.block
+                if (sentDocBlock != null && sendableDocument != null) {
+                    requestUserText = DocumentPrompt.augmentWithDocument(requestUserText, sentDocBlock)
+                    groundedSourceDetails = groundedSourceDetails + GroundedSource(
+                        url = DOCUMENT_SOURCE_PREFIX + sendableDocument.filename,
+                        extractedText = sendableDocument.text,
+                        status = GroundedSourceStatus.OK,
+                        snippet = sendableDocument.truncatedAt?.let { "truncated at $it chars" },
+                    )
+                    sendableDocument.truncatedAt?.let { n ->
+                        _events.tryEmit(
+                            ChatEvent.Snackbar(
+                                context.getString(
+                                    R.string.doc_reader_truncated,
+                                    n,
+                                    sendableDocument.filename,
+                                ),
+                            ),
+                        )
+                    }
+                }
                 val historyMessages = _transcript.value.messages
                 val requestMessages = if (doGround && historyMessages.isNotEmpty()) {
                     historyMessages.dropLast(1) + historyMessages.last().copy(content = requestUserText)
@@ -1086,6 +1146,9 @@ class ChatViewModel @Inject constructor(
                     // computes its own loop-arming (it has no
                     // conversationId to read the row itself).
                     webOverride = perChatOverride,
+                    // 70-02: turn-bound document block for the
+                    // `read_text_file` executor branch (all drivers).
+                    documentBlock = sentDocBlock,
                 )
                 // Phase 49 (DEL-01): single-turn chat — no skills, no tool
                 // loop, no no-tool-support notice. Legacy Role.TOOL history
@@ -1360,6 +1423,12 @@ class ChatViewModel @Inject constructor(
                 // 46-01: clear the serving helper on turn end — but only if no newer
                 // turn has started since (stale-finally guard via turnId/seq).
                 if (turnId == generationSeq.get()) activeHelper = null
+                // Phase 70 (70-02): per-turn attachment — clear the consumed
+                // instance only (ref-equality: a newer pick replacing it
+                // mid-turn survives for the next send).
+                if (sentDocument != null && _attachedDocument.value === sentDocument) {
+                    _attachedDocument.value = null
+                }
                 // Phase 54 (RETRY-01): the send may have crossed a
                 // connectivity transition — refresh the Reintentar gate.
                 refreshConnectivity()
@@ -3408,6 +3477,122 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Phase 70 (70-02): per-turn document attachment state. [block] is the
+     * fused `DocumentPrompt` envelope (turn text + `read_text_file` re-feed);
+     * [text] the sanitized bounded body (Fuentes preview sheet);
+     * [truncatedAt] the cap N when over-cap (chip marker + send notice).
+     * The chip renders only for [AttachStatus.READY]; other statuses keep
+     * the text sendable with their contracted notices.
+     */
+    data class AttachedDocument(
+        val uri: Uri,
+        val filename: String,
+        val sizeBytes: Long,
+        val block: String,
+        val text: String,
+        val truncatedAt: Int?,
+        val status: AttachStatus,
+    )
+
+    /** Phase 70 (70-02): READY grounds; the rest send text-only + notice. */
+    enum class AttachStatus { READY, UNSUPPORTED, FAILED }
+
+    /**
+     * Phase 70 (70-02): attach a picked document (SAF `OpenDocument`, text
+     * MIME filter at the call site — system picker only, per-file
+     * read-only grant, no storage permission, T-70-05). A new pick
+     * replaces the previous attachment (one document per turn).
+     * Resolver I/O runs on Dispatchers.IO — never the UI thread (T-70-02);
+     * the read is hard-capped at cap + 1 bytes (the +1 detects truncation
+     * without over-reading) and decoded UTF-8 with malformed-input REPLACE.
+     *
+     * TOOL-03 record: no unit-converter code ships — 70-RESEARCH.md Q2
+     * returned the FIT verdict (readTextFile fit with in-repo precedents
+     * for the picker, bounded read, fusion, and fallback), so per the
+     * CONTEXT.md trust-boundary rule the converter stays UNBUILT.
+     */
+    fun attachDocument(uri: Uri) {
+        viewModelScope.launch(coroutineExceptionHandler) {
+            val outcome = withContext(Dispatchers.IO) { readAttachedDocument(uri) }
+            if (outcome.status == AttachStatus.UNSUPPORTED) {
+                _events.tryEmit(
+                    ChatEvent.Snackbar(
+                        context.getString(R.string.doc_reader_unsupported, outcome.filename),
+                    ),
+                )
+            }
+            _attachedDocument.value = outcome
+        }
+    }
+
+    /** Phase 70 (70-02): remove-X — single tap, no dialog (non-destructive, per-turn only). */
+    fun clearDocument() {
+        _attachedDocument.value = null
+    }
+
+    /**
+     * Phase 70 (70-02): SAF bounded read (IO-context only). Total — never
+     * throws: metadata failure degrades to FAILED, a rejected mime to
+     * UNSUPPORTED (T-70-06: the filename is display-only, never a path,
+     * never used to open anything; the gate runs before any read).
+     */
+    private fun readAttachedDocument(uri: Uri): AttachedDocument {
+        var filename = "document.txt"
+        var sizeBytes = -1L
+        var mime: String? = null
+        try {
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                val sizeIdx = cursor.getColumnIndex(OpenableColumns.SIZE)
+                if (cursor.moveToFirst()) {
+                    if (nameIdx != -1) {
+                        cursor.getString(nameIdx)?.takeIf { it.isNotBlank() }?.let { filename = it }
+                    }
+                    if (sizeIdx != -1) sizeBytes = cursor.getLong(sizeIdx)
+                }
+            }
+            mime = context.contentResolver.getType(uri)
+        } catch (e: Exception) {
+            Timber.w(e, "Chat: document metadata query failed")
+        }
+        if (!DocumentReader.gate(mime, filename)) {
+            return AttachedDocument(uri, filename, sizeBytes, "", "", null, AttachStatus.UNSUPPORTED)
+        }
+        return try {
+            val cap = DocumentReader.capFor(_connection.value.generationParameters.contextSize)
+            val bytes = ByteArray(cap + 1)
+            var total = 0
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                val buffered = (input as? BufferedInputStream) ?: BufferedInputStream(input)
+                while (total < cap + 1) {
+                    val n = buffered.read(bytes, total, cap + 1 - total)
+                    if (n == -1) break
+                    total += n
+                }
+            } ?: return AttachedDocument(uri, filename, sizeBytes, "", "", null, AttachStatus.FAILED)
+            if (sizeBytes < 0) sizeBytes = total.toLong()
+            val decoded = String(bytes, 0, total, Charsets.UTF_8)
+            if (decoded.isBlank()) {
+                return AttachedDocument(uri, filename, sizeBytes, "", "", null, AttachStatus.FAILED)
+            }
+            val (bounded, truncatedAt) = DocumentReader.bound(decoded, cap)
+            val sanitized = DocumentPrompt.sanitize(bounded)
+            AttachedDocument(
+                uri = uri,
+                filename = filename,
+                sizeBytes = sizeBytes,
+                block = DocumentPrompt.buildBlock(filename, sanitized, truncatedAt),
+                text = sanitized,
+                truncatedAt = truncatedAt,
+                status = AttachStatus.READY,
+            )
+        } catch (e: Exception) {
+            Timber.w(e, "Chat: document read failed")
+            AttachedDocument(uri, filename, sizeBytes, "", "", null, AttachStatus.FAILED)
+        }
+    }
+
     private val supportedImageTypes = setOf("image/png", "image/jpeg", "image/jpg")
 
     private fun uriToBase64(uri: Uri): String? {
@@ -3462,4 +3647,19 @@ class ChatViewModel @Inject constructor(
 internal fun pickAutoSelectModel(models: List<LocalModel>, selectedId: String?): String? {
     if (selectedId != null || models.isEmpty()) return null
     return models.maxByOrNull { it.importedAt }?.filePath
+}
+
+/**
+ * Phase 70 (70-02): chip size readout — whole KB under 1 MB, one-decimal
+ * MB at/above (UI-SPEC prescriptive). US locale keeps the decimal point
+ * deterministic across EN/ES locales. Bytes come from the pre-read size
+ * check (the VM falls back to the actual read count when unknown).
+ */
+internal fun formatDocumentSize(sizeBytes: Long): String {
+    val bytes = sizeBytes.coerceAtLeast(0)
+    return if (bytes < 1024 * 1024) {
+        "${bytes / 1024} KB"
+    } else {
+        String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024.0))
+    }
 }
