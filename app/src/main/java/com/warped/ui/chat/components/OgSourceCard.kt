@@ -46,6 +46,7 @@ import coil3.compose.AsyncImage
 import com.warped.R
 import com.warped.domain.model.DOCUMENT_SOURCE_PREFIX
 import com.warped.domain.model.GroundedSource
+import com.warped.domain.model.isDocumentSource
 import com.warped.ui.theme.OgCardDark
 import com.warped.ui.theme.OgShimmer
 import java.net.URI
@@ -154,16 +155,20 @@ fun OgSourceCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = source.url,
-                    fontSize = 12.sp,
-                    lineHeight = 12.sp,
-                    fontWeight = FontWeight.Normal,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                // Phase 70: document rows carry no host — the title already
+                // shows the stripped filename, so the raw `doc:` URL stays hidden.
+                if (!source.isDocumentSource()) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = source.url,
+                        fontSize = 12.sp,
+                        lineHeight = 12.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
@@ -271,16 +276,20 @@ fun CompactSourceCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = source.url,
-                    fontSize = 12.sp,
-                    lineHeight = 12.sp,
-                    fontWeight = FontWeight.Normal,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                // Phase 70: document rows carry no host — the title already
+                // shows the stripped filename, so the raw `doc:` URL stays hidden.
+                if (!source.isDocumentSource()) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = source.url,
+                        fontSize = 12.sp,
+                        lineHeight = 12.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }

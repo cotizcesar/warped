@@ -282,6 +282,7 @@
     <string name="doc_reader_unsupported">Aún no se puede leer %1$s — solo archivos de texto (.txt, .md)</string>
     <string name="doc_reader_failed">No se pudo leer %1$s — respondiendo sin él</string>
     <string name="doc_reader_showing_first">Mostrando los primeros %1$d caracteres</string>
+    <string name="doc_reader_attached">Documento adjunto: %1$s</string>
 
     <!-- Insignias de capacidad -->
     <string name="badge_vision">Visión</string>

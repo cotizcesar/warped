@@ -140,13 +140,18 @@ fun SourcePreviewSheet(
                         }
                     }
                     Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = source.url,
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    // Phase 70: document rows show no URL line — the header
+                    // title already carries the stripped filename, and the
+                    // raw `doc:` prefix must never render (nor as a link).
+                    if (!source.isDocumentSource()) {
+                        Text(
+                            text = source.url,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))

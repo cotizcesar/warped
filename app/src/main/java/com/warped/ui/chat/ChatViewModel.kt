@@ -1119,7 +1119,9 @@ class ChatViewModel @Inject constructor(
                         url = DOCUMENT_SOURCE_PREFIX + sendableDocument.filename,
                         extractedText = sendableDocument.text,
                         status = GroundedSourceStatus.OK,
-                        snippet = sendableDocument.truncatedAt?.let { "truncated at $it chars" },
+                        snippet = sendableDocument.truncatedAt?.let {
+                            context.getString(R.string.doc_reader_showing_first, it)
+                        },
                     )
                     sendableDocument.truncatedAt?.let { n ->
                         _events.tryEmit(

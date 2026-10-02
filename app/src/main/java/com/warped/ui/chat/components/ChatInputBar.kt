@@ -378,7 +378,9 @@ fun ChatInputBar(
                         onClick = onAttachDocument,
                         enabled = !inputLocked,
                         modifier = Modifier.size(40.dp).semantics {
-                            if (attachedDocName != null) stateDescription = attachedDocName
+                            attachedDocName?.let {
+                                stateDescription = stringResource(R.string.doc_reader_attached, it)
+                            }
                         },
                     ) {
                         Icon(

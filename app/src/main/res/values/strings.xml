@@ -281,6 +281,7 @@
     <string name="doc_reader_unsupported">Can\'t read %1$s yet — text files (.txt, .md) only</string>
     <string name="doc_reader_failed">Couldn\'t read %1$s — answering without it</string>
     <string name="doc_reader_showing_first">Showing first %1$d chars</string>
+    <string name="doc_reader_attached">Document attached: %1$s</string>
 
     <!-- Capability badges -->
     <string name="badge_vision">Vision</string>
