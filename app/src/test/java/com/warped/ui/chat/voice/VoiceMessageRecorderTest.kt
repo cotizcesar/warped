@@ -95,6 +95,21 @@ class VoiceMessageRecorderTest {
     }
 
     @Test
+    fun `destroy deletes the partial clip`() {
+        val factory = FakeFactory()
+        val outDir = File(tempDir, "voice")
+        val rec = VoiceMessageRecorder(fakeContext(), outDir, factory)
+        assertThat(rec.start()).isTrue()
+        val produced = File(requireNotNull(factory.handle.outputPath))
+        produced.parentFile?.mkdirs()
+        produced.writeText("fake-audio")
+        assertThat(produced.exists()).isTrue()
+        rec.destroy()
+        assertThat(produced.exists()).isFalse()
+        assertThat(rec.isRecording).isFalse()
+    }
+
+    @Test
     fun `destroy is idempotent`() {
         val factory = FakeFactory()
         val rec = VoiceMessageRecorder(fakeContext(), File(tempDir, "voice"), factory)

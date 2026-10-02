@@ -197,7 +197,9 @@ class VoiceMessageRecorder(
         }
     }
 
-    /** Explicit teardown. Safe to call twice. */
+    /** Explicit teardown. Safe to call twice. Destroy means discard:
+     * a partial clip must never survive teardown unreferenced
+     * (CR-02: keep only happens through stop()). */
     @Synchronized
     fun destroy() {
         try {
@@ -214,8 +216,15 @@ class VoiceMessageRecorder(
                 Timber.w(e, "VoiceMsg: destroy failed")
             } finally {
                 handle = null
-                outputFile = null
                 isRecording = false
+            }
+            // Never leave a partial clip behind: destroy discards it.
+            try {
+                outputFile?.takeIf { it.exists() }?.delete()
+            } catch (e: Exception) {
+                Timber.w(e, "VoiceMsg: destroy delete failed")
+            } finally {
+                outputFile = null
             }
         }
     }
