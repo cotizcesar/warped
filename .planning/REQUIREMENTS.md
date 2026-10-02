@@ -25,10 +25,10 @@ Requirements for v3.0 Chat UX + Voice Dictation. Each maps to roadmap phases.
 
 ### Web Search (DuckDuckGo-only)
 
-- [ ] **SEARCH-01**: Tavily integration is fully removed (client, producer, DI, Settings UI, Keystore paths, EN+ES strings, tests — grep-clean)
-- [ ] **SEARCH-02**: User gets grounded answers from DuckDuckGo-only search behind the existing producer interface (budget + cancel semantics preserved)
-- [ ] **SEARCH-03**: Upgrading user leaves no orphaned Tavily Keystore entry (upgrade migration deletes it)
-- [ ] **SEARCH-04**: Legacy chats with Tavily citations still render read-only without crashes
+- [x] **SEARCH-01**: Tavily integration is fully removed (client, producer, DI, Settings UI, Keystore paths, EN+ES strings, tests — grep-clean)
+- [x] **SEARCH-02**: User gets grounded answers from DuckDuckGo-only search behind the existing producer interface (budget + cancel semantics preserved)
+- [x] **SEARCH-03**: Upgrading user leaves no orphaned Tavily Keystore entry (upgrade migration deletes it)
+- [x] **SEARCH-04**: Legacy chats with Tavily citations still render read-only without crashes
 
 ### Settings Cleanup
 
@@ -79,10 +79,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DRAWER-03 | Phase 64 | Pending |
 | DRAWER-04 | Phase 64 | Pending |
 | HELP-01 | Phase 64 | Pending |
-| SEARCH-01 | Phase 63 | Pending |
-| SEARCH-02 | Phase 63 | Pending |
-| SEARCH-03 | Phase 63 | Pending |
-| SEARCH-04 | Phase 63 | Pending |
+| SEARCH-01 | Phase 63 | Complete |
+| SEARCH-02 | Phase 63 | Complete |
+| SEARCH-03 | Phase 63 | Complete |
+| SEARCH-04 | Phase 63 | Complete |
 | SET-01 | Phase 64 | Pending |
 | SET-02 | Phase 64 | Pending |
 | FUN-01 | Phase 64 | Pending |
@@ -93,6 +93,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VOICE-03 | Phase 65 | Pending |
 
 **Coverage:**
+
 - v3.0 requirements: 19 total
 - Mapped to phases: 19
 - Unmapped: 0 ✓

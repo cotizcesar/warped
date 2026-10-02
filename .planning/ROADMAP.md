@@ -53,7 +53,7 @@
 
 **Phases:**
 
-- [ ] **Phase 63: Tavily Removal → DDG-only Search** - Delete Tavily integration, single DuckDuckGo producer behind existing interface
+- [x] **Phase 63: Tavily Removal → DDG-only Search** - Delete Tavily integration, single DuckDuckGo producer behind existing interface (completed 2026-10-02)
 - [ ] **Phase 64: Drawer + Settings + Help + Funnel Polish** - Drawer cluster, settings cleanup, help rewrite, empty-state CTAs
 - [ ] **Phase 65: Voice Dictation** - Speech-to-text into chat input with permission flow and fallback
 - [ ] **Phase 66: Play In-App Review** - Ambient rating trigger plus always-reachable Store entry
@@ -77,11 +77,11 @@
 Plans:
 **Wave 1**
 
-- [ ] 63-01-PLAN.md — Tracer: delete Tavily files, standalone DDG producer, DI rebind, CompatToolLoop rewired
+- [x] 63-01-PLAN.md — Tracer: delete Tavily files, standalone DDG producer, DI rebind, CompatToolLoop rewired
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 63-02-PLAN.md — Settings/Keystore/strings removal, remaining callers, tests, legacy citation verification
+- [x] 63-02-PLAN.md — Settings/Keystore/strings removal, remaining callers, tests, legacy citation verification
 
 ### Phase 64: Drawer + Settings + Help + Funnel Polish
 
@@ -133,7 +133,7 @@ Phases execute in numeric order: 63 → 64 → 65 → 66
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 63. Tavily Removal → DDG-only Search | 0/TBD | Not started | - |
+| 63. Tavily Removal → DDG-only Search | 2/2 | Complete    | 2026-10-02 |
 | 64. Drawer + Settings + Help + Funnel Polish | 0/TBD | Not started | - |
 | 65. Voice Dictation | 0/TBD | Not started | - |
 | 66. Play In-App Review | 0/TBD | Not started | - |

@@ -2,45 +2,46 @@
 gsd_state_version: "1.0"
 milestone: v3.0
 milestone_name: Chat UX + Voice Dictation
-current_phase: 63
-current_phase_name: Tavily Removal → DDG-only Search
+current_phase: 64
+current_phase_name: Drawer + Settings + Help + Funnel Polish
 status: planning
-stopped_at: v2.5 milestone complete and archived (tag v2.5)
-last_updated: "2026-10-02T14:04:18.455Z"
+stopped_at: Phase 63 complete, ready to plan Phase 64
+last_updated: "2026-10-02T14:35:59.682Z"
 last_activity: 2026-10-02
-state_head: 386ed916393809e8c24262c57de73d6c96c4ddd4
+last_activity_desc: Phase 63 complete, transitioned to Phase 64
+state_head: 2fed243e092e37f52297cdda4bcb17d45cfcaf5c
 progress:
   total_phases: 4
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 0
-  percent: 0
+  completed_plans: 2
+  percent: 25
 ---
 
 # Project State: Warped
 
 **Last updated:** 2026-09-30
-**Last activity:** 2026-10-02
+**Last activity:** 2026-10-02 — Phase 63 complete, transitioned to Phase 64
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-10-01, v2.5 shipped)
 
 **Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** v3.0 Chat UX + Voice Dictation roadmap ready (Phases 63-66, 19/19 requirements mapped) — next: plan Phase 63
+**Current focus:** Phase 64 — Drawer + Settings + Help + Funnel Polish (Phase 63 shipped: DDG-only search, Tavily removed)
 
 ## Current Position
 
-Phase: 63 (Tavily Removal → DDG-only Search) — READY TO EXECUTE
-Plan: —
-Status: Roadmap approved-pending, planning Phase 63
-Last activity: 2026-10-02 — v3.0 roadmap created (Phases 63-66)
+Phase: 64 — Drawer + Settings + Help + Funnel Polish
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-10-02 — Phase 63 execution started
 
 ## Phase Structure (v3.0 — PLANNED)
 
 | Phase | Name | Requirements | Status | Depends On |
 |-------|------|--------------|--------|------------|
-| 63 | Tavily Removal → DDG-only Search | SEARCH-01..04 (4) | Not started | Phase 62 |
+| 63 | Tavily Removal → DDG-only Search | SEARCH-01..04 (4) | Complete (2026-10-02, 2/2 plans, 7/7 verified, 895 tests green) | Phase 62 |
 | 64 | Drawer + Settings + Help + Funnel Polish | DRAWER-01..04, SET-01/02, HELP-01, FUN-01..03 (10) | Not started | Phase 63 |
 | 65 | Voice Dictation | VOICE-01..03 (3) | Not started | Phase 64 |
 | 66 | Play In-App Review | RATE-01/02 (2) | Not started | Phase 65 |
@@ -59,6 +60,7 @@ Last activity: 2026-10-02 — v3.0 roadmap created (Phases 63-66)
 
 ### Decisions
 
+- [v3.0-63]: Tavily fully removed (3 files deleted, `SearchOutcome` rename file-wide for grep-clean, startup Keystore alias cleanup off-main-thread via `KeystoreManager.LEGACY_SEARCH_ALIAS`) — DDG single producer, budget/cancel preserved, legacy citations render via existing host-fallback, zero schema change
 - [v3.0]: 4 phases per research (compressed 5→4: regression sweep folded into per-phase verification — it carries zero requirements and coarse granularity forbids standalone maintenance phases) — Tavily contract-move + deletion first, drawer/settings/help/funnel batch second (same composables), voice third (after ChatScreen churn), Play Review last (smallest, independent). Continues numbering at Phase 63 (v2.5 ended at 62).
 
 - [v2.5]: 4 phases per research — 16 KB verification first (gates Play submission, zero code), API-36 audit second (contracts before churn), LeakCanary baseline third (needs runnable build), fix loop + hardening last (owner-local, dependency-gated order). Coarse granularity.
@@ -134,7 +136,7 @@ See prior STATE history for v2.2–v2.4 quick-task log (archived at roadmap rewr
 **Resume file:** —
 
 Last session: 2026-10-01
-Stopped at: v2.5 milestone complete and archived (tag v2.5)
+Stopped at: Phase 63 complete, ready to plan Phase 64
 Resume: `/gsd-new-milestone` (after `/clear`)
 
 ## Operator Next Steps
