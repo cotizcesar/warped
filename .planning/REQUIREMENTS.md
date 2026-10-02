@@ -14,14 +14,14 @@ Requirements for v3.0 Chat UX + Voice Dictation. Each maps to roadmap phases.
 
 ### Chat Drawer
 
-- [ ] **DRAWER-01**: User with no models sees a "Download a model" button in the chat model drawer that navigates to Model Catalog
-- [ ] **DRAWER-02**: User no longer sees Web Options in the model drawer (web grounding lives in Settings only)
-- [ ] **DRAWER-03**: User sees Models, Help and Settings footer items in the same text size as New Chat
-- [ ] **DRAWER-04**: User can delete all chats from the chat drawer (bottom of list, above Models) with the existing confirm dialog
+- [x] **DRAWER-01**: User with no models sees a "Download a model" button in the chat model drawer that navigates to Model Catalog
+- [x] **DRAWER-02**: User no longer sees Web Options in the model drawer (web grounding lives in Settings only)
+- [x] **DRAWER-03**: User sees Models, Help and Settings footer items in the same text size as New Chat
+- [x] **DRAWER-04**: User can delete all chats from the chat drawer (bottom of list, above Models) with the existing confirm dialog
 
 ### Help
 
-- [ ] **HELP-01**: User reads a short, minimal, to-the-point Help screen (rewritten post-Tavily, EN+ES)
+- [x] **HELP-01**: User reads a short, minimal, to-the-point Help screen (rewritten post-Tavily, EN+ES)
 
 ### Web Search (DuckDuckGo-only)
 
@@ -32,14 +32,14 @@ Requirements for v3.0 Chat UX + Voice Dictation. Each maps to roadmap phases.
 
 ### Settings Cleanup
 
-- [ ] **SET-01**: User no longer sees a Keystore key-deletion affordance in Settings (key rotation stays via edit-overwrite; programmatic deleteKey retained for endpoint-deletion flows)
-- [ ] **SET-02**: User no longer sees a Data section or delete-chats in Settings (bulk delete lives in the chat drawer)
+- [x] **SET-01**: User no longer sees a Keystore key-deletion affordance in Settings (key rotation stays via edit-overwrite; programmatic deleteKey retained for endpoint-deletion flows)
+- [x] **SET-02**: User no longer sees a Data section or delete-chats in Settings (bulk delete lives in the chat drawer)
 
 ### Download→Chat Funnel
 
-- [ ] **FUN-01**: User sees a "Use in Chat" button on downloaded models in Model Catalog that activates the model for chat
-- [ ] **FUN-02**: User with no local models sees a "Download a local model" button in Models & Endpoints that navigates to Model Catalog
-- [ ] **FUN-03**: User with no endpoints sees an "Add a new Endpoint" button in Models & Endpoints that opens endpoint creation
+- [x] **FUN-01**: User sees a "Use in Chat" button on downloaded models in Model Catalog that activates the model for chat
+- [x] **FUN-02**: User with no local models sees a "Download a local model" button in Models & Endpoints that navigates to Model Catalog
+- [x] **FUN-03**: User with no endpoints sees an "Add a new Endpoint" button in Models & Endpoints that opens endpoint creation
 
 ### Voice Dictation
 
@@ -74,20 +74,20 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | RATE-01 | Phase 66 | Pending |
 | RATE-02 | Phase 66 | Pending |
-| DRAWER-01 | Phase 64 | Pending |
-| DRAWER-02 | Phase 64 | Pending |
-| DRAWER-03 | Phase 64 | Pending |
-| DRAWER-04 | Phase 64 | Pending |
-| HELP-01 | Phase 64 | Pending |
+| DRAWER-01 | Phase 64 | Complete |
+| DRAWER-02 | Phase 64 | Complete |
+| DRAWER-03 | Phase 64 | Complete |
+| DRAWER-04 | Phase 64 | Complete |
+| HELP-01 | Phase 64 | Complete |
 | SEARCH-01 | Phase 63 | Complete |
 | SEARCH-02 | Phase 63 | Complete |
 | SEARCH-03 | Phase 63 | Complete |
 | SEARCH-04 | Phase 63 | Complete |
-| SET-01 | Phase 64 | Pending |
-| SET-02 | Phase 64 | Pending |
-| FUN-01 | Phase 64 | Pending |
-| FUN-02 | Phase 64 | Pending |
-| FUN-03 | Phase 64 | Pending |
+| SET-01 | Phase 64 | Complete |
+| SET-02 | Phase 64 | Complete |
+| FUN-01 | Phase 64 | Complete |
+| FUN-02 | Phase 64 | Complete |
+| FUN-03 | Phase 64 | Complete |
 | VOICE-01 | Phase 65 | Pending |
 | VOICE-02 | Phase 65 | Pending |
 | VOICE-03 | Phase 65 | Pending |

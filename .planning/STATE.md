@@ -2,47 +2,47 @@
 gsd_state_version: "1.0"
 milestone: v3.0
 milestone_name: Chat UX + Voice Dictation
-current_phase: 64
-current_phase_name: Drawer + Settings + Help + Funnel Polish
-status: executing
-stopped_at: Phase 63 complete, ready to plan Phase 64
-last_updated: "2026-10-02T14:52:31.877Z"
+current_phase: 65
+current_phase_name: Voice Dictation
+status: planning
+stopped_at: Phase 64 complete, ready to plan Phase 65
+last_updated: "2026-10-02T15:31:46.374Z"
 last_activity: 2026-10-02
-last_activity_desc: Phase 63 complete, transitioned to Phase 64
-state_head: 42db8eb9bc607ecc917f2d22e2070b7118215a4c
+last_activity_desc: Phase 64 complete, transitioned to Phase 65
+state_head: 8ad46ea9c26877adb8c6d1378d9d696dd409e014
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 2
-  percent: 25
+  completed_plans: 4
+  percent: 50
 ---
 
 # Project State: Warped
 
 **Last updated:** 2026-09-30
-**Last activity:** 2026-10-02 — Phase 63 complete, transitioned to Phase 64
+**Last activity:** 2026-10-02 — Phase 64 complete, transitioned to Phase 65
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-10-01, v2.5 shipped)
 
 **Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** Phase 64 — Drawer + Settings + Help + Funnel Polish (Phase 63 shipped: DDG-only search, Tavily removed)
+**Current focus:** Phase 65 — Voice Dictation (Phase 64 shipped: drawer/settings/help/funnel polish, 5/5 verified, security SECURED)
 
 ## Current Position
 
-Phase: 64 (Drawer + Settings + Help + Funnel Polish) — READY TO EXECUTE
+Phase: 65 — Voice Dictation
 Plan: Not started
-Status: Ready to execute
-Last activity: 2026-10-02 — Phase 63 execution started
+Status: Ready to plan
+Last activity: 2026-10-02 — Phase 64 execution started
 
 ## Phase Structure (v3.0 — PLANNED)
 
 | Phase | Name | Requirements | Status | Depends On |
 |-------|------|--------------|--------|------------|
 | 63 | Tavily Removal → DDG-only Search | SEARCH-01..04 (4) | Complete (2026-10-02, 2/2 plans, 7/7 verified, 895 tests green) | Phase 62 |
-| 64 | Drawer + Settings + Help + Funnel Polish | DRAWER-01..04, SET-01/02, HELP-01, FUN-01..03 (10) | Not started | Phase 63 |
+| 64 | Drawer + Settings + Help + Funnel Polish | DRAWER-01..04, SET-01/02, HELP-01, FUN-01..03 (10) | Complete (2026-10-02, 2/2 plans, 5/5 verified, 891 tests green, SECURED 6/6) | Phase 63 |
 | 65 | Voice Dictation | VOICE-01..03 (3) | Not started | Phase 64 |
 | 66 | Play In-App Review | RATE-01/02 (2) | Not started | Phase 65 |
 
@@ -60,6 +60,7 @@ Last activity: 2026-10-02 — Phase 63 execution started
 
 ### Decisions
 
+- [v3.0-64]: Drawer/settings/help/funnel polish (ModelSelectorSheet CTA + catalog wiring, uniform 16sp footer + drawer-bottom delete-all, Settings removals-only, catalog Use-in-Chat with Snackbar error channel, dual empty-state CTAs, Help numbered-steps rewrite EN+ES) — dead endpoint-key code removed, T-64-02 closed via repository-owned cleanup, UI review 17/24 priority fixes applied, catalog dead-end retry deferred (needs design)
 - [v3.0-63]: Tavily fully removed (3 files deleted, `SearchOutcome` rename file-wide for grep-clean, startup Keystore alias cleanup off-main-thread via `KeystoreManager.LEGACY_SEARCH_ALIAS`) — DDG single producer, budget/cancel preserved, legacy citations render via existing host-fallback, zero schema change
 - [v3.0]: 4 phases per research (compressed 5→4: regression sweep folded into per-phase verification — it carries zero requirements and coarse granularity forbids standalone maintenance phases) — Tavily contract-move + deletion first, drawer/settings/help/funnel batch second (same composables), voice third (after ChatScreen churn), Play Review last (smallest, independent). Continues numbering at Phase 63 (v2.5 ended at 62).
 
@@ -136,7 +137,7 @@ See prior STATE history for v2.2–v2.4 quick-task log (archived at roadmap rewr
 **Resume file:** —
 
 Last session: 2026-10-01
-Stopped at: Phase 63 complete, ready to plan Phase 64
+Stopped at: Phase 64 complete, ready to plan Phase 65
 Resume: `/gsd-new-milestone` (after `/clear`)
 
 ## Operator Next Steps
