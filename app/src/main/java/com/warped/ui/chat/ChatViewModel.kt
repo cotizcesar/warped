@@ -1787,6 +1787,19 @@ class ChatViewModel @Inject constructor(
     @Volatile
     private var voiceStarting = false
 
+    /**
+     * Stop requested while [voiceStarting] (WR-05): stop/auto-stop/cancel
+     * taps landing in the spin-up window record intent here instead of
+     * hitting the `_isVoiceRecording` guard and being swallowed. The IO
+     * coroutine consumes it right after platform accept — KEEP stops and
+     * keeps the clip (manual stop / cap path), DISCARD stops and deletes
+     * it (cancel path). Cleared on failed start.
+     */
+    @Volatile
+    private var pendingVoiceStop: PendingVoiceStop? = null
+
+    private enum class PendingVoiceStop { KEEP, DISCARD }
+
     private fun getVoiceRecorder(): VoiceMessageRecorder {
         voiceRecorderOverride?.let { return it }
         return voiceRecorder ?: VoiceMessageRecorder(
@@ -1810,7 +1823,37 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO + coroutineExceptionHandler) {
             try {
                 val recorder = getVoiceRecorder()
-                if (!recorder.start()) return@launch
+                if (!recorder.start()) {
+                    pendingVoiceStop = null
+                    return@launch
+                }
+                // WR-05: a stop tapped during spin-up is honored
+                // immediately — the session never becomes visible.
+                val pending = pendingVoiceStop
+                if (pending != null) {
+                    pendingVoiceStop = null
+                    if (pending == PendingVoiceStop.KEEP) {
+                        val kept = try {
+                            peekVoiceRecorder()?.stop()
+                        } catch (e: Exception) {
+                            Timber.w(e, "VoiceMsg: pending-stop failed")
+                            null
+                        }
+                        voiceClipFile = kept
+                        _hasVoiceClip.value = kept != null
+                    } else {
+                        try {
+                            peekVoiceRecorder()?.cancel()
+                        } catch (e: Exception) {
+                            Timber.w(e, "VoiceMsg: pending-cancel failed")
+                        }
+                        voiceClipFile = null
+                        _hasVoiceClip.value = false
+                    }
+                    _isVoiceRecording.value = false
+                    _voiceAmplitude.value = 0
+                    return@launch
+                }
                 _isVoiceRecording.value = true
                 _voiceElapsedSec.value = 0
                 _voiceAmplitude.value = 0
@@ -1861,7 +1904,12 @@ class ChatViewModel @Inject constructor(
 
     /** Manual stop (second tap): keep the clip in memory for send. */
     fun stopVoiceRecording() {
-        if (!_isVoiceRecording.value) return
+        if (!_isVoiceRecording.value) {
+            // WR-05: stop tapped during spin-up — record intent for the
+            // IO coroutine instead of swallowing the tap.
+            if (voiceStarting) pendingVoiceStop = PendingVoiceStop.KEEP
+            return
+        }
         val file = keepAndStopVoice()
         voiceClipFile = file
         _hasVoiceClip.value = file != null
@@ -1875,7 +1923,10 @@ class ChatViewModel @Inject constructor(
      * silent — no bogus "limit reached" toast).
      */
     fun autoStopVoiceRecording(announceCap: Boolean = true) {
-        if (!_isVoiceRecording.value) return
+        if (!_isVoiceRecording.value) {
+            if (voiceStarting) pendingVoiceStop = PendingVoiceStop.KEEP
+            return
+        }
         val file = keepAndStopVoice()
         voiceClipFile = file
         _hasVoiceClip.value = file != null
@@ -1887,6 +1938,12 @@ class ChatViewModel @Inject constructor(
      * in-progress recording and a previously kept clip.
      */
     fun cancelVoiceRecording() {
+        if (!_isVoiceRecording.value && voiceStarting) {
+            // WR-05: cancel tapped during spin-up — the IO coroutine
+            // discards right after platform accept.
+            pendingVoiceStop = PendingVoiceStop.DISCARD
+            return
+        }
         voiceSessionJob?.cancel()
         voiceSessionJob = null
         try {
