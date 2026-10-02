@@ -1792,11 +1792,15 @@ class ChatViewModel @Inject constructor(
         // FIRST — dictation and transcript STT never overlap (strictly
         // sequential, ERROR_RECOGNIZER_BUSY avoidance).
         stopTranscriptSession()
-        if (_isVoiceRecording.value) stopVoiceRecording()
-        // Phase 69 Plan 01 extension point (VMSG-07, Plan 02 owns): starting
-        // dictation must also stop the transcript STT session first —
-        // dictation and transcript STT never overlap (strictly sequential,
-        // ERROR_RECOGNIZER_BUSY avoidance).
+        if (voiceStarting && !_isVoiceRecording.value) {
+            // CR-01: dictation tapped during recorder spin-up — mirror the
+            // WR-05 pending-stop discipline so the in-flight IO block never
+            // starts the transcript STT session under live dictation. The
+            // pending-stop path freezes a null holder and returns before
+            // STT start, so dictation runs on a recognizer-free state in
+            // both interleavings.
+            pendingVoiceStop = PendingVoiceStop.KEEP
+        } else if (_isVoiceRecording.value) stopVoiceRecording()
         lastPartial = ""
         partialAnchor = null
         _isListening.value = getDictationManager().start()
@@ -2022,6 +2026,22 @@ class ChatViewModel @Inject constructor(
     private var transcriptUnavailable: Boolean = false
 
     /**
+     * WR-02: transcript session generation. Bumped on every session
+     * boundary (recording entry, STT start, transcript stop, buffer
+     * clear) so a trailing async onResults from session N — delivered on
+     * the binder thread after session N+1 began — is dropped by the
+     * per-session listener identity captured in [getTranscriptManager]
+     * instead of polluting the new session's buffer.
+     */
+    private val transcriptSession = AtomicLong(0L)
+
+    /**
+     * WR-02: guards the transcript read-modify-write (binder-thread
+     * callbacks vs Main/IO resets) against lost updates.
+     */
+    private val transcriptLock = Any()
+
+    /**
      * Live transcript hypothesis (committed finals + current partial).
      * Thread-safe StateFlow — callbacks only touch flows, never Compose
      * state, never Main-blocked.
@@ -2041,14 +2061,20 @@ class ChatViewModel @Inject constructor(
 
     private fun getTranscriptManager(): VoiceDictationManager {
         transcriptManagerOverride?.let { return it }
+        // WR-02: the manager is (re)created per STT session with the
+        // current generation captured in its lambdas — a trailing final
+        // from session N arrives on N's lambdas and is dropped once the
+        // counter moved on (stop/clear/next entry). Same lazy-holder +
+        // override-seam discipline as the dictation manager.
+        val session = transcriptSession.get()
         return transcriptManager ?: VoiceDictationManager(
             context = context,
-            onPartial = { onTranscriptPartial(it) },
-            onFinal = { onTranscriptFinal(it) },
+            onPartial = { if (session == transcriptSession.get()) onTranscriptPartial(it) },
+            onFinal = { if (session == transcriptSession.get()) onTranscriptFinal(it) },
             // Degrade-to-null policy: failures never touch inputText and
             // never emit UI events — the dictation callbacks stay
             // dictation-only.
-            onError = { onTranscriptError(it) },
+            onError = { if (session == transcriptSession.get()) onTranscriptError(it) },
         ).also { transcriptManager = it }
     }
 
@@ -2058,7 +2084,11 @@ class ChatViewModel @Inject constructor(
      * deltas). Writes ONLY to the transcript buffer.
      */
     internal fun onTranscriptPartial(text: String) {
-        _voiceTranscriptLive.value = joinTranscript(transcriptFinalized, text)
+        // WR-02: binder-thread callback — synchronize the buffer write
+        // against concurrent session resets.
+        synchronized(transcriptLock) {
+            _voiceTranscriptLive.value = joinTranscript(transcriptFinalized, text)
+        }
     }
 
     /**
@@ -2069,12 +2099,21 @@ class ChatViewModel @Inject constructor(
     internal fun onTranscriptFinal(text: String) {
         val clean = text.trim()
         if (clean.isEmpty()) return
-        if (transcriptFinalized.endsWith(clean)) {
+        // WR-02: binder-thread callback — synchronize the
+        // read-modify-write against concurrent session resets.
+        synchronized(transcriptLock) {
+            // WR-03: skip only true duplicate delivery — no new partial
+            // hypothesis arrived since the last final (live == committed).
+            // A genuine repetition ("yes … yes") carries an intervening
+            // partial, so live differs from committed and the repeat is
+            // appended honestly (VMSG-07).
+            if (transcriptFinalized.endsWith(clean) && _voiceTranscriptLive.value == transcriptFinalized) {
+                _voiceTranscriptLive.value = transcriptFinalized
+                return
+            }
+            transcriptFinalized = joinTranscript(transcriptFinalized, clean)
             _voiceTranscriptLive.value = transcriptFinalized
-            return
         }
-        transcriptFinalized = joinTranscript(transcriptFinalized, clean)
-        _voiceTranscriptLive.value = transcriptFinalized
     }
 
     /**
@@ -2096,6 +2135,9 @@ class ChatViewModel @Inject constructor(
 
     /** Stop the transcript STT session (idempotent, best-effort). */
     private fun stopTranscriptSession() {
+        // WR-02: invalidate the session FIRST so a trailing onResults
+        // racing this stop is dropped by the listener identity check.
+        transcriptSession.incrementAndGet()
         try {
             (transcriptManagerOverride ?: transcriptManager)?.stop()
         } catch (e: Exception) {
@@ -2173,6 +2215,9 @@ class ChatViewModel @Inject constructor(
         // stop that never ran STT can never freeze stale text. The holder
         // is untouched: it still belongs to a possibly-kept previous draft
         // until this session freezes or clears it.
+        // WR-02: invalidate any trailing callbacks from the previous
+        // session alongside the reset.
+        transcriptSession.incrementAndGet()
         transcriptFinalized = ""
         _voiceTranscriptLive.value = ""
         transcriptUnavailable = false
@@ -2232,6 +2277,20 @@ class ChatViewModel @Inject constructor(
                 // after stopDictation above). Best-effort: start failure
                 // degrades to unavailable — recording continues and
                 // voice-send is never blocked by STT.
+                // WR-02: fresh listener identity per session — the previous
+                // manager is torn down so its trailing callbacks can never
+                // reach the new buffer; the new instance captures the
+                // bumped generation (the override seam keeps its own
+                // instance in tests).
+                transcriptSession.incrementAndGet()
+                if (transcriptManagerOverride == null) {
+                    try {
+                        transcriptManager?.destroy()
+                    } catch (e: Exception) {
+                        Timber.w(e, "VoiceMsg: transcript teardown failed")
+                    }
+                    transcriptManager = null
+                }
                 transcriptFinalized = ""
                 _voiceTranscriptLive.value = ""
                 transcriptUnavailable = false
