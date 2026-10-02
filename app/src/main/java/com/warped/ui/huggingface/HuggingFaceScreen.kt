@@ -79,6 +79,7 @@ fun HuggingFaceScreen(
 ) {
     val downloadStates by viewModel.downloadStates.collectAsStateWithLifecycle()
     val downloadedFileNames by viewModel.downloadedFileNames.collectAsStateWithLifecycle()
+    val activeLocalModelId by viewModel.activeLocalModelId.collectAsStateWithLifecycle()
 
     // FUN-01: activation creates the bound conversation asynchronously —
     // navigate once its id lands, then consume so a later recomposition
@@ -164,6 +165,7 @@ fun HuggingFaceScreen(
                             viewModel = viewModel,
                             downloadStates = downloadStates,
                             isOnDevice = true,
+                            isInUse = isEntryInUse(activeLocalModelId, entry),
                             onDeleteDownloaded = { viewModel.deleteDownloaded(entry) },
                             onUseInChat = { viewModel.useDownloadedModel(entry) }
                         )
@@ -218,6 +220,7 @@ private fun CatalogCardItem(
     viewModel: CatalogViewModel,
     downloadStates: Map<String, DownloadState>,
     isOnDevice: Boolean,
+    isInUse: Boolean = false,
     onDeleteDownloaded: () -> Unit = {},
     onUseInChat: () -> Unit = {}
 ) {
@@ -226,6 +229,7 @@ private fun CatalogCardItem(
         entry = entry,
         downloadState = downloadStates[downloadId],
         isOnDevice = isOnDevice,
+        isInUse = isInUse,
         onDownload = { viewModel.startDownload(entry) },
         onCancel = { viewModel.cancelDownload(downloadId) },
         onPause = { viewModel.pauseDownload(downloadId) },
@@ -278,6 +282,7 @@ private fun CatalogModelCard(
     entry: AllowlistedModel,
     downloadState: DownloadState?,
     isOnDevice: Boolean = false,
+    isInUse: Boolean = false,
     onDownload: () -> Unit,
     onCancel: () -> Unit,
     onPause: () -> Unit,
@@ -336,12 +341,19 @@ private fun CatalogModelCard(
         )
     }
 
-    // Unified card shared with Models & Endpoints — only the trailing
-    // action switches (download cluster here, delete there).
+    // Unified card shared with Models & Endpoints — the header always
+    // shows the full title/meta/capability block (same as Available
+    // cards). For downloaded cards the delete icon stays in the header
+    // trailing slot and the Use-in-chat CTA renders full-width at the
+    // BOTTOM of the card (downloadContent slot below), so every card is
+    // distinguishable by name and the action sits where the thumb expects
+    // it. The active model additionally carries an "In use" pill.
+    val inUseLabel = stringResource(R.string.catalog_in_use)
     com.warped.ui.components.ModelCard(
         title = entry.displayName,
         sizeText = formatFileSize(entry.sizeInBytes),
         ramText = entry.ramNote,
+        metaChips = if (downloaded && isInUse) listOf(inUseLabel) else emptyList(),
         vision = entry.capabilities.vision,
         audio = entry.capabilities.audio,
         reasoning = entry.capabilities.supportsThinking,
@@ -350,26 +362,13 @@ private fun CatalogModelCard(
         expandable = expandable,
         trailingActions = {
             if (downloaded) {
-                // FUN-01: compact Use in Chat beside the unchanged delete
-                // icon — same row pattern as ModelsScreen ModelCard.
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Button(
-                        onClick = onUseInChat,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = WarpedAccent),
-                        shape = RoundedCornerShape(8.dp)
-                    ) { Text(stringResource(R.string.use_in_chat), color = Color.White) }
-                    IconButton(onClick = { showDeleteConfirm = true }) {
-                        Icon(
-                            imageVector = Icons.Filled.Delete,
-                            contentDescription = stringResource(R.string.delete),
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
+                IconButton(onClick = { showDeleteConfirm = true }) {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = stringResource(R.string.delete),
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(22.dp)
+                    )
                 }
             } else {
                 CatalogDownloadActions(
@@ -394,6 +393,22 @@ private fun CatalogModelCard(
                     onResume = onResume,
                     onRetry = onRetry
                 )
+            }
+            // Downloaded CTA: full-width bottom action, same accent as the
+            // Available download affordance.
+            if (downloaded) {
+                Spacer(Modifier.height(10.dp))
+                Button(
+                    onClick = onUseInChat,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = WarpedAccent),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = if (isInUse) inUseLabel else stringResource(R.string.use_in_chat),
+                        color = Color.White
+                    )
+                }
             }
         },
         // Retained error text (icon form keeps the message for a11y;

@@ -63,7 +63,12 @@ fun ChatInputBar(
     // dictation (UI-SPEC section 3). Fires on every selection change;
     // the ViewModel inserts dictated text at the last reported position.
     onCursorChange: (Int) -> Unit = {},
+    // Model-loading gate (2026-10-02): while a model loads, the WHOLE
+    // input is disabled — text field, image/think buttons, mic, and send.
+    isLoadingModel: Boolean = false,
 ) {
+    // Single gate for the entire bar: generating, no model, or loading.
+    val inputLocked = isGenerating || !canSend || isLoadingModel
     Surface(
         color = Color(0xFF2B2B29),
         shape = MaterialTheme.shapes.extraLarge,
@@ -98,7 +103,7 @@ fun ChatInputBar(
                                     .size(20.dp)
                                     .clip(RoundedCornerShape(50))
                                     .background(Color.Black.copy(alpha = 0.5f))
-                                    .clickable { onRemoveImage(i) },
+                                    .clickable(enabled = !inputLocked) { onRemoveImage(i) },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(Icons.Filled.Close, stringResource(R.string.cd_remove), tint = Color.White, modifier = Modifier.size(12.dp))
@@ -134,18 +139,18 @@ fun ChatInputBar(
                     .fillMaxWidth()
                     .onKeyEvent { event ->
                         val hasContent = text.isNotBlank() || attachedImages.isNotEmpty()
-                        if (event.key == Key.Enter && canSend && !isGenerating && hasContent) {
+                        if (event.key == Key.Enter && canSend && !isGenerating && !isLoadingModel && hasContent) {
                             onSend()
                             true
                         } else false
                     },
                 placeholder = { Text(stringResource(R.string.type_message)) },
-                enabled = !isGenerating && canSend,
+                enabled = !inputLocked,
                 maxLines = 4,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = {
                     val hasContent = text.isNotBlank() || attachedImages.isNotEmpty()
-                    if (canSend && !isGenerating && hasContent) onSend()
+                    if (canSend && !isGenerating && !isLoadingModel && hasContent) onSend()
                 }),
                 shape = MaterialTheme.shapes.medium,
                 colors = OutlinedTextFieldDefaults.colors(
@@ -169,7 +174,7 @@ fun ChatInputBar(
                 // buttons are hidden, not dimmed — no dead affordances.
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (modelHasVision) {
-                        IconButton(onClick = onAddImage, modifier = Modifier.size(40.dp)) {
+                        IconButton(onClick = onAddImage, enabled = !inputLocked, modifier = Modifier.size(40.dp)) {
                             Icon(Icons.Filled.AddPhotoAlternate, stringResource(R.string.cd_add_image),
                                 tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
                         }
@@ -180,6 +185,7 @@ fun ChatInputBar(
                         if (modelHasVision) Spacer(Modifier.width(10.dp))
                         Button(
                             onClick = onToggleReasoning,
+                            enabled = !inputLocked,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (reasoningEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent
                             ),
@@ -200,9 +206,10 @@ fun ChatInputBar(
 
                 // Phase 65 (VOICE-01/03): dictation mic, immediately left of
                 // the send/stop slot. Hidden without a recognizer
-                // (speechAvailable) and while generating so no two stop
-                // icons ever appear together.
-                if (speechAvailable && !isGenerating) {
+                // (speechAvailable), while generating, and while a model
+                // loads (inputLocked) so no two stop icons ever appear
+                // together and nothing is tappable mid-load.
+                if (speechAvailable && !isGenerating && !isLoadingModel) {
                     // Phase 65 UI-review: localized stateDescription so
                     // TalkBack announces the listening state beyond the
                     // content-description swap (which is not reliably
@@ -234,7 +241,7 @@ fun ChatInputBar(
                     }
                 } else {
                     val hasContent = text.isNotBlank() || attachedImages.isNotEmpty()
-                    if (hasContent && canSend) {
+                    if (hasContent && canSend && !isLoadingModel) {
                         IconButton(
                             onClick = onSend,
                             modifier = Modifier.size(40.dp),

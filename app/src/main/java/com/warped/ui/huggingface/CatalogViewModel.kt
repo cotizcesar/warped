@@ -79,6 +79,19 @@ class CatalogViewModel @Inject constructor(
                 emptySet(),
             )
 
+    /** Active local model id (absolute file path) for the "In use" badge. */
+    val activeLocalModelId: StateFlow<String?> =
+        activeModelSelection.localSelection
+            .map { it.modelId }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.Eagerly,
+                // Null initial: reading localSelection.value eagerly breaks
+                // relaxed-mock construction in JVM tests (CCE on the mock's
+                // value); the live flow emits immediately on collect.
+                null,
+            )
+
     fun downloadId(entry: AllowlistedModel): String =
         "${entry.repoSlug}/${entry.modelFile}"
 
@@ -216,6 +229,15 @@ class CatalogViewModel @Inject constructor(
         }
     }
 }
+
+/**
+ * Pure "In use" rule: true when the active local model id resolves to the
+ * same on-device file as the catalog entry (basename match — the DB row
+ * stores the absolute path, the entry only the basename). JVM-testable.
+ */
+fun isEntryInUse(activeLocalModelId: String?, entry: AllowlistedModel): Boolean =
+    activeLocalModelId != null &&
+        activeLocalModelId.substringAfterLast("/") == entry.modelFile
 
 /**
  * Shared catalog-to-library resolver (WR-03). The allowlist entry carries

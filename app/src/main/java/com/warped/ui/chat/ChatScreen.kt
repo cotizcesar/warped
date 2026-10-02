@@ -434,6 +434,8 @@ fun ChatScreen(
                 onMicClick = onMicClick,
                 // WR-03: report the caret so dictation inserts at cursor.
                 onCursorChange = { viewModel.updateInputCursor(it) },
+                // Model-loading gate: the whole bar locks while loading.
+                isLoadingModel = connection.isLoadingModel,
             )
             }
         }

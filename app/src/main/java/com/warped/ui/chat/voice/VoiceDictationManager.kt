@@ -7,6 +7,7 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import timber.log.Timber
+import java.util.Locale
 
 /**
  * Phase 65 (VOICE-01/VOICE-03): thin platform SpeechRecognizer wrapper for
@@ -16,8 +17,10 @@ import timber.log.Timber
  * - Partial results stream through [onPartial], final text through [onFinal].
  * - Errors surface only as a code on [onError] with zero UI side effects;
  *   the owner (ChatViewModel) applies the silent-error policy.
- * - Recognition language follows the system locale (no EXTRA_LANGUAGE
- *   override, no in-app picker).
+ * - Recognition language follows the device locale explicitly
+ *   (EXTRA_LANGUAGE = Locale.getDefault()), so Spanish-locale devices
+ *   recognize Spanish instead of falling back to English. The platform
+ *   has no multi-language auto-detect; the locale is the selector.
  * - All platform calls are async with no synchronous waits — never blocks
  *   the UI thread. Availability is resolved by the owner off the
  *   composition path (Dispatchers.IO) and cached.
@@ -47,7 +50,14 @@ class VoiceDictationManager(
     /**
      * Start listening. Creates the platform recognizer once, attaches the
      * listener, and issues the async start call. Recognition language
-     * follows the system locale.
+     * follows the device locale explicitly.
+     *
+     * NOTE (StackOverflow fix): the listener's onError MUST forward via
+     * `this@VoiceDictationManager.onError` — a bare `onError(error)` call
+     * inside the anonymous RecognitionListener resolves to the listener's
+     * own override and recurses until StackOverflowError (crash log:
+     * onError:88 repeated to SIG 9). Same qualification for onPartial /
+     * onFinal for symmetry and safety.
      *
      * @return true when the platform accepted the start request. False
      * when the synchronous start threw (the async [onError] path also
@@ -60,6 +70,9 @@ class VoiceDictationManager(
                 RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                 RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
             )
+            // Device locale explicitly: without this some recognizers
+            // default to en-US and transcribe Spanish speech as English.
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
         }
@@ -72,7 +85,7 @@ class VoiceDictationManager(
             override fun onEvent(eventType: Int, params: Bundle?) = Unit
 
             override fun onPartialResults(partialResults: Bundle?) {
-                firstResult(partialResults)?.let { onPartial(it) }
+                firstResult(partialResults)?.let { this@VoiceDictationManager.onPartial(it) }
             }
 
             override fun onResults(results: Bundle?) {
@@ -81,11 +94,11 @@ class VoiceDictationManager(
                 // platform recognizer is single-shot: on silence/timeout
                 // it stops by itself, and without this the UI stays stuck
                 // on the stop toggle for a dead recognizer.
-                onFinal(firstResult(results).orEmpty())
+                this@VoiceDictationManager.onFinal(firstResult(results).orEmpty())
             }
 
             override fun onError(error: Int) {
-                onError(error)
+                this@VoiceDictationManager.onError(error)
             }
         }
         try {
