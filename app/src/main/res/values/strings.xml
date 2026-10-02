@@ -292,6 +292,7 @@
     <string name="models_empty_hint">Tap Add Model to download one from the catalog or import a file.</string>
     <string name="models_memory_msg_fmt">This model needs ~%1$d MB, your device has %2$d MB available. Loading may cause instability.</string>
     <string name="selector_no_models">No models available. Download a .litertlm model or add an endpoint.</string>
+    <string name="drawer_empty_download_cta">Download a model</string>
     <string name="selector_no_local">No local models downloaded</string>
     <string name="selector_no_model">No model selected. Edit this endpoint to pick one.</string>
     <string name="dl_paused_fmt">Paused · %1$s / %2$s</string>
@@ -299,11 +300,6 @@
     <string name="params_dialog_title_fmt">Parameters for %1$s</string>
 
     <!-- Settings -->
-    <string name="settings_section_data">Data</string>
-    <string name="settings_row_chats">Chats</string>
-    <string name="settings_row_endpoints">Endpoints</string>
-    <string name="settings_row_models">Models</string>
-    <string name="settings_row_presets">Presets</string>
     <string name="settings_section_web">Web</string>
     <string name="settings_grounding_title">Grounding web</string>
     <string name="settings_grounding_desc">Read the content of links you paste in chat.</string>
@@ -312,19 +308,12 @@
     <string name="settings_code_theme_desc">Color scheme for code blocks in chat</string>
     <string name="settings_code_font">Code font size</string>
     <string name="settings_section_app">App</string>
-    <string name="settings_section_security">Security</string>
-    <string name="settings_security_desc">API keys are encrypted using Android Keystore (AES-256-GCM)</string>
-    <string name="settings_delete_all_keys_btn">Delete all keys</string>
     <string name="settings_delete_chats_title">Delete All Chats</string>
     <plurals name="settings_delete_chats_msg">
         <item quantity="one">This will permanently delete all %1$d conversation and its messages. This cannot be undone.</item>
         <item quantity="other">This will permanently delete all %1$d conversations and their messages. This cannot be undone.</item>
     </plurals>
     <string name="settings_delete_all">Delete All</string>
-    <string name="settings_delete_keys_title">Delete All API Keys</string>
-    <string name="settings_delete_keys_msg">This will permanently delete all stored API keys. This cannot be undone.</string>
-    <string name="settings_msg_chats_deleted">All chat history deleted</string>
-    <string name="settings_msg_keys_deleted">All API keys deleted</string>
     <string name="settings_msg_key_deleted">API key deleted</string>
 
     <!-- Presets -->

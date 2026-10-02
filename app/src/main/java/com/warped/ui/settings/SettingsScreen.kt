@@ -21,18 +21,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -43,7 +40,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.R
 import com.warped.domain.model.SyntaxTheme
 import com.warped.domain.model.TokenType
-import com.warped.ui.components.WarpedAlertDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,43 +52,8 @@ fun SettingsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     // API-03: system back follows the same onBack path wired in the nav graph
-    // (popBackStack) — gesture and button identical. Delete-confirm dialogs
-    // self-dismiss and keep priority while visible.
+    // (popBackStack) — gesture and button identical.
     BackHandler(onBack = onBack)
-
-    if (uiState.showDeleteChatsDialog) {
-            WarpedAlertDialog(
-            onDismissRequest = { viewModel.dismissDeleteChatsDialog() },
-            title = { Text(stringResource(R.string.settings_delete_chats_title)) },
-            text = {
-                Text(
-                    pluralStringResource(R.plurals.settings_delete_chats_msg, uiState.chatCount, uiState.chatCount)
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { viewModel.deleteAllChats() },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) { Text(stringResource(R.string.settings_delete_all)) }
-            },
-            dismissButton = { TextButton(onClick = { viewModel.dismissDeleteChatsDialog() }) { Text(stringResource(R.string.cancel)) } }
-        )
-    }
-
-    if (uiState.showDeleteKeysDialog) {
-            WarpedAlertDialog(
-            onDismissRequest = { viewModel.dismissDeleteKeysDialog() },
-            title = { Text(stringResource(R.string.settings_delete_keys_title)) },
-            text = { Text(stringResource(R.string.settings_delete_keys_msg)) },
-            confirmButton = {
-                TextButton(
-                    onClick = { viewModel.deleteAllApiKeys() },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) { Text(stringResource(R.string.settings_delete_all)) }
-            },
-            dismissButton = { TextButton(onClick = { viewModel.dismissDeleteKeysDialog() }) { Text(stringResource(R.string.cancel)) } }
-        )
-    }
 
     Scaffold(
         topBar = {
@@ -130,50 +91,6 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(vertical = 12.dp)
     ) {
-        // Data section
-        item {
-            SettingsSectionHeader(
-                icon = Icons.Filled.Storage,
-                title = stringResource(R.string.settings_section_data)
-            )
-        }
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(stringResource(R.string.settings_row_chats), style = MaterialTheme.typography.bodyLarge)
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("${uiState.chatCount}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(Modifier.width(8.dp))
-                            TextButton(
-                                onClick = { viewModel.showDeleteChatsDialog() },
-                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                            ) { Text(stringResource(R.string.delete)) }
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(stringResource(R.string.settings_row_endpoints), style = MaterialTheme.typography.bodyLarge)
-                        Text("${uiState.endpointCount}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(stringResource(R.string.settings_row_models), style = MaterialTheme.typography.bodyLarge)
-                        Text("${uiState.modelCount}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(stringResource(R.string.settings_row_presets), style = MaterialTheme.typography.bodyLarge)
-                        Text("${uiState.presetCount}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-        }
-
         // Web section
         item {
             SettingsSectionHeader(
@@ -345,32 +262,6 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
             }
         }
 
-        // Security section
-        item {
-            SettingsSectionHeader(
-                icon = Icons.Filled.Lock,
-                title = stringResource(R.string.settings_section_security)
-            )
-        }
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        stringResource(R.string.settings_security_desc),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    TextButton(
-                        onClick = { viewModel.showDeleteKeysDialog() },
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                    ) { Text(stringResource(R.string.settings_delete_all_keys_btn)) }
-                }
-            }
-        }
         item { Spacer(Modifier.height(24.dp)) }
     }
 }
