@@ -184,6 +184,7 @@
     <string name="cd_pause_download">Pausar descarga</string>
     <string name="cd_resume_download">Reanudar descarga</string>
     <string name="cd_connection_status">Estado de conexión</string>
+    <string name="cd_toggle_thinking">Alternar modo de pensamiento</string>
     <string name="cd_select_model">Seleccionar modelo</string>
     <string name="cd_thinking_generating">Pensando. Generando respuesta.</string>
     <string name="cd_menu">Menú</string>

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -62,9 +63,6 @@ fun ChatInputBar(
     onTextChange: (String) -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit,
-    reasoningEnabled: Boolean = true,
-    onToggleReasoning: () -> Unit = {},
-    modelHasReasoning: Boolean = true,
     modelHasVision: Boolean = true,
     onAddImage: () -> Unit = {},
     attachedImages: List<Uri> = emptyList(),
@@ -321,115 +319,91 @@ fun ChatInputBar(
                     }
                 }
             } else {
-                OutlinedTextField(
-                value = fieldValue,
-                onValueChange = { next ->
-                    fieldValue = next
-                    if (next.text != text) onTextChange(next.text)
-                    onCursorChange(next.selection.start)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .onFocusChanged { inputFocused = it.isFocused }
-                    .onKeyEvent { event ->
-                        val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip
-                        if (event.key == Key.Enter && canSend && !isGenerating && !isLoadingModel && hasContent) {
-                            onSend()
-                            true
-                        } else false
+                // Single input row: [+] [input........] [mic] [voice]
+                // [send↑]. The attach menu opens upward; the Think toggle
+                // moved to the header bar (brain icon by the traffic
+                // light); mic/voice/send keep their visibility rules and
+                // send renders only with content.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Unified attach menu (Photos on vision-capable
+                    // models, Files always); Files-only attaches directly
+                    // instead of opening a one-item menu.
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val showPhotosItem = modelHasVision
+                        if (showPhotosItem) {
+                            AttachMenuButton(
+                                enabled = !inputLocked,
+                                onPickPhotos = onAddImage,
+                                onPickFiles = onAttachDocument,
+                            )
+                        } else {
+                            // Files-only: direct attach, no menu detour.
+                            // description swaps to replace when attached (a new
+                            // pick replaces); the attached filename rides
+                            // stateDescription (Phase 65 pattern).
+                            // Hoisted out of semantics{}: stringResource is
+                            // @Composable and cannot run inside the semantics lambda.
+                            val attachedStateDesc = attachedDocName?.let {
+                                stringResource(R.string.doc_reader_attached, it)
+                            }
+                            IconButton(
+                                onClick = onAttachDocument,
+                                enabled = !inputLocked,
+                                modifier = Modifier.size(48.dp).semantics {
+                                    attachedStateDesc?.let { stateDescription = it }
+                                },
+                            ) {
+                                Icon(
+                                    Icons.Filled.AttachFile,
+                                    stringResource(
+                                        if (attachedDocName != null) R.string.doc_reader_replace
+                                        else R.string.doc_reader_attach
+                                    ),
+                                    tint = Color.White.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
+                        }
+                    }
+                    OutlinedTextField(
+                    value = fieldValue,
+                    onValueChange = { next ->
+                        fieldValue = next
+                        if (next.text != text) onTextChange(next.text)
+                        onCursorChange(next.selection.start)
                     },
-                placeholder = { Text(stringResource(R.string.type_message)) },
-                enabled = !inputLocked,
-                maxLines = 4,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = {
-                    val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip
-                    if (canSend && !isGenerating && !isLoadingModel && hasContent) onSend()
-                }),
-                shape = MaterialTheme.shapes.medium,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent,
-                    disabledBorderColor = Color.Transparent,
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent
-                )
-                )
-            }
-
-            Spacer(Modifier.height(10.dp))
-
-            // Row 2: Left (image + brain) | Right (model + send/stop)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Left group: unified attach menu + Thinking toggle
-                // (reasoning-capable models only). Unsupported entries are
-                // hidden, not dimmed — no dead affordances. A single "+"
-                // opens an upward menu (Photos on vision-capable models,
-                // Files always); with Files as the only option the button
-                // attaches directly instead of opening a one-item menu.
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    val showPhotosItem = modelHasVision
-                    if (showPhotosItem) {
-                        AttachMenuButton(
-                            enabled = !inputLocked,
-                            onPickPhotos = onAddImage,
-                            onPickFiles = onAttachDocument,
-                        )
-                    } else {
-                        // Files-only: direct attach, no menu detour.
-                        // description swaps to replace when attached (a new
-                        // pick replaces); the attached filename rides
-                        // stateDescription (Phase 65 pattern).
-                        // Hoisted out of semantics{}: stringResource is
-                        // @Composable and cannot run inside the semantics lambda.
-                        val attachedStateDesc = attachedDocName?.let {
-                            stringResource(R.string.doc_reader_attached, it)
-                        }
-                        IconButton(
-                            onClick = onAttachDocument,
-                            enabled = !inputLocked,
-                            modifier = Modifier.size(48.dp).semantics {
-                                attachedStateDesc?.let { stateDescription = it }
-                            },
-                        ) {
-                            Icon(
-                                Icons.Filled.AttachFile,
-                                stringResource(
-                                    if (attachedDocName != null) R.string.doc_reader_replace
-                                    else R.string.doc_reader_attach
-                                ),
-                                tint = Color.White.copy(alpha = 0.6f),
-                                modifier = Modifier.size(24.dp),
-                            )
-                        }
-                    }
-                    // Think toggle
-                    val canThink = modelHasReasoning
-                    if (canThink) {
-                        Spacer(Modifier.width(10.dp))
-                        Button(
-                            onClick = onToggleReasoning,
-                            enabled = !inputLocked,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (reasoningEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent
-                            ),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                            shape = MaterialTheme.shapes.small,
-                            modifier = Modifier.height(28.dp)
-                        ) {
-                            Text(
-                                stringResource(R.string.thinking),
-                                color = if (reasoningEnabled) Color.White else Color.White.copy(alpha = 0.6f),
-                                fontSize = MaterialTheme.typography.labelSmall.fontSize
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.weight(1f))
+                    modifier = Modifier
+                        .weight(1f)
+                        .onFocusChanged { inputFocused = it.isFocused }
+                        .onKeyEvent { event ->
+                            val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip
+                            if (event.key == Key.Enter && canSend && !isGenerating && !isLoadingModel && hasContent) {
+                                onSend()
+                                true
+                            } else false
+                        },
+                    placeholder = { Text(stringResource(R.string.type_message)) },
+                    enabled = !inputLocked,
+                    maxLines = 4,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = {
+                        val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip
+                        if (canSend && !isGenerating && !isLoadingModel && hasContent) onSend()
+                    }),
+                    shape = MaterialTheme.shapes.medium,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                        disabledBorderColor = Color.Transparent,
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent
+                    )
+                    )
+                    // (Attach menu + input field live above, in the single
+                    // input row — this slot now holds mic/voice/send only.)
 
                 // Phase 65 (VOICE-01/03): dictation mic, immediately left of
                 // the send/stop slot. Hidden without a recognizer
@@ -525,6 +499,9 @@ fun ChatInputBar(
                     Spacer(Modifier.width(8.dp))
                 }
 
+                // Send/stop slot: stop while generating; up-arrow send
+                // ONLY with content (text, images, document, or voice
+                // draft) — empty input shows no send affordance at all.
                 if (isGenerating) {
                     IconButton(onClick = onStop, modifier = Modifier.size(40.dp)) {
                         Icon(Icons.Filled.Stop, stringResource(R.string.cd_stop), tint = Color.White, modifier = Modifier.size(24.dp))
@@ -540,19 +517,14 @@ fun ChatInputBar(
                                 contentColor = Color.White
                             )
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.Send, stringResource(R.string.cd_send), modifier = Modifier.size(24.dp))
-                        }
-                    } else {
-                        IconButton(onClick = onSend, enabled = false, modifier = Modifier.size(40.dp)) {
-                            Icon(Icons.AutoMirrored.Filled.Send, stringResource(R.string.cd_send),
-                                tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(24.dp))
+                            Icon(Icons.Filled.ArrowUpward, stringResource(R.string.cd_send), modifier = Modifier.size(24.dp))
                         }
                     }
                 }
             }
         }
     }
-}
+}}
 
 /**
  * Unified attach affordance: a single "+" button opening an upward menu

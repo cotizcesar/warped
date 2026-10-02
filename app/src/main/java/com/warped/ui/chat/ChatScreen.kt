@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -595,9 +596,6 @@ fun ChatScreen(
                 onTextChange = { viewModel.updateInput(it) },
                 onSend = onSendMessage,
                 onStop = { viewModel.stopGeneration() },
-                reasoningEnabled = input.enableThinking,
-                onToggleReasoning = { viewModel.toggleThinking() },
-                modelHasReasoning = input.supportsThinking,
                 // Verified-only capabilities: image/audio buttons hide when
                 // the selected local model lacks the modality. Remote or
                 // unselected → fail open (null → true).
@@ -680,6 +678,9 @@ fun ChatScreen(
                     viewModel.fetchAllEndpointModels()
                 },
                 onOpenDrawer = onOpenDrawer,
+                thinkingEnabled = input.enableThinking,
+                supportsThinking = input.supportsThinking,
+                onToggleThinking = { viewModel.toggleThinking() },
             )
 
             if (isEmpty) {
@@ -1072,7 +1073,13 @@ private fun InlineModelSelectorBar(
     loadingModelName: String,
     trafficLight: TrafficLightState,
     onClick: () -> Unit,
-    onOpenDrawer: () -> Unit
+    onOpenDrawer: () -> Unit,
+    // Thinking toggle (reasoning-capable models only): brain icon
+    // switch left of the traffic light. Hidden otherwise — no dead
+    // affordances.
+    thinkingEnabled: Boolean = false,
+    supportsThinking: Boolean = false,
+    onToggleThinking: () -> Unit = {},
 ) {
     val pillColor = if (isLocal) Color(0xFF4CAF50) else Color(0xFF2196F3)
     val pillText = if (isLocal) "Local" else "Net"
@@ -1130,6 +1137,21 @@ private fun InlineModelSelectorBar(
                         modifier = Modifier.weight(1f)
                     )
                     Spacer(Modifier.width(8.dp))
+                    if (supportsThinking) {
+                        IconButton(
+                            onClick = onToggleThinking,
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(
+                                Icons.Filled.Psychology,
+                                contentDescription = stringResource(R.string.cd_toggle_thinking),
+                                tint = if (thinkingEnabled) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
+                        Spacer(Modifier.width(2.dp))
+                    }
                     Icon(
                         Icons.Filled.Circle,
                         contentDescription = stringResource(R.string.cd_connection_status),
