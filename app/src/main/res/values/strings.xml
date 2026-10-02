@@ -461,7 +461,7 @@
     <string name="help_s7_step5">Web grounding adds cited search results — no setup needed.</string>
     <string name="help_s8_title">8. Tips &amp; Shortcuts</string>
     <string name="help_s8_step1">Tap send to reply; drafts stay in the input.</string>
-    <string name="help_s8_step2">Save generation settings as Presets.</string>
+    <string name="help_s8_step2">You can save generation settings as Presets.</string>
     <string name="help_s8_step3">Tap a model card for its full capability table.</string>
     <string name="help_s8_step4">Delete chats from Recents with the X on each row.</string>
     <string name="help_s8_step5">History stays on your device — nothing goes to the cloud.</string>

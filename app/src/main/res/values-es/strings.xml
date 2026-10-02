@@ -289,7 +289,7 @@
     <string name="selector_no_models">No hay modelos disponibles. Descargá uno para empezar.</string>
     <string name="drawer_empty_download_cta">Descargar un modelo</string>
     <string name="models_empty_download_cta">Descargar un modelo local</string>
-    <string name="models_empty_add_endpoint_cta">Agregar un endpoint</string>
+    <string name="models_empty_add_endpoint_cta">Agregar un Endpoint</string>
     <string name="selector_no_local">No se descargaron modelos locales</string>
     <string name="selector_no_model">Ningún modelo seleccionado. Editá este endpoint para elegir uno.</string>
     <string name="dl_paused_fmt">En pausa · %1$s / %2$s</string>
@@ -465,7 +465,7 @@
     <string name="help_s7_step5">La búsqueda web agrega resultados citados — sin configuración.</string>
     <string name="help_s8_title">8. Consejos y atajos</string>
     <string name="help_s8_step1">Tocá enviar para responder; el borrador queda en la entrada.</string>
-    <string name="help_s8_step2">Guardá tus ajustes de generación como Presets.</string>
+    <string name="help_s8_step2">Podés guardar tus ajustes de generación como Presets.</string>
     <string name="help_s8_step3">Tocá una tarjeta para su tabla completa de capacidades.</string>
     <string name="help_s8_step4">Borrá chats de Recientes con la X de cada fila.</string>
     <string name="help_s8_step5">El historial queda en tu dispositivo — nada va a la nube.</string>
