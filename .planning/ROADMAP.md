@@ -99,9 +99,19 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
+**Wave 1**
 
 - [ ] 64-01-PLAN.md — Drawer sheet CTA + footer + delete-all row, Settings removals-only cleanup
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 64-02-PLAN.md — Catalog Use in Chat + two-CTA empty states + Help rewrite (EN+ES)
+
+**Cross-cutting constraints:**
+
+- Catalog downloaded cards keep the existing delete IconButton with its existing delete content-description string beside the new Use in Chat button — no bare icon button (checker constraint a)
+- All touched composables reuse only the 5 surveyed Material 3 type roles with no new sizes or weights (checker constraint b)
+
 **UI hint**: yes
 
 ### Phase 65: Voice Dictation
