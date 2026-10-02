@@ -1,8 +1,10 @@
 package com.warped.ui.chat.components
 
+import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.core.net.toUri
 import com.warped.R
@@ -61,43 +63,35 @@ fun openUrlInBrowser(context: Context, url: String): Boolean {
  * never user input — so no allowlist applies (unlike [openUrlInBrowser],
  * whose http/https gate would reject `market:`).
  *
+ * WR-04: every launch goes through one guarded gate — `SecurityException`
+ * (OEM exported-activity enforcement) falls through to the https
+ * fallback exactly like `ActivityNotFoundException`, and non-Activity
+ * callers get `FLAG_ACTIVITY_NEW_TASK` instead of an
+ * `AndroidRuntimeException`. Only when BOTH destinations fail does the
+ * user see the no-browser toast.
+ *
  * @return true when a Store intent was launched, false otherwise.
  */
 fun openPlayStoreListing(context: Context): Boolean {
     val packageName = context.packageName
-    return try {
-        context.startActivity(Intent(Intent.ACTION_VIEW, "market://details?id=$packageName".toUri()))
+    fun launch(uri: Uri): Boolean = try {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, uri).apply {
+                if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        )
         true
     } catch (_: ActivityNotFoundException) {
-        try {
-            context.startActivity(
-                Intent(
-                    Intent.ACTION_VIEW,
-                    "https://play.google.com/store/apps/details?id=$packageName".toUri()
-                )
-            )
-            true
-        } catch (_: ActivityNotFoundException) {
-            Toast.makeText(
-                context,
-                context.getString(R.string.toast_no_browser),
-                Toast.LENGTH_SHORT,
-            ).show()
-            false
-        } catch (_: SecurityException) {
-            Toast.makeText(
-                context,
-                context.getString(R.string.toast_no_browser),
-                Toast.LENGTH_SHORT,
-            ).show()
-            false
-        }
+        false
     } catch (_: SecurityException) {
-        Toast.makeText(
-            context,
-            context.getString(R.string.toast_no_browser),
-            Toast.LENGTH_SHORT,
-        ).show()
         false
     }
+    if (launch("market://details?id=$packageName".toUri())) return true
+    if (launch("https://play.google.com/store/apps/details?id=$packageName".toUri())) return true
+    Toast.makeText(
+        context,
+        context.getString(R.string.toast_no_browser),
+        Toast.LENGTH_SHORT,
+    ).show()
+    return false
 }
