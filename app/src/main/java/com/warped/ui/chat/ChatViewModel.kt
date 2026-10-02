@@ -416,6 +416,13 @@ class ChatViewModel @Inject constructor(
     }
 
     fun sendMessage(text: String, images: List<Uri> = emptyList(), audioBytes: ByteArray? = null) {
+        // CR-03: sending while listening tears the recognizer down first.
+        // Otherwise it keeps listening with no on-screen stop affordance
+        // (the mic hides while generating) and its late results pollute
+        // the fresh empty draft. Defense in depth next to the
+        // screen-level stop in ChatScreen onSend; committed partial text
+        // stays in the draft and is sent normally.
+        stopDictation()
         val state = snapshot()
 
         val effectiveModelId = state.selectedLocalModelId ?: state.selectedRemoteModelId

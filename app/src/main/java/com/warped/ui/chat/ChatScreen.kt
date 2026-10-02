@@ -376,6 +376,9 @@ fun ChatScreen(
                 canSend = (connection.selectedLocalModelId ?: connection.selectedRemoteModelId) != null,
                 onTextChange = { viewModel.updateInput(it) },
                 onSend = {
+                    // CR-03: never leave the mic live without its indicator
+                    // — the mic hides while generating, so stop first.
+                    if (isListening) viewModel.stopDictation()
                     snapToBottomOnNextContent = true
                     hasNewContentBelow = false
                     viewModel.sendMessage(input.inputText, attachedImages, audioBytes)
