@@ -283,6 +283,7 @@
     <string name="hf_downloaded">Descargado</string>
     <string name="hf_download_model">Descargar modelo</string>
     <string name="hf_load_failed">No se pudo cargar el catálogo de modelos. Reiniciá la app e intentá de nuevo.</string>
+    <string name="catalog_activation_failed">No se pudo abrir ese modelo en el chat. Intentá de nuevo.</string>
     <string name="hf_expand">Expandir detalles</string>
     <string name="hf_collapse">Contraer detalles</string>
 

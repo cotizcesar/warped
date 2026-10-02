@@ -32,6 +32,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -88,11 +90,23 @@ fun HuggingFaceScreen(
         }
     }
 
+    // WR-01: surface activation failures (missing file, chat creation
+    // throw) via Snackbar — same show-then-clear pattern as ModelsScreen.
+    val snackbarHostState = remember { SnackbarHostState() }
+    val activationError by viewModel.error.collectAsStateWithLifecycle()
+    LaunchedEffect(activationError) {
+        activationError?.let { msg ->
+            snackbarHostState.showSnackbar(message = msg)
+            viewModel.clearError()
+        }
+    }
+
     Scaffold(
         // API-02: explicit system-bars content insets (same as the Scaffold
         // default) — the catalog list never draws under status/nav bars, in
         // gesture-nav and 3-button nav alike.
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.hf_catalog)) },

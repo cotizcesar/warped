@@ -95,6 +95,20 @@ class CatalogViewModel @Inject constructor(
         _pendingChatId.value = null
     }
 
+    /**
+     * Activation failure channel (WR-01). Mirrors the ModelsViewModel
+     * `_uiState.error` pattern: a missing file or a failed chat creation
+     * lands here so the screen can show a Snackbar instead of silently
+     * doing nothing.
+     */
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
+    /** Clear a delivered activation error after the screen shows it. */
+    fun clearError() {
+        _error.value = null
+    }
+
     private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         Timber.e(throwable, "Unhandled coroutine exception")
     }
@@ -166,10 +180,15 @@ class CatalogViewModel @Inject constructor(
                 val models = localModelRepository.observeModels().first()
                 val model = models.firstOrNull {
                     it.filePath.substringAfterLast("/") == entry.modelFile
-                } ?: return@launch Timber.w(
-                    "CatalogVM: use requested for missing file %s",
-                    entry.modelFile
-                )
+                } ?: run {
+                    Timber.w(
+                        "CatalogVM: use requested for missing file %s",
+                        entry.modelFile
+                    )
+                    _error.value =
+                        context.getString(R.string.catalog_activation_failed)
+                    return@launch
+                }
                 activeModelSelection.connectLocal(model.filePath, ProviderType.LITE_RT_LM)
                 openBoundChat(
                     providerType = ProviderType.LITE_RT_LM,
@@ -203,6 +222,7 @@ class CatalogViewModel @Inject constructor(
             _pendingChatId.value = id
         } catch (e: Exception) {
             Timber.e(e, "CatalogVM: activation chat creation failed")
+            _error.value = e.message
         }
     }
 }
