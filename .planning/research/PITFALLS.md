@@ -1,333 +1,180 @@
-# Pitfalls Research: v3.0 Chat UX + Voice Dictation
+# Domain Pitfalls: v3.1 Voice Messages + New Tool
 
-**Domain:** Adding Play In-App Review + voice dictation to an existing Android chat app (Warped, Kotlin + Compose + Hilt), and deleting Tavily integration + destructive settings surfaces
+**Domain:** Adding in-app audio recording + audio-model input + a new function-calling tool to an existing Android LLM app (Warped — LiteRT-LM local, remote OpenAI-compatible endpoints, offline-first, Room v16+, v3.0 SpeechRecognizer dictation already shipped)
 **Researched:** 2026-10-02
-**Confidence:** HIGH for Play Review quota/testing and SpeechRecognizer API behavior (official Android docs); MEDIUM for Compose-lifecycle and removal-cleanup specifics (community + codebase evidence); LOW where noted.
+**Overall confidence:** HIGH for Android platform facts (official docs), MEDIUM for LiteRT-LM audio specifics (docs + community code, no Context7)
 
-This file is scoped to the v3.0 milestone only: what breaks when you *add* Review + voice to this chat app, and when you *delete* Tavily + settings surfaces. General Android pitfalls from prior milestones are not repeated here.
+---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Play Review triggered from a user-visible CTA (button/menu item)
+Mistakes that cause rewrites, Play rejection, data loss, or security incidents.
 
-**What goes wrong:**
-A "Rate us ★" button is wired directly to `launchReviewFlow()`. Most taps show nothing — Play's time-bound quota silently suppresses the dialog (quota may be as tight as roughly once per month per user, exact value undisclosed and changeable without notice). Users perceive a dead button; support/deletion pressure follows; the team "fixes" it by calling the API more aggressively, which changes nothing.
+### PIT-01: Recording through Activity-scoped MediaRecorder that dies on rotation/backgrounding
+**What goes wrong:** Recorder is owned by a Composable/ViewModel tied to the chat screen. User rotates the phone or switches apps mid-recording → Activity recreates or stops → `MediaRecorder.release()` in `onStop()` kills the session, the partial file is corrupt, and the 60s timer state is lost. User re-records from scratch.
+**Why it happens:** Official Android guidance says to release MediaRecorder in `onStop()` — correct for a camera-style Activity, wrong for a chat attachment flow where the recording must survive short lifecycle transitions. Developers copy the sample verbatim.
+**Consequences:** Lost recordings, corrupt 0-byte files, 1-star "ate my voice message" reviews.
+**Prevention:**
+- Own the recorder in a **lifecycle-aware holder outside the UI layer**: either an `Application`-scoped recorder manager (Hilt `@Singleton`) with explicit start/stop, or a **foreground Service** if recording must continue with the screen off (see PIT-02).
+- Timer/cap countdown lives in a `StateFlow` in the holder, not in Compose state — recompositions and rotations must not reset it.
+- On `onStop()` without an active recording, release; with an active recording, keep and show an ongoing-recording indicator (notification if service-backed).
+- Handle the documented `stop()`-immediately-after-`start()` `RuntimeException`: delete the malformed output file, don't crash.
+**Detection:** Rotate the device at 0:15 of a recording in QA; if the timer resets or the file is unplayable, this pitfall fired.
+**Phase:** Voice recording phase — recorder ownership + rotation/background test must be in the phase plan, not a follow-up.
 
-**Why it happens:**
-Developers treat the Review API like a normal dialog (`show()` = visible). It is not — `requestReviewFlow()` + `launchReviewFlow()` is a *request* Play may decline silently, by design. Google's own guidance explicitly says: do not attach a call-to-action to the API.
+### PIT-02: Background recording without a foreground service (silent-audio trap on API 28+)
+**What goes wrong:** App records while the user locks the screen or takes a call. On API 28+, background apps receive **silent audio** from the mic — the file records 60 seconds of zeros and the user sends a "voice message" containing nothing. No error is raised; the failure is silent.
+**Why it happens:** Developer tests only in-foreground; assumes recording continues because no exception is thrown. Official docs state background mic access returns silence, not an error.
+**Consequences:** Empty voice messages sent to the model (wasted inference + user confusion), or a Play policy problem if the app tries workarounds (see PIT-04).
+**Prevention:** Decide up front, and the milestone scope ("in-chat recorder with 60s cap") suggests the cheap correct answer:
+- **Option A (recommended): pause/stop recording when the app backgrounds.** Observe `ProcessLifecycleOwner`; on background, auto-pause (API 24+ `pause()`/`resume()`) or auto-stop-and-keep-draft. Simple, no FGS, no Play declaration burden.
+- **Option B: foreground service with `microphone` FGS type** (API 30+ requires `FOREGROUND_SERVICE_MICROPHONE`; API 34+ requires runtime `FOREGROUND_SERVICE_*` permission + manifest type declaration). Only if the requirement demands lock-screen recording. Adds notification, Play review surface, and battery scrutiny — disproportionate for a 60s chat attachment.
+- Either way: also handle **audio-focus interruption** (phone call) — pause recording via `onAudioFocusChange`, don't capture the call.
+**Detection:** Record → press power button → unlock → play back. Silence = this pitfall.
+**Phase:** Voice recording phase — the backgrounding decision is a planning input, not an implementation detail.
 
-**How to avoid:**
-- Never wire a button directly to `launchReviewFlow()`. The in-app flow fires only from *opportunistic, app-chosen* moments (e.g., after N successful chat turns, post-download success) with internal gating logic (DataStore flag: last-prompt timestamp, session count, cooldown).
-- If v3.0 wants a visible "Rate" affordance (likely in the rewritten Help screen or Settings), that affordance must deep-link to the Play Store listing (`market://details?id=...` with `https://` fallback) — never to the in-app API.
-- Treat `requestReviewFlow()` failure and silent no-show as the *normal* path: always continue the user flow unchanged. Log/skip silently; never show "please try again" or block navigation on it.
+### PIT-03: Sending raw recorder output to the model — wrong container/codec for audio-capable models
+**What goes wrong:** `MediaRecorder` defaults (`THREE_GPP`/`AMR_NB`) produce a file the audio preprocessor can't consume. LiteRT-LM's Gemma 3n/4 audio path (`AudioPreprocessorMiniAudio`, USM-style config) expects **mono 16 kHz WAV/PCM-like input**; community implementations converge on mono 16 kHz WAV and short clips (one reference gates reliability at ≤30s mono clips, experimental beyond). Sending AMR/3GP either errors in preprocessing or silently degrades transcription quality.
+**Why it happens:** Developer treats "audio file" as interchangeable; tests only the record→playback path (MediaPlayer plays anything) and never the record→model path on-device.
+**Consequences:** "Voice message" feature that records and plays fine but fails or hallucinates at inference time — the core value prop broken while all unit tests pass.
+**Prevention:**
+- Record in a model-digestible format from the start: `MPEG_4` container is fine for playback, but **transcode/resample to mono 16 kHz WAV before attaching to the prompt** (small utility, testable on JVM with synthetic PCM).
+- Alternatively record WAV directly via `AudioRecord` — more code (manual PCM→WAV header), more control (exact sample rate, live amplitude for the waveform UI). Prefer MediaRecorder + transcode unless a live waveform is required.
+- Cap enforcement must consider **preprocessed size, not just seconds**: 60 s of 16 kHz mono 16-bit ≈ 1.9 MB PCM — fine for local, but see PIT-05 for context-window cost. Validate duration AND file size before send.
+- Gate the send path on the **loaded model's actual audio capability** (runtime capability flag from the model/session, not the model name string) — text-only models (Qwen, Gemma 3 1B) must disable/hide the voice-send icon with an explanation, not send audio into a text-only session and crash the preprocessor with "Provided more audio than expected"-class errors.
+**Detection:** First on-device E2E test of record→send→response on an audio-capable model (Gemma 4 E2B / 3n E2B). Emulator-only testing hides this (MediaPipe/LLM runtimes commonly don't support emulators — require physical-device smoke).
+**Phase:** Voice recording phase — needs a device-smoke requirement (record→model→response on hardware), CI-gated unit tests can't cover it.
 
-**Warning signs:**
-- Plan shows a star button calling `ReviewManager` directly.
-- Acceptance criteria say "tapping Rate shows the review dialog" — untestable in production by definition.
-- No cooldown/prompt-count state in the design.
+### PIT-04: RECORD_AUDIO Play compliance — missing declaration, missing rationale, dictation/reuse confusion
+**What goes wrong:** `RECORD_AUDIO` is a dangerous permission AND Play-sensitive user data (microphone). App adds in-app recording but: (a) no Play Console **Sensitive App Permissions** declaration for the new microphone use, (b) no **Data safety section** update (audio collection), (c) no in-app prominent disclosure before first record, or (d) assumes the v3.0 SpeechRecognizer permission grant covers the new use — it covers the *permission*, not the *disclosure/Declaration* for a new feature (voice messages retained/sent vs. transient dictation).
+**Why it happens:** "We already have RECORD_AUDIO from dictation, so nothing to do." The permission grant is the same; the Play paperwork (purpose, retention, Data safety) differs because a stored/sent voice clip is a new data use.
+**Consequences:** Extended Play review, rejection, or update stuck in "pending publication"; worst case a User Data policy strike.
+**Prevention:**
+- Update **Data safety → Microphone/audio collection** (collected, purpose: app functionality, retained as chat attachments until deleted, not shared) and **Sensitive App Permissions** declaration with a voice-message-specific justification before submitting the release with this feature.
+- In-app: first-tap rationale for the voice-send icon **separate from the dictation rationale** (v3.0 established the first-tap-rationale + Settings-escape pattern — reuse the pattern, not the same string; the purposes differ).
+- Handle **permanent denial** with a Settings deep-link escape hatch (already established in v3.0 — extend, don't reinvent).
+- Handle the mic/camera **system toggle + one-time grant**: a one-time grant from dictation may already be expired when the user records — always check `checkSelfPermission` at record-start, never cache "granted".
+- Privacy-by-design: store voice clips in **app-private internal storage** (`filesDir`), never external/shared; delete the file when the message is deleted (see PIT-06); never log/transmit raw audio except as the model input the user explicitly sent.
+**Detection:** Pre-release checklist item: Play Console declaration + Data safety diff reviewed before rollout. Lint: grep for new `RECORD_AUDIO` usage sites vs. declared purposes.
+**Phase:** Voice recording phase — compliance tasks are phase requirements, not release-day paperwork.
 
-**Phase to address:** Review-flow phase (first). The gating policy (when to prompt, cooldown storage, Store-link fallback) is a design decision that must land before any code.
+### PIT-05: Audio blows the context window and the RAM budget — 60 s of audio ≠ 60 s of text
+**What goes wrong:** Audio soft-tokens are far denser than users intuit: tens of seconds of audio can consume **thousands of context tokens** (USM-style encoders emit roughly one token per ~tens of ms of audio — 60 s can be several thousand tokens). On a 4K/8K-context on-device model that's a quarter to half the window for one message; multi-turn chats with several voice messages overflow → silent truncation of history or OOM on low-RAM devices. Remote endpoints bill audio input tokens at a premium (OpenAI-compatible audio input pricing is multiples of text).
+**Why it happens:** Feature spec says "60-second cap" as if duration were the only budget. No token accounting for the audio modality; existing text-only budget guards don't see audio tokens.
+**Consequences:** Degraded answers (history silently dropped), `OutOfMemoryError` on 6–8 GB devices, surprise API bills on remote endpoints.
+**Prevention:**
+- Extend the existing **model-window-aware grounding/budget logic** (v2.3 established a global grounding budget with exit gates) to include an **audio token estimate per voice message**; when the budget is exceeded, degrade gracefully (transcribe-first fallback? refuse-with-explanation? drop oldest audio?) — a deliberate policy, not silent truncation.
+- **Memory gate before inference**: check `ActivityManager.MemoryInfo` before loading audio into the session; suggest a shorter clip or text instead of crashing.
+- For remote endpoints: confirm the endpoint's audio-input support via the **capability matrix** pattern (v2.4) and surface cost/latency honestly; never send audio to an endpoint that will 400 on it — validate and explain.
+- Consider a **transcribe-locally-then-send-text** option for text-only models: on-device STT of the clip, user-editable transcript, sent as text. Cheaper, compatible everywhere, and preserves the voice UX. (Scope decision for planning: full audio-input vs. transcript fallback.)
+**Detection:** Multi-turn test: 3+ voice messages in one conversation on a mid-range device + a token-count assertion in unit tests for the budget estimator.
+**Phase:** Voice recording phase (budget + gating) — not polish; it determines whether the feature works in real conversations.
 
----
+### PIT-06: Room schema for audio messages — blob in the messages table, no migration, orphaned files
+**What goes wrong:** One of three variants: (a) storing the audio bytes as a BLOB in `messages` → DB bloat, slow queries, `TransactionTooLarge` on process death; (b) adding a non-null column without a migration → crash on upgrade (`IllegalStateException: Migration didn't properly handle`); (c) storing a file path but never deleting the file when the message/chat is deleted → unbounded growth in `filesDir` (60 s clips ≈ MBs each).
+**Why it happens:** Audio messages look like "just another message" — developer adds a column and moves on. The project already has Room v16 and a `MIGRATION_14_15`-style discipline with JVM static gates; a rushed milestone skips it.
+**Consequences:** Upgrade crashes (worst — affects existing users), storage bloat, failed Play reviews on excessive storage.
+**Prevention:**
+- **Store files on disk, references in Room**: new nullable columns on `messages` (`audio_path`, `audio_duration_ms`, `audio_mime`) or a small `voice_attachments` table keyed by `message_id` with `ON DELETE CASCADE`. Never BLOB audio.
+- Follow the established migration discipline: version bump + tested `Migration` object + JVM-verifiable gate; keep the "delete-all-chats" path (drawer-bottom, v3.0) deleting audio files too — cascade or explicit cleanup in the repository, covered by a unit test.
+- Playback must stream from disk (`MediaPlayer.setDataSource(path)` + `release()` in `onStop`), never load the whole clip into memory; only one player at a time (stop previous on new play — same single-flight discipline as inference cancellation in v2.1).
+- Chat-history export/share must handle audio references (skip with a placeholder, or attach file) — decide explicitly so legacy render paths (read-only legacy rows from v2.2/v3.0) don't crash on the new columns.
+**Detection:** Upgrade test (old DB → new version), delete-chat storage assertion, and a "DB size after 20 voice messages" check.
+**Phase:** Voice recording phase — schema design is the first task, migration test is a phase gate.
 
-### Pitfall 2: Review flow tested only with FakeReviewManager — shipping untested production path
-
-**What goes wrong:**
-`FakeReviewManager` always returns a fake `ReviewInfo` and success — it renders no UI and performs no review. A suite green on Fake proves only that *post-completion callbacks* run. The real path (Play Store presence, `requestReviewFlow()` Task failure modes, Activity-result handling, R8/ProGuard keeping Play classes) goes unverified, and release-day failures (silent no-op or crash on `launchReviewFlow`) surprise the team.
-
-**Why it happens:**
-Fake is frictionless (unit-test friendly) while real testing requires an internal test track upload, a tester account in the Play library, and quota-aware expectations. Teams stop at Fake.
-
-**How to avoid:**
-- Three-tier test strategy, each with a distinct purpose:
-  1. **Unit (FakeReviewManager):** verify app behavior *after* completion (cooldown flag written, no crash, flow continues). Nothing more.
-  2. **Internal test track on a real device:** the only way to see the real dialog. Prerequisites: tester account on internal track, primary account selected in Play Store, app installed from Play at least once (puts it in the user's library), no existing review from that account. Note quota is *not* enforced for internal-track installs — useful for testing, but means production will show the dialog *less* often than testing suggests.
-  3. **Release-UAT negative test:** confirm the app behaves fine when the dialog does *not* appear (fresh account that already reviewed, or quota-hit account).
-- Keep Play Review dependency current (`com.google.android.play:review` / `review-ktx` 2.x) and verify R8 keep rules cover Play Core Task classes (release-build smoke, not just debug).
-- Troubleshooting checklist for "dialog never shows in test": appId must exist at least on internal track; tester must have downloaded from Play; primary-account mismatch and enterprise-protected accounts are the classic silent blockers.
-
-**Warning signs:**
-- Test plan mentions only FakeReviewManager.
-- No internal-track build ever uploaded during the phase.
-- Dialog-show rate in testing assumed to equal production rate.
-
-**Phase to address:** Review-flow phase. Require an internal-track verification item in the phase's exit criteria, distinct from unit tests.
-
----
-
-### Pitfall 3: Review flow blocks or hijacks the chat/inference flow
-
-**What goes wrong:**
-`requestReviewFlow()` is kicked off on the chat screen's critical path (e.g., `await()` on the Task before sending a message, or `launchReviewFlow` from the streaming completion callback). Play Task latency or failure stalls message send; worse, the review Activity overlay interrupts an active LiteRT-LM inference turn or a grounding fan-out, colliding with v2.1's single-flight cancel discipline and v2.3's per-send grounding scope.
-
-**Why it happens:**
-"Prompt after a good chat turn" gets implemented literally *inside* the turn-completion handler, sharing its coroutine scope.
-
-**How to avoid:**
-- Fire the review trigger from a **decoupled, app-foreground scope** (e.g., `Application`-scoped or a dedicated `ReviewPromptController`), never from the inference/grounding coroutine scope. Check cooldown + eligibility *after* the turn fully settles (streaming done, rows committed), with a small delay and an idle/app-foreground guard.
-- `requestReviewFlow()` failure (Task exception) must be swallowed with a metric/log only — it must never surface as a chat error, snackbar, or retry.
-- Verify Stop-means-stop still holds: launching review must not retain inference jobs, SSE streams, or grounding fan-out (v2.1/v2.3 cancel guards).
-
-**Warning signs:**
-- Review code lives in the chat ViewModel's send path or streaming collector.
-- Review Task awaited with no timeout / on `Dispatchers.Main` in the send pipeline.
-- Stop button behavior changes after adding the prompt.
-
-**Phase to address:** Review-flow phase, verified by the regression phase (re-run single-flight cancel + grounding-cancel tests with the prompt enabled).
-
----
-
-### Pitfall 4: Voice dictation assumes a recognizer exists — crash/no-op on devices without one
-
-**What goes wrong:**
-`SpeechRecognizer.createSpeechRecognizer()` throws or `startListening` fails with `ERROR_CLIENT` on devices with no recognition service (de-Googled ROMs, some Fire/Chinese-OEM devices, work profiles with services disabled, emulators without Google apps). If the mic button is always visible and unguarded, tapping it crashes or silently does nothing on exactly the offline/privacy-conscious devices Warped's local-LLM users disproportionately own.
-
-**Why it happens:**
-Developers test on Pixel/GMS hardware where Google's recognizer is always present, and never call the availability gate.
-
-**How to avoid:**
-- Gate mic-button visibility on `SpeechRecognizer.isRecognitionAvailable(context)` (checked at composition/input-screen entry, cheap PackageManager query). No recognizer → hide the mic icon entirely (preferred) or show a disabled state with an explanatory tooltip — never a live button that dead-ends.
-- Prefer the **on-device recognizer path** where available (`createOnDeviceSpeechRecognizer` + `isOnDeviceRecognitionAvailable`, API 31+) for Warped's offline-first story; fall back to network recognizer only when the user consents implicitly by tapping mic while online. Never promise "works offline" for dictation unless the on-device gate passes *and* the language pack is downloaded (`ERROR_LANGUAGE_UNAVAILABLE` is the tell).
-- Handle `ERROR_LANGUAGE_NOT_SUPPORTED` / `ERROR_LANGUAGE_UNAVAILABLE` with a specific message ("voice input isn't available for this language on this device"), not a generic error.
-
-**Warning signs:**
-- Mic button rendered unconditionally.
-- No `isRecognitionAvailable` call anywhere in the voice path.
-- Test matrix is Pixel-only.
-
-**Phase to address:** Voice phase (entry gate), verified on a GMS-less emulator image in the regression phase.
+### PIT-07: New tool breaks the trust boundary — excessive agency + untrusted tool output
+**What goes wrong:** The new tool is designed for capability, not least privilege: broad file/network access, open-ended parameters, or its output (web content, file text, device data) flows back into the prompt **unmarked** → indirect prompt injection ("ignore previous instructions…") executes through the tool loop. The project previously built and then removed a tool surface (v2.2) and re-added an agentic loop (v2.4) — institutional memory of the trust-boundary design may have atrophied.
+**Why it happens:** Tool evaluation optimizes for "value" and "wow"; security review happens after implementation. The Android official guidance (excessive-agency + prompt-injection pages) is explicit but only helps if it's a phase input.
+**Consequences:** Data exfiltration via tool output, unintended destructive actions, user-trust loss. For tools touching device data: a malicious page/file can inject instructions the model obeys.
+**Prevention (apply the official Android AI-risk mitigations as requirements):**
+- **Minimal, single-purpose tools**: the new tool does one thing with a strict parameter schema; validate args against the schema before dispatch (reject unknown enums, out-of-scope identifiers).
+- **Trust-boundary marking**: wrap tool results in explicit delimiters (`<tool_result name=…>…</tool_result>` / `<external_data>`) and instruct the system prompt to treat delimited content as data, never instructions. This is the documented indirect-injection mitigation — implement it in the shared tool-loop path, not per-tool.
+- **Human approval for side effects**: any tool action that mutates state, sends data off-device, or spends money gets a confirmation dialog (never auto-execute). Read-only tools may auto-run; the classification must be explicit per tool.
+- **Cap and hygiene**: keep the v2.4-established loop caps (call cap, Stop-cancels-all, transient rows, channel hygiene) — the new tool inherits them; add a regression test proving it.
+- **Candidate analysis must score abuse potential**: each tool candidate gets a risk column (data access × exfiltration path × side-effect severity). A high-value/high-agency candidate loses to a moderate-value/read-only one unless the milestone explicitly budgets the confirmation UX + validation work.
+**Detection:** Adversarial test cases in the tool phase: tool output containing "ignore previous instructions" must not alter behavior; destructive-arg fuzzing against the schema validator.
+**Phase:** New-tool phase — candidate analysis (with risk scoring) first, then implementation with validation + confirmation UX as requirements.
 
 ---
 
-### Pitfall 5: RECORD_AUDIO permission flow dead-ends (one-shot ask, no rationale, no settings escape)
+## Moderate Pitfalls
 
-**What goes wrong:**
-First tap on mic fires the system permission dialog with no context; user denies (possibly "don't ask again"); mic now permanently dead with no in-app path to recovery. Or the app loops re-requesting after permanent denial, which Android silently ignores — looking broken. Worst case: `ERROR_INSUFFICIENT_PERMISSIONS` (error 9) surfaces as a cryptic toast, including the known trap where the *Google recognizer app itself* lacks mic permission.
+### PIT-08: Two mic icons, one confused user — voice-send vs. dictation indistinguishability
+**What goes wrong:** Chat input ends up with two microphone-ish affordances; users tap the wrong one, speak a 45-second message into the transient dictation box (which was designed for short input), or tap voice-send when they wanted quick STT. Support burden + feature looks broken.
+**Prevention:** Visually distinct icons (dictation = mic/keyboard-adjacent; voice-send = waveform/attachment-style with duration), distinct entry points (dictation lives in the text field; voice-send lives with attachments/send), model-gated visibility (voice-send hidden/disabled with a one-line reason on text-only models), and a first-run hint. Usability test with 3 users suffices.
+**Phase:** Voice recording phase — icon/entry-point spec before implementation.
 
-**Why it happens:**
-Runtime-permission UX has three states (granted / denied-with-rationale / permanently-denied) but implementations handle one. Compose + Accompanist/activity-result launchers make it easy to fire-and-forget.
+### PIT-09: SpeechRecognizer dictation and MediaRecorder fighting over the mic
+**What goes wrong:** User starts a voice recording while dictation is listening (or vice versa) → `IllegalStateException` / silent failure / both capture garbage. The v3.0 single-insertion dictation state machine doesn't know about the new recorder.
+**Prevention:** A single **mic-ownership lock**: starting either path stops/cancels the other; UI reflects the single active capture state. Unit-test the state machine transitions (dictate→record, record→dictate, incoming-call-during-either).
+**Phase:** Voice recording phase — integration with the existing dictation state machine is an explicit task.
 
-**How to avoid:**
-- Pre-permission rationale: first mic tap shows an in-app explainer ("voice dictation needs the microphone; audio is only used for transcription") with Cancel, *then* launches the system request. Follow platform guidance: ask in context, always offer cancel.
-- Permanent-denial path: when `shouldShowRequestPermissionRationale` returns false after a denial, show a Snackbar/dialog routing to app Settings (`ACTION_APPLICATION_DETAILS_SETTINGS`), not another request.
-- Never start `SpeechRecognizer` before permission is granted — pre-check with `ContextCompat.checkSelfPermission`; map `onError(ERROR_INSUFFICIENT_PERMISSIONS)` to the settings-route UI, not a raw error code.
-- Declare `RECORD_AUDIO` in the manifest (required regardless) and keep the permission out of onboarding — request only at first mic use.
+### PIT-10: 60-second cap enforced only in the UI timer
+**What goes wrong:** Countdown is a Compose-side timer; background throttling, Doze, or a slow device lets recording run past 60 s → oversized file, budget overrun (PIT-05), or `setMaxDuration` never set so nothing stops it at the platform level.
+**Prevention:** Defense in depth: `MediaRecorder.setMaxDuration(60_000)` + `OnInfoListener(MEDIA_RECORDER_INFO_MAX_DURATION_REACHED)` as the hard stop, UI timer as the display. Auto-stop → draft-kept → user reviews/sends. Test by letting the timer run with the screen off.
+**Phase:** Voice recording phase.
 
-**Warning signs:**
-- `RequestPermission` launcher with no rationale branch.
-- No settings-deep-link string in the voice UI.
-- Error 9 shown to users verbatim.
+### PIT-11: Playback leaks — MediaPlayer held across navigation, multiple simultaneous players
+**What goes wrong:** Each chat bubble creates its own player; navigating away leaks native players (the v2.5 LeakCanary tour explicitly covers chat — new players are new leak surface), or two voice messages play simultaneously.
+**Prevention:** Single shared `VoicePlayer` holder (one `MediaPlayer` at a time, `release()` on completion/navigation), playback position in UI state (restorable), LeakCanary tour extended with a play-navigate leg, regression tests mirroring the v2.5 clean-path locks.
+**Phase:** Voice recording phase — playback architecture + leak-tour extension.
 
-**Phase to address:** Voice phase. Permission-state matrix (granted / denied / permanently-denied / no-recognizer) as explicit acceptance criteria.
+### PIT-12: New tool duplicates the removed-skills mistakes (formatter/parser + remote matrix gaps)
+**What goes wrong:** Tool works locally but breaks on remote endpoints (different `tools[]` schemas per provider — OpenAI/Anthropic/Ollama/LM Studio/Custom), or the formatter/parser for the local model doesn't cover the new tool's schema (constrained-decoding mismatch → model emits malformed calls). v2.4 built a capability matrix + classifier; the new tool must extend them, not bypass them.
+**Prevention:** New tool ships with: local formatter/parser coverage, capability-matrix entry per provider, fallback notice where unsupported, and Stop-cancellation. Integration test across at least local + one remote provider.
+**Phase:** New-tool phase.
 
----
-
-### Pitfall 6: SpeechRecognizer leaks across recompositions and navigation (main-thread + destroy discipline)
-
-**What goes wrong:**
-`SpeechRecognizer` must be used from the main thread and **must** have `destroy()` called when done. In Compose, creating it in a composable without `DisposableEffect`, or holding it in a ViewModel that outlives the input screen, leaks the recognizer service connection — each leaked instance holds audio resources and can cause `ERROR_RECOGNIZER_BUSY` on subsequent attempts, battery drain, and (per v2.5's leak-harness precedent) a LeakCanary failure on the scripted tour.
-
-**Why it happens:**
-Recognizer is callback-based (`RecognitionListener`) in a Flow/coroutine codebase; bridging it ad hoc (listener writing to mutable state, recognizer stored in a `remember` without cleanup) skips the lifecycle contract. Partial dictation results + recomposition churn make it worse.
-
-**How to avoid:**
-- Encapsulate in a `VoiceDictationController` (or repository) exposing `Flow<DictationState>` (`Idle/Listening/PartialResult/FinalResult/Error`), internally bridging `RecognitionListener` → `callbackFlow`. Lifecycle rule: create on mic-start (or `DisposableEffect` entry), `cancel()` + `destroy()` on stop/dispose/navigation-away — never retain across conversation switches.
-- `stopListening()` on send; `cancel()` + `destroy()` on screen disposal. Guard double-start (`ERROR_RECOGNIZER_BUSY` / `ERROR_TOO_MANY_REQUESTS`) by disabling the mic button while `Listening`.
-- Dictation appends to the existing message `TextField` buffer (insert at cursor), never replaces it and never auto-sends. Partial results update the buffer; only a final result (or explicit stop) commits. This preserves drafts, grounding chips (`Sin web`), and per-chat toggle state.
-- Add the voice tour leg to the LeakCanary scripted run (start dictation → stop → navigate away → assert clean), following the v2.5 Phase 61/62 pattern.
-
-**Warning signs:**
-- `createSpeechRecognizer` inside a `@Composable` without `DisposableEffect(onDispose { destroy() })`.
-- Mic stays "listening" after navigating drawers/catalog and back.
-- Second dictation attempt fails with busy errors.
-
-**Phase to address:** Voice phase (controller design), locked by the regression phase (LeakCanary leg + busy-retry test).
+### PIT-13: Offline-first violated — voice send requires network, or queued voice messages lose audio
+**What goes wrong:** Voice message to a remote endpoint while offline either crashes, silently drops the audio file reference, or retries by re-running inference (v2.3 established: retry reuses rows, inference never re-runs — audio must follow the same rule).
+**Prevention:** Same offline pattern as grounding-retry: queue the message with audio intact, `En espera`-style state, retry sends the same attachment without re-recording or re-running inference. Local audio-capable models work fully offline (verify on-device with airplane mode).
+**Phase:** Voice recording phase — offline matrix (local-offline, remote-offline-queue, retry) as requirements.
 
 ---
 
-### Pitfall 7: Tavily removal leaves billable/secret-bearing leftovers (key, client, tests, docs)
+## Minor Pitfalls
 
-**What goes wrong:**
-The UI toggle and search call-site are deleted, but remnants survive: the Tavily API key in EncryptedSharedPreferences/Keystore, the `@Named("tavily")` OkHttp client in `NetworkModule`, `TavilySearchRepository.kt` + `TavilySearchRepositoryTest`, string resources, Settings key field + test-connection UI, README/MILESTONES references — and any background retry/worker still holding a Tavily reference. Result: dead code that still compiles (or worse, still *runs* billing-adjacent network calls), a secret with no UI to rotate/delete, and reviewer confusion about which search path is live. Warped already has this exact scar: the v2.2 HF-token removal left an orphaned Keystore `huggingface_token` entry carried as a known deferred item through v2.3–v2.5.
+### PIT-14: Forgetting `setAudioSamplingRate`/`setAudioEncodingBitRate` → device-dependent output
+Different OEMs default differently; identical code yields 8 kHz on one phone and 44.1 kHz on another → inconsistent model quality. Set all three (source, rate 16 kHz or 44.1 kHz pre-transcode, encoder AAC) explicitly.
+**Phase:** Voice recording phase.
 
-**Why it happens:**
-Deletions are verified by "new behavior works" (DDG-only search returns results) rather than by "old surface is fully gone." Keystore/prefs entries are invisible in code review; DI bindings survive because nothing fails to compile.
+### PIT-15: Not requesting `POST_NOTIFICATIONS` handling for the recording indicator
+If a foreground service is chosen (PIT-02 option B), the persistent notification needs runtime notification permission on API 33+; without it the user gets no visible recording indicator — a Play privacy red flag (secret recording appearance). Prefer option A to avoid this entirely.
+**Phase:** Voice recording phase (only if FGS chosen).
 
-**How to avoid:**
-- Deletion checklist enforced in the removal phase (grep-gated):
-  1. `TavilySearchRepository.kt` + `TavilySearchRepositoryTest` deleted; DDG fallback/delegate legs referencing Tavily (`DuckDuckGoSearchRepository` fallback + keyed image-direct legs) re-pointed to DDG-only or removed.
-  2. `@Named("tavily")` binding + dedicated Bearer client removed from `NetworkModule`; confirm remaining client count.
-  3. Tavily key **deleted from Keystore/EncryptedSharedPreferences on upgrade** via an explicit migration (do not repeat the HF-token orphan — this time delete, with a logged one-shot migration), and the Settings key field + test-connection UI removed.
-  4. Room/DataStore: any Tavily-tagged source rows, prefs keys, or `GroundingPrecedence`/capability-matrix entries referencing Tavily updated; existing conversations with Tavily citations still render (read-only legacy rows, per the v2.2 skills-row precedent) but no new Tavily path exists.
-  5. Docs updated (README agentic-grounding line, MILESTONES WEB-09, PROJECT validated requirement "stores a Tavily key" moved to Out of Scope/removed).
-- Verification: `grep -ri tavily` returns zero source hits (docs excepted and intentional); full unit suite green *after* deletions (dead tests fail loudly if left); release smoke confirms no Tavily network call (proxy/log check).
+### PIT-16: Voice drafts lost on process death
+Recording in progress when the system kills the process → partial file orphaned, no recovery. Persist recorder state (output path, start timestamp) to DataStore/saved-state; on restore, offer the partial clip or clean it up. At minimum, orphan-scan `filesDir/voice/` on startup and delete unreferenced files.
+**Phase:** Voice recording phase.
 
-**Warning signs:**
-- PR deletes UI but `TavilySearchRepository` still exists.
-- "Orphaned key, harmless" appears in deferred items again.
-- DDG repository still imports Tavily classes.
-
-**Phase to address:** Removal phase (Tavily deletion), with a zero-grep verification item owned by the regression phase.
+### PIT-17: Accessibility — record/stop/playback not operable via TalkBack/switch access
+Icon-only mic buttons with no content descriptions exclude users and risk Play accessibility review flags. Every new affordance gets a content description, and recording state is announced.
+**Phase:** Voice recording phase (cheap if done with the UI, expensive as retrofit).
 
 ---
 
-### Pitfall 8: Removing key-deletion and Data/delete-chats strands users (no rotation, no recovery, no bulk cleanup)
+## Phase-Specific Warnings
 
-**What goes wrong:**
-Two removals with opposite risks ship together: (a) removing the Keystore key-deletion ability leaves users with *no way to rotate/revoke a compromised endpoint API key* — a leaked key becomes permanent; (b) removing the Data section + delete-all-chats leaves users with *no bulk cleanup* — storage grows unbounded and a user wanting a fresh start must delete conversations one by one. Both look like "simplification" but remove the only escape hatches for real situations.
-
-**Why it happens:**
-"Remove destructive surfaces = safer" is half-true: it prevents accidental loss but also prevents intentional recovery. The design omits replacement paths.
-
-**How to avoid:**
-- Key management without key-deletion: keep **overwrite/replace** (editing an endpoint's key overwrites the Keystore entry) and keep **per-endpoint delete** (deleting the endpoint deletes its key). What is removed is only the standalone "delete key, keep endpoint" action that orphans endpoints pointing at missing credentials. Acceptance: compromised-key rotation achievable in ≤2 taps (edit endpoint → save new key).
-- Delete-all-chats relocation (drawer bottom above Models): the move itself is the mitigation — bulk delete *stays*, relocated, with its existing confirmation. Regression-test that the relocated action deletes all conversations, that undo/timeout semantics (if any) survive the move, and that no second copy remains in Settings.
-- Never leave an endpoint referencing a deleted key or a chat referencing a deleted model: deletion paths must null-or-reassign foreign references (chat keeps `model_id` text for history display; active session falls back to auto-select).
-
-**Warning signs:**
-- Settings diff shows deletions with no corresponding edit/overwrite path.
-- Endpoint with wiped key still selectable in the Models & Endpoints picker (traffic-light status must show disconnected/error, never crash).
-- Two delete-all entry points after the move (drawer + Settings remnant).
-
-**Phase to address:** Removal phase for the cuts; drawer/settings UX phase for the relocated delete-all and rotation-path verification.
+| Phase Topic | Likely Pitfall | Mitigation |
+|-------------|---------------|------------|
+| Voice recorder + playback UI | PIT-01 (lifecycle), PIT-08 (icon confusion), PIT-09 (mic fight), PIT-10 (cap) | Recorder holder outside UI; icon spec + mic lock + `setMaxDuration` as phase requirements |
+| Audio → model send path | PIT-03 (codec), PIT-05 (context/RAM), PIT-13 (offline) | Transcode-to-WAV utility + capability gating + budget extension + offline matrix; device-smoke E2E required |
+| Room schema for audio | PIT-06 (blob/migration/orphans) | Files-on-disk + migration test + cascade-delete test as phase gates |
+| Permissions + Play | PIT-04 (declaration/disclosure) | Data safety + declaration + separate rationale before release submit |
+| New tool candidates | PIT-07 (trust boundary) | Risk-scored analysis; least-privilege design; delimiter + validation + confirmation UX |
+| New tool implementation | PIT-12 (matrix/formatter gaps) | Matrix entry + parser coverage + cross-provider integration test |
+| Playback + leaks | PIT-11 (player leaks) | Shared player holder; extend LeakCanary tour with playback leg |
+| Release hardening | PIT-02 (background silence), PIT-16 (orphans), PIT-17 (a11y) | Background-policy test, startup orphan sweep, content descriptions |
 
 ---
-
-### Pitfall 9: Drawer + catalog CTA navigation regressions (empty-state CTAs route wrong or strand back-stack)
-
-**What goes wrong:**
-Five navigation-touching changes land at once (model-drawer "Download a model" → Catalog; chat-drawer footer reorder + delete-all relocation; Models & Endpoints empty-state CTAs; Catalog "Use in Chat" on downloaded models; Web Options removed from drawer). Typical breakage: CTA launches the wrong destination, deep-links drop drawer/back-stack state (Back exits the app instead of returning to chat), "Use in Chat" selects the model but doesn't navigate back to the input, or Web Options becomes unreachable (removed from drawer before its Settings anchor exists).
-
-**Why it happens:**
-Drawer destinations are stringly-routed in several places; empty-state CTAs are added per-screen without a navigation map; "Use in Chat" touches model-selection state owned by a different screen.
-
-**How to avoid:**
-- Single navigation map for v3.0 before coding: every new CTA gets (source → destination → back behavior) specified, including: model-drawer CTA → Catalog → back returns to drawer/chat; "Use in Chat" → sets active model *and* pops to chat input with the model chip updated; Web Options reachable in Settings with the drawer entry removed (no orphaned route).
-- "Use in Chat" must reuse the existing model-select path (same function the picker calls), not a parallel setter — otherwise traffic-light status, auto-select, and Thinking-config state diverge.
-- Footer parity (same text size as New Chat) is a theme/typography token change, not per-item font overrides — prevents future drift.
-- Regression sweep: each CTA tapped from each entry point, Back pressed, state asserted (active chat preserved, model selected, no duplicate destinations on the stack).
-
-**Warning signs:**
-- CTA handlers calling `navigate()` with hardcoded routes duplicated across files.
-- "Use in Chat" writes a different prefs key than the picker.
-- Back from Catalog exits to launcher instead of returning to chat.
-
-**Phase to address:** Drawer/catalog UX phase (build), regression phase (navigation sweep incl. Back-stack assertions).
-
----
-
-### Pitfall 10: Help rewrite + grounding-simplification docs drift (Help says Tavily, Settings says web-toggle that no longer exists)
-
-**What goes wrong:**
-Help is rewritten "short and minimal" while Tavily references survive elsewhere (README agentic-grounding line, old Help screenshots, Settings descriptions mentioning search providers, per-chat toggle copy implying multi-provider choice). Users read Help promising one thing and see another; reviewers flag stale provider claims during Play review.
-
-**Why it happens:**
-Copy lives in many files; the rewrite touches one.
-
-**How to avoid:**
-- Copy audit as part of the removal phase: single source of truth for "search = DuckDuckGo only" propagated to Help, Settings copy, README, and in-app empty states in the same PR/plan.
-- Keep the rewritten Help minimal but *complete* on: offline model chat, endpoint setup + key rotation path (see Pitfall 8), voice dictation permission note, review/rate Store link (see Pitfall 1), and where Web Options now lives.
-
-**Warning signs:**
-- `grep -ri tavily` clean in code but stale in `.md` / string resources.
-- Help mentions a Settings section that was deleted.
-
-**Phase to address:** Removal phase (copy audit rides along — cheapest when the code is being deleted anyway).
-
-## Technical Debt Patterns
-
-| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
-|----------|-------------------|----------------|-----------------|
-| FakeReviewManager-only tests, no internal-track check | Phase closes fast without Play Console uploads | Real-path failures (Task errors, R8, silent no-show handling) found by users | Never — internal-track verification is the exit gate |
-| Mic button always visible, no `isRecognitionAvailable` gate | Less branching, simpler UI code | Dead/crashing button on GMS-less devices; 1-star reviews from privacy users | Never |
-| Leaving Tavily Keystore key "harmlessly orphaned" (HF-token precedent) | Skips a migration | Second orphaned secret; no UI to rotate/delete; Play data-safety questions linger | Never — one-shot delete migration this time |
-| Deleting tests alongside Tavily without DDG coverage replacement | Suite stays green trivially | Search path loses regression net; DDG-only bugs slip through | Only if DDG-equivalent cases are added in the same change |
-| Hardcoded CTA routes per screen | Fast to wire | Drawer/catalog nav drift, broken Back stacks | Never — use the shared nav map + existing select paths |
-| Per-item font-size overrides for footer parity | Quick visual match | Typography drift on next theme change | Never — use the shared text-style token |
-
-## Integration Gotchas
-
-| Integration | Common Mistake | Correct Approach |
-|-------------|----------------|------------------|
-| Play Review API (`review`/`review-ktx` 2.x) | CTA button → `launchReviewFlow()`; awaiting result to continue flow | Opportunistic trigger with cooldown state; failure/no-show is normal; visible Rate affordance deep-links to Play Store listing |
-| Play Review testing | Relying on FakeReviewManager as full verification | Fake = unit only; real dialog requires internal test track (tester account, Play-library install, primary account); quota unenforced on internal track ≠ production behavior |
-| SpeechRecognizer service | Assuming GMS recognizer present; ignoring `isRecognitionAvailable` | Gate mic on `isRecognitionAvailable`; on-device path via `isOnDeviceRecognitionAvailable` (API 31+) for offline; explicit language-unavailable messaging |
-| RECORD_AUDIO permission | Fire-and-forget request; looping after permanent denial | Rationale → request → settings-route on permanent denial; never start recognizer ungranted |
-| DuckDuckGo search (post-Tavily) | Leaving Tavily fallback legs wired; dual-provider capability matrix | Single DDG path; capability matrix/static copy updated; DDG rate-limit/offline behavior covered by existing offline-retry design |
-| Keystore/EncryptedSharedPreferences | Deleting UI but keeping stored Tavily key | One-shot upgrade migration deleting the Tavily entry; keep endpoint-key overwrite + endpoint-delete-key paths |
-
-## Performance Traps
-
-| Trap | Symptoms | Prevention | When It Breaks |
-|------|----------|------------|----------------|
-| Review Task on chat critical path | Message-send latency spikes; ANRs on slow Play Services | Decoupled prompt controller, idle/foreground guard, never await in send pipeline | Any device with slow/stale Play Services |
-| Recognizer held across navigation | `ERROR_RECOGNIZER_BUSY`, audio-resource drain, LeakCanary failures | Create-on-start / destroy-on-dispose; mic disabled while listening | Second dictation attempt; drawer/catalog tour with mic active |
-| Partial-result recomposition storm | Jank in chat input during dictation | Buffer partials with throttled state updates; commit on final/stop | Long dictations on low-end devices |
-
-## Security Mistakes
-
-| Mistake | Risk | Prevention |
-|---------|------|------------|
-| Orphaned Tavily key with no UI | Unrotatable secret; data-safety disclosure drift | Delete entry via upgrade migration; remove from data-safety/Support copy if declared |
-| Endpoint without key after key-deletion removal (if overwrite path missing) | App sends unauthenticated requests; key material in logs on 401 paths | Keep key-overwrite on edit; endpoint with missing key shows disconnected, never sends; no key logging |
-| Voice audio leaves the device unexpectedly | Privacy violation for offline-positioned app | Prefer on-device recognizer; disclose network fallback; never persist raw audio, only transcribed text |
-
-## UX Pitfalls
-
-| Pitfall | User Impact | Better Approach |
-|---------|-------------|-----------------|
-| Star button that usually does nothing | Feels broken; erodes trust | No API-bound CTA; opportunistic prompt + Store deep-link for manual rating |
-| Pre-prompt interrogation ("Do you like the app?") | Policy-violating; user manipulation | Direct, ungated prompt at a good moment per Play guidance |
-| Dictation replaces typed draft | Data loss; fury | Insert at cursor; never auto-send; partials preview, final commits |
-| Mic with no listening state | User doesn't know if it's working | Visible listening indicator + cancel/stop; auto-stop on silence timeout |
-| Delete-all moved without discoverability | Users can't find bulk cleanup | Drawer-bottom placement above Models + confirmation; Help documents it |
-| Empty states with no action | Dead-end screens | Every empty state gets its CTA (drawer → Catalog; Models → download; Endpoints → add) |
-
-## "Looks Done But Isn't" Checklist
-
-- [ ] **Review:** Fake tests green — verify internal-track real-dialog test + no-show negative test done
-- [ ] **Review:** Prompt fires — verify cooldown state persists across restarts (DataStore) and Stop/cancel guards still pass
-- [ ] **Voice:** Mic works on Pixel — verify GMS-less emulator (button hidden/disabled) + permission-denied + permanently-denied paths
-- [ ] **Voice:** Dictation appends text — verify no draft overwrite, no auto-send, recognizer destroyed on navigate-away (LeakCanary leg)
-- [ ] **Tavily removal:** DDG search works — verify `grep -ri tavily` zero in code, Keystore entry deleted on upgrade, suite green post-deletion
-- [ ] **Settings cleanup:** Screens simpler — verify key rotation still possible (edit-overwrite), no endpoint points at a missing key
-- [ ] **Drawers/catalog:** CTAs navigate — verify Back-stack returns to chat, "Use in Chat" uses the shared select path, Web Options reachable in Settings
-
-## Recovery Strategies
-
-| Pitfall | Recovery Cost | Recovery Steps |
-|---------|---------------|----------------|
-| API-bound Rate button shipped | LOW | Rewire button to Store deep-link; move in-app prompt to opportunistic trigger (no data migration) |
-| Fake-only review testing | MEDIUM | Upload internal-track build; run real-dialog + no-show tests; patch Task-error handling if exposed |
-| Orphaned Tavily key (repeat of HF-token) | LOW | Ship one-shot delete migration; confirm with prefs/Keystore dump test |
-| Tavily code remnants still compiled | LOW | Follow deletion checklist; grep-gate CI if recurrence feared |
-| Users stranded without rotation/cleanup | MEDIUM | Restore overwrite/delete paths in a patch; add migration only if data already orphaned |
-| Broken CTA back-stacks | LOW–MEDIUM | Centralize routes; add Back-stack assertions; patch destinations |
-
-## Pitfall-to-Phase Mapping
-
-| Pitfall | Prevention Phase | Verification |
-|---------|------------------|--------------|
-| 1. API-bound Rate CTA | Review-flow phase | No UI element calls `launchReviewFlow` directly; manual Rate (if any) opens Store listing |
-| 2. Fake-only testing | Review-flow phase | Internal-track real-dialog evidence + no-show negative test recorded |
-| 3. Review blocks chat flow | Review-flow phase (+ regression) | Prompt fires off inference scope; single-flight cancel + grounding-cancel suites green with prompt enabled |
-| 4. Missing recognizer assumption | Voice phase (+ regression) | `isRecognitionAvailable` gate; GMS-less emulator check |
-| 5. Permission dead-ends | Voice phase | Granted/denied/permanently-denied matrix demonstrated; settings deep-link works |
-| 6. Recognizer lifecycle leaks | Voice phase (+ regression) | Controller with destroy-on-dispose; LeakCanary voice leg clean; no busy-error on repeat dictation |
-| 7. Tavily leftovers | Removal phase (+ regression) | Zero-grep in code; Keystore migration test; suite green; no Tavily network call in smoke |
-| 8. Stranded rotation/cleanup | Removal + drawer/settings UX phases | Key rotation in ≤2 taps; relocated delete-all works; no missing-key endpoints selectable |
-| 9. CTA nav regressions | Drawer/catalog UX phase (+ regression) | Per-CTA nav map executed incl. Back behavior; "Use in Chat" shares picker select path |
-| 10. Copy drift | Removal phase | Copy audit: Help/Settings/README agree on DDG-only + new locations |
 
 ## Sources
 
-- Play In-App Review guidance — quotas, no-CTA rule, FakeReviewManager scope: https://developer.android.com/guide/playcore/in-app-review (HIGH)
-- Play In-App Review testing — internal track prerequisites, troubleshooting table: https://developer.android.com/guide/playcore/in-app-review/test (HIGH)
-- `SpeechRecognizer` API contract — main-thread, `destroy()` MUST, RECORD_AUDIO, `isRecognitionAvailable` / `isOnDeviceRecognitionAvailable`, error codes: https://developer.android.com/reference/android/speech/SpeechRecognizer (HIGH)
-- Runtime permission principles — ask in context, always offer cancel: https://developer.android.com/training/permissions/requesting (HIGH)
-- Warped codebase evidence — `TavilySearchRepository.kt`, `DuckDuckGoSearchRepository` fallback legs, `@Named("tavily")` client, `TavilySearchRepositoryTest`, v2.2 HF-token orphan precedent (PROJECT.md deferred items), v2.5 LeakCanary tour pattern (MEDIUM — codebase facts, HIGH for file existence)
-- Community permission-in-Compose patterns — rationale + settings-route for permanent denial (MEDIUM — pattern consensus, adapt to Warped's permission infra)
-
----
-*Pitfalls research for: v3.0 Chat UX + Voice Dictation*
-*Researched: 2026-10-02*
+- Android MediaRecorder reference — `pause()`/`resume()` semantics, `release()` in `onStop()` guidance, `stop()`-after-`start()` RuntimeException, `setMaxDuration` + `MEDIA_RECORDER_INFO_MAX_DURATION_REACHED`: https://developer.android.com/reference/android/media/MediaRecorder (HIGH)
+- Android MediaRecorder overview — runtime permission flow, background-mic restriction (API 28+: background apps get no mic access): https://developer.android.com/media/platform/mediarecorder (HIGH)
+- Request RECORD_AUDIO + dangerous-permission runtime model: https://developer.android.com/media/platform/mediarecorder (HIGH)
+- Play User Data policy — prominent disclosure + affirmative consent before mic access; Data safety section obligations: https://support.google.com/googleplay/android-developer/answer/10144311 (HIGH)
+- Play sensitive-permissions declaration (Permissions Declaration Form / Sensitive App Permissions in Play Console): https://support.google.com/googleplay/android-developer/answer/9214102 (MEDIUM — process details shift; verify in Console at release time)
+- LiteRT-LM audio support — Gemma3 data processor audio path (`AudioPreprocessorMiniAudio`, `<audio_soft_token>`, `InputAudio`): https://github.com/google-ai-edge/LiteRT-LM/blob/main/runtime/conversation/model_data_processor/gemma3_data_processor.cc (MEDIUM — C++ source confirms architecture, not Android API contract)
+- LiteRT-LM multimodal (Gemma 4 E2B text+image+audio; model-gated audio; mono 16 kHz WAV guidance, short-clip reliability): community implementations (lukaskris/litert-lm-mobile-android, llamadart chat_app) — LOW, patterns agree but unverified against official LiteRT-LM Android audio API docs; **phase research should confirm the exact `LlmInference`/`GenAI` audio-input API and format requirements against the LiteRT-LM version in the app's version catalog**
+- Android AI-risk mitigations — prompt injection (delimiters, output validation), excessive agency (least privilege, arg validation, human approval): https://developer.android.com/privacy-and-security/risks/ai-risks/risks-mitigations + prompt-injection and excessive-agency pages (HIGH for guidance; applicability to the new tool is a design judgment)
+- AI Edge Function Calling SDK (declarations, formatter/parser, constrained decoding): https://developers.google.com/edge/mediapipe/solutions/genai/function_calling/android (MEDIUM — MediaPipe-era doc; confirm against the LiteRT-LM `@Tool`/loop path actually in the codebase)
+- Project context: `.planning/PROJECT.md` v3.0 shipped items (SpeechRecognizer dictation state machine, first-tap rationale, Keystore cleanup) and v2.x established patterns (budget gates, capability matrix, migration discipline, LeakCanary tour) — HIGH (in-repo)

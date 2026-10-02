@@ -1,329 +1,176 @@
-# Architecture Research: v3.0 Chat UX + Voice Dictation
+# Architecture Patterns: v3.1 Voice Messages + New Tool
 
-**Domain:** Android (Kotlin + Compose + Hilt, Clean architecture) — incremental milestone on existing app Warped
+**Domain:** In-chat voice-message send (60s cap) + one new agentic tool, on the existing Warped tree
 **Researched:** 2026-10-02
-**Confidence:** HIGH (codebase-verified: every integration point below cites an existing file/symbol; Play/SpeechRecognizer API details MEDIUM — framework-stable APIs, no new third-party SDK)
+**Overall confidence:** HIGH (all integration points verified in-tree; only LiteRT-LM audio-byte format is doc-sourced)
 
-## Standard Architecture (as built — verified in tree)
+## 1. What Already Exists (Do NOT Rebuild)
 
-v3.0 adds to an existing, healthy Clean-architecture app. Nothing in the layering changes. All v3.0 work is
-**new leaves or deletions on the existing tree**, not restructuring:
+The audio-bytes inference path is **fully plumbed end-to-end**. The v3.1 voice feature is a capture + persistence + UI task, not an inference task.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  UI LAYER (Compose + ViewModel, Hilt @AndroidEntryPoint)        │
-│  ┌──────────────┐ ┌──────────────┐ ┌───────────┐ ┌────────────┐  │
-│  │ ChatScreen + │ │ NavGraph     │ │ Settings  │ │ Models /   │  │
-│  │ ChatInputBar │ │ Drawer +     │ │ Screen +  │ │ Endpoints /│  │
-│  │ ModelSelector│ │ NavHost (14  │ │ ViewModel │ │ Catalog    │  │
-│  │              │ │ destinations)│ │           │ │ screens    │  │
-│  └──────┬───────┘ └──────┬───────┘ └─────┬─────┘ └─────┬──────┘  │
-│         │                │               │             │          │
-├─────────┴────────────────┴───────────────┴─────────────┴──────────┤
-│  DOMAIN LAYER (pure Kotlin interfaces + models)                   │
-│  LlmModelHelper (keystone) · LlmProvider · repositories (interfaces)│
-│  GroundingPrecedence (pure tri-state) · SmartPresetCalculator      │
-├──────────────────────────────────────────────────────────────────┤
-│  DATA LAYER (Hilt @Singleton, Dispatchers.IO)                     │
-│  grounding/ : MultiUrlFetcher · DuckDuckGoSearchRepository        │
-│    · TavilySearchRepository ← DELETE · WebPageFetcher ·           │
-│    SearchOgEnricher · GroundedImages · GroundingBudget             │
-│  remote/api: TavilyApi ← DELETE · remote/provider/* (consumers)    │
-│  local/security: ApiKeyStore (tavily alias ← DELETE)               │
-│  Room v16 · DataStore prefs · OkHttp/Retrofit (@Named clients)    │
-└─────────────────────────────────────────────────────────────────┘
-```
+| Existing piece | Location | Status |
+|---|---|---|
+| `ChatRequest.audioBytes: ByteArray?` | `domain/model/ChatRequest.kt:7` | Ships today; carried on the request, ignored by history |
+| `sendMessage(text, images, audioBytes)` | `ui/chat/ChatViewModel.kt:462` | Accepts audio; media gate at lines 876–886 (`error_no_audio` when `!capabilities.audio`) |
+| `Content.AudioBytes(audioBytes)` attach | `data/local/inference/LiteRTLmProvider.kt:281–305` | Step 4: audio + images + optional text in one `Contents.of()`; empty-text part suppressed (engine rejects it) |
+| Audio backend slot | `data/local/inference/EngineManager.kt:206–211` | `resolveAudioBackend()` probes CPU for allowlist `audio == true` models; slot-aware retry on constraint mismatch |
+| Allowlist-verified audio flag | `ModelAllowlistRepository.effectiveCapabilities()` + `ChatViewModel.verifiedLocalCapabilities()` | **The only capability source.** Never `LocalModel.capabilities` (lazy all-true default) |
+| Input-bar audio props | `ui/chat/components/ChatInputBar.kt:54–56` | `modelHasAudio`, `onAudioRecorded: ((ByteArray) -> Unit)?`, `onAudioRecordingChanged: ((Boolean) -> Unit)?` — **dead props, no caller wires them**. The recorder UI is the gap |
+| Attachment pre-search skip | `ChatViewModel.kt:705` | Audio turns skip the heuristic DDG pre-search (deliberate, anti-junk-context). Untouched by v3.1 |
+| STT dictation | `ui/chat/voice/VoiceDictationManager.kt` | `SpeechRecognizer` wrapper, VM-owned, destroyed in `onCleared`, `RECORD_AUDIO` permission flow exists (Phase 65). Must stay **separate** from voice messages |
+| Tool pattern | `data/agentic/WebSearchToolSet.kt`, `WebFetchToolSet.kt` | Schema-only `@Tool` bodies (`HOST_EXECUTED`), manual-loop execution, provider-neutral snake-case names |
+| Tool execution | `LiteRTLmProvider.runToolLoop` + `executeToolCallDetailed` (local); `CompatToolLoop` + `defaultRemoteTools()` (remote) | New tool plugs into both dispatch sites |
+| Room precedent for media | `messages.images TEXT` (`MIGRATION_4_5`) + `EntityMappers` JSON list | Exact template for the audio column (nullable TEXT, no backfill, fail-soft decode) |
 
-### Component Responsibilities
+**Remote providers ignore audio today.** Grep over `data/remote/provider/` finds zero `audioBytes` handling — voice send is local-only at launch unless a phase explicitly maps audio onto OpenAI audio-input format (out of scope recommendation, see §6).
 
-| Component | Responsibility | v3.0 change |
-|-----------|----------------|-------------|
-| `ChatInputBar` (`ui/chat/components/ChatInputBar.kt`, 195 lines) | Stateless pill input: text, image attach, think toggle, send/stop | **MODIFY** — add mic button + listening state params; stays stateless, all logic hoisted |
-| `ChatScreen` (`ui/chat/ChatScreen.kt`, 865 lines, calls `ChatInputBar` ~line 298) | Hosts input, owns `RECORD_AUDIO`-adjacent launchers after change | **MODIFY** — permission launcher + recognizer lifecycle owner |
-| `ChatViewModel` | Grounding orchestration, DDG-primary/Tavily-fallback branches (`MissingKey`/`InvalidKey`/`UsageLimit`) | **MODIFY** — collapse to DDG-only outcomes |
-| `DuckDuckGoSearchRepository` | Today: DDG-primary/Tavily-fallback executor + Tavily-direct image leg | **MODIFY** — becomes the sole `web_search` producer; fallback + image-direct legs deleted |
-| `TavilySearchOutcome` sealed interface (defined in `TavilySearchRepository.kt`) | Shared producer→consumer contract used by VM, `LocalToolLoop`, `CompatToolLoop`, providers | **MOVE + RENAME** to `SearchOutcome` (or keep name) in DDG file — this is the highest-risk edit; every consumer imports it |
-| `NavGraph.kt` drawer content | `ModalNavigationDrawer` + custom full-width `Surface` sheet; footer row Models/Help/Settings at 12sp | **MODIFY** — footer parity, delete-all-chats row, (verify Web-Options anchor — no web row exists in this drawer today) |
-| `ModelSelector.kt` line ~164 `if (localModels.isEmpty() && endpoints.isEmpty())` | Model-pick bottom sheet empty state | **MODIFY** — "Download a model" CTA → Catalog |
-| `SettingsScreen` + `SettingsViewModel` + `SettingsUiState` | `TavilyKeyCard` (~line 403/361), Data section (~line 137), key-delete actions | **MODIFY (deletion)** — remove card, Data section, key-delete; Web section (grounding toggle) stays |
-| `HelpScreen.kt` (236 lines, string-resource-driven sections) | Long tutorial help | **MODIFY (rewrite)** — content-only, structure (`HelpSection` composable) stays |
-| `ModelsScreen` line ~247 empty-state; `EndpointsScreen` line ~50 empty-state | Empty hints | **MODIFY** — add CTA buttons with existing nav callbacks |
-| `HuggingFaceScreen` (catalog) | Static-catalog downloads | **MODIFY** — "Use in Chat" on downloaded rows (ModelsScreen already has `onUseInChat: (Long) -> Unit` pattern to copy) |
-| `NetworkModule` `@Named("tavily")` client + retrofit + api | Dedicated zero-interceptor Tavily stack | **DELETE** three providers + `TavilyApi.kt`, `TavilyDtos.kt` |
-| `ApiKeyStore` `TAVILY_ALIAS` + `store/get/deleteTavilyKey` + `deleteAllKeys` call | Keystore Tavily surface | **MODIFY** — delete Tavily methods (keep stored-key orphan note: same harmless-orphan precedent as `huggingface_token`) |
-| NEW: `ReviewManager` wrapper (data or util, `@Singleton`, Hilt-injected) | Play In-App Review: `requestReviewFlow` + `launchReviewFlow`, quota guard via DataStore | **NEW** — thin wrapper, no business logic in UI |
-| NEW: voice dictation state holder | `SpeechRecognizer` lifecycle + `RecognitionListener` → text-field append | **NEW** — prefer small `VoiceInputManager` (or `rememberVoiceInputState`) over putting recognizer code in ChatScreen; see Pattern 2 |
+## 2. Recommended Architecture
 
-## Recommended Project Structure (deltas only)
+### 2.1 Component map (new vs modified)
 
 ```
-app/src/main/java/com/warped/
-├── data/
-│   ├── grounding/
-│   │   ├── TavilySearchRepository.kt      ← DELETE (move outcome iface out first)
-│   │   └── DuckDuckGoSearchRepository.kt  ✎ strip fallback + image-direct legs
-│   ├── remote/api/
-│   │   ├── TavilyApi.kt                   ← DELETE
-│   │   └── dto/TavilyDtos.kt              ← DELETE
-│   ├── local/security/ApiKeyStore.kt      ✎ delete Tavily fns (keep endpoint-key fns)
-│   └── review/
-│       └── ReviewManager.kt               ＋ NEW wrapper (or util/review/)
-├── di/
-│   └── NetworkModule.kt                   ✎ delete 3× @Named("tavily") providers
-└── ui/
-    ├── chat/
-    │   ├── ChatScreen.kt                  ✎ launcher + recognizer host + drawer CTA wiring
-    │   ├── ChatViewModel.kt               ✎ DDG-only branches; review-trigger hook
-    │   └── components/
-    │       ├── ChatInputBar.kt            ✎ mic button + isListening param (stateless)
-    │       └── ModelSelector.kt           ✎ empty-state CTA (line ~164)
-    ├── voice/
-    │   └── VoiceInputManager.kt (or VoiceInputState.kt) ＋ NEW (see Pattern 2)
-    ├── navigation/NavGraph.kt             ✎ drawer footer + delete-all row
-    ├── settings/ (Screen+VM+UiState)      ✎ deletions only
-    ├── help/HelpScreen.kt                 ✎ content rewrite (keep HelpSection)
-    ├── models/ModelsScreen.kt             ✎ empty-state CTA
-    ├── endpoints/EndpointsScreen.kt       ✎ empty-state CTA
-    └── huggingface/HuggingFaceScreen.kt   ✎ "Use in Chat" on downloaded rows
-AndroidManifest.xml                        ✎ re-add RECORD_AUDIO (was removed 2026-10-01, noted dead-code)
-gradle/libs.versions.toml                  ✎ add play-review (+ activity-compose if missing — verify)
+ui/chat/voice/
+├── VoiceDictationManager.kt      [EXISTS — untouched, STT into draft]
+├── VoiceMessageRecorder.kt       [NEW — MediaRecorder wrapper, 60s cap]
+└── VoiceMessagePlayer.kt         [NEW — MediaPlayer wrapper, bubble playback]
+
+ui/chat/
+├── ChatViewModel.kt              [MODIFY — own recorder/player, recording state, send path]
+├── ChatInputState.kt             [MODIFY — isRecording, recordingSecs, audioDraft fields]
+└── components/
+    ├── ChatInputBar.kt           [MODIFY — wire dead audio props + new voice-send icon]
+    └── VoiceMessageBubble.kt     [NEW — playback row inside user bubbles with audio]
+
+domain/model/
+└── ChatMessage.kt                [MODIFY — add audioPath: String? persisted field]
+
+data/local/db/
+├── entity/MessageEntity.kt       [MODIFY — audio_path TEXT nullable]
+├── entity/EntityMappers.kt       [MODIFY — map audioPath both directions, fail-soft]
+└── Migrations.kt                 [MODIFY — MIGRATION_17_18, ALTER-only shape]
+                                   (DB is at v17; verify in AppDatabase.kt at plan time)
+
+data/agentic/
+└── <New>ToolSet.kt               [NEW — schema-only @Tool, sibling of WebFetchToolSet]
+data/local/inference/
+└── LiteRTLmProvider.kt           [MODIFY — register tool in armed ConversationConfig]
+data/agentic/ or remote loop
+├── LocalToolLoop.kt              [MODIFY — validateArgs/mapToolCallName/dispatch entry]
+└── CompatToolLoop.kt + defaultRemoteTools() [MODIFY — OpenAI tools[] mapping for remote]
+
+app cache/files:
+└── filesDir/voice/<messageId>.m4a [NEW — audio file store, Room holds path only]
 ```
 
-### Structure Rationale
+### 2.2 Layer placement rationale (domain vs data vs ui)
 
-- **Voice holder lives outside ChatScreen.** `ChatScreen` is already 865 lines; embedding
-  `SpeechRecognizer` + `RecognitionListener` + permission handling inline repeats the exact bloat
-  the v2.x milestones kept paying down. A small lifecycle-aware holder (`VoiceInputManager` injected
-  into the VM, or a `rememberVoiceInputState()` in `ui/voice/`) keeps `ChatInputBar` stateless and
-  the recognizer testable without Compose.
-- **Review wrapper lives in data/util, not UI.** Play's API needs an `Activity` at launch time and
-  has an opaque quota — both are reasons to centralize, not sprinkle `ReviewManagerFactory` calls
-  across screens. One entry point (`maybePromptForReview(activity)`), called from exactly one place
-  (post-successful-chat-turn hook in `ChatViewModel` or ChatScreen), guarded by DataStore counters.
-- **Tavily deletion is a vertical slice, not scattered edits.** Delete order matters (see Build Order):
-  outcome-interface move → consumer re-point → producer simplification → DI/keystore/UI removal → test updates.
+| Component | Layer | Why |
+|---|---|---|
+| `VoiceMessageRecorder` | **ui/chat/voice** (not data) | Platform capture API, same category as `VoiceDictationManager`. VM-owned lifecycle (lazy-create, destroy in `onCleared`), same `dictationManagerOverride`-style test seam. Putting it in `data/` would imply repository semantics it doesn't have; putting it behind Hilt `@Singleton` would leak recorder/context across screens (Phase 65 precedent: owner-managed, never singleton) |
+| `VoiceMessagePlayer` | **ui/chat/voice** | Same reasoning. `MediaPlayer` is a UI-clocked resource (seekbar, completion callback); one instance per ChatViewModel, released on `onCleared` and on new playback start (single-flight, mirrors `generationJob` single-collector precedent) |
+| `audioPath` on `ChatMessage` | **domain/model** | Follows `imageUris` precedent: persisted render data, mapped field-by-field in `EntityMappers` |
+| `audio_path` column + migration | **data/local/db** | Only data-layer change for voice. Audio bytes themselves NEVER enter Room (see §3.2) |
+| New `ToolSet` schema | **data/agentic** | Fixed two-tool allowlist becomes three; schema-only body (`HOST_EXECUTED`, never `runBlocking` — Pitfall 3 from `WebFetchToolSet` kdoc) |
+| Tool execution bodies | `LocalToolLoop` + `CompatToolLoop` | Existing dispatch sites; no new loop machinery |
+| Zero changes | `LlmModelHelper` interface, `LiteRtLlmHelper`, `EngineManager`, `ChatRequest`, grounding pipeline | The inference contract already carries audio; the interface needs no new method |
 
-## Architectural Patterns
+### 2.3 Data flow — voice send turn
 
-### Pattern 1: Play In-App Review via thin Hilt wrapper + quota guard
+```
+[1] User taps voice-send icon (visible iff modelHasAudio && !inputLocked)
+        → ChatInputBar shows recording sheet: timer, 60s progress, stop/send/cancel
+[2] VoiceMessageRecorder.start(cacheFile) — MediaRecorder, setMaxDuration(60_000),
+    auto-stop → onMaxDuration callback finalizes file
+        → VM: _input.isRecording=true, recordingSecs ticker (1s granularity is fine)
+[3] Stop → file finalized → playback preview (VoiceMessagePlayer, local file)
+        → Send: bytes = file.readBytes() (Dispatchers.IO) → sendMessage(text="", audioBytes=bytes)
+        → Cancel: delete cache file, clear draft
+[4] sendMessage: existing path unchanged —
+    media gate (audio flag) → ensureConversation(hasMedia=true) → saveMessage →
+    ChatRequest(audioBytes) → LiteRTLmProvider Step 4 → Content.AudioBytes
+[5] Done: persist audio file filesDir/voice/<userMsgId>.m4a,
+    update row audio_path; transcript renders VoiceMessageBubble (play/pause + duration)
+```
 
-**What:** `com.google.android.play:review` (or `review-ktx`) — `ReviewManagerFactory.create(context)`,
-`requestReviewFlow()` → `launchReviewFlow(activity, reviewInfo)`. Play enforces its own display quota;
-calls are fire-and-forget (no callback on whether UI showed).
-**When to use:** exactly this — one wrapper, one call site.
-**Trade-offs:** Pro: official API, no permission, works offline-queued. Con: quota is opaque (never
-assume the dialog showed; never gate features on it; never call on every launch).
+Key invariant: **audio bytes are single-turn, never history-carried.** `buildHistoryMessages` carries images (K=3 newest) but has no audio carry — follow-up turns do not resend voice bytes. This is deliberate (bytes are large, voice is a one-shot utterance) and matches the existing `audioBytes` transient contract. Document it; do not "fix" it.
 
-**Example:**
+### 2.4 Data flow — new tool turn (unchanged loop, new schema)
+
+```
+Armed ConversationConfig.tools += tool(<New>ToolSet())   // local
+defaultRemoteTools() += <new> OpenAiTool mapping          // remote
+Model emits toolCall → LocalToolLoop.validateArgs → executeToolCallDetailed
+  → ToolCompleted(sources?) → VM unions into loopSourceDetails (Fuentes rows iff sources)
+  → Content.ToolResponse back into loop
+```
+
+If the new tool returns no citable sources, emit no `ToolCompleted` rows (IN-02 precedent: no transient row for sourceless calls) and return the mapped string only.
+
+## 3. Patterns to Follow
+
+### 3.1 Recorder wrapper mirrors VoiceDictationManager (HIGH confidence — in-tree precedent)
+
+Thin platform wrapper, callbacks only, zero UI side effects; the ViewModel applies all policy (cap, gating, file lifecycle). `start(): Boolean`-style synchronous-accept signal (WR-01 lesson: never flip `isRecording=true` unless the platform accepted). `stop()` keeps the instance for re-record; `destroy()` in `onCleared`.
+
+### 3.2 Files for bytes, Room for paths (HIGH — images precedent + size math)
+
+60s AAC/M4A ≈ 0.5–1 MB. Base64-ing that into a TEXT column would bloat the `messages` table and break the `conversation_id, created_at` index locality. Store under `filesDir/voice/` (app-private, survives restart, no `READ_MEDIA` permission needed for own files), persist only the path. Cap the directory (count or MB, LRU by message `created_at`; precedent: `LiteRtLmCacheManager` capped cache) and delete-on-message-delete (check `ChatRepository.deleteMessage` path at plan time).
+
+### 3.3 Migration shape: ALTER-only nullable, no backfill (HIGH — MIGRATION_4_5/14_15/15_16 precedent)
+
 ```kotlin
-@Singleton
-class PlayReviewManager @Inject constructor(
-  @ApplicationContext private val context: Context,
-  private val prefs: ReviewPrefs, // DataStore: success-turn count + last-prompt epoch
-) {
-  suspend fun maybePrompt(activity: Activity) {
-    if (!prefs.isEligible()) return          // e.g. ≥N successful turns AND cooldown elapsed
-    try {
-      val manager = ReviewManagerFactory.create(context)
-      val info = manager.requestReviewFlow().await()   // Tasks API → coroutine
-      manager.launchReviewFlow(activity, info)
-      prefs.markPrompted()                   // record attempt regardless of display
-    } catch (_: Exception) { /* never crash chat for a rating prompt */ }
-  }
+val MIGRATION_17_18 = object : Migration(17, 18) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE messages ADD COLUMN audio_path TEXT")
+    }
 }
 ```
 
-**Entry point (opinionated):** post-successful-chat-turn in `ChatViewModel` (it already owns turn
-completion/stream-stop states), not Settings and not app-launch. Settings entry is a fallback link at most.
+NULL = no voice attached (all pre-v3.1 rows). No index (no query filters on the column), no backfill. Mapper decodes fail-soft (`try/catch → null`), mirroring the `images` JSON decode guard. Verify current DB version in `AppDatabase.kt` before freezing numbers — migrations chain is manual (no AutoMigration; KSP schema caveat documented in `Migrations.kt:62-65`).
 
-### Pattern 2: SpeechRecognizer lifecycle owned outside the text field
+### 3.4 Audio format: MediaRecorder M4A/AAC + engine-side bytes (MEDIUM)
 
-**What:** Framework `android.speech.SpeechRecognizer` (no new dependency) + `RECORD_AUDIO` runtime
-permission via `rememberLauncherForActivityResult(RequestPermission())`. Listener partial results
-(`onPartialResults`) stream into the existing `onTextChange` path — dictation appends/inserts text,
-it never sends.
-**When to use:** this milestone's "speech-to-text only, no audio messages" scope.
-**Trade-offs:** Pro: zero-dependency, on-device on GMS devices, partial results feel live. Con:
-`SpeechRecognizer` availability varies (`isRecognitionAvailable()` check required); error codes
-(`ERROR_NO_MATCH`, `ERROR_SPEECH_TIMEOUT`) must reset UI state or the mic button sticks in "listening".
+LiteRT-LM's public contract is `Content.AudioBytes(audioBytes: ByteArray)` (Google AI Edge docs: "ByteArray of the audio"; verified via webfetch of the LiteRT-LM Android guide). No published sample-rate/format constraint was found in the fetched docs — **flag as a phase-time spike**: record AAC, confirm on-device with an audio-capable allowlist model (`gemma-4-E2B-it` class), and if the engine rejects it, transcode to 16 kHz mono PCM via `AudioRecord` (TensorAudio-compatible shape) before `sendMessage`. Keep the transcode path behind a pure function so it's unit-testable without the engine. LOW-confidence detail, HIGH-confidence fallback plan.
 
-**Example:**
-```kotlin
-@Composable
-fun rememberVoiceInputState(onResult: (String) -> Unit): VoiceInputState {
-  val context = LocalContext.current
-  val recognizer = remember {
-    if (SpeechRecognizer.isRecognitionAvailable(context))
-      SpeechRecognizer.createSpeechRecognizer(context) else null
-  }
-  val permission = rememberLauncherForActivityResult(RequestPermission()) { granted ->
-    if (granted) recognizer?.startListening(recognizerIntent()) // ACTION_RECOGNIZE_SPEECH, partial results
-  }
-  DisposableEffect(Unit) { onDispose { recognizer?.destroy() } } // hard requirement
-  ...
-}
-```
+### 3.5 Icon differentiation (HIGH — existing ChatInputBar layout precedent)
 
-Rules: (1) `destroy()` in `DisposableEffect.onDispose` — recognizer holds a service connection;
-(2) stop listening on send/stop-turn and on navigate-away; (3) mic button hidden (not dimmed) when
-`!isRecognitionAvailable()` — matches the codebase's "no dead affordances" convention in `ChatInputBar`;
-(4) re-add `RECORD_AUDIO` to the manifest (it was deliberately removed 2026-10-01 as dead — this
-milestone is the "real feature + runtime request" that justifies its return).
+- Dictation mic (`Icons.Filled.Mic` → `Stop` while listening) stays exactly where it is, gated by `speechAvailable`.
+- Voice-send is a **separate affordance** with a non-mic icon (recommend `Audiotrack` — already the codebase's audio-capability badge icon in `CapabilityBadges.kt`/`ModelCard.kt`, so users learn one audio glyph; alternatives `MicExternalOn`/`KeyboardVoice` are untested in this tree). Gated by `modelHasAudio` (allowlist-verified, same fail-open-while-loading rule as `supportsThinkingFor`), hidden while `inputLocked` (generating/loading) so two stop icons never coexist (Phase 65 no-two-stops precedent).
+- `hasContent` for send-enabling must include the audio draft (`text.isNotBlank() || images || audioDraft != null`) — the current Enter-key and keyboard-send checks (`ChatInputBar.kt:153,164`) only test text+images and need the same extension.
 
-### Pattern 3: Deletion-slice for Tavily removal (contract-first)
+## 4. Anti-Patterns to Avoid
 
-**What:** The shared `TavilySearchOutcome` sealed interface is the load-bearing contract — `ChatViewModel`
-(~10 references), `LocalToolLoop`, `CompatToolLoop`, all five remote providers route through it.
-Delete in contract-first order: (1) move/rename the outcome interface into `DuckDuckGoSearchRepository.kt`
-(e.g. `SearchOutcome`), (2) re-point all consumer imports, (3) simplify DDG repo to DDG-only,
-(4) delete `TavilyApi`/`TavilyDtos`/`TavilySearchRepository`/DI providers/keystore fns/Settings UI,
-(5) update/delete Tavily tests.
-**When to use:** any removal where a deleted file owns a type others import.
-**Trade-offs:** Slightly more steps than delete-and-fix-compile, but each step compiles, so bisectability
-and reviewability survive. The v2.2 milestone already proved this team can land net-deletion slices cleanly.
+| Anti-pattern | Why bad | Instead |
+|---|---|---|
+| Extending `LlmModelHelper` with audio methods | Interface is the local/remote keystone; audio already rides `ChatRequest`. A new method forks every helper + `ProviderRouter` + tests for zero gain | Reuse `ChatRequest.audioBytes` untouched |
+| Storing audio bytes/base64 in Room | 0.5–1 MB blobs in `messages` TEXT; history load pays it on every open; no precedent (images are KB-scale data URLs) | `filesDir/voice/` + `audio_path` column |
+| Hilt `@Singleton` recorder/player | Recorder holds native handles + context; singleton leaks across screens and survives model switch (EngineManager-unload analogue) | VM-owned, `destroy()/release()` in `onCleared`, single-flight playback |
+| Merging dictation + voice-send into one button/mode | Different destinations (draft text vs model audio attachment), different gating (recognizer-available vs audio-capable model), Phase 65 single-insertion state machine assumes mic exclusivity | Two icons, mutually exclusive sessions: starting one stops the other (`sendMessage` already calls `stopDictation()` — mirror it: recorder start calls `stopDictation()`, dictation start stops recording) |
+| Carrying audio in `buildHistoryMessages` | Re-sends MB-scale bytes every follow-up turn; context-window eviction + OOM (the exact reason image carry is capped at K=3) | Single-turn only; history shows the playable bubble via `audio_path` |
+| New tool with `runBlocking` body or auto-executing SDK path | `ReflectionTool.execute` is synchronous; network I/O there blocks engine threads with no Stop propagation (documented in `WebSearchToolSet` + `LocalToolLoop` kdocs) | Schema-only `@Tool` body + manual-loop suspend execution (`automaticToolCalling=false`), Stop-safe via `ensureActive()` per round |
+| Remote voice-send without mapping | Remote providers drop `audioBytes` silently today → user records 60s and the model never hears it | Gate voice-send on `LITE_RT_LM && audio-capable` at launch (local-only); remote audio is an explicit future phase, not a silent gap |
 
-### Pattern 4: Drawer/catalog CTA navigation reuses existing callbacks
+## 5. Scalability / Resource Considerations
 
-**What:** Every CTA in this milestone maps to an already-existing nav callback — no new destinations,
-no NavGraph route changes. `ModelsScreen.onUseInChat: (Long) -> Unit`, `onOpenHuggingFace`,
-`UnifiedSelectorScreen.onNavigateToChat`, drawer `navController.navigate(Screen.Selector/Help/Settings)`
-are all in place.
-**When to use:** all six navigation touchpoints in v3.0.
-**Trade-offs:** Pro: zero navigation risk; footer parity and delete-all relocation are pure UI moves
-inside `NavGraph.kt` drawer content. Con: temptation to add a dedicated "review" or "voice" screen —
-do not; neither needs one.
+| Concern | Approach |
+|---|---|
+| 60s cap enforcement | `MediaRecorder.setMaxDuration(60_000)` (platform-enforced, survives Duration-ticker drift) + UI progress bar as the soft signal; auto-stop routes through the same finalize path as manual stop |
+| Recorder leak on rotation/process death | VM survives rotation (collection lives in VM — 46-01 precedent); on `onCleared` release recorder + player; orphaned cache files swept at next chat open (single `cacheDir/voice_tmp` wipe of files with no matching `audio_path` row — one-shot, `Dispatchers.IO`) |
+| Playback concurrency | One `MediaPlayer` per VM; starting bubble B stops bubble A (single-flight, same stale-guard spirit as `generationSeq`); completion releases the handle but keeps the file |
+| Voice dir growth | LRU cap (e.g. 50 files / 100 MB); eviction deletes file + nulls `audio_path` (bubble degrades to duration label, never crashes — fail-soft mapper precedent) |
+| New-tool loop budget | Existing 5-call cap (`LocalToolLoop.MAX_TOOL_CALLS`) covers the new tool with no change; cap-reached string path reused verbatim |
 
-## Data Flow
+## 6. Suggested Build Order (dependency-respecting)
 
-### Request Flow — voice dictation
-
-```
-[mic tap] → permission launcher (granted?) → recognizer.startListening
-    ↓ onPartialResults / onResults
-[VoiceInputState] → onTextChange(existing VM path) → input.inputText
-    ↓ send validated as usual (text non-blank) — dictation never auto-sends
-[ChatViewModel.sendMessage] → unchanged grounding + inference pipeline
-[onDispose / onSend / onStop] → recognizer.stopListening/destroy
-```
-
-### Request Flow — grounding after Tavily removal (DDG-only)
-
-```
-[send with web intent] → DuckDuckGoSearchRepository.search()   (sole producer)
-    ↓ HTML fetch → parse-only extract → sanitize → fuse [WEB CONTEXT 1..N]
-[TavilySearchOutcome.* → SearchOutcome.*] → ChatViewModel branches collapse:
-  Grounded / ModelOnly stay · MissingKey·InvalidKey·UsageLimit DELETE
-  (no key exists anymore → no key-error UI; DDG-fail = FETCH_FAILED path)
-[image-intent turns] → Tavily-direct leg DELETED → DDG text grounding only,
-  image grid empty (GroundedImages stays — render-side gate, harmless with empty input)
-```
-
-### State Management — review eligibility
-
-```
-[successful turn completes] → ChatViewModel → PlayReviewManager.maybePrompt(activity)
-    ↓ DataStore: turn-count++ ; eligible? (count ≥ N AND cooldown elapsed)
-[requestReviewFlow → launchReviewFlow] → markPrompted (attempt recorded either way)
-```
-
-### Key Data Flows
-
-1. **Review flow:** single call site, DataStore-guarded, exception-swallowing — a rating prompt must
-   never crash or block chat.
-2. **Voice flow:** recognizer output re-enters through the exact same `updateInput` path as typing,
-   so validation, send-enabling, and grounding triggers behave identically.
-3. **Grounding flow (post-removal):** producer count goes 2 → 1; downstream (fusion, persist, Fuentes,
-   preview, citations) untouched — same guarantee the DDG file's own header documents for its shape parity.
-
-## Scaling Considerations
-
-Not applicable (on-device app, no backend). The analogous "what breaks" list for this milestone:
-
-1. **First bottleneck: outcome-interface rename blast radius.** ~15 files import Tavily symbols
-   (VM, 2 tool loops, 5+ providers, Settings ×3, Chat UI ×2, grounding internals). Mitigation: rename-first,
-   compile-after-each-step; keep the sealed-interface *shape* identical so branch bodies barely change.
-2. **Second bottleneck: ChatScreen/ChatInputBar review churn.** Both are high-traffic files; keep
-   `ChatInputBar` stateless (new params only) and voice/review logic in the new holder + wrapper so
-   diffs stay additive.
-
-## Anti-Patterns
-
-### Anti-Pattern 1: SpeechRecognizer inline in the Composable
-
-**What people do:** `createSpeechRecognizer` + anonymous `RecognitionListener` inside `ChatInputBar` or `ChatScreen`.
-**Why it's wrong:** service-connection leak on recomposition/navigation; untestable; balloons the two
-most-edited files. (The v2.5 leak-hunt milestone exists precisely because lifecycle discipline matters here.)
-**Do this instead:** lifecycle-aware holder with `DisposableEffect.destroy()` + `isRecognitionAvailable()` gate.
-
-### Anti-Pattern 2: Prompting review from multiple places or on launch
-
-**What people do:** review calls in `onCreate`, Settings, and post-chat simultaneously to "maximize ratings."
-**Why it's wrong:** Play's quota silently suppresses all of them, and launch-time prompts train users to dismiss.
-**Do this instead:** one post-success call site + DataStore cooldown. One screen (Settings → rate link) optional.
-
-### Anti-Pattern 3: Deleting Tavily files before moving the shared outcome type
-
-**What people do:** delete `TavilySearchRepository.kt` first, then chase 15 broken files.
-**Why it's wrong:** repo doesn't compile at any intermediate commit; review becomes a wall of red.
-**Do this instead:** Pattern 3 — move/rename contract type first, re-point, then delete leaves.
-
-### Anti-Pattern 4: Leaving key-delete / Data-section ViewModel functions wired to nothing
-
-**What people do:** remove the Settings rows but leave `deleteAllApiKeys()`, `showDeleteChatsDialog()`,
-Tavily VM functions in place "in case."
-**Why it's wrong:** dead public VM surface + orphaned strings; the delete-all-chats function must *move*
-(its logic is reused by the drawer row), the Tavily ones must die with their UI.
-**Do this instead:** relocate chat-deletion logic to the drawer call path (VM function reused or moved to
-`ChatRepository`-backed action); delete Tavily VM state/functions/tests outright.
-
-## Integration Points
-
-### External Services
-
-| Service | Integration Pattern | Notes |
-|---------|---------------------|-------|
-| Play In-App Review (`com.google.android.play:review`) | Thin Hilt wrapper; `requestReviewFlow` + `launchReviewFlow(activity, info)` | NEW dependency (verify latest version at plan time — catalog has no play dep today). Quota opaque; never gate features. MEDIUM confidence on artifact coordinates |
-| Android `SpeechRecognizer` (framework) | Holder + `RequestPermission` launcher + `ACTION_RECOGNIZE_SPEECH` intent with partial results | No dependency. Requires `RECORD_AUDIO` manifest re-add + `isRecognitionAvailable()` gate. HIGH confidence (stable framework API) |
-| DuckDuckGo HTML endpoint (existing) | Unchanged — becomes sole producer | Brittleness note already documented in DDG repo header (markup-shape dependency); unchanged by this milestone |
-
-### Internal Boundaries (new vs modified — explicit)
-
-| Boundary | New / Modified | Notes |
-|----------|---------------|-------|
-| `ChatInputBar` ← voice holder | MODIFIED (additive params: `isListening`, `onMicClick`, `voiceAvailable`) | stays stateless; no recognizer imports in this file |
-| `ChatScreen` ↔ voice holder + permission launcher | MODIFIED | launcher + `DisposableEffect` host; mic affordance placement next to send/stop row |
-| `ChatViewModel` → `PlayReviewManager` | MODIFIED (one call site) | needs Activity handle at launch — pass from Composable, don't hold Activity in VM |
-| `ChatViewModel` ↔ `DuckDuckGoSearchRepository` | MODIFIED (branch collapse) | delete `MissingKey`/`InvalidKey`/`UsageLimit` arms; simplify key-presence probe (~line 770) |
-| `DuckDuckGoSearchRepository` ← former Tavily callers | MODIFIED | fallback + `include_images` Tavily-direct legs deleted; DDG-only + FETCH_FAILED |
-| Outcome interface → all consumers | MOVE+RENAME then re-point | the critical-path edit; keep case shape identical |
-| `NetworkModule` → rest of graph | MODIFIED (delete 3 `@Named("tavily")` providers) | verify no other `@Inject @Named("tavily")` sites beyond `TavilySearchRepository` |
-| `ApiKeyStore` ↔ `SettingsViewModel` | MODIFIED (delete Tavily fns + `deleteAllKeys` Tavily line) | endpoint-key fns + `deleteKey` stay (key-deletion *ability* removal is a UI-scope question — milestone says remove key-delete affordance; keep store-level `deleteKey` for endpoint deletion flows — verify at plan time) |
-| Drawer ↔ `ChatRepository.deleteConversation` (+ delete-all) | MODIFIED | drawer row above Models footer; reuse existing delete path + confirm dialog pattern (`WarpedAlertDialog`) |
-| Catalog rows → chat | MODIFIED | copy `ModelsScreen.onUseInChat` wiring into `HuggingFaceScreen` downloaded rows |
-| `HelpScreen` ↔ `strings.xml` | MODIFIED (content only) | short/minimal rewrite; ES + EN values (`values-es`) both updated |
-
-### Suggested Build Order (removals before additions where they overlap)
-
-1. **Tavily contract move** — move/rename outcome interface, re-point consumers, green build. (Unblocks everything grounding-adjacent; zero behavior change.)
-2. **Tavily deletion slice** — DDG simplification → delete API/DTO/repo/DI/keystore/Settings card/tests. (Must precede Help rewrite + Settings cleanup which reference the same screens; behavior change lands here.)
-3. **Settings cleanup + drawer/footer/delete-all + empty-state CTAs + Help rewrite** — all pure-UI, parallelizable once (2) is done; no interdependencies. Suggested split: settings/drawer one plan, CTAs/catalog/help another.
-4. **Voice dictation** — manifest + holder + `ChatInputBar` mic + launcher wiring. Independent of (1–3); can run parallel, but schedule after UI churn settles to avoid `ChatScreen` merge conflicts.
-5. **Play Review** — dependency + wrapper + DataStore prefs + single call site. Fully independent; smallest slice, good last-plan candidate.
+1. **Room foundation** — `audio_path` column + `MIGRATION_17_18` + `EntityMappers` + `ChatMessage.audioPath`, with a JVM migration test (static gate precedent: `MIGRATION_14_15` had a JVM static gate). Unblocks everything below; zero UI.
+2. **Recorder + player + VM state** — `VoiceMessageRecorder`, `VoiceMessagePlayer`, `ChatInputState` recording fields, VM `startRecording/stopRecording/sendVoiceMessage/cancelRecording`, `RECORD_AUDIO` permission reuse from Phase 65, 60s cap, file→`filesDir/voice/` persist on send. Unit-testable policy (cap, gating, mutual exclusion with dictation) with a fake recorder seam.
+3. **Input-bar + bubble UI** — wire the dead `modelHasAudio`/`onAudioRecorded` props, new voice-send icon, recording sheet (timer/progress/send/cancel), `hasContent` extension, `VoiceMessageBubble` playback row; TalkBack `stateDescription` parity with the dictation mic (Phase 65 UI-review precedent).
+4. **Device spike: audio format** — record → send → confirm on an audio-capable allowlist model; transcode fallback only if the engine rejects AAC (§3.4). Must precede release-UAT but not the UI above (bytes flow through the same `audioBytes` slot either way).
+5. **New tool schema + local execution** — `<New>ToolSet` + `LocalToolLoop` dispatch + armed-config registration + unit tests (validateArgs short-circuits, cap accounting). Independent of 1–4; can parallelize after the tool is chosen.
+6. **New tool remote mapping** — `defaultRemoteTools()` entry + `CompatToolLoop` handling + capability-matrix check (`ToolCapabilityMatrix`). Last: needs the local shape frozen first (Phase 57 precedent: local 1:1 → remote tools[] entry).
 
 ## Sources
 
-- Codebase (HIGH): `NavGraph.kt` (drawer + 14 destinations), `Screen.kt`, `ChatInputBar.kt` (195 lines),
-  `ChatScreen.kt` (~line 298 input wiring), `ModelSelector.kt` (line ~164 empty-state),
-  `SettingsScreen.kt` (Data §137, Web §~190, `TavilyKeyCard` ~403), `SettingsViewModel.kt` (Tavily fns),
-  `ApiKeyStore.kt` (`TAVILY_ALIAS`), `NetworkModule.kt` (`@Named("tavily")` ×3),
-  `TavilySearchRepository.kt` (outcome iface + Bearer discipline), `DuckDuckGoSearchRepository.kt`
-  (DDG-primary/fallback policy header), `WebSearchToolSet.kt`, `GroundedImages.kt`,
-  `AndroidManifest.xml` (RECORD_AUDIO removal note), `gradle/libs.versions.toml` (no play/activity deps),
-  `.planning/PROJECT.md` (v3.0 scope, v2.2/v2.4/v2.5 precedents).
-- Framework knowledge (MEDIUM, verify at plan time): Play In-App Review artifact coordinates + latest
-  version; `SpeechRecognizer` partial-results + error-code behavior (stable for years, low drift risk);
-  `androidx.activity:activity-compose` launcher APIs (verify catalog needs the explicit dep).
-
----
-*Architecture research for: v3.0 Chat UX + Voice Dictation*
-*Researched: 2026-10-02*
+- In-tree (HIGH): `LiteRTLmProvider.kt` Step 4 audio attach (lines 281–305); `ChatViewModel.sendMessage` + audio gate (lines 462–488, 876–886); `EngineManager.resolveAudioBackend` (lines 206–211); `ChatInputBar` dead audio props (lines 54–56) + mic block (lines 224–248); `VoiceDictationManager` contract; `EntityMappers` images precedent; `Migrations.kt` v4→v17 chain; `WebFetchToolSet` schema-only kdoc.
+- Official docs (MEDIUM): LiteRT-LM Android guide (`developers.google.com/edge/litert-lm/android`) — `Content.AudioBytes(audioBytes)` ByteArray contract confirmed via WebFetch; no sample-rate/format constraint found in fetched content → §3.4 spike flag (LOW confidence on format details, HIGH on fallback plan).
+- Not verified at research time (plan-time checks): current `AppDatabase` version number (=17 assumed from migration chain); whether `RECORD_AUDIO` permission declaration already covers `MediaRecorder` (same permission, but manifest entry must be confirmed); Media3/ExoPlayer absence (recommendation is zero-dep `MediaPlayer` regardless); `deleteMessage` file-cleanup hook point.

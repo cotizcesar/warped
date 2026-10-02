@@ -1,140 +1,142 @@
-# Feature Research: v3.0 Chat UX + Voice Dictation
+# Feature Landscape: v3.1 Voice Messages + New Tool
 
-**Domain:** Android LLM chat app (Warped — LM Studio equivalent, Kotlin + Compose)
+**Domain:** In-chat voice messages (audio-attachment input) + one new function-calling tool for a mobile LM-Studio-equivalent
 **Researched:** 2026-10-02
-**Confidence:** HIGH (Play In-App Review + STT patterns verified against official Android docs; scope items are deletions/simplifications of already-built surfaces)
-**Scope:** Subsequent milestone — covers ONLY the 11 new v3.0 items. Everything else (local/remote chat, static catalog + downloads, Models & Endpoints CRUD, grounding, syntax highlighting, settings, help) already exists.
+**Scope:** NEW features only. Already shipped (do NOT re-spec): text chat local/remote with streaming, image attachments (vision slot gating), STT dictation into input (v3.0 mic), DDG web grounding, presets, history, benchmark, Prompt Lab, Play Review.
 
-## Feature Landscape
+## Part 1 — Voice Messages (record → 60s cap → playback → send as model audio input)
 
-### Table Stakes (Users Expect These)
+### How it typically works in mobile LLM apps
 
-Features users assume exist. Missing these = product feels incomplete.
+The established pattern (WhatsApp/Telegram voice notes, Sendbird/TalkJS chat SDKs, Gemini Android's 2026 voice-input redesign toward messaging-app style) is a three-state attachment flow that is deliberately **separate from dictation**:
+
+1. **Record** — tap (or hold) a dedicated affordance → `MediaRecorder` captures AAC (`MPEG_4`/`AAC`, `VOICE_RECOGNITION` or `MIC` source) to the app cache dir. A live timer + amplitude/waveform indicator runs; the 60 s cap auto-stops the recorder (standard pattern: hard stop at cap, keep what was captured — "draft preview" à la WhatsApp).
+2. **Review (playback before send)** — the captured clip becomes a draft chip/row: play/pause button + duration + waveform or progress bar + **Send** + **Delete/cancel**. Playback via `MediaPlayer` (or ExoPlayer if already a dependency — it is not; prefer `MediaPlayer` for a single local file). This draft-preview step is table stakes: WhatsApp added "Draft Preview" explicitly because users refuse to send unheard audio.
+3. **Send as model audio input** — the message is sent as an **audio attachment**, not transcribed text: local path wraps raw PCM/bytes into LiteRT-LM `Content.AudioBytes` (audio-capable models only, e.g. Gemma 3n; audio encoder runs on its own `audioBackend` slot); remote path base64-attaches to the provider's audio-input field (OpenAI-compatible `input_audio`, where supported).
+
+**Dictation (existing v3.0 mic) vs voice message (new) — the critical distinction:**
+
+| | Dictation mic (SHIPPED v3.0) | Voice message (NEW v3.1) |
+|---|---|---|
+| Output | Text inserted at cursor in the input field | Audio-attachment message sent to the model |
+| Engine | Platform `SpeechRecognizer` (on-device/Google STT) | `MediaRecorder` file → model hears raw audio |
+| Model requirement | None (works with every model) | Audio-capable model only (local: TF_LITE_AUDIO_ENCODER_HW / Gemma 3n-class; remote: provider audio-input support) |
+| Permission | `RECORD_AUDIO` (already declared, `uses-feature required=false`) | Same `RECORD_AUDIO` — no manifest change needed |
+| Review step | Live partial text in input (already built) | Playback-before-send draft (must build) |
+| Failure surface | Silent-error policy (accepted risk, STATE.md) | Must surface: too-short clip, cap reached, model lacks audio |
+
+### Icon / UX differentiation patterns (industry)
+
+- **Two distinct affordances, never one mic doing both.** ChatGPT mobile: mic = voice *conversation/dictation*, separate attach (`+`) = files. Gemini: prompt-bar mic = dictation, separate waveform/Live entry = audio experience. Gboard: keyboard mic = dictation. The rule: **mic icon = "speech becomes text"; waveform/audio-clip icon = "audio goes to the model."**
+- **Recommended for Warped:** keep the existing mic icon for dictation; add a **waveform (`graphic_eq` / `audio_file`) or mic-with-waveform-badge icon** for voice-send, placed in the attachment row/picker next to the image-attach affordance (it IS an attachment — audio slot — not a second mic). Disabled/hidden with an explanatory tooltip when the active model lacks audio capability (mirrors the existing vision/audio slot-gating pattern from v2.5).
+- **In-history rendering:** sent voice message renders as a **play-button + duration bubble** (WhatsApp/Telegram/Sendbird standard), replayable on tap; text reply from the model appears below as usual. Do NOT auto-transcribe-and-replace — the audio is the message. (Optional later: model-generated transcript as caption — defer, see Anti-Features.)
+
+### Dependencies on existing code (verified in repo)
+
+| Dependency | Status | Location |
+|---|---|---|
+| `Content.AudioBytes(audioBytes)` send path | ✅ EXISTS — reuse, feed recorded bytes here | `LiteRTLmProvider.kt:289` |
+| Audio backend slot + capability gating (`TF_LITE_AUDIO_ENCODER_HW`, `BackendSlot.AUDIO`) | ✅ EXISTS — reuse for the voice-send enabled/hidden gate | `EngineManager.kt`, `BackendConstraintTest.kt` |
+| `RECORD_AUDIO` permission + runtime request flow + rationale UI | ✅ EXISTS (dictation) — share the gate; do not duplicate | `AndroidManifest.xml:9`, `ChatScreen.kt:279-318`, `ChatViewModel.kt:1668` |
+| STT dictation state machine (`VoiceDictationManager`) | ✅ EXISTS — keep separate; share only the permission launcher | `ui/chat/voice/`, `VoiceDictationTest.kt` |
+| Playback | ❌ NEW — `MediaPlayer` for draft + history bubbles | — |
+| Recorder | ❌ NEW — `MediaRecorder` AAC → cache file, 60 s auto-stop, amplitude for waveform | — |
+| Chat history audio rows | ❌ NEW — Room: store audio file path/duration alongside message (image-attachment pattern is the analog) | — |
+
+## Table Stakes (voice messages)
+
+Features users expect. Missing = feels broken vs WhatsApp/Telegram/Gemini.
 
 | Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Voice dictation into chat input (STT → text field) | Every major chat/messaging app (WhatsApp, Telegram, Gboard mic) offers mic-to-text in the message box; chat is the app's core surface so a mic button is expected, not a novelty | LOW | Use `RecognizerIntent.ACTION_RECOGNIZE_SPEECH` + `LANGUAGE_MODEL_FREE_FORM` via Activity Result API, append best match to existing input text (don't overwrite). No `RECORD_AUDIO` permission needed for the Intent path (recognition Activity owns the mic). Graceful fallback: disable/hide mic button when no recognizer resolves (`queryIntentActivities` empty) or on `ActivityNotFoundException`. Dictation only — recognized text lands in the input field for editing before send, no audio messages stored/sent. Dependency: existing chat input pill composable. |
-| Model-drawer empty-state "Download a model" CTA → catalog | An empty picker that strands the user with no next step is a dead end; Material empty-state guidance is illustration + explanation + single primary action. User has no local model = the only sensible action is the catalog | LOW | Text-button/CTA in the existing model-drawer (unified model+endpoint picker from v1.7/v1.8) visible only when downloaded-models list is empty; navigates to existing Model Catalog screen via existing nav route. Dependency: model drawer + catalog route. Zero new screens. |
-| Models & Endpoints empty-state CTAs ("Download a local model" / "Add a new Endpoint") | Same dead-end principle, one per section: empty local-models list → catalog; empty endpoints list → existing endpoint add/edit screen. Two CTAs because the screen has two independent lists | LOW | Conditional empty-state rows in the existing Models & Endpoints screen reusing its current navigation actions (catalog route, endpoint editor). Dependency: Models & Endpoints screen only. |
-| Catalog "Use in Chat" on downloaded models | After downloading, forcing the user to hunt through a drawer to activate the model breaks the download→chat funnel; competitors (LM Studio "load model", AI Edge Gallery task screens) complete the loop in place | LOW | Button on catalog cards where `download_status == DOWNLOADED`; on tap: set active model (same ViewModel call the drawer uses) + navigate to chat. Dependency: catalog card composable + existing model-activation path. Must be hidden/disabled while downloading. |
-| Chat-drawer footer parity (Models/Help/Settings = New Chat text size) | Uniform footer sizing is baseline visual hygiene; mismatched sizes read as a bug, not a design choice | LOW | Single typography token change in the existing chat drawer footer. Dependency: chat drawer composable only. Trivial, batch with item below. |
-| Help screen rewrite (short/minimal) | Help must be scannable; the current screen still references removed surfaces (Tavily key step, `help_s7_step5`) which actively misleads after the DDG-only cut | LOW | Rewrite `HelpScreen.kt` + `help_*` strings (EN + ES `values-es`) as a short minimal list; delete stale Tavily/search-key steps. Dependency: HelpScreen + strings; MUST be sequenced after/with Tavily removal or help will document a dead feature. Batch the string edits together. |
+|---|---|---|---|
+| Tap-to-record with live timer + level/waveform feedback | Every voice-note UX has this; silent recording feels broken | Med | `MediaRecorder.maxAmplitude` polling → Compose amplitude bar; full waveform (WhatsApp-style) is polish, not required |
+| 60 s hard cap with auto-stop + "60 s max" indicator | Milestone requirement; auto-stop-and-keep is the standard cap behavior | Low | Countdown display last 10 s; keep partial clip, don't discard |
+| Playback-before-send draft (play/pause + delete + send) | WhatsApp "Draft Preview" proved users won't send unheard audio | Med | `MediaPlayer` on cache file; draft state in ViewModel, survives rotation |
+| Cancel/delete draft discards file | Privacy + storage hygiene | Low | Delete cache file on cancel; also on conversation delete |
+| Voice bubble in history (play + duration + progress) | Standard render; replay must work after restart | Med | Persist file path + duration in Room; files live in app-private storage |
+| Gated on audio capability (hidden/disabled + reason otherwise) | Sending audio to a text-only model fails cryptically (native encoder error) | Low | Reuse `BackendSlot.AUDIO` resolution; same pattern as vision gating |
+| Distinct icon from dictation mic | #1 confusion risk of this milestone | Low | Waveform/audio-file icon in attachment row; mic stays dictation-only |
+| Graceful failures: <1 s clip, permission denied, encoder error | Table stakes for audio on fragmented Android hardware | Low-Med | Reuse dictation's rationale/Settings-escape Snackbar pattern |
 
-### Differentiators (Competitive Advantage)
-
-Features that set the product apart. Not required, but valuable.
+## Differentiators (voice messages)
 
 | Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Play in-app star rating | Timely ratings lift Play listing conversion; in-app flow (no store redirect) measurably raises review volume vs "rate us" links | LOW | `com.google.android.play:review:2.0.2` (+ `review-ktx`), `ReviewManagerFactory` → `requestReviewFlow()` (pre-cache) → `launchReviewFlow()`. **Critical official constraints:** (a) NEVER trigger from a "Rate us" CTA button — quota (~1/month, undisclosed, silently no-ops) makes buttons look broken; fire at a natural success moment (e.g. after N successful chat turns / returning to chat), (b) no pre-qualifying questions ("Do you like the app?") — Play policy violation risk, (c) swallow all errors silently, never block user flow, (d) test via internal test track (quota not enforced there) + `FakeReviewManager` for unit tests. So the v3.0 "Play star rating in-app" item = automatic/ambient trigger, NOT a settings button. Dependency: chat screen lifecycle + DataStore counter (turns completed / days installed). Sources: developer.android.com/guide/playcore/in-app-review (+kotlin-java, +test). |
-| Delete-all-chats relocated to chat-drawer bottom above Models | Destructive action lives where the objects live (drawer lists the chats) instead of buried in Settings → Data; matches messaging-app convention (bulk delete near the list) and shortens the path | LOW | Move existing delete-all logic (confirmation dialog + Room clear) from Settings Data section into chat drawer footer above Models entry; delete the Settings Data section entirely. Dependency: chat drawer + Settings screen + existing delete-allChats path. Requires confirm dialog (destructive, irreversible) — keep the existing one, just re-parent it. Batch with footer-parity item (same file). |
-| Web Options removed from model drawer (settings only) | Declutters the critical chat-entry path: model drawer goes back to one job (pick a model/endpoint). Grounding toggles (tri-state Sí/No/Heredar + Sin web from v2.3) remain fully available in Settings | LOW | Delete the Web Options block from the model-drawer composable; no Settings work needed (controls already there). Dependency: model drawer only. Pure deletion — lowest risk item in the milestone. |
-| Tavily removal → DuckDuckGo-only search | Removes the last API-key friction in the app (Tavily key in Keystore + test-connection + settings UI + error strings + fallback legs in `OpenAIProvider`/`CompatToolLoop`/`LocalToolLoop`/`WebSearchToolSet`); DDG needs no key so grounding becomes zero-config for every user | MEDIUM | Delete: `TavilySearchRepository` + key/settings UI + `tavily_*`/`bubble_tavily_*` strings (EN+ES) + fallback call sites (keep DDG leg as the single path) + Keystore `tavily` entry read/write. Keep DDG repository and the `[WEB CONTEXT]` fusion pipeline untouched. Regression net: grounding tests that mock the Tavily fallback must be updated/removed. Cross-cuts providers + agentic loops + settings + help strings, so it is the highest-blast-radius item despite being "just a deletion". Sequence help rewrite + error-string cleanup in the same phase. |
+|---|---|---|---|
+| Waveform visualization (record + bubble) | WhatsApp-grade feel; biggest perceived-quality lever | Med | Amplitude samples persisted per clip; static bars, no live DSP lib |
+| Model-generated transcript caption under own bubble | Accessibility + searchability; remote audio models often return it free | Med | Only where provider returns transcript; never local-STT it (duplicates dictation) |
+| Speaker/volume normalization notice | Mobile recordings vary wildly; model hears better with 16 kHz mono | Low | Resample at send time; invisible improvement |
 
-### Anti-Features (Commonly Requested, Often Problematic)
+## Anti-Features (voice messages)
 
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| Explicit "Rate this app" button wired to `launchReviewFlow` | Feels like giving users control over when to rate | Quota silently suppresses the dialog → button appears broken; Google explicitly forbids CTA-triggered review flow. A button must deep-link to the Play Store listing instead | Ambient trigger after success moments (the actual v3.0 item) + optional store-link in Settings/Help |
-| Pre-rating sentiment gate ("Do you love the app? Yes→review, No→feedback") | Tries to filter 5-star reviews | Direct Play policy violation ("shouldn't ask the user any questions before or while presenting the rating button or card") — removal risk | Trigger unconditionally at good moments; handle feedback via existing channels |
-| Continuous/background voice listening or audio messages | "Full voice mode" sounds premium | `SpeechRecognizer` docs warn against continuous recognition (battery/bandwidth); audio messages need storage schema, playback UI, and provider multimodal support — all out of scope (PROJECT.md explicitly defers voice I/O) | One-shot dictation → editable text (the actual v3.0 item); revisit voice mode only after text chat is solid |
-| Custom in-app STT engine / on-device model for dictation | Offline dictation parity | Heavy native dependency + model downloads for a convenience feature; platform recognizer already handles offline via `EXTRA_PREFER_OFFLINE` where supported | Platform `RecognizerIntent` (default), `EXTRA_PREFER_OFFLINE=true` hint if offline parity matters later |
-| `SpeechRecognizer` + custom listening UI for v1 of dictation | More control, inline UX | Requires `RECORD_AUDIO` runtime permission (new Play declaration + rationale UI), main-thread-only API, manual error/restart handling — all for zero user-visible gain over the Intent dialog in a dictation-only scope | `RecognizerIntent` via Activity Result API; graduate to `SpeechRecognizer` only if partial-results/live-transcription is later requested |
-| Keystore key-deletion UI (the item being removed) | "Let users manage keys" | With Tavily gone there are no user-managed keys left (HF token already removed in v2.2); a deletion UI for zero keys is dead surface that suggests secrets exist | Remove as scoped; reintroduce only if a new keyed integration lands |
-| Settings Data section / per-chat delete (the items being removed) | Fine-grained data control | Duplicates the drawer bulk action one tap away from the list; two delete paths = two confirmation flows to maintain and test | Single delete-all-chats in drawer (the actual v3.0 item) |
+| Anti-Feature | Why Avoid | What to Do Instead |
+|---|---|---|
+| Merging dictation + voice-send into one mic button | Guaranteed confusion; industry keeps them separate | Two affordances, two icons, mic = text |
+| Auto-transcribing voice message to text and discarding audio | Destroys the feature's purpose (tone, language, singing, non-speech audio); duplicates v3.0 dictation | Send raw audio; transcript only as optional caption |
+| Live two-way voice conversation mode (Gemini Live / Realtime API style) | WebSocket session infra, 60-min session billing, huge scope; milestone is async voice *messages* | Async record→send; realtime is a future milestone |
+| ExoPlayer dependency for single-file playback | Extra ~1 MB + API surface for what `MediaPlayer` does | `MediaPlayer`, encapsulated behind a `VoicePlayer` interface |
+| Cloud STT fallback for local audio models | Breaks offline-first core value; adds key/vendor surface just removed (Tavily lesson, v3.0) | On-device only; non-audio model → gated-off UI |
+| Waveform-perfection (SoundCloud-grade rendering lib) | Third-party audio-UI libs rot fast on Compose; amplitude bars suffice | Hand-rolled bars from `maxAmplitude` samples |
 
-## Feature Dependencies
+---
+
+## Part 2 — New Tool: candidate evaluation + winner
+
+### Context that constrains the choice (verified)
+
+- Tool infra exists: local `@Tool`/`ToolSet` + `automaticToolCalling` (LiteRT-LM supports it; needs tool-capable model e.g. FunctionGemma-class) and remote `tools[]` loop with capability gating (shipped v2.1/v2.4; v2.2's deletion was reverted by v2.4's agentic loops — confirm current wiring during planning).
+- **v2.2 explicitly deleted Calculator / CurrentTime / JsonFormatter because the user found no value.** Candidates in that family (arithmetic, clock, JSON pretty-print) are therefore **disqualified** — do not re-propose them, even though generic "new tool" brainstorms suggest them.
+- DDG web grounding already covers "look something up online." The winner must cover ground grounding does NOT.
+
+### Ranked candidates
+
+| # | Candidate | Value proposition | Effort | Fit | Verdict |
+|---|---|---|---|---|---|
+| 1 | **Local document reader — `readTextFile(path-or-picker)`**: model reads a user-picked `.txt`/`.md` (later: PDF) from device storage into context via SAF picker | Only way to get *on-device private content* into context while offline; complements URL grounding (web) + vision (images) + audio (voice) — completes the "any input" matrix; zero new permissions (SAF), zero deps, offline-first | Low-Med (SAF picker → bounded read with size cap + truncation notice → tool result string) | ★★★★★ | **WINNER — implement** |
+| 2 | Unit converter (`convertUnits`) | Genuinely useful on mobile (recipes, travel, DIY); deterministic; offline | Low (pure Kotlin, ~200 lines + tests) | ★★★★☆ | Runner-up; resurrect only if winner blocked |
+| 3 | Reminder/timer setter (`setReminder` via AlarmManager/WorkManager) | "Remind me in 20 min" is a classic assistant action; sticky value | Med-High (exact-alarm permission on API 31+, notification permission on 33+, Doze edge cases, Play policy scrutiny) | ★★★☆☆ | Defer — permission + policy surface too big for a one-tool milestone |
+| 4 | Clipboard read/write (`readClipboard`/`copyResult`) | Handy ("summarize what I copied") | Low but **security-sensitive** (Android 10+ background-clipboard restrictions; foreground-only; user-trust risk) | ★★★☆☆ | Defer — trust cost exceeds value; paste already works |
+| 5 | Date/time (`getCurrentTime`) | Model knows "today" for relative dates | Trivial | ★★☆☆☆ | **Disqualified** — deleted in v2.2 for no value |
+| 6 | Calculator (`calculate`) | Arithmetic the model flubs | Trivial | ★★☆☆☆ | **Disqualified** — deleted in v2.2 for no value |
+| 7 | Currency converter (live rates) | Travel use case | Med + **network dependency** (breaks offline-first; API key/provenance questions) | ★★☆☆☆ | Reject — network-dependent, grounding-adjacent |
+
+### Winner detail: local document reader
+
+- **Tool shape:** `@Tool(description = "Read a user-selected text file into context")` returning truncated content with a `truncated: true/false` + `totalChars` envelope; hard cap (e.g. 20–50 k chars, inside the model-window-aware budget pattern from v2.3) with a "file too large, first N chars" notice so the model can ask for a narrower pick.
+- **UX flow:** user intent ("summarize this doc") → model calls tool with no args → app opens SAF `OpenDocument` picker (`text/*` + `application/pdf` guarded: PDFs either rejected with message or text-extracted later) → chosen file read on `Dispatchers.IO` → content returned as tool result → model answers. Picker-first (never silent filesystem access) = no `READ_EXTERNAL_STORAGE`/`MANAGE_EXTERNAL_STORAGE`, no Play policy review trigger.
+- **Dependencies:** tool-loop wiring (local `ToolSet` registration + remote `tools[]` mapping — verify current state in planning, v2.4 shipped both); v2.3's window-budget precedent for the size cap; Room optional (no persistence needed — content is ephemeral context, like grounding blocks).
+- **Complexity:** Low-Med. One `ToolSet` class + SAF launcher + bounded reader + ~15 unit tests. No new dependencies, no new permissions, works fully offline.
+- **Why it beats unit converter:** converter is a nicer calculator (same family the user already rejected); document reader unlocks an entire input modality the app cannot do today.
+
+## Feature Dependencies (new work)
 
 ```
-[Play in-app rating]
-    └──requires──> [chat success signal (completed turn counter)]
-                       └──requires──> [existing chat ViewModel / DataStore]
-
-[Catalog "Use in Chat"]
-    └──requires──> [existing model-activation path (drawer uses it)]
-                       └──requires──> [catalog download_status field]
-
-[Drawer empty-state CTA] ──navigates──> [existing Model Catalog route]
-[Endpoints empty-state CTA] ──navigates──> [existing endpoint editor]
-[Delete-all-chats in drawer] ──reparents──> [existing delete-all logic + confirm dialog]
-[Help rewrite] ──requires──> [Tavily removal strings finalized]
-[Tavily removal] ──touches──> [OpenAIProvider, CompatToolLoop, LocalToolLoop, WebSearchToolSet, Settings, HelpScreen, strings EN+ES]
-[Voice dictation] ──requires──> [chat input pill composable]
-[Footer parity + delete-all + drawer CTA + Web Options removal]
-    └──all touch──> [model/chat drawer composables — batch in one phase]
+RECORD_AUDIO runtime grant (exists, v3.0) → voice recorder + dictation share it
+BackendSlot.AUDIO resolution (exists, v2.5) → voice-send icon gate
+Content.AudioBytes send path (exists) → voice message send
+MediaRecorder draft file (NEW) → MediaPlayer draft preview (NEW) → send
+Room message row + audio file ref (NEW, analog: image attachments) → history bubble playback (NEW)
+Tool loop wiring local+remote (verify current, v2.4) → readTextFile ToolSet (NEW) → SAF picker (NEW)
 ```
 
-### Dependency Notes
+## MVP Recommendation (v3.1 scope)
 
-- **Help rewrite requires Tavily removal (ordering):** help currently documents the Tavily key step; rewriting before the cut re-documents a dead feature. Same phase, Tavily deletion first.
-- **Drawer cluster batches:** footer parity + delete-all relocation + drawer empty-state CTA + Web Options removal all edit the same drawer composables — one phase avoids merge churn.
-- **Tavily removal is the blast-radius item:** it is the only v3.0 change touching data-layer providers and grounding tests; everything else is UI-surface only.
-- **Voice dictation is independent:** touches only the chat input pill + result appending; no permission, manifest, or data-layer changes on the Intent path. Can parallelize with anything.
-- **Play rating is independent but needs a trigger definition:** decide the success-moment rule (e.g. 3+ successful turns AND 2+ days installed, once per version) before implementation; DataStore counter is new but trivial.
+**Voice messages — build in this order:**
+1. Recorder + 60 s cap + timer/amplitude UI (table stakes core)
+2. Draft preview (playback + send/cancel) (table stakes core)
+3. Audio-gated voice-send icon, visually distinct from mic (milestone's explicit requirement; cheap)
+4. History voice bubbles with replay (table stakes render)
+5. Failure handling + permission sharing with dictation
 
-## MVP Definition
+**Defer:** full waveform art, transcript captions, resampling polish, realtime voice mode.
 
-v3.0 is a polish milestone, not a product launch — "MVP" here = the shippable slice if the milestone had to be cut.
-
-### Launch With (must-ship for the milestone goal)
-
-- [ ] Voice dictation into chat input — the only new user-facing capability; the milestone's headline
-- [ ] Tavily removal (DDG-only) — breaking-behavior change justifying the major bump; everything referencing keys must die together
-- [ ] Drawer cluster (empty-state CTA, footer parity, delete-all relocation, Web Options removal) — the visible "polish" users judge v3.0 on
-- [ ] Catalog "Use in Chat" + Models & Endpoints empty-state CTAs — closes the download→chat funnel gaps
-
-### Add After Validation (same milestone, separable)
-
-- [ ] Play in-app rating — ambient, invisible when quota-suppressed; safe to land late, zero UI coupling
-- [ ] Help rewrite — must follow Tavily removal; land any time after
-- [ ] Settings cleanup (key-delete + Data section) — mechanical once delete-all is reparented
-
-### Future Consideration (explicitly out of v3.0)
-
-- [ ] Audio messages / voice replies (TTS) — PROJECT.md Out of Scope ("Voice input/output — defer")
-- [ ] Continuous listening / live transcription via `SpeechRecognizer` — graduate only on user demand
-- [ ] New keyed search provider replacing Tavily — would resurrect key UI just deleted
-
-## Feature Prioritization Matrix
-
-| Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| Voice dictation | HIGH (headline capability) | LOW (Intent path, no permission) | P1 |
-| Tavily removal DDG-only | HIGH (zero-config grounding, justifies major) | MEDIUM (cross-cutting deletion + test updates) | P1 |
-| Model-drawer empty-state CTA | HIGH (unblocks no-model users) | LOW | P1 |
-| Catalog "Use in Chat" | HIGH (closes download→chat funnel) | LOW | P1 |
-| Delete-all-chats relocation | MEDIUM (better placement, removes settings clutter) | LOW | P1 |
-| Models & Endpoints empty CTAs | MEDIUM | LOW | P2 |
-| Web Options drawer removal | MEDIUM (declutter) | LOW (pure deletion) | P2 |
-| Footer font parity | LOW (cosmetic) | LOW (batch free) | P2 |
-| Help rewrite | MEDIUM (removes misleading docs) | LOW | P2 |
-| Settings cleanup | LOW (removes dead surface) | LOW | P2 |
-| Play in-app rating | MEDIUM (ratings lift, invisible infra) | LOW | P2 |
-
-**Priority key:**
-- P1: Must have for milestone goal (headline + breaking changes + core funnel)
-- P2: Should have, separable, batch where files overlap
-
-## Competitor Feature Analysis
-
-| Feature | LM Studio (desktop) | AI Edge Gallery (Android, Google) | Our Approach |
-|---------|---------------------|-----------------------------------|--------------|
-| Voice input | None (desktop typing assumed) | None (task-runner focus) | One-shot dictation → editable text; differentiator on mobile, no competitor has it |
-| In-app rating | N/A (direct download) | Play listing only | Ambient In-App Review at success moments; no CTA button per Google guidance |
-| Empty-state CTAs | Model-load prompts point at search | Task screens assume models present | Inline CTAs routing to existing catalog/editor — matches Material empty-state pattern |
-| Download → use funnel | "Load model" in place | Model auto-loads into task | "Use in Chat" on downloaded catalog cards — parity with LM Studio behavior |
-| Search grounding keys | N/A (local only) | N/A | DDG-only zero-config; removing Tavily removes the last key friction — unique simplicity vs key-heavy wrappers |
+**New tool — build:** local document reader (`readTextFile` via SAF). Defer: unit converter (fallback), reminders, clipboard.
 
 ## Sources
 
-- Play In-App Review guide — https://developer.android.com/guide/playcore/in-app-review (HIGH: quota behavior, no-CTA rule, no pre-questions rule)
-- Integrate in-app reviews (Kotlin/Java), `review:2.0.2` + `review-ktx:2.0.2`, `ReviewManagerFactory` — https://developer.android.com/guide/playcore/in-app-review/kotlin-java (HIGH)
-- Test in-app reviews (internal track bypasses quota, `FakeReviewManager`) — https://developer.android.com/guide/playcore/in-app-review/test (HIGH)
-- `SpeechRecognizer` API reference (main-thread only, `RECORD_AUDIO` required, not for continuous use) — https://developer.android.com/reference/android/speech/SpeechRecognizer (HIGH)
-- `RecognizerIntent` API reference (`ACTION_RECOGNIZE_SPEECH`, `LANGUAGE_MODEL_FREE_FORM`, `EXTRA_PREFER_OFFLINE`) — https://developer.android.com/reference/android/speech/RecognizerIntent (HIGH)
-- RecognizerIntent vs SpeechRecognizer tradeoffs (Intent = simple + consistent UI + no permission; SpeechRecognizer = control + custom UI + permission + error handling) — StackOverflow/community consensus (MEDIUM)
-- Existing codebase: `HelpScreen.kt`, `TavilySearchRepository` usages (`OpenAIProvider`, `CompatToolLoop`, `LocalToolLoop`, `WebSearchToolSet`), Tavily strings in `values/strings.xml` + `values-es/strings.xml`, manifest note on removed `RECORD_AUDIO` (HIGH — verified in repo)
-
----
-*Feature research for: v3.0 Chat UX + Voice Dictation*
-*Researched: 2026-10-02*
+- LiteRT-LM Android docs (HIGH): `Content.AudioBytes`/`AudioFile`, `audioBackend` in `EngineConfig`, audio only on multimodal models (Gemma 3n), `@Tool`/`ToolSet`/`automaticToolCalling` — fetched 2026-10-02 via WebFetch (https://developers.google.com/edge/litert-lm/android).
+- WhatsApp voice-message features — waveform visualization + draft preview (MEDIUM, official Meta announcement via search).
+- Sendbird/TalkJS voice-message SDK patterns — record → preview → cancel/send (MEDIUM, vendor docs via search).
+- Gemini Android voice-input redesign toward messaging-app audio style, 9to5Google 2026-03 (MEDIUM, press via search).
+- Android `MediaRecorder` overview — official docs (HIGH, platform API, stable for years).
+- Repo verification (HIGH): `LiteRTLmProvider.kt:289`, `EngineManager.kt` `BackendSlot.AUDIO`, `AndroidManifest.xml:9`, `ChatScreen.kt:279-318`, `ChatViewModel.kt:1668`, `VoiceDictationTest.kt`.
+- v2.2 Calculator/CurrentTime/JsonFormatter deletion for no user value (HIGH, PROJECT.md Key Decisions + v2.2 milestone notes).
