@@ -72,7 +72,7 @@ object DocumentPrompt {
      * JVM-testable.
      */
     fun sanitizeFilename(raw: String): String =
-        raw.map { c -> if (c == '\n' || c == '\r' || c < ' ' || c == '\\u007F') ' ' else c }
+        raw.map { c -> if (c == '\n' || c == '\r' || c < ' ' || c == '\u007F') ' ' else c }
             .joinToString("")
             .trim()
             .take(120)
