@@ -2252,6 +2252,13 @@ class ChatViewModel @Inject constructor(
                     started = player.play(file.absolutePath)
                 }
                 if (!started) return@launch
+                // WR-04: completion/error may have fired between play()
+                // returning and this line (microsecond window for corrupt or
+                // instantaneous clips). The callbacks already cleared state
+                // and there is no poll job yet — re-arming here would wedge
+                // the card in "playing" with a leaked poll loop. Bail when
+                // the player is no longer alive instead.
+                if (!player.isPlaying) return@launch
                 _isDraftPlaying.value = true
                 startDraftPoll(player)
             } finally {
@@ -2395,6 +2402,11 @@ class ChatViewModel @Inject constructor(
                     started = player.play(file.absolutePath)
                 }
                 if (!started) return@launch
+                // WR-04: same completion-before-flag window as the draft
+                // path (see playVoiceDraft) — never re-arm over a dead
+                // player, or the bubble sticks in "playing" with a leaked
+                // poll job nothing will clear.
+                if (!player.isPlaying) return@launch
                 _playingMessageId.value = message.id
                 _isHistoryPlaying.value = true
                 _historyDurationMs.value = message.audioDurationMs
