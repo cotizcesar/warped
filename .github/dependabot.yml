@@ -1,0 +1,10 @@
+# Pinned GitHub Actions are updated via Dependabot (weekly PRs).
+# Review changelogs before merging — especially upload-google-play
+# (holds the Release Manager service account + signed AAB).
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
