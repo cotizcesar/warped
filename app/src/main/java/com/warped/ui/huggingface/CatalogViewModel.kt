@@ -192,7 +192,9 @@ class CatalogViewModel @Inject constructor(
                         context.getString(R.string.catalog_activation_failed)
                     return@launch
                 }
-                activeModelSelection.connectLocal(model.filePath, ProviderType.LITE_RT_LM)
+                // Lazy load: mark pending only — the engine mounts on the
+                // first send, never on activation.
+                activeModelSelection.selectLocalPending(model.filePath)
                 openBoundChat(
                     providerType = ProviderType.LITE_RT_LM,
                     modelId = model.filePath,

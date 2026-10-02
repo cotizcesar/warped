@@ -254,9 +254,9 @@ class ChatViewModel @Inject constructor(
             localModelRepository.observeModels().collect { models ->
                 // Auto-select: a fresh download/import leaves no selection,
                 // which disables the chat input (NoModelSelected) until the
-                // user finds Models & Endpoints. Select the newest model so
-                // chat is immediately usable — the engine loads on first
-                // send (helper.initialize) or on selector pick (preload).
+                // user finds Models & Endpoints. Mark the newest model
+                // pending so chat is immediately usable — the engine mounts
+                // on the first send, never on selection.
                 // The toggle this replaces is gone: unloading happens
                 // implicitly on switch/delete, never by hand.
                 val selectedId = _connection.value.selectedLocalModelId
@@ -265,14 +265,9 @@ class ChatViewModel @Inject constructor(
                     ?.takeIf { it != autoSelectedModelPath }
                     ?.let { autoPick ->
                         autoSelectedModelPath = autoPick
-                        activeModelSelection.markLocalLoading(autoPick)
-                        // Preload immediately: markLocalLoading alone leaves
-                        // the traffic light spinning ("Loading…") with no
-                        // engine behind it. preload carries the memory guard
-                        // and flips to connected (or a real error) on finish.
-                        viewModelScope.launch(coroutineExceptionHandler) {
-                            preloadLocalModel(autoPick)
-                        }
+                        // Lazy load: mark pending only — the engine mounts
+                        // on the first send. Never preload on selection.
+                        activeModelSelection.selectLocalPending(autoPick)
                     }
                 updateConnection { state ->
                     val activeLocalId = state.selectedLocalModelId
@@ -306,7 +301,12 @@ class ChatViewModel @Inject constructor(
             activeModelSelection.localSelection.collect { local ->
                 val modelId = local.modelId
                 val connected = local.isConnected
-                val loading = modelId != null && !connected
+                // Lazy load: the spinner is the explicit load signal
+                // (LocalSelection.isLoading), never the
+                // selected-but-unconnected derivation — a pending
+                // selection (marked, engine not yet mounted) shows
+                // selected-not-loaded with the input enabled.
+                val loading = local.isLoading
                 val justConnected = modelId != null && connected
 
                 if (justConnected) {
@@ -504,6 +504,40 @@ class ChatViewModel @Inject constructor(
         val turnId = generationSeq.incrementAndGet()
         generationJob = viewModelScope.launch(coroutineExceptionHandler) {
             try {
+                // Lazy model load (quick-task lazy-model-load): selection
+                // only marks pending — the engine mounts here on the first
+                // send, then the turn generates. Remote path untouched.
+                if (effectiveProvider == ProviderType.LITE_RT_LM) {
+                    val modelFile = java.io.File(effectiveModelId)
+                    if (!modelFile.exists()) {
+                        updateTranscript {
+                            it.copy(
+                                messages = it.messages.filterNot { m -> m.id == userMessage.id },
+                                error = ChatError.DownloadModelFirst,
+                                isStreaming = false
+                            )
+                        }
+                        updateInput { it.copy(isGenerating = false, inputText = text) }
+                        return@launch
+                    }
+                    if (engineManager.getActiveEngine()?.modelPath != effectiveModelId) {
+                        activeModelSelection.markLocalLoading(effectiveModelId)
+                        preloadLocalModel(effectiveModelId)
+                    }
+                    if (engineManager.getActiveEngine()?.modelPath != effectiveModelId) {
+                        val loadError = _connection.value.modelLoadError
+                            ?: context.getString(R.string.error_unknown_short)
+                        updateTranscript {
+                            it.copy(
+                                messages = it.messages.filterNot { m -> m.id == userMessage.id },
+                                error = ChatError.Unknown(loadError),
+                                isStreaming = false
+                            )
+                        }
+                        updateInput { it.copy(isGenerating = false, inputText = text) }
+                        return@launch
+                    }
+                }
                 val conversationId = ensureConversation(text, hasMedia = images.isNotEmpty() || audioBytes != null)
                 chatRepository.saveMessage(conversationId, userMessage)
 
@@ -845,21 +879,9 @@ class ChatViewModel @Inject constructor(
                     }
                 }
 
-                // Auto-reload local model if engine was unloaded (e.g. memory pressure)
-                if (selectedProvider == ProviderType.LITE_RT_LM) {
-                    val modelFile = java.io.File(modelId)
-                    if (!modelFile.exists()) {
-                        updateTranscript {
-                            it.copy(
-                                error = ChatError.DownloadModelFirst,
-                                isStreaming = false
-                            )
-                        }
-                        updateInput { it.copy(isGenerating = false) }
-                        return@launch
-                    }
-                    // Model loads on-demand on first message
-                }
+                // (Lazy load above already mounted the engine when the
+                // selection was pending, and rejected missing files before
+                // persisting.)
 
                 // The LOCAL branch below is a mandatory exhaustive reference to
                 // the deprecated legacy entry (persisted rows may still carry
@@ -1446,7 +1468,9 @@ class ChatViewModel @Inject constructor(
                 }
                 if (conversation.modelId != null && !modelMissing) {
                     if (conversation.providerType == ProviderType.LITE_RT_LM) {
-                        activeModelSelection.markLocalLoading(conversation.modelId)
+                        // Lazy load: mark pending only — the engine mounts
+                        // on the first send. Never preload on open.
+                        activeModelSelection.selectLocalPending(conversation.modelId)
                     } else {
                         val endpoint = if (conversation.endpointId != 0L) {
                             endpointRepository.getById(conversation.endpointId)
@@ -1460,12 +1484,9 @@ class ChatViewModel @Inject constructor(
                             activeModelSelection.selectRemote(conversation.modelId, conversation.providerType, endpoint.id)
                         }
                     }
-                    // BUG-02: Preload the model if reload is needed, so the loading indicator shows.
-                    // If engine already matches, preloadLocalModel will be a no-op (EngineManager.switchToLiteRT
-                    // skips when activeEngine matches the target).
-                    if (conversation.providerType == ProviderType.LITE_RT_LM) {
-                        preloadLocalModel(conversation.modelId)
-                    }
+                    // Lazy load: no preload on open — the traffic light
+                    // shows selected-not-loaded until the first send
+                    // mounts the engine.
                 }
                 activeModelSelection.saveLastConversation(conversation.id)
                 refreshActiveBackend()
@@ -1767,16 +1788,15 @@ class ChatViewModel @Inject constructor(
         val oldInstance = _connection.value.loadedInstanceId
 
         if (providerType == ProviderType.LITE_RT_LM) {
-            activeModelSelection.markLocalLoading(modelId)
+            // Lazy load: mark pending only — the engine mounts on the
+            // first send. Never preload on selection.
+            activeModelSelection.selectLocalPending(modelId)
             updateConnection {
                 it.copy(
                     selectedLocalModelId = modelId,
                     selectedRemoteModelId = null,
                     selectedRemoteProvider = null
                 )
-            }
-            viewModelScope.launch(coroutineExceptionHandler) {
-                preloadLocalModel(modelId)
             }
         } else {
             viewModelScope.launch(coroutineExceptionHandler) {
@@ -1866,9 +1886,9 @@ class ChatViewModel @Inject constructor(
                 }
             }
             ProviderType.LITE_RT_LM -> {
-                // Model loads on-demand on first message (handled by helper.initialize
-                // in sendMessage). preloadLocalModel() also pre-warms the engine so the
-                // traffic-light UI flips to "connected" faster.
+                // Lazy load: the model mounts on the first send
+                // (sendMessage drives markLocalLoading + preloadLocalModel
+                // when the engine path mismatches the selection).
             }
             else -> {}
         }
@@ -1996,12 +2016,11 @@ class ChatViewModel @Inject constructor(
 
     private fun refreshActiveBackend() {
         // Loading-flag heal: the selection collector derives isLoadingModel
-        // from localSelection.isConnected, but some paths leave
-        // LocalSelection(modelId, connected=false) behind while the engine is
-        // already loaded for that same path (restart restore rehydrates
-        // connected=false; a cancelled/failed preload never reaches
-        // connectLocal; the provider lazy-loads without touching selection).
-        // Reconcile against engine truth here — read the raw engine path and
+        // from localSelection.isLoading, but some paths leave
+        // LocalSelection(modelId, connected=false, loading=false) behind
+        // while the engine is already loaded for that same path (restart
+        // restore rehydrates pending; the provider lazy-loads without
+        // touching selection). Reconcile against engine truth here — read the raw engine path and
         // the raw selection (NOT isLocalModelLoaded, which derives from the
         // stuck connected flag and would be circular). Emitting connectLocal
         // lets the untouched collector clear isLoadingModel itself.
@@ -2027,21 +2046,27 @@ class ChatViewModel @Inject constructor(
         updateConnection { it.copy(isLocalModelLoaded = false, activeBackend = null) }
     }
 
+    /**
+     * Lazy-load driver (quick-task lazy-model-load): mounts [filePath] into
+     * the engine. Called ONLY from the send path (after `markLocalLoading`)
+     * — never from selection sites. State flows ONLY through
+     * [ActiveModelSelection] (`connectLocal` / `markLocalDisconnected`);
+     * the selection collector owns `isLoadingModel`/`loadingModelName`.
+     * This function writes `modelLoadError` only. Failures keep the
+     * selection (pending) so retrying just works.
+     */
     private suspend fun preloadLocalModel(filePath: String) {
         val model = _connection.value.localModels.firstOrNull { it.filePath == filePath }
         if (model != null && !memoryChecker.canLoadModel(model.sizeBytes)) {
             val memInfo = memoryChecker.getMemoryInfo()
             val modelMB = model.sizeBytes / (1024 * 1024)
             val availMB = memInfo.availableBytes / (1024 * 1024)
+            // Memory guard: no engine load follows — clear the loading
+            // flag via selection (kept for retry after freeing memory).
+            activeModelSelection.markLocalDisconnected()
             updateConnection {
                 it.copy(
                     modelLoadError = context.getString(R.string.error_no_memory_fmt, modelMB, availMB),
-                    // Clear the loading flag: markLocalLoading set it via
-                    // the selection collector, and no engine load follows —
-                    // otherwise the traffic light spins forever. Selection
-                    // is kept so retrying after freeing memory just works.
-                    isLoadingModel = false,
-                    loadingModelName = ""
                 )
             }
             return
@@ -2051,18 +2076,16 @@ class ChatViewModel @Inject constructor(
             parameterStore.update(model.parameters)
         }
 
-        val modelName = filePath.substringAfterLast("/").removeSuffix(".litertlm")
-        updateConnection { it.copy(isLoadingModel = true, loadingModelName = modelName, modelLoadError = null) }
+        updateConnection { it.copy(modelLoadError = null) }
         try {
             withContext(Dispatchers.Default) {
                 engineManager.switchToLiteRT(filePath)
             }
             activeModelSelection.connectLocal(filePath, ProviderType.LITE_RT_LM)
-            updateConnection { it.copy(isLoadingModel = false, loadingModelName = "") }
             refreshActiveBackend()
         } catch (e: Exception) {
-            activeModelSelection.disconnectLocal()
-            updateConnection { it.copy(isLoadingModel = false, modelLoadError = e.message) }
+            activeModelSelection.markLocalDisconnected()
+            updateConnection { it.copy(modelLoadError = e.message) }
         }
     }
 

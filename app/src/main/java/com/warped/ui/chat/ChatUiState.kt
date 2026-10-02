@@ -317,7 +317,10 @@ fun trafficLightState(
     transcript: ChatTranscriptState,
     connection: ChatConnectionState,
 ): TrafficLightState {
-    val isLocal = connection.selectedLocalModelId != null && connection.isLocalModelLoaded
+    // Lazy load: a pending local selection (marked, engine not yet
+    // mounted) is selected-not-loaded — RED "Not connected" with the
+    // input enabled — until the first send connects it (GREEN).
+    val isLocal = connection.selectedLocalModelId != null
     val isRemote = connection.selectedRemoteModelId != null && connection.selectedRemoteProvider != null
     return when {
         transcript.isStreaming -> TrafficLightState.YELLOW

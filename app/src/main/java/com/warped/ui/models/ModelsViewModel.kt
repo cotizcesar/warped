@@ -127,7 +127,9 @@ class ModelsViewModel @Inject constructor(
     }
 
     fun useLocalModel(model: LocalModel) {
-        activeModelSelection.connectLocal(model.filePath, ProviderType.LITE_RT_LM)
+        // Lazy load: mark pending only — the engine mounts on the first
+        // send, never on activation.
+        activeModelSelection.selectLocalPending(model.filePath)
         viewModelScope.launch(coroutineExceptionHandler) {
             openBoundChat(
                 providerType = ProviderType.LITE_RT_LM,
