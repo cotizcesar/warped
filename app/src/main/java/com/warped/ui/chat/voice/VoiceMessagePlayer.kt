@@ -94,6 +94,9 @@ class VoiceMessagePlayer(
      * clip always stops first (single-player discipline across draft and
      * history sharing this one instance).
      */
+    // IN-03: volatile like isPlaying — read from VM IO coroutines,
+    // written under @Synchronized.
+    @Volatile
     var currentPath: String? = null
         private set
 
