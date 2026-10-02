@@ -168,6 +168,7 @@ internal object CompatToolLoop {
                             val outcome = executeRemoteTool(
                                 canonical, argsMap, contextSize,
                                 ddg, multiUrlFetcher, webPageFetcher, logTag,
+                                request.documentBlock,
                             )
                             // Quick-task (tool-failure-note): failures ride
                             // the transient errorReason note (never
@@ -237,6 +238,7 @@ internal object CompatToolLoop {
         multiUrlFetcher: MultiUrlFetcher,
         webPageFetcher: WebPageFetcher,
         logTag: String,
+        documentBlock: String?,
     ): LocalToolLoop.ToolCallOutcome {
         // Unknown names fail closed here — the body below never runs them.
         LocalToolLoop.validateArgs(toolName, args)?.let { return LocalToolLoop.ToolCallOutcome(it) }
@@ -293,6 +295,20 @@ internal object CompatToolLoop {
                         Timber.w(e, "$logTag: web_fetch failed")
                         LocalToolLoop.ToolCallOutcome(LocalToolLoop.toolFailureMessage(e.message.orEmpty()), failed = true)
                     }
+                }
+                LocalToolLoop.TOOL_READ_TEXT -> {
+                    // No internet gate: the block is already in hand (fused
+                    // into the turn by the VM) — a local file read needs no
+                    // socket. Unbound attachment degrades, never throws;
+                    // sources stay empty (the VM owns the document Fuentes
+                    // row directly, so no double-emit through ToolCompleted).
+                    val block = documentBlock
+                    if (block.isNullOrBlank()) {
+                        return@withContext LocalToolLoop.ToolCallOutcome(
+                            LocalToolLoop.DOCUMENT_READ_FAILED_STRING,
+                        )
+                    }
+                    LocalToolLoop.ToolCallOutcome(LocalToolLoop.mapDocumentResult(block))
                 }
                 else -> LocalToolLoop.ToolCallOutcome(LocalToolLoop.unknownToolMessage(toolName))
             }

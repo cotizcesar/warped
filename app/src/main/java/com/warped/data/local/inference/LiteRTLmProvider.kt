@@ -164,17 +164,15 @@ class LiteRTLmProvider @Inject constructor(
     private var activeConversationConfig: ConversationConfig? = null
 
     /**
-     * Phase 70 (70-01): turn-bound document block for the `read_text_file`
-     * executor branch. Set per turn by the caller that fuses the VM's
-     * attachment into the turn text (Plan 02 threads it — same fused
-     * `DocumentPrompt` block string, so an explicit model call re-feeds
-     * identical content, still bounded by the same cap and the loop call
-     * budget, never a second full-size copy); null when no document is
-     * attached. Volatile because the loop reads it off the collection
-     * context while the VM writes it from its own scope. Turn-scoped by
-     * contract (T-70-04: a missing attachment feeds the degradation
-     * string, never a previous turn's content — the writer clears it after
-     * send).
+     * Phase 70 (70-01/70-02): turn-bound document block for the
+     * `read_text_file` executor branch. Bound from
+     * `ChatRequest.documentBlock` in [chatInternal] for the armed-turn
+     * path only (the same fused `DocumentPrompt` block string the VM fused
+     * into the turn text, so an explicit model call re-feeds identical
+     * content — same cap, same loop call budget, never a second full-size
+     * copy) and cleared in `finally` (T-70-04: a missing attachment feeds
+     * the degradation string, never a previous turn's content).
+     * Volatile because the loop reads it off the collection context.
      */
     @Volatile
     var attachedDocumentBlock: String? = null
@@ -375,7 +373,15 @@ class LiteRTLmProvider @Inject constructor(
         )
         if (armSnapshot.armed) {
             Timber.d("LiteRTLm: agentic loop armed (model=%s)", armSnapshot.modelPath?.substringAfterLast("/"))
-            sendAgenticWithRetry(currentContents, conversationConfig, armSnapshot, params.contextSize, 0)
+            // Phase 70 (70-02): bind the turn's document block for the
+            // `read_text_file` executor branch, cleared in finally so the
+            // binding never leaks across turns (T-70-04).
+            attachedDocumentBlock = request.documentBlock
+            try {
+                sendAgenticWithRetry(currentContents, conversationConfig, armSnapshot, params.contextSize, 0)
+            } finally {
+                attachedDocumentBlock = null
+            }
         } else {
             sendContentsWithRetry(currentContents, conversationConfig, armSnapshot, 0)
         }

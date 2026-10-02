@@ -274,7 +274,7 @@ class OpenAIProvider(
                             // surface their structured sources via
                             // ToolCompleted so the VM persists Fuentes rows
                             // on Done (same shape as local loop turns).
-                            val outcome = executeRemoteTool(canonical, argsMap, contextSize)
+                            val outcome = executeRemoteTool(canonical, argsMap, contextSize, request.documentBlock)
                             // Quick-task (tool-failure-note): failures ride
                             // the transient errorReason note (never
                             // persisted, model-fed text untouched).
@@ -338,6 +338,7 @@ class OpenAIProvider(
         toolName: String,
         args: Map<String, Any?>,
         contextSize: Int,
+        documentBlock: String?,
     ): LocalToolLoop.ToolCallOutcome {
         // Unknown names fail closed here — the body below never runs them.
         LocalToolLoop.validateArgs(toolName, args)?.let { return LocalToolLoop.ToolCallOutcome(it) }
@@ -402,6 +403,20 @@ class OpenAIProvider(
                         Timber.w(e, "OpenAI: web_fetch failed")
                         LocalToolLoop.ToolCallOutcome(LocalToolLoop.toolFailureMessage(e.message.orEmpty()), failed = true)
                     }
+                }
+                LocalToolLoop.TOOL_READ_TEXT -> {
+                    // No internet gate: the block is already in hand (fused
+                    // into the turn by the VM) — a local file read needs no
+                    // socket. Unbound attachment degrades, never throws;
+                    // sources stay empty (the VM owns the document Fuentes
+                    // row directly, so no double-emit through ToolCompleted).
+                    val block = documentBlock
+                    if (block.isNullOrBlank()) {
+                        return@withContext LocalToolLoop.ToolCallOutcome(
+                            LocalToolLoop.DOCUMENT_READ_FAILED_STRING,
+                        )
+                    }
+                    LocalToolLoop.ToolCallOutcome(LocalToolLoop.mapDocumentResult(block))
                 }
                 else -> LocalToolLoop.ToolCallOutcome(LocalToolLoop.unknownToolMessage(toolName))
             }

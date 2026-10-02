@@ -1,6 +1,8 @@
 package com.warped.data.remote.dto
 
 import com.warped.data.agentic.LocalToolLoop
+import com.warped.data.agentic.READ_TEXT_FILENAME_DESCRIPTION
+import com.warped.data.agentic.READ_TEXT_TOOL_DESCRIPTION
 import com.warped.data.agentic.WEB_FETCH_TOOL_DESCRIPTION
 import com.warped.data.agentic.WEB_FETCH_URL_DESCRIPTION
 import com.warped.data.agentic.WEB_SEARCH_QUERY_DESCRIPTION
@@ -57,8 +59,9 @@ data class OpenAiChatRequest(
 
 /**
  * Phase 57 (57-01): one `tools[]` entry — `type:"function"` wrapping the
- * provider-neutral `web_search` / `web_fetch` schemas (descriptions copied
- * verbatim from the local `@Tool` constants, locked identical surface).
+ * provider-neutral `web_search` / `web_fetch` / `read_text_file` schemas
+ * (descriptions copied verbatim from the local `@Tool` constants, locked
+ * identical surface).
  */
 @Serializable
 data class OpenAiTool(
@@ -77,9 +80,11 @@ data class OpenAiFunctionDef(
 )
 
 /**
- * Phase 57 (57-01): the two-tool `tools[]` list for an armed round, built
- * once per turn. Single-required-string params (`query` / `url`) — strict
- * buys nothing, loose maximizes compat-server acceptance.
+ * Phase 57 (57-01): the three-tool `tools[]` list for an armed round, built
+ * once per turn. Single-required-string params (`query` / `url` /
+ * `filename`) — strict buys nothing, loose maximizes compat-server
+ * acceptance. Phase 70 (70-02) appends the `read_text_file` entry reusing
+ * the local schema constants (same loose shape as `web_fetch`).
  */
 fun defaultRemoteTools(): List<OpenAiTool> = listOf(
     OpenAiTool(
@@ -112,6 +117,23 @@ fun defaultRemoteTools(): List<OpenAiTool> = listOf(
                     }
                 }
                 putJsonArray("required") { add(JsonPrimitive("url")) }
+                put("additionalProperties", false)
+            },
+        ),
+    ),
+    OpenAiTool(
+        function = OpenAiFunctionDef(
+            name = LocalToolLoop.TOOL_READ_TEXT,
+            description = READ_TEXT_TOOL_DESCRIPTION,
+            parameters = buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") {
+                    putJsonObject("filename") {
+                        put("type", "string")
+                        put("description", READ_TEXT_FILENAME_DESCRIPTION)
+                    }
+                }
+                putJsonArray("required") { add(JsonPrimitive("filename")) }
                 put("additionalProperties", false)
             },
         ),

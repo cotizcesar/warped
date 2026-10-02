@@ -1,6 +1,8 @@
 package com.warped.data.remote.dto
 
 import com.warped.data.agentic.LocalToolLoop
+import com.warped.data.agentic.READ_TEXT_FILENAME_DESCRIPTION
+import com.warped.data.agentic.READ_TEXT_TOOL_DESCRIPTION
 import com.warped.data.agentic.WEB_FETCH_TOOL_DESCRIPTION
 import com.warped.data.agentic.WEB_FETCH_URL_DESCRIPTION
 import com.warped.data.agentic.WEB_SEARCH_QUERY_DESCRIPTION
@@ -42,9 +44,9 @@ data class AnthropicChatRequest(
 /**
  * Phase 57 (57-02): one native Anthropic tool entry. Schemas mirror the
  * 57-01 OpenAI `parameters` verbatim (single-required-string
- * `query`/`url`, descriptions copied from the local `@Tool` constants) —
- * only the envelope key differs (`input_schema`, no `type:"function"`
- * wrapper).
+ * `query`/`url`/`filename`, descriptions copied from the local `@Tool`
+ * constants) — only the envelope key differs (`input_schema`, no
+ * `type:"function"` wrapper).
  */
 @Serializable
 data class AnthropicTool(
@@ -56,8 +58,10 @@ data class AnthropicTool(
 )
 
 /**
- * Phase 57 (57-02): the two-tool `tools` list for an armed round, built
+ * Phase 57 (57-02): the three-tool `tools` list for an armed round, built
  * once per turn. Same provider-neutral surface as [defaultRemoteTools].
+ * Phase 70 (70-02) appends the `read_text_file` entry (same description
+ * constants, Anthropic schema shape).
  */
 fun defaultAnthropicTools(): List<AnthropicTool> = listOf(
     AnthropicTool(
@@ -87,6 +91,21 @@ fun defaultAnthropicTools(): List<AnthropicTool> = listOf(
                 }
             }
             putJsonArray("required") { add(JsonPrimitive("url")) }
+            put("additionalProperties", false)
+        },
+    ),
+    AnthropicTool(
+        name = LocalToolLoop.TOOL_READ_TEXT,
+        description = READ_TEXT_TOOL_DESCRIPTION,
+        inputSchema = buildJsonObject {
+            put("type", "object")
+            putJsonObject("properties") {
+                putJsonObject("filename") {
+                    put("type", "string")
+                    put("description", READ_TEXT_FILENAME_DESCRIPTION)
+                }
+            }
+            putJsonArray("required") { add(JsonPrimitive("filename")) }
             put("additionalProperties", false)
         },
     ),
