@@ -1,5 +1,6 @@
 package com.warped.ui.chat
 
+import kotlinx.coroutines.test.TestScope
 import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import com.google.common.truth.Truth.assertThat
@@ -177,7 +178,7 @@ class ModelSwitchUnloadTest {
      * `preloadLocalModel` hops to Dispatchers.Default (a real thread under
      * runTest) — yield until the mount lands before asserting.
      */
-    private suspend fun awaitMount(fixture: Fixture) {
+    private suspend fun TestScope.awaitMount(fixture: Fixture) {
         var attempts = 0
         while (fixture.engineManager.getActiveEngine() == null && attempts++ < 100) {
             kotlinx.coroutines.delay(10)
@@ -384,8 +385,15 @@ class ModelSwitchUnloadTest {
         fixture.vm.launchModelSelection("gpt", ProviderType.OPENAI, endpointId = null)
         advanceUntilIdle()
 
+        // The sent turn leaves messages behind, so the switch parks behind
+        // the mid-conversation confirm dialog — confirm it to proceed.
+        fixture.vm.confirmModelSwitch()
+        advanceUntilIdle()
+
         // Local->remote keeps the explicit unload; local selection cleared.
-        verify(exactly = 1) { fixture.engineManager.unloadCurrent() }
+        // The unload launches on Dispatchers.Default (a real thread under
+        // runTest), so verify with a timeout instead of bare advanceUntilIdle.
+        verify(timeout = 5000, exactly = 1) { fixture.engineManager.unloadCurrent() }
         assertThat(fixture.selection.localSelection.value.modelId).isNull()
     }
 }
