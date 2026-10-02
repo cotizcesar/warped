@@ -16,7 +16,9 @@ import com.warped.data.grounding.SearchOutcome
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.inference.AgenticTurn
 import com.warped.data.local.inference.AgenticTurnTransport
+import com.warped.data.local.inference.ActiveEngine
 import com.warped.data.local.inference.EngineManager
+import com.warped.data.local.inference.EngineType
 import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.local.inference.LiteRTLmProvider
 import com.warped.data.local.inference.MemoryChecker
@@ -245,6 +247,10 @@ class ToolFailureAffordanceTest {
         every { activeModelSelection.activeModel } returns MutableStateFlow(null)
         every { activeModelSelection.localSelection } returns
             MutableStateFlow(LocalSelection(modelId = modelPath, isConnected = true))
+        // Lazy load: the send path mounts only on engine-path mismatch —
+        // stub the engine as already serving this model.
+        every { engineManager.getActiveEngine() } returns
+            ActiveEngine(EngineType.LITE_RT_LM, modelPath)
         every { activeModelSelection.remoteSelection } returns MutableStateFlow(RemoteSelection())
         every { activeModelSelection.saveLastConversation(any()) } returns Unit
         every { advancedPreferences.syntaxTheme } returns flowOf(SyntaxTheme.MONOKAI)

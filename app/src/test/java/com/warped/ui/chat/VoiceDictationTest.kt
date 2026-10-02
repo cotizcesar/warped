@@ -3,7 +3,9 @@ package com.warped.ui.chat
 import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import com.google.common.truth.Truth.assertThat
+import com.warped.data.local.inference.ActiveEngine
 import com.warped.data.local.inference.EngineManager
+import com.warped.data.local.inference.EngineType
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.preferences.AdvancedPreferences
 import com.warped.data.remote.provider.ProviderRouter
@@ -96,6 +98,10 @@ class VoiceDictationTest {
         every { activeModelSelection.activeModel } returns MutableStateFlow(null)
         every { activeModelSelection.localSelection } returns
             MutableStateFlow(LocalSelection(modelId = modelPath, isConnected = true))
+        // Lazy load: the send path mounts only on engine-path mismatch —
+        // stub the engine as already serving this model.
+        every { engineManager.getActiveEngine() } returns
+            ActiveEngine(EngineType.LITE_RT_LM, modelPath)
         every { activeModelSelection.remoteSelection } returns MutableStateFlow(RemoteSelection())
         every { activeModelSelection.saveLastConversation(any()) } just Runs
         every { advancedPreferences.syntaxTheme } returns flowOf(SyntaxTheme.MONOKAI)
