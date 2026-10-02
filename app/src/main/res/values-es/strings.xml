@@ -464,7 +464,7 @@
     <string name="help_s7_step4">Sin conexión los envíos quedan en cola — tocá Reintentar al volver.</string>
     <string name="help_s7_step5">La búsqueda web agrega resultados citados — sin configuración.</string>
     <string name="help_s8_title">8. Consejos y atajos</string>
-    <string name="help_s8_step1">Enter envía; Shift+Enter agrega una línea.</string>
+    <string name="help_s8_step1">Tocá enviar para responder; el borrador queda en la entrada.</string>
     <string name="help_s8_step2">Guardá tus ajustes de generación como Presets.</string>
     <string name="help_s8_step3">Tocá una tarjeta para su tabla completa de capacidades.</string>
     <string name="help_s8_step4">Borrá chats de Recientes con la X de cada fila.</string>

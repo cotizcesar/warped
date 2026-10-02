@@ -339,7 +339,7 @@ private fun EndpointSelectorCard(
                 Button(
                     onClick = onUseInChat,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                    colors = ButtonDefaults.buttonColors(containerColor = WarpedAccent),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(stringResource(R.string.use_in_chat), color = Color.White)
