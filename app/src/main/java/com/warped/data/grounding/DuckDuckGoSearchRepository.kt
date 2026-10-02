@@ -106,8 +106,10 @@ class DuckDuckGoSearchRepository @Inject constructor(
          * Image-intent turns pass true; the DDG HTML endpoint has no image
          * API so the fused images list stays empty (text grounding
          * preserved, grid empty). Kept as a parameter so existing call
-         * sites compile unchanged.
+         * sites compile unchanged — the value is intentionally ignored.
+         * TODO(Phase 64+: wire a real image provider or remove this flag).
          */
+        @Suppress("UNUSED_PARAMETER")
         includeImages: Boolean = false,
     ): SearchOutcome = withContext(ioDispatcher) {
         val trimmedQuery = query.take(MAX_QUERY_CHARS)
