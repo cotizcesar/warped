@@ -125,7 +125,16 @@ Plans:
   2. User tapping mic the first time gets an in-context rationale plus permission request, and a Settings escape on permanent denial
   3. User on a device without speech recognition gets a graceful fallback with no crash
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 65-01-PLAN.md — Foundation: RECORD_AUDIO manifest, 7 EN+ES strings, VoiceDictationManager wrapper, Chat state + ViewModel ownership
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 65-02-PLAN.md — Input-bar mic button, permission launcher, rationale dialog, denial Snackbar, lifecycle teardown
 **UI hint**: yes
 
 ### Phase 66: Play In-App Review
