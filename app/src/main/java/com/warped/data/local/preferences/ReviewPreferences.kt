@@ -16,6 +16,17 @@ import javax.inject.Singleton
 private val Context.reviewPreferencesStore: DataStore<Preferences> by preferencesDataStore(name = "review_preferences")
 
 /**
+ * Phase 66 review-fix (WR-02): single-snapshot view of the ambient
+ * review trigger state, so increment-then-read sees one consistent
+ * instant instead of three independently snapshotted flows.
+ */
+data class ReviewState(
+    val completedTurns: Int = 0,
+    val lastPromptMillis: Long = 0L,
+    val promptCount: Int = 0,
+)
+
+/**
  * Phase 66 (RATE-01): DataStore-backed ambient review trigger state.
  * Persists the completed-turn counter, the last prompt timestamp, and the
  * total prompt count driving the eligibility predicate in
@@ -23,6 +34,11 @@ private val Context.reviewPreferencesStore: DataStore<Preferences> by preference
  *
  * Self-registering `@Singleton @Inject` with `@ApplicationContext` — no
  * Hilt module entry (same convention as [WizardPreferences]).
+ *
+ * WR-02: [reviewState] exposes all three counters as a SINGLE DataStore
+ * snapshot so [com.warped.domain.review.ReviewHelper] never mixes
+ * `completedTurns`, `lastPromptMillis`, and `promptCount` from different
+ * states. The per-key flows below stay for any fine-grained observers.
  */
 @Singleton
 class ReviewPreferences @Inject constructor(
@@ -44,6 +60,19 @@ class ReviewPreferences @Inject constructor(
 
     val promptCount: Flow<Int> = context.reviewPreferencesStore.data.map { prefs ->
         prefs[KEY_PROMPT_COUNT] ?: 0
+    }
+
+    /**
+     * Phase 66 review-fix (WR-02): single-snapshot view of the whole
+     * trigger state. Read this (once) instead of the three per-key
+     * flows when the three values must describe the same instant.
+     */
+    val reviewState: Flow<ReviewState> = context.reviewPreferencesStore.data.map { prefs ->
+        ReviewState(
+            completedTurns = prefs[KEY_COMPLETED_TURNS] ?: 0,
+            lastPromptMillis = prefs[KEY_LAST_PROMPT_MILLIS] ?: 0L,
+            promptCount = prefs[KEY_PROMPT_COUNT] ?: 0,
+        )
     }
 
     suspend fun incrementCompletedTurns() {
