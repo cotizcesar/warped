@@ -17,7 +17,6 @@ import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.LocalModelRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -108,10 +107,6 @@ class CatalogViewModel @Inject constructor(
     /** Clear a delivered activation error after the screen shows it. */
     fun clearError() {
         _error.value = null
-    }
-
-    private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
-        Timber.e(throwable, "Unhandled coroutine exception")
     }
 
     fun startDownload(entry: AllowlistedModel) {
