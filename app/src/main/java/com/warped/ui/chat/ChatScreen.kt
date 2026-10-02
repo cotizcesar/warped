@@ -385,10 +385,9 @@ fun ChatScreen(
                 Toast.makeText(context, R.string.error_no_audio, Toast.LENGTH_SHORT).show()
             }
             remoteSelected -> {
-                // TODO(67-02-Task3): resource as voice_msg_remote_blocked.
                 Toast.makeText(
                     context,
-                    "Voice messages need an on-device audio model.",
+                    R.string.voice_msg_remote_blocked,
                     Toast.LENGTH_SHORT,
                 ).show()
             }
@@ -409,10 +408,9 @@ fun ChatScreen(
     // Phase 67 (VMSG-01 full): 60 s auto-stop toast. Collects the one-shot
     // voiceCapEvent flow (once per emission — never derived from
     // isVoiceRecording state, so recomposition cannot re-fire it).
-    // TODO(67-02-Task3): resource as voice_msg_cap_reached.
     LaunchedEffect(Unit) {
         viewModel.voiceCapEvent.collect {
-            Toast.makeText(context, "60s limit reached", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, R.string.voice_msg_cap_reached, Toast.LENGTH_SHORT).show()
         }
     }
 

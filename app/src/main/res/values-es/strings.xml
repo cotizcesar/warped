@@ -235,6 +235,17 @@
     <string name="voice_denied">Micrófono bloqueado. Actívalo en Ajustes para dictar.</string>
     <string name="voice_open_settings">Ajustes</string>
 
+    <!-- Mensajes de voz (Phase 67) -->
+    <string name="voice_msg_cap_reached">Límite de 60 s alcanzado</string>
+    <string name="voice_msg_first_30s">Se enviaron al modelo los primeros 30 s</string>
+    <string name="voice_msg_denied">Se necesita acceso al micrófono: concede permiso para grabar mensajes de voz</string>
+    <string name="voice_msg_cancel">Cancelar grabación</string>
+    <string name="voice_msg_record">Grabar mensaje de voz</string>
+    <string name="voice_msg_stop">Detener grabación</string>
+    <string name="voice_msg_recording_state">Grabando, %1$d:%2$02d</string>
+    <string name="voice_msg_remote_blocked">Los mensajes de voz necesitan un modelo de audio en el dispositivo.</string>
+    <string name="voice_msg_transcode_failed">No se pudo procesar el mensaje de voz.</string>
+
     <!-- Insignias de capacidad -->
     <string name="badge_vision">Visión</string>
     <string name="badge_audio">Audio</string>

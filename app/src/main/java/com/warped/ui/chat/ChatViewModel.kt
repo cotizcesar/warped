@@ -1726,13 +1726,11 @@ class ChatViewModel @Inject constructor(
      * Phase 67 (VMSG-01): permanent-denial escape for voice-send. Mirrors
      * [emitMicDenied] with the voice-message copy. Call ONLY on permanent
      * denial — transient denial uses [emitVoiceDeniedTransient].
-     *
-     * TODO(67-02-Task3): move hardcoded copy to voice_msg_* resources.
      */
     fun emitVoiceDenied() {
         _events.tryEmit(
             ChatEvent.SnackbarWithAction(
-                message = "Microphone access needed — grant permission to record voice messages",
+                message = context.getString(R.string.voice_msg_denied),
                 actionLabel = context.getString(R.string.voice_open_settings),
                 action = SnackbarAction.OPEN_APP_SETTINGS,
             ),
@@ -1742,12 +1740,10 @@ class ChatViewModel @Inject constructor(
     /**
      * Phase 67 (VMSG-01): transient-denial notice for voice-send. Plain
      * non-blocking Snackbar (no Settings action); recording never starts.
-     *
-     * TODO(67-02-Task3): move hardcoded copy to voice_msg_* resources.
      */
     fun emitVoiceDeniedTransient() {
         _events.tryEmit(
-            ChatEvent.Snackbar("Microphone access needed — grant permission to record voice messages"),
+            ChatEvent.Snackbar(context.getString(R.string.voice_msg_denied)),
         )
     }
 
@@ -1912,8 +1908,6 @@ class ChatViewModel @Inject constructor(
      * [sendMessage] audioBytes path so the capabilities.audio gate stays
      * the backstop. Transcode failure emits a Snackbar and keeps the file
      * for retry; failed sends keep the file (Phase 68 draft basis).
-     *
-     * TODO(67-02): move hardcoded copy to voice_msg_* string resources.
      */
     fun sendVoiceMessage(caption: String) {
         val file = voiceClipFile ?: return
@@ -1926,11 +1920,11 @@ class ChatViewModel @Inject constructor(
                 Timber.w(e, "VoiceMsg: transcode failed")
                 voiceClipFile = file
                 _hasVoiceClip.value = true
-                _events.tryEmit(ChatEvent.Snackbar("Voice message could not be processed."))
+                _events.tryEmit(ChatEvent.Snackbar(context.getString(R.string.voice_msg_transcode_failed)))
                 return@launch
             }
             if (result.truncated) {
-                _events.tryEmit(ChatEvent.Snackbar("First 30s sent to model"))
+                _events.tryEmit(ChatEvent.Snackbar(context.getString(R.string.voice_msg_first_30s)))
             }
             sendMessage(caption, audioBytes = result.bytes)
         }

@@ -73,7 +73,6 @@ fun ChatInputBar(
     onVoiceClick: () -> Unit = {},
     // Phase 67 (VMSG-01 full): recording-row state. Timer + amplitude
     // render inline while recording; cancel discards immediately.
-    // TODO(67-02-Task3): resource the content descriptions + TalkBack copy.
     voiceElapsedSec: Int = 0,
     voiceAmplitude: Int = 0,
     onCancelRecording: () -> Unit = {},
@@ -165,8 +164,11 @@ fun ChatInputBar(
                 // description only changes every 5 s so announcements
                 // never spam, while the visual timer ticks each second.
                 val announceBucket = voiceElapsedSec / 5
-                val announceText =
-                    "Recording, ${announceBucket * 5 / 60}:${(announceBucket * 5 % 60).toString().padStart(2, '0')}"
+                val announceText = stringResource(
+                    R.string.voice_msg_recording_state,
+                    announceBucket * 5 / 60,
+                    announceBucket * 5 % 60,
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth().semantics {
                         stateDescription = announceText
@@ -174,7 +176,7 @@ fun ChatInputBar(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onCancelRecording, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.Filled.Close, "Cancel recording",
+                        Icon(Icons.Filled.Close, stringResource(R.string.voice_msg_cancel),
                             tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(24.dp))
                     }
                     Text(
@@ -193,7 +195,7 @@ fun ChatInputBar(
                     )
                     Spacer(Modifier.width(8.dp))
                     IconButton(onClick = onVoiceClick, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.Filled.Stop, "Stop recording",
+                        Icon(Icons.Filled.Stop, stringResource(R.string.voice_msg_stop),
                             tint = recColor, modifier = Modifier.size(24.dp))
                     }
                 }
@@ -311,7 +313,6 @@ fun ChatInputBar(
                 // dictation mic, same visibility conditions. Waveform
                 // glyph (GraphicEq family), never a mic; doubles as the
                 // stop toggle while recording.
-                // TODO(67-02-Task3): resource Record/Stop copy.
                 if (speechAvailable && !isGenerating && !isLoadingModel) {
                     // Adopt the pre-existing dead onAudioRecordingChanged
                     // channel: it now fires with the live recording flag so
@@ -327,10 +328,10 @@ fun ChatInputBar(
                         )
                     ) {
                         if (isVoiceRecording) {
-                            Icon(Icons.Filled.Stop, "Stop recording",
+                            Icon(Icons.Filled.Stop, stringResource(R.string.voice_msg_stop),
                                 tint = Color.White, modifier = Modifier.size(24.dp))
                         } else {
-                            Icon(Icons.Filled.GraphicEq, "Record voice message",
+                            Icon(Icons.Filled.GraphicEq, stringResource(R.string.voice_msg_record),
                                 tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
                         }
                     }
