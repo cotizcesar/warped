@@ -41,6 +41,7 @@ import coil3.compose.AsyncImage
 import com.warped.R
 import com.warped.ui.chat.voice.GateState
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatInputBar(
     text: String,
@@ -100,6 +101,13 @@ fun ChatInputBar(
     // Model-loading gate (2026-10-02): while a model loads, the WHOLE
     // input is disabled — text field, image/think buttons, mic, and send.
     isLoadingModel: Boolean = false,
+    // Phase 69 Plan 03 (VMSG-03): first-use coachmark. When true AND the
+    // voice button renders enabled, a one-shot M3 PlainTooltip anchors to
+    // it; ANY tap through either button or outside dismisses via
+    // onCoachmarkDismiss (the VM persists seen=true — no local flag that
+    // could diverge, never re-shows).
+    showVoiceCoachmark: Boolean = false,
+    onCoachmarkDismiss: () -> Unit = {},
 ) {
     // Single gate for the entire bar: generating, no model, or loading.
     val inputLocked = isGenerating || !canSend || isLoadingModel
@@ -328,7 +336,13 @@ fun ChatInputBar(
                     // re-announced on a stable node). Cleared when idle.
                     val listeningState = stringResource(R.string.voice_listening_state)
                     IconButton(
-                        onClick = onMicClick,
+                        // Phase 69 Plan 03 (VMSG-03): a dictation tap is a
+                        // first interaction — it dismisses the voice
+                        // coachmark too (whichever comes first).
+                        onClick = {
+                            if (showVoiceCoachmark) onCoachmarkDismiss()
+                            onMicClick()
+                        },
                         modifier = Modifier.size(40.dp).semantics {
                             if (isListening) stateDescription = listeningState
                         },
@@ -388,8 +402,32 @@ fun ChatInputBar(
                             }
                         }
                     } else {
-                        IconButton(
-                            onClick = onVoiceClick,
+                        // Phase 69 Plan 03 (VMSG-03): first-use coachmark
+                        // anchored to the enabled voice button. The M3
+                        // PlainTooltip (Compose BOM, zero new deps) shows
+                        // once while showVoiceCoachmark; outside taps
+                        // dismiss via onDismissRequest, voice taps via the
+                        // wrapped onClick below — whichever first.
+                        val voiceTooltipState = rememberTooltipState(isPersistent = true)
+                        LaunchedEffect(showVoiceCoachmark, voiceGate) {
+                            if (showVoiceCoachmark && voiceGate == GateState.Allowed) voiceTooltipState.show()
+                            else voiceTooltipState.dismiss()
+                        }
+                        TooltipBox(
+                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                            tooltip = {
+                                PlainTooltip {
+                                    Text(stringResource(R.string.voice_msg_coachmark))
+                                }
+                            },
+                            state = voiceTooltipState,
+                            onDismissRequest = { if (showVoiceCoachmark) onCoachmarkDismiss() },
+                        ) {
+                            IconButton(
+                                onClick = {
+                                    if (showVoiceCoachmark) onCoachmarkDismiss()
+                                    onVoiceClick()
+                                },
                             modifier = Modifier.size(48.dp),
                             colors = IconButtonDefaults.iconButtonColors(
                                 containerColor = if (isVoiceRecording) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent
@@ -397,6 +435,7 @@ fun ChatInputBar(
                         ) {
                             Icon(Icons.Filled.GraphicEq, stringResource(R.string.voice_msg_record),
                                 tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
+                        }
                         }
                     }
                     Spacer(Modifier.width(8.dp))

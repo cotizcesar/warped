@@ -270,6 +270,8 @@
     <string name="voice_msg_show_more">Mostrar más</string>
     <string name="voice_msg_show_less">Mostrar menos</string>
     <string name="voice_msg_transcript_fallback">%1$d:%2$02d mensaje de voz</string>
+    <!-- Coachmark de primer uso (Phase 69) -->
+    <string name="voice_msg_coachmark">Mensaje de voz</string>
 
     <!-- Insignias de capacidad -->
     <string name="badge_vision">Visión</string>
@@ -525,4 +527,10 @@
     <string name="help_s8_step4">Borrá chats de Recientes con la X de cada fila.</string>
     <string name="help_s8_step5">El historial queda en tu dispositivo — nada va a la nube.</string>
     <string name="help_s8_step6">Los modelos viven en almacenamiento privado de la app.</string>
+    <!-- Mensajes de voz (Phase 69: destino de Más información del gating remoto) -->
+    <string name="help_s9_title">9. Mensajes de voz</string>
+    <string name="help_s9_step1">Los mensajes de voz envían el audio que escucha el modelo; el dictado escribe lo que decís.</string>
+    <string name="help_s9_step2">La grabación se detiene a los 60 segundos; solo los primeros 30 segundos se envían al modelo.</string>
+    <string name="help_s9_step3">Los mensajes de voz se transcriben en este dispositivo y se envían solo a modelos locales con capacidad de audio.</string>
+    <string name="help_s9_step4">Los mensajes de voz quedan en este dispositivo por ahora: los endpoints remotos muestran el aviso Solo en el dispositivo.</string>
 </resources>

@@ -26,6 +26,7 @@ import com.warped.data.local.inference.BackendType
 import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.preferences.AdvancedPreferences
+import com.warped.data.local.preferences.VoicePreferences
 import com.warped.data.remote.provider.ProviderRouter
 import com.warped.data.repository.ModelAllowlistRepository
 import com.warped.domain.llm.LlmModelHelper
@@ -69,6 +70,15 @@ class ChatViewModel @Inject constructor(
     private val engineManager: EngineManager,
     private val memoryChecker: MemoryChecker,
     private val advancedPreferences: AdvancedPreferences,
+    /**
+     * Phase 69 Plan 03 (VMSG-03): first-use coachmark flag store. Nullable
+     * default keeps the existing unit-test fixtures compiling without
+     * churn — production Hilt always injects the real store (Dagger passes
+     * every @Inject constructor arg explicitly; the default only applies to
+     * direct Kotlin callers). A missing store reads as seen (coachmark never
+     * shows) and dismissal is a no-op.
+     */
+    private val voicePreferences: VoicePreferences? = null,
     private val reviewHelper: ReviewHelper,
     private val fetcher: WebPageFetcher,
     private val multiUrlFetcher: MultiUrlFetcher,
@@ -129,6 +139,38 @@ class ChatViewModel @Inject constructor(
         GateState.GatedTextOnly -> context.getString(R.string.voice_msg_gate_audio)
         GateState.GatedRemote -> context.getString(R.string.voice_msg_gate_remote)
         GateState.Allowed -> null
+    }
+
+    /**
+     * Phase 69 Plan 03 (VMSG-03): one-shot first-use coachmark state. True
+     * only while the flag is unseen AND the voice button is enabled
+     * (Allowed) — the coachmark never shows on a gated button. Computed
+     * off-composition (combine transform, no IO); Eagerly started like
+     * [voiceSendGate] so unit tests read a settled value after advancing.
+     * The screen anchors the tooltip only where the button renders, so no
+     * speech-availability term is needed here.
+     */
+    val showVoiceCoachmark: StateFlow<Boolean> =
+        combine(
+            voicePreferences?.voiceCoachmarkSeen ?: flowOf(true),
+            voiceSendGate,
+        ) { seen, gate -> !seen && gate == GateState.Allowed }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /**
+     * Phase 69 Plan 03 (VMSG-03): persist coachmark seen=true. Best-effort
+     * off-Main with catch-and-log (existing prefs-write discipline) — a
+     * failed persist only re-shows once, never a crash.
+     */
+    fun dismissVoiceCoachmark() {
+        val prefs = voicePreferences ?: return
+        viewModelScope.launch(Dispatchers.IO + coroutineExceptionHandler) {
+            try {
+                prefs.markVoiceCoachmarkSeen()
+            } catch (e: Exception) {
+                Timber.w(e, "Chat: dismissVoiceCoachmark persist failed")
+            }
+        }
     }
 
     @Deprecated("PERF-14 shim: collect transcriptState/inputState/connectionState instead")

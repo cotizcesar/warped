@@ -356,6 +356,11 @@ fun WarpedNavGraph() {
                         navController.navigate(Screen.HuggingFace) {
                             launchSingleTop = true
                         }
+                    },
+                    onNavigateToHelp = {
+                        navController.navigate(Screen.Help) {
+                            launchSingleTop = true
+                        }
                     }
                 )
             }
@@ -371,6 +376,11 @@ fun WarpedNavGraph() {
                     },
                     onNavigateToCatalog = {
                         navController.navigate(Screen.HuggingFace) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToHelp = {
+                        navController.navigate(Screen.Help) {
                             launchSingleTop = true
                         }
                     }
@@ -392,6 +402,11 @@ fun WarpedNavGraph() {
                     },
                     onNavigateToCatalog = {
                         navController.navigate(Screen.HuggingFace) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToHelp = {
+                        navController.navigate(Screen.Help) {
                             launchSingleTop = true
                         }
                     }

@@ -269,6 +269,8 @@
     <string name="voice_msg_show_more">Show more</string>
     <string name="voice_msg_show_less">Show less</string>
     <string name="voice_msg_transcript_fallback">%1$d:%2$02d voice message</string>
+    <!-- First-use coachmark (Phase 69) -->
+    <string name="voice_msg_coachmark">Voice message</string>
 
     <!-- Capability badges -->
     <string name="badge_vision">Vision</string>
@@ -521,4 +523,10 @@
     <string name="help_s8_step4">Delete chats from Recents with the X on each row.</string>
     <string name="help_s8_step5">History stays on your device — nothing goes to the cloud.</string>
     <string name="help_s8_step6">Models live in app-private storage.</string>
+    <!-- Voice messages (Phase 69: Learn-more destination for the remote gate) -->
+    <string name="help_s9_title">9. Voice messages</string>
+    <string name="help_s9_step1">Voice messages send audio the model hears; dictation types what you say.</string>
+    <string name="help_s9_step2">Recording stops at 60 seconds; only the first 30 seconds are sent to the model.</string>
+    <string name="help_s9_step3">Voice messages are transcribed on this device and sent only to audio-capable local models.</string>
+    <string name="help_s9_step4">Voice messages stay on this device for now — remote endpoints show a Device-only notice.</string>
 </resources>

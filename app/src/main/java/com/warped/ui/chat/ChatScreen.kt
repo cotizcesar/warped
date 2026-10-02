@@ -96,6 +96,7 @@ fun ChatScreen(
     onOpenDrawer: () -> Unit = {},
     onNavigateToSelector: () -> Unit = {},
     onNavigateToCatalog: () -> Unit = {},
+    onNavigateToHelp: () -> Unit = {},
     conversationId: Long = 0L,
     newChat: Boolean = false
 ) {
@@ -119,6 +120,9 @@ fun ChatScreen(
     // single gate source — the button, hint, and send-block all read it
     // and flip live on model switch (no screen-local capability read).
     val voiceGate by viewModel.voiceSendGate.collectAsStateWithLifecycle()
+    // Phase 69 Plan 03 (VMSG-03): one-shot coachmark state for the
+    // voice-send button (VM persists dismissal — never re-shows).
+    val showVoiceCoachmark by viewModel.showVoiceCoachmark.collectAsStateWithLifecycle()
     val hasVoiceClip by viewModel.hasVoiceClip.collectAsStateWithLifecycle()
     // Phase 67 (VMSG-01 full): recording-row state (timer + amplitude).
     val voiceElapsedSec by viewModel.voiceElapsedSec.collectAsStateWithLifecycle()
@@ -406,7 +410,7 @@ fun ChatScreen(
 
     // Phase 69 Plan 01 (VMSG-04/08): gate-driven voice explainer. Gated
     // taps never dead-end: text-only links to the model catalog, remote
-    // re-shows the reason until Plan 03 wires Learn more to Help.
+    // links to the Help voice section (Plan 03 wiring below).
     val showVoiceGateExplainer: (GateState) -> Unit = { gate ->
         scope.launch {
             when (gate) {
@@ -424,14 +428,10 @@ fun ChatScreen(
                         actionLabel = context.getString(R.string.voice_msg_learn_more),
                         duration = SnackbarDuration.Long,
                     )
-                    if (result == SnackbarResult.ActionPerformed) {
-                        // TODO(69-03): route Learn more to the Help voice
-                        // section; re-show the reason until then.
-                        snackbarHostState.showSnackbar(
-                            context.getString(R.string.voice_msg_gate_remote),
-                            duration = SnackbarDuration.Short,
-                        )
-                    }
+                    // Phase 69 Plan 03 (VMSG-03): the secondary explainer
+                    // action lands on the Help voice section (all three
+                    // chat entry points wire onNavigateToHelp in NavGraph).
+                    if (result == SnackbarResult.ActionPerformed) onNavigateToHelp()
                 }
                 GateState.Allowed -> Unit
             }
@@ -597,6 +597,10 @@ fun ChatScreen(
                 // button).
                 voiceGate = voiceGate,
                 onGatedVoiceClick = { showVoiceGateExplainer(voiceGate) },
+                // Phase 69 Plan 03 (VMSG-03): one-shot coachmark on the
+                // enabled voice button; any tap dismisses (VM persists).
+                showVoiceCoachmark = showVoiceCoachmark,
+                onCoachmarkDismiss = { viewModel.dismissVoiceCoachmark() },
                 onAudioRecorded = { bytes -> audioBytes = bytes },
                 onAudioRecordingChanged = { isRecording = it },
                 speechAvailable = speechAvailable,

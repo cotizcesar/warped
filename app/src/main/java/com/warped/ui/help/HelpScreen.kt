@@ -9,6 +9,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Memory
@@ -178,6 +179,22 @@ fun HelpScreen(onNavigateBack: () -> Unit) {
                         stringResource(R.string.help_s8_step4),
                         stringResource(R.string.help_s8_step5),
                         stringResource(R.string.help_s8_step6),
+                    )
+                )
+            }
+
+            // Section 9: voice (Phase 69 VMSG-03/VMSG-08) — reached via
+            // the secondary action from the remote-gate explainer.
+            // Reuses HelpSection unchanged (existing card style).
+            item {
+                HelpSection(
+                    icon = Icons.Filled.GraphicEq,
+                    title = stringResource(R.string.help_s9_title),
+                    steps = listOf(
+                        stringResource(R.string.help_s9_step1),
+                        stringResource(R.string.help_s9_step2),
+                        stringResource(R.string.help_s9_step3),
+                        stringResource(R.string.help_s9_step4),
                     )
                 )
             }
