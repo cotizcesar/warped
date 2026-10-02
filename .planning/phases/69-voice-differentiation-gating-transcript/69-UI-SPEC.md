@@ -73,7 +73,7 @@ Gated-button color rule (locked by CONTEXT.md — disabled-with-reason, never hi
 
 Caption color rule: transcript caption text `onSurfaceVariant`; expand affordance ("Show more" / "Show less") tinted `colorScheme.primary` (text-button language). Duration-only fallback caption in `onSurfaceVariant` (informational, never error-red — missing STT is not a user error).
 
-Active-mode rule: the active input mode's button wears `colorScheme.primary` tint; the inactive sibling renders in default `onSurfaceVariant`. When neither mode is active, both render in default `onSurfaceVariant` (voice-send enabled) or disabled styling (gated). No background recolor, no pulsing — tint is the only active-mode signal (consistent with the Phase 68 no-recolor rule).
+Active-mode rule: the active input mode's button wears `colorScheme.primary` tint; the inactive sibling renders in default `onSurfaceVariant`. When neither mode is active, both render in default `onSurfaceVariant` (voice-send enabled) or disabled styling (gated). Tint is the primary active-mode signal. Amendment (post-implementation, UI review 20/24 fix 3): the shipped `primary@50%` IconButton container behind the active glyph is blessed as the inherited pill convention — it predates this phase (Phase 65 dictation listening state, Phase 67 recording state) and keeps both modes visually consistent. The Phase 68 no-recolor rule governs progress surfaces, not the input-row active button.
 
 ---
 
