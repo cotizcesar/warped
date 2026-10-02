@@ -54,9 +54,13 @@ class VoiceSendGateTest {
 
     @Test
     @Suppress("DEPRECATION")
-    fun `legacy LOCAL provider returns GatedRemote`() {
+    fun `legacy LOCAL provider is treated as local`() {
         assertThat(VoiceSendGate.evaluate(ProviderType.LOCAL, true))
-            .isEqualTo(GateState.GatedRemote)
+            .isEqualTo(GateState.Allowed)
+        assertThat(VoiceSendGate.evaluate(ProviderType.LOCAL, false))
+            .isEqualTo(GateState.GatedTextOnly)
+        assertThat(VoiceSendGate.evaluate(ProviderType.LOCAL, null))
+            .isEqualTo(GateState.Allowed)
     }
 
     @Test

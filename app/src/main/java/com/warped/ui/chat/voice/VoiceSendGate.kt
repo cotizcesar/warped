@@ -22,8 +22,8 @@ object VoiceSendGate {
      *
      * - providerType null (nothing selected / unknown) → [GateState.Allowed]
      *   (fail-open, matches the existing `?: true` convention).
-     * - providerType == LITE_RT_LM → [GateState.Allowed] when
-     *   localAudioCapable != false, else [GateState.GatedTextOnly]
+     * - providerType == LITE_RT_LM (or legacy LOCAL) → [GateState.Allowed]
+     *   when localAudioCapable != false, else [GateState.GatedTextOnly]
      *   (null capability = allowlist not loaded yet → fail open).
      * - Any other provider (remote) → [GateState.GatedRemote]. The remote
      *   check runs first — a stale local id never un-gates remote.
@@ -37,7 +37,9 @@ object VoiceSendGate {
         localAudioCapable: Boolean?,
     ): GateState {
         if (providerType == null) return GateState.Allowed
-        if (providerType != ProviderType.LITE_RT_LM) return GateState.GatedRemote
-        return if (localAudioCapable == false) GateState.GatedTextOnly else GateState.Allowed
+        if (providerType == ProviderType.LITE_RT_LM || providerType == ProviderType.LOCAL) {
+            return if (localAudioCapable == false) GateState.GatedTextOnly else GateState.Allowed
+        }
+        return GateState.GatedRemote
     }
 }
