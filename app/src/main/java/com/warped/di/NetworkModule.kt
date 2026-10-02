@@ -1,6 +1,5 @@
 package com.warped.di
 
-import com.warped.data.remote.api.TavilyApi
 import com.warped.data.remote.network.AuthInterceptor
 import okhttp3.Cache
 import okhttp3.CacheControl
@@ -119,49 +118,4 @@ object NetworkModule {
             .connectionPool(ConnectionPool(5, 1, TimeUnit.MINUTES))
             .build()
     }
-
-    /**
-     * Phase 55 (TAV-02, T-55-01/T-55-02): dedicated Tavily HTTP client.
-     * Built from scratch with ZERO interceptors — no [AuthInterceptor]
-     * (endpoint keys must never reach api.tavily.com) and no body-level
-     * logging interceptor (which would print `Authorization: Bearer` and
-     * the full request body to logcat). Auth is a per-call header
-     * assembled at call time by `TavilySearchRepository`; the key is
-     * never logged. `retryOnConnectionFailure(false)` because POST is
-     * non-idempotent — the caller retries explicitly.
-     */
-    @Provides
-    @Singleton
-    @Named("tavily")
-    fun provideTavilyOkHttpClient(): OkHttpClient =
-        OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .callTimeout(60, TimeUnit.SECONDS)
-            .retryOnConnectionFailure(false)
-            .connectionPool(ConnectionPool(5, 1, TimeUnit.MINUTES))
-            .build()
-
-    /**
-     * Phase 55 (TAV-02): Tavily Retrofit on `https://api.tavily.com/`
-     * using the project's shared `Json` converter (ignoreUnknownKeys,
-     * lenient, coercing — same conventions as every other DTO).
-     */
-    @Provides
-    @Singleton
-    @Named("tavily")
-    fun provideTavilyRetrofit(
-        @Named("tavily") client: OkHttpClient,
-        json: Json,
-    ): Retrofit = Retrofit.Builder()
-        .client(client)
-        .baseUrl("https://api.tavily.com/")
-        .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
-        .build()
-
-    @Provides
-    @Singleton
-    fun provideTavilyApi(
-        @Named("tavily") retrofit: Retrofit,
-    ): TavilyApi = retrofit.create(TavilyApi::class.java)
 }
