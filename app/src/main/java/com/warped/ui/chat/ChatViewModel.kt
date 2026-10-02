@@ -1112,6 +1112,7 @@ class ChatViewModel @Inject constructor(
                                 // retry path keeps owning replaceSources;
                                 // this turn never rewrites history), same
                                 // Snackbar, same post-restart preview.
+                                var turnPersisted = false
                                 try {
                                     if (allDetails.isNotEmpty()) {
                                         chatRepository.saveMessageWithSources(
@@ -1122,6 +1123,7 @@ class ChatViewModel @Inject constructor(
                                     } else {
                                         chatRepository.saveMessage(conversationId, assistantMessage)
                                     }
+                                    turnPersisted = true
                                 } catch (e: Exception) {
                                     Timber.e(e, "Chat: failed to persist assistant sources")
                                     _events.tryEmit(
@@ -1134,14 +1136,27 @@ class ChatViewModel @Inject constructor(
                                 // fire-and-forget child launch off the turn
                                 // path (never a suspend on this path); a
                                 // null Activity handle skips silently
-                                // (previews/tests).
-                                viewModelScope.launch(coroutineExceptionHandler) {
-                                    try {
-                                        val activity = reviewActivityProvider?.invoke()
-                                            ?: return@launch
-                                        reviewHelper.maybePrompt(activity)
-                                    } catch (e: Exception) {
-                                        Timber.w(e, "Review prompt failed silently")
+                                // (previews/tests). WR-05: only persisted
+                                // user-visible turns advance the counter —
+                                // a turn whose save failed was never
+                                // persisted, so it must not count. (Loop
+                                // drivers emit ToolCompleted into this same
+                                // turn; exactly one Done runs per user
+                                // turn, so no loop-turn flag is needed.)
+                                if (turnPersisted) {
+                                    viewModelScope.launch(coroutineExceptionHandler) {
+                                        try {
+                                            val activity = reviewActivityProvider?.invoke()
+                                                ?: return@launch
+                                            reviewHelper.maybePrompt(activity)
+                                        } catch (e: CancellationException) {
+                                            throw e
+                                        } catch (_: Exception) {
+                                            // WR-01/IN-02: already logged
+                                            // inside ReviewHelper — stay
+                                            // silent, never swallow
+                                            // cancellation.
+                                        }
                                     }
                                 }
                             } else {
