@@ -171,25 +171,25 @@ class VoiceDictationTest {
         assertThat(vm.inputState.value.inputText).isEqualTo("hello world")
 
         // The final replaces the standing hypothesis once — no duplication —
-        // and the session stays live for the next utterance (continuous).
+        // and the session auto-stops (user decision 2026-10-02).
         vm.onDictationFinal("hello world")
         assertThat(vm.inputState.value.inputText).isEqualTo("hello world")
-        assertThat(vm.isListening.value).isTrue()
+        assertThat(vm.isListening.value).isFalse()
     }
 
     @Test
-    fun `final without partials appends once and keeps listening`() = runTest {
+    fun `final without partials appends once and stops listening`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val vm = listeningViewModel()
         runCurrent()
 
         vm.onDictationFinal("hello")
         assertThat(vm.inputState.value.inputText).isEqualTo("hello")
-        assertThat(vm.isListening.value).isTrue()
+        assertThat(vm.isListening.value).isFalse()
     }
 
     @Test
-    fun `blank final keeps listening without touching the draft`() = runTest {
+    fun `blank final stops listening without touching the draft`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val vm = listeningViewModel()
         runCurrent()
@@ -197,11 +197,11 @@ class VoiceDictationTest {
         vm.updateInput("keep me")
         vm.onDictationFinal("   ")
         assertThat(vm.inputState.value.inputText).isEqualTo("keep me")
-        assertThat(vm.isListening.value).isTrue()
+        assertThat(vm.isListening.value).isFalse()
     }
 
     @Test
-    fun `recoverable error re-arms and keeps the partial draft`() = runTest {
+    fun `any error stops listening and keeps the partial draft`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val vm = listeningViewModel()
         runCurrent()
@@ -209,7 +209,7 @@ class VoiceDictationTest {
         vm.onDictationPartial("hello")
         vm.onDictationError(android.speech.SpeechRecognizer.ERROR_NO_MATCH)
         assertThat(vm.inputState.value.inputText).isEqualTo("hello")
-        assertThat(vm.isListening.value).isTrue()
+        assertThat(vm.isListening.value).isFalse()
     }
 
     @Test
@@ -225,7 +225,7 @@ class VoiceDictationTest {
     }
 
     @Test
-    fun `late error after stop never re-arms the session`() = runTest {
+    fun `late error after stop stays stopped`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val vm = listeningViewModel()
         runCurrent()
@@ -284,7 +284,7 @@ class VoiceDictationTest {
 
         vm.onDictationFinal("brave new")
         assertThat(vm.inputState.value.inputText).isEqualTo("hello brave new world")
-        assertThat(vm.isListening.value).isTrue()
+        assertThat(vm.isListening.value).isFalse()
     }
 
     @Test

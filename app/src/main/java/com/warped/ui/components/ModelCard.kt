@@ -43,6 +43,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.warped.R
 
+/** Left-column width: 10.dp status dot + 12.dp header gap. */
+private val DotColumnWidth = 22.dp
+
 /**
  * Unified model card shared by the Model Catalog and Models & Endpoints.
  * Same structure everywhere — only the trailing action switches:
@@ -51,6 +54,10 @@ import com.warped.R
  * Layout: status dot + title/meta/capability-icons, optional params icon,
  * trailing actions; tap expands the LM-Studio-style [CapabilityTable]
  * (plus optional caller details like blurb/RAM notes).
+ *
+ * The dot owns only its left column: everything below the header (CTA /
+ * progress, error, description, features table) is indented by
+ * [DotColumnWidth] so it aligns vertically with the title.
  *
  * @param title model display name.
  * @param sizeText formatted file size (right side of the meta row).
@@ -164,26 +171,30 @@ fun ModelCard(
                 trailingActions()
             }
 
-            downloadContent()
+            // Below-header slots align with the title: the dot owns only
+            // its left column (DotColumnWidth = 10.dp dot + 12.dp gap).
+            Column(modifier = Modifier.padding(start = DotColumnWidth)) {
+                downloadContent()
 
-            if (errorText != null) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = errorText,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
+                if (errorText != null) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = errorText,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
 
-            if (expanded && expandable) {
-                detailsContent()
-                Spacer(Modifier.height(8.dp))
-                CapabilityTable(
-                    vision = vision,
-                    audio = audio,
-                    reasoning = reasoning,
-                    tools = tools
-                )
+                if (expanded && expandable) {
+                    detailsContent()
+                    Spacer(Modifier.height(8.dp))
+                    CapabilityTable(
+                        vision = vision,
+                        audio = audio,
+                        reasoning = reasoning,
+                        tools = tools
+                    )
+                }
             }
         }
     }

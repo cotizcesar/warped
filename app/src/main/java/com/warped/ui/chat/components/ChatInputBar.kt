@@ -114,19 +114,16 @@ fun ChatInputBar(
             }
 
             // Row 1: Input only. WR-03: TextFieldValue (not raw String) so
-            // the cursor survives programmatic updates — dictation inserts
-            // at the selection via onCursorChange, and external text changes
-            // preserve the caret instead of jumping to the end.
-            var fieldValue by remember { mutableStateOf(TextFieldValue(text)) }
+            // dictation inserts at the selection via onCursorChange.
+            // External text changes (dictation commits) snap the caret to
+            // the END of the text (user decision 2026-10-02: keep typing
+            // after what was dictated) and report it so the ViewModel's
+            // lastKnownCursor stays in sync. Typing is untouched: this
+            // block only runs when the text actually changed externally.
+            var fieldValue by remember { mutableStateOf(TextFieldValue(text, TextRange(text.length))) }
             if (fieldValue.text != text) {
-                val kept = fieldValue.selection
-                fieldValue = fieldValue.copy(
-                    text = text,
-                    selection = TextRange(
-                        kept.start.coerceIn(0, text.length),
-                        kept.end.coerceIn(0, text.length),
-                    ),
-                )
+                fieldValue = TextFieldValue(text, TextRange(text.length))
+                onCursorChange(text.length)
             }
             OutlinedTextField(
                 value = fieldValue,

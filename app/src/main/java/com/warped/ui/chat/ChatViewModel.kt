@@ -1551,54 +1551,46 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Continuous-dictation final handler (user decision 2026-10-02: the
-     * session stops ONLY on user tap). The platform recognizer is
-     * single-shot — it ends the utterance on silence/timeout and fires
-     * onResults — so after committing the final text the session
-     * immediately restarts listening for the next utterance. The listening
-     * flag stays true across finals; only [stopDictation], a failed
-     * restart, or a fatal [onDictationError] clears it. Blank finals
-     * (silence) also restart: silence never stops the session.
+     * Auto-stop final handler (user decision 2026-10-02, reverting the
+     * continuous session): the platform recognizer is single-shot — it
+     * ends the utterance on silence/timeout and fires onResults — so the
+     * final commits the text and the session STOPS. Listening ends on
+     * platform end or user tap. Blank finals still end the session
+     * (flag cleared, draft untouched).
      */
     internal fun onDictationFinal(text: String) {
         if (!_isListening.value) return
+        _isListening.value = false
         val trimmed = text.trim()
         val anchor = partialAnchor
         val standing = lastPartial
         lastPartial = ""
         partialAnchor = null
-        if (trimmed.isNotEmpty()) {
-            updateInput { state ->
-                val current = state.inputText
-                if (anchor != null && standing.isNotEmpty() &&
-                    anchor <= current.length &&
-                    current.regionMatches(anchor, standing, 0, standing.length)
-                ) {
-                    lastKnownCursor = anchor + trimmed.length
-                    state.copy(
-                        inputText = current.substring(0, anchor) + trimmed +
-                            current.substring(anchor + standing.length),
-                    )
-                } else {
-                    val (inserted, start) = insertAtCursor(current, trimmed, lastKnownCursor)
-                    lastKnownCursor = start + trimmed.length
-                    state.copy(inputText = inserted)
-                }
+        if (trimmed.isEmpty()) return
+        updateInput { state ->
+            val current = state.inputText
+            if (anchor != null && standing.isNotEmpty() &&
+                anchor <= current.length &&
+                current.regionMatches(anchor, standing, 0, standing.length)
+            ) {
+                lastKnownCursor = anchor + trimmed.length
+                state.copy(
+                    inputText = current.substring(0, anchor) + trimmed +
+                        current.substring(anchor + standing.length),
+                )
+            } else {
+                val (inserted, start) = insertAtCursor(current, trimmed, lastKnownCursor)
+                lastKnownCursor = start + trimmed.length
+                state.copy(inputText = inserted)
             }
         }
-        // Single-shot platform ended the utterance: re-arm for the next
-        // one while the session is live. A synchronous failure ends the
-        // session instead of stranding the stop toggle on a dead
-        // recognizer (same WR-01 contract as startDictation).
-        _isListening.value = restartDictation()
     }
 
     /**
-     * Continuous-dictation error policy (user decision 2026-10-02):
-     * recoverable ends-of-utterance (no speech, speech timeout) re-arm
-     * the session instead of stopping it — a pause is not a stop. Fatal
-     * errors (permissions, busy, server, language) clear listening state
-     * plus the partial tracking; the draft keeps whatever partial text
+     * Auto-stop error policy (user decision 2026-10-02): any recognition
+     * error (no speech, timeout, permissions, busy, server, language)
+     * ends the session — a pause is a stop. Clears listening state plus
+     * the partial tracking; the draft keeps whatever partial text
      * arrived. No event emission, no error copy.
      */
     internal fun onDictationError(error: Int) {
@@ -1606,29 +1598,7 @@ class ChatViewModel @Inject constructor(
         Timber.w("Voice: recognition error $error, keeping partial draft")
         lastPartial = ""
         partialAnchor = null
-        _isListening.value = if (isRecoverableDictationError(error)) {
-            restartDictation()
-        } else {
-            false
-        }
-    }
-
-    private fun isRecoverableDictationError(error: Int): Boolean =
-        error == android.speech.SpeechRecognizer.ERROR_NO_MATCH ||
-            error == android.speech.SpeechRecognizer.ERROR_SPEECH_TIMEOUT
-
-    /**
-     * Re-arm the platform recognizer for the next continuous-dictation
-     * utterance. Returns the new listening state (false when the
-     * synchronous start failed).
-     */
-    private fun restartDictation(): Boolean {
-        return try {
-            (dictationManagerOverride ?: dictationManager)?.start() ?: false
-        } catch (e: Exception) {
-            Timber.w(e, "Voice: dictation restart failed")
-            false
-        }
+        _isListening.value = false
     }
 
     /**
