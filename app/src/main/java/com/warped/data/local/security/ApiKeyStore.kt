@@ -27,31 +27,5 @@ class ApiKeyStore @Inject constructor(
 
     fun deleteAllKeys(endpointIds: List<Long>) {
         endpointIds.forEach { deleteKey(it) }
-        deleteTavilyKey()
-    }
-
-    /**
-     * Phase 55 (TAV-01): Tavily key under a dedicated string alias.
-     * Tavily is NOT per-endpoint — never shoehorn it under a fake
-     * endpoint Long id (orphan precedent: `huggingface_token`).
-     * Same KeystoreManager backing + CharArray-zeroing discipline as
-     * [storeKey]; key material never hits logs.
-     */
-    fun storeTavilyKey(apiKey: CharArray) {
-        val bytes = apiKey.concatToString().toByteArray(Charsets.UTF_8)
-        apiKey.fill('0')
-        keystoreManager.put(TAVILY_ALIAS, bytes.toString(Charsets.UTF_8))
-        bytes.fill(0)
-    }
-
-    fun getTavilyKey(): CharArray? =
-        keystoreManager.get(TAVILY_ALIAS)?.toCharArray()
-
-    fun deleteTavilyKey() {
-        keystoreManager.remove(TAVILY_ALIAS)
-    }
-
-    companion object {
-        const val TAVILY_ALIAS = "tavily_api_key"
     }
 }

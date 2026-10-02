@@ -255,10 +255,6 @@
     <string name="bubble_offline_queued">Offline. Model-only answer, no page content. Queued.</string>
     <string name="bubble_fetch_failed_one">Couldn\'t read the page. Model-only answer — check your connection or paste another link.</string>
     <string name="bubble_fetch_failed_many">Couldn\'t read the pages. Model-only answer — check your connection or paste other links.</string>
-    <string name="bubble_tavily_missing">No Tavily key saved. Model-only answer — get a key at tavily.com and paste it in Settings &gt; Web Search.</string>
-    <string name="bubble_images_need_key">Image results need a Tavily key — get one at tavily.com and paste it in Settings &gt; Web Search.</string>
-    <string name="bubble_tavily_invalid">Invalid Tavily key. Model-only answer — check the key in Settings &gt; Web Search.</string>
-    <string name="bubble_tavily_limit">Tavily usage limit reached. Model-only answer — check your plan usage and try again later.</string>
     <string name="bubble_tools_unsupported">This endpoint doesn\'t support tool calling. Model-only answer — no web sources this turn. Switch to a tool-capable endpoint to restore search.</string>
     <string name="bubble_retry">Retry</string>
     <string name="bubble_retry_hint">Retry reading the pages. Available when the connection recovers.</string>
@@ -331,24 +327,6 @@
     <string name="settings_msg_chats_deleted">All chat history deleted</string>
     <string name="settings_msg_keys_deleted">All API keys deleted</string>
     <string name="settings_msg_key_deleted">API key deleted</string>
-    <string name="settings_tavily_title">Tavily search</string>
-    <string name="settings_tavily_desc">Ground answers in web search results. Get a key at tavily.com.</string>
-    <string name="settings_tavily_present">Key saved</string>
-    <string name="settings_tavily_absent">No key saved</string>
-    <string name="settings_tavily_label">Tavily API key</string>
-    <string name="tavily_test">Test connection</string>
-    <string name="tavily_testing_short">Testing…</string>
-    <string name="tavily_paste_key">Paste a key before saving.</string>
-    <string name="tavily_key_saved">Tavily API key saved.</string>
-    <string name="tavily_save_failed">Couldn\'t save the key. Try again.</string>
-    <string name="tavily_key_deleted">Tavily API key deleted.</string>
-    <string name="tavily_delete_failed">Couldn\'t delete the key. Try again.</string>
-    <string name="tavily_testing">Testing connection…</string>
-    <string name="tavily_ok">Connection successful. Tavily search is working.</string>
-    <string name="tavily_bad_key">Invalid API key. Check the key and try again.</string>
-    <string name="tavily_429">Usage limit reached (429). Check your Tavily plan.</string>
-    <string name="tavily_net_error">Network error. Check your connection and try again.</string>
-    <string name="tavily_no_key">No API key saved. Get one at tavily.com and paste it above.</string>
 
     <!-- Presets -->
     <string name="preset_params_title">Generation Parameters</string>
@@ -498,7 +476,7 @@
     <string name="help_s7_step2">Watch the Fuentes strip fill as pages resolve; tap any source for a preview.</string>
     <string name="help_s7_step3">The Sin web chip sends one model-only message; per-chat Sí/No/Heredar lives in the chat header.</string>
     <string name="help_s7_step4">Offline sends queue up — tap Reintentar when you are back online.</string>
-    <string name="help_s7_step5">A Tavily key (Settings) adds search-result grounding with citations.</string>
+    <string name="help_s7_step5">Web grounding adds search-result grounding with citations — no key needed.</string>
     <string name="help_s8_title">8. Tips &amp; Shortcuts</string>
     <string name="help_s8_step1">Enter key sends your message. Shift+Enter adds a new line.</string>
     <string name="help_s8_step2">Use Presets to save generation parameters (temperature, top_p, etc.).</string>

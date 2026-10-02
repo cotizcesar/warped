@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.*
@@ -38,9 +37,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -349,18 +345,6 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
             }
         }
 
-        // Web Search section (Phase 55 TAV-01: dedicated card above
-        // Security so the Security card stays untouched)
-        item {
-            SettingsSectionHeader(
-                icon = Icons.Filled.Search,
-                title = stringResource(R.string.settings_section_websearch)
-            )
-        }
-        item {
-            TavilyKeyCard(uiState, viewModel)
-        }
-
         // Security section
         item {
             SettingsSectionHeader(
@@ -388,92 +372,6 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
             }
         }
         item { Spacer(Modifier.height(24.dp)) }
-    }
-}
-
-// =========================================
-// Phase 55 (TAV-01): Tavily key row (D-01)
-//
-// Password-style field (T-55-05: no echo of the stored key — the saved key
-// is never read back into the field, only a presence line), Save + Clear +
-// Test connection, status line with the four test states. Never logs key
-// material.
-// =========================================
-@Composable
-private fun TavilyKeyCard(uiState: SettingsUiState, viewModel: SettingsViewModel) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(stringResource(R.string.settings_tavily_title), style = MaterialTheme.typography.bodyLarge)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                stringResource(R.string.settings_tavily_desc),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                if (uiState.tavilyKeyPresent) stringResource(R.string.settings_tavily_present) else stringResource(R.string.settings_tavily_absent),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = uiState.tavilyKeyInput,
-                onValueChange = viewModel::onTavilyKeyInputChange,
-                label = { Text(stringResource(R.string.settings_tavily_label)) },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                enabled = !uiState.tavilyTesting,
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = Color(0xFF374151)
-                )
-            )
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(
-                    onClick = { viewModel.saveTavilyKey() },
-                    enabled = !uiState.tavilyTesting
-                ) { Text(stringResource(R.string.save)) }
-                TextButton(
-                    onClick = { viewModel.clearTavilyKey() },
-                    enabled = !uiState.tavilyTesting,
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) { Text(stringResource(R.string.action_clear)) }
-                TextButton(
-                    onClick = { viewModel.testTavilyConnection() },
-                    enabled = !uiState.tavilyTesting
-                ) { Text(if (uiState.tavilyTesting) stringResource(R.string.tavily_testing_short) else stringResource(R.string.tavily_test)) }
-            }
-            if (uiState.tavilyStatus != null) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    uiState.tavilyStatus,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (uiState.tavilyStatusIsError) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                )
-            }
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Test connection uses one search credit.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
     }
 }
 

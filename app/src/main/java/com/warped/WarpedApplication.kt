@@ -17,7 +17,12 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
 import com.warped.BuildConfig
 import com.warped.data.local.inference.EngineManager
+import com.warped.data.local.security.KeystoreManager
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.HiltAndroidApp
+import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
 import okio.Path.Companion.toOkioPath
 import timber.log.Timber
@@ -71,6 +76,7 @@ class WarpedApplication : Application(), Configuration.Provider, SingletonImageL
 
     override fun onCreate() {
         super.onCreate()
+        cleanupOrphanedSearchAlias()
         createNotificationChannels()
         // Chain the previous handler (lint DefaultUncaughtExceptionDelegation):
         // log first, then delegate so crash reporting still fires; only when
@@ -102,6 +108,25 @@ class WarpedApplication : Application(), Configuration.Provider, SingletonImageL
                     .penaltyLog()
                     .build()
             )
+        }
+    }
+
+    /**
+     * Phase 63 (SEARCH-03): one-shot best-effort cleanup of the orphaned
+     * legacy search-provider Keystore alias left by pre-DDG-only installs.
+     * Never throws — a locked Keystore must not block launch (T-63-04).
+     * KeystoreManager itself already swallows storage exceptions; the outer
+     * guard covers EntryPoint resolution as well.
+     */
+    private fun cleanupOrphanedSearchAlias() {
+        try {
+            val entryPoint = EntryPointAccessors.fromApplication(
+                this,
+                OrphanedSearchCleanupEntryPoint::class.java
+            )
+            entryPoint.keystoreManager().remove("tavily_api_key")
+        } catch (e: Exception) {
+            Timber.w(e, "Orphaned search alias cleanup skipped")
         }
     }
 
@@ -137,6 +162,17 @@ class WarpedApplication : Application(), Configuration.Provider, SingletonImageL
     companion object {
         const val CHANNEL_DOWNLOADS = "model_downloads"
     }
+}
+
+/**
+ * Phase 63 (SEARCH-03): Hilt EntryPoint for the one-shot orphaned legacy
+ * search alias cleanup. Application.onCreate runs before Hilt injection is
+ * available on the Application itself, hence the EntryPoint lookup.
+ */
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface OrphanedSearchCleanupEntryPoint {
+    fun keystoreManager(): KeystoreManager
 }
 
 class RedactingTree : Timber.DebugTree() {
