@@ -75,6 +75,7 @@ fun ChatScreen(
     viewModel: ChatViewModel = hiltViewModel(),
     onOpenDrawer: () -> Unit = {},
     onNavigateToSelector: () -> Unit = {},
+    onNavigateToCatalog: () -> Unit = {},
     conversationId: Long = 0L,
     newChat: Boolean = false
 ) {
@@ -559,9 +560,7 @@ fun ChatScreen(
             onModelSelected = { modelId, providerType, endpointId ->
                 viewModel.launchModelSelection(modelId, providerType, endpointId)
             },
-            webOverride = connection.webOverride,
-            globalWebEnabled = connection.webGroundingEnabled,
-            onWebOverrideSelected = { viewModel.setWebOverride(it) }
+            onNavigateToCatalog = { showModelPicker = false; onNavigateToCatalog() }
         )
     }
 }
