@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -197,6 +198,12 @@ fun ChatScreen(
                 // the mic without a process restart.
                 viewModel.refreshSpeechAvailability()
             }
+            // Phase 67 (VMSG-01 full): backgrounding auto-stops recording
+            // and keeps the clip (no foreground service). Rotation is a
+            // config change, not a pause, so VM-owned state survives it.
+            if (event == Lifecycle.Event.ON_PAUSE) {
+                viewModel.autoStopVoiceRecording()
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
@@ -364,23 +371,48 @@ fun ChatScreen(
         }
     }
 
-    // Phase 67 (VMSG-01 full): voice-send tap gate. Granted toggles
-    // start/stop; first ungranted tap opens the in-context rationale,
-    // later taps request directly — both carrying the VOICE intent so the
-    // shared launcher result routes back to recording. Recording never
-    // starts without the runtime grant (no-op otherwise, no crash).
-    // Capability guards (text-only / remote toasts) land in Task 2.
+    // Phase 67 (VMSG-01 full): voice-send tap gate. Order: capability
+    // guards first (feedback toasts, never dead buttons), then the
+    // permission flow carrying the VOICE intent, then the toggle.
+    // isLoadingModel locks the whole bar via inputLocked (existing gate —
+    // verified, not duplicated), so the button is unreachable mid-load.
     val onVoiceClick = {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            if (isVoiceRecording) viewModel.stopVoiceRecording() else viewModel.startVoiceRecording()
-        } else if (!voiceRationaleSeen) {
-            pendingVoiceRequest = PendingVoiceRequest.VOICE
-            showVoiceRationale = true
-        } else {
-            pendingVoiceRequest = PendingVoiceRequest.VOICE
-            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        val localId = connection.selectedLocalModelId
+        val audioCapable = viewModel.verifiedLocalCapabilities(localId)?.audio ?: true
+        val remoteSelected = localId == null && connection.selectedRemoteModelId != null
+        when {
+            !audioCapable -> {
+                Toast.makeText(context, R.string.error_no_audio, Toast.LENGTH_SHORT).show()
+            }
+            remoteSelected -> {
+                // TODO(67-02-Task3): resource as voice_msg_remote_blocked.
+                Toast.makeText(
+                    context,
+                    "Voice messages need an on-device audio model.",
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED -> {
+                if (isVoiceRecording) viewModel.stopVoiceRecording() else viewModel.startVoiceRecording()
+            }
+            !voiceRationaleSeen -> {
+                pendingVoiceRequest = PendingVoiceRequest.VOICE
+                showVoiceRationale = true
+            }
+            else -> {
+                pendingVoiceRequest = PendingVoiceRequest.VOICE
+                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+    }
+    // Phase 67 (VMSG-01 full): 60 s auto-stop toast. Collects the one-shot
+    // voiceCapEvent flow (once per emission — never derived from
+    // isVoiceRecording state, so recomposition cannot re-fire it).
+    // TODO(67-02-Task3): resource as voice_msg_cap_reached.
+    LaunchedEffect(Unit) {
+        viewModel.voiceCapEvent.collect {
+            Toast.makeText(context, "60s limit reached", Toast.LENGTH_SHORT).show()
         }
     }
 
