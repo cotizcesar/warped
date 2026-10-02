@@ -1799,6 +1799,9 @@ class ChatViewModel @Inject constructor(
     /** Test seam: a fake replaces the platform recorder in unit tests. */
     internal var voiceRecorderOverride: VoiceMessageRecorder? = null
 
+    // WR-02: read/written from IO coroutines (send/transcode vs duration
+    // validation) — volatile so the mid-flight slot check observes it.
+    @Volatile
     private var voiceClipFile: java.io.File? = null
     private var voiceSessionJob: Job? = null
 
@@ -2156,9 +2159,22 @@ class ChatViewModel @Inject constructor(
                 PcmTranscoder.transcodeFirst30s(file.absolutePath)
             } catch (e: Exception) {
                 Timber.w(e, "VoiceMsg: transcode failed")
-                voiceClipFile = file
-                _hasVoiceClip.value = true
-                _draftDurationMs.value = lastSentVoiceDurationMs
+                // WR-02: only restore when no newer clip took the slot
+                // mid-flight (the input bar offers record again immediately).
+                // Otherwise clip B is live — delete the failed file and drop
+                // the stale holders instead of clobbering B.
+                if (voiceClipFile == null) {
+                    voiceClipFile = file
+                    _hasVoiceClip.value = true
+                    _draftDurationMs.value = lastSentVoiceDurationMs
+                } else {
+                    try {
+                        if (file.exists()) file.delete()
+                    } catch (_: Exception) {
+                    }
+                    lastSentVoicePath = null
+                    lastSentVoiceDurationMs = 0L
+                }
                 _events.tryEmit(ChatEvent.Snackbar(context.getString(R.string.voice_msg_transcode_failed)))
                 return@launch
             }
