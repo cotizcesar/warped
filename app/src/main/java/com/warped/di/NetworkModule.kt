@@ -5,12 +5,9 @@ import okhttp3.Cache
 import okhttp3.CacheControl
 import okhttp3.ConnectionPool
 import okhttp3.Interceptor
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
-import retrofit2.Retrofit
-import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import timber.log.Timber
 import java.io.File
 import java.util.concurrent.TimeUnit
