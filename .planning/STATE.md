@@ -2,21 +2,26 @@
 gsd_state_version: "1.0"
 milestone: v3.1
 milestone_name: Voice Messages + New Tool
+current_phase: 68
+current_phase_name: Voice Draft + Playback History
 status: planning
-last_updated: "2026-10-02T18:21:33.815Z"
+stopped_at: Phase 67 complete, ready to plan Phase 68
+last_updated: "2026-10-02T19:24:27.279Z"
 last_activity: 2026-10-02
+last_activity_desc: Phase 67 complete, transitioned to Phase 68
+state_head: 38e030f0de05dc4a8a7fe3fd195175893c65e0fc
 progress:
   total_phases: 4
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 2
+  completed_plans: 2
+  percent: 25
 ---
 
 # Project State: Warped
 
 **Last updated:** 2026-09-30
-**Last activity:** 2026-10-02 — Phase 66 complete
+**Last activity:** 2026-10-02 — Phase 67 complete, transitioned to Phase 68
 
 ## Project Reference
 
@@ -27,9 +32,9 @@ See: .planning/PROJECT.md (updated 2026-10-01, v2.5 shipped)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
+Phase: 68 — Voice Draft + Playback History
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-10-02 — Milestone v3.1 started
 
 ## Phase Structure (v3.1 — PLANNED)
@@ -85,6 +90,7 @@ None yet.
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
+| Release-UAT | 67 voice device smoke (record→send→response on audio-capable allowlist model; 60 s cap toast; >30 s note; cancel/denial/background/rotation — runbook in 67/deferred-items.md) | Accepted, release UAT | Phase 67 close |
 | Release-UAT | 61 Leg 1B model-B switch (needs second complete model) | Accepted, release UAT | Phase 61 close |
 | Release-UAT | 60 follow-ups: 3-button nav visuals; light-theme visuals (blocked, no toggle); Play Console target warnings; foldable posture; quota-pressure platform stop | Accepted, release UAT | Phase 60 close |
 | Release-UAT | G-59-01 16KB chat turn (healthy 16 KB system + smallest-model download + local chat turn, zero native failures) | Accepted, release UAT | Phase 59 close |
@@ -138,7 +144,7 @@ See prior STATE history for v2.2–v2.4 quick-task log (archived at roadmap rewr
 **Resume file:** —
 
 Last session: 2026-10-02
-Stopped at: v3.1 roadmap created — Phases 67-70 ready
+Stopped at: Phase 67 complete, ready to plan Phase 68
 Resume: `/gsd-plan-phase 67` (after `/clear`)
 
 ## Operator Next Steps
