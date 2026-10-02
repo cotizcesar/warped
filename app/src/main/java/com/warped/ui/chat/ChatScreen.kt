@@ -1,9 +1,16 @@
 package com.warped.ui.chat
 
+import android.Manifest
+import android.app.Activity
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -85,6 +92,11 @@ fun ChatScreen(
     val transcript by viewModel.transcriptState.collectAsStateWithLifecycle()
     val input by viewModel.inputState.collectAsStateWithLifecycle()
     val connection by viewModel.connectionState.collectAsStateWithLifecycle()
+    // Phase 65 (VOICE-02 UI): dictation affordance state. Cached flows from
+    // the ViewModel (platform probe ran once at init off the main thread) —
+    // reading them here adds no composition-hot-path work.
+    val speechAvailable by viewModel.speechAvailable.collectAsStateWithLifecycle()
+    val isListening by viewModel.isListening.collectAsStateWithLifecycle()
     // 48-01 (PERF-15): keyed LazyColumn state. isAtBottom follows 48-UI-SPEC
     // §3 ("last item visible and within 48dp of the end").
     val listState = rememberLazyListState()
@@ -109,6 +121,9 @@ fun ChatScreen(
     var audioBytes by remember { mutableStateOf<ByteArray?>(null) }
     var isRecording by remember { mutableStateOf(false) }
     var showModelPicker by remember { mutableStateOf(false) }
+    // Phase 65 (VOICE-02): first-tap rationale visibility. Shown only when
+    // RECORD_AUDIO is ungranted; confirm fires the system request.
+    var showVoiceRationale by remember { mutableStateOf(false) }
     // API-03: system back dismisses the model picker through the same
     // onDismiss path as tap-outside/scrim — gesture and button identical.
     // (The sheet itself also self-dismisses; this is the explicit contract.)
@@ -132,6 +147,10 @@ fun ChatScreen(
     }
     DisposableEffect(Unit) {
         onDispose {
+            // Phase 65 (VOICE-03): stop dictation when leaving the screen so
+            // the recognizer never outlives the UI (destroy itself happens
+            // in ChatViewModel.onCleared).
+            viewModel.stopDictation()
             viewModel.unloadLocalModels()
         }
     }
@@ -188,17 +207,28 @@ fun ChatScreen(
             when (event) {
                 is ChatEvent.Snackbar ->
                     snackbarHostState.showSnackbar(event.message, duration = SnackbarDuration.Short)
-                // Phase 65 (VOICE-01 foundation): render the denial event
-                // through the same host. The Settings action wiring
-                // (OPEN_APP_SETTINGS deep-link) lands in plan 65-02 with
-                // the permission flow — this branch only keeps the
-                // exhaustive when compiling until then.
+                // Phase 65 (VOICE-02): permanent-denial escape. Long duration
+                // for reading time + action tap; the Settings action
+                // deep-links to this app's OS details page only (fixed
+                // ACTION_APPLICATION_DETAILS_SETTINGS + package URI, no
+                // extras, no user-controlled destination — T-65-05).
                 is ChatEvent.SnackbarWithAction ->
-                    snackbarHostState.showSnackbar(
-                        message = event.message,
-                        actionLabel = event.actionLabel,
-                        duration = SnackbarDuration.Long,
-                    )
+                    when (event.action) {
+                        SnackbarAction.OPEN_APP_SETTINGS -> {
+                            val result = snackbarHostState.showSnackbar(
+                                message = event.message,
+                                actionLabel = event.actionLabel,
+                                duration = SnackbarDuration.Long,
+                            )
+                            if (result == SnackbarResult.ActionPerformed) {
+                                context.startActivity(
+                                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                        data = Uri.fromParts("package", context.packageName, null)
+                                    }
+                                )
+                            }
+                        }
+                    }
             }
         }
     }
@@ -225,6 +255,39 @@ fun ChatScreen(
                     duration = SnackbarDuration.Short
                 )
             }
+        }
+    }
+
+    // Phase 65 (VOICE-02): RECORD_AUDIO runtime request. Follows the
+    // imagePickerLauncher shape above with ActivityResultContracts
+    // .RequestPermission. Granted → start dictation; permanent denial
+    // (shouldShowRequestPermissionRationale false after denial) emits the
+    // Settings-escape Snackbar; transient denial stays silent.
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            viewModel.startDictation()
+        } else {
+            val activity = context as? Activity
+            val permanent = activity?.let {
+                !ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.RECORD_AUDIO)
+            } ?: false
+            if (permanent) viewModel.emitMicDenied()
+        }
+    }
+
+    // Phase 65 (VOICE-01): mic tap gate. The permission check runs inside
+    // the click lambda — never on the composition hot path, so the input
+    // bar never janks. Granted toggles start/stop; ungranted opens the
+    // in-context rationale (whose confirm fires the launcher above).
+    val onMicClick = {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            if (isListening) viewModel.stopDictation() else viewModel.startDictation()
+        } else {
+            showVoiceRationale = true
         }
     }
 
@@ -335,6 +398,9 @@ fun ChatScreen(
                     ?: true,
                 onAudioRecorded = { bytes -> audioBytes = bytes },
                 onAudioRecordingChanged = { isRecording = it },
+                speechAvailable = speechAvailable,
+                isListening = isListening,
+                onMicClick = onMicClick,
             )
             }
         }
@@ -532,6 +598,36 @@ fun ChatScreen(
                 ) {
                     Text(stringResource(R.string.model_no_longer_installed))
                 }
+            }
+
+            // Phase 65 (VOICE-02): first-tap in-context rationale. Copies the
+            // WarpedAlertDialog slot pattern below; confirm is the sole
+            // trigger of the system RECORD_AUDIO request (T-65-04), dismiss
+            // reuses the existing dismiss string.
+            if (showVoiceRationale) {
+                WarpedAlertDialog(
+                    onDismissRequest = { showVoiceRationale = false },
+                    title = { Text(stringResource(R.string.voice_rationale_title)) },
+                    text = {
+                        Text(
+                            stringResource(R.string.voice_rationale_body),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            showVoiceRationale = false
+                            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }) {
+                            Text(stringResource(R.string.voice_rationale_allow))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showVoiceRationale = false }) {
+                            Text(stringResource(R.string.dismiss))
+                        }
+                    }
+                )
             }
 
             // Model switch confirmation dialog
