@@ -44,9 +44,11 @@ object DocumentPrompt {
 
     /**
      * Strips hijack lines, then escapes document delimiter collisions so a
-     * pasted `--- Document: [` / `--- End of document ---` /
+     * pasted `--- Document:` / `--- End of document ---` /
      * `[DOCUMENT CONTEXT` can never forge block boundaries (mirrors the
-     * WebContextSanitizer lines 56-60 escaping shape).
+     * WebContextSanitizer lines 56-60 escaping shape, adapted: the
+     * document envelope header carries no `[N]` index, so the whole
+     * `--- Document:` prefix is neutralized, not just a bracket variant).
      */
     fun sanitize(text: String): String {
         val kept = text.split("\n").filter { line ->
@@ -56,9 +58,25 @@ object DocumentPrompt {
         }
         return kept.joinToString("\n")
             .replace("[DOCUMENT CONTEXT", "[DOCUMENT-CONTEXT")
-            .replace("--- Document: [", "--- Document:-[")
+            .replace("--- Document:", "--- Document-:")
             .replace("--- End of document ---", "--- End-of-document ---")
     }
+
+    /**
+     * Phase 70 fix (CR-01): SAF `DISPLAY_NAME` is attacker-influenced (a
+     * shared or downloaded file can carry newlines / control chars /
+     * instruction text or a forged `--- End of document ---` line) and the
+     * envelope header interpolates it into model context, bypassing
+     * [sanitize] (which only covers the body). Strip line breaks + control
+     * chars, trim, cap length; blank falls back to `document.txt`. Pure —
+     * JVM-testable.
+     */
+    fun sanitizeFilename(raw: String): String =
+        raw.map { c -> if (c == '\n' || c == '\r' || c < ' ' || c == '\\u007F') ' ' else c }
+            .joinToString("")
+            .trim()
+            .take(120)
+            .ifBlank { "document.txt" }
 
     /**
      * Fuses a sanitized document block into the turn — same order as

@@ -57,7 +57,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.warped.R
 import timber.log.Timber
-import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicLong
@@ -3556,28 +3555,41 @@ class ChatViewModel @Inject constructor(
         } catch (e: Exception) {
             Timber.w(e, "Chat: document metadata query failed")
         }
+        // Phase 70 fix (CR-01): DISPLAY_NAME is attacker-influenced — clean
+        // it before it enters model context (block header), Fuentes rows,
+        // or the chip/notices (all read `filename` downstream).
+        filename = DocumentPrompt.sanitizeFilename(filename)
         if (!DocumentReader.gate(mime, filename)) {
             return AttachedDocument(uri, filename, sizeBytes, "", "", null, AttachStatus.UNSUPPORTED)
         }
         return try {
             val cap = DocumentReader.capFor(_connection.value.generationParameters.contextSize)
-            val bytes = ByteArray(cap + 1)
+            // Phase 70 fix (CR-02): read cap + 1 CHARS (not bytes) so the
+            // truncation signal matches DocumentReader.bound()'s char unit —
+            // a byte probe silently drops multi-byte UTF-8 without the
+            // marker. The +1 slot detects over-cap without over-reading.
+            val buf = CharArray(cap + 1)
             var total = 0
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                val buffered = (input as? BufferedInputStream) ?: BufferedInputStream(input)
+            context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { reader ->
                 while (total < cap + 1) {
-                    val n = buffered.read(bytes, total, cap + 1 - total)
+                    val n = reader.read(buf, total, cap + 1 - total)
                     if (n == -1) break
                     total += n
                 }
             } ?: return AttachedDocument(uri, filename, sizeBytes, "", "", null, AttachStatus.FAILED)
             if (sizeBytes < 0) sizeBytes = total.toLong()
-            val decoded = String(bytes, 0, total, Charsets.UTF_8)
+            val decoded = String(buf, 0, total)
             if (decoded.isBlank()) {
                 return AttachedDocument(uri, filename, sizeBytes, "", "", null, AttachStatus.FAILED)
             }
             val (bounded, truncatedAt) = DocumentReader.bound(decoded, cap)
             val sanitized = DocumentPrompt.sanitize(bounded)
+            // Phase 70 fix (WR-05): a sanitizer that strips everything
+            // degrades like an unreadable file — a header/footer-only block
+            // with no content must not attach as READY.
+            if (sanitized.isBlank()) {
+                return AttachedDocument(uri, filename, sizeBytes, "", "", null, AttachStatus.FAILED)
+            }
             AttachedDocument(
                 uri = uri,
                 filename = filename,
