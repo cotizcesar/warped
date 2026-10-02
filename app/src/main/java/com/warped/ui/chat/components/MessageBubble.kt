@@ -52,6 +52,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.warped.R
@@ -84,6 +85,11 @@ fun MessageBubble(
     voiceFileMissing: Boolean = false,
     onPlayVoice: () -> Unit = {},
     onPauseVoice: () -> Unit = {},
+    // Phase 69 Plan 02 (VMSG-07): transcript caption source override.
+    // Defaults to null so previews and non-voice callers compile unchanged;
+    // the caption reads this first, then message.transcript hydrated from
+    // history load.
+    transcript: String? = null,
 ) {
     val isUser = message.role == Role.USER
     // Phase 49 (DEL-01): persisted tool rows render as collapsed transcript
@@ -259,6 +265,20 @@ fun MessageBubble(
                         onPlay = onPlayVoice,
                         onPause = onPauseVoice,
                     )
+                    // Phase 69 Plan 02 (VMSG-07): transcript caption
+                    // UNDERNEATH the player row (Phase 68 chrome untouched —
+                    // player above, caption below). NULL/blank renders the
+                    // honest duration-only fallback (never empty, never a
+                    // fake transcript). Missing-file rows stay caption-free;
+                    // assistant bubbles never reach this branch (isUser).
+                    if (!voiceFileMissing) {
+                        Spacer(Modifier.height(4.dp))
+                        VoiceTranscriptCaption(
+                            transcript = transcript ?: message.transcript,
+                            durationMs = message.audioDurationMs,
+                            messageKey = message.id,
+                        )
+                    }
                 }
 
                 if (message.content.isNotBlank()) {
@@ -788,5 +808,67 @@ private fun VoicePlayerRow(
             ),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+/**
+ * Phase 69 Plan 02 (VMSG-07): own-voice bubble transcript caption. Label
+ * 14sp in onSurfaceVariant (the existing duration-readout convention):
+ * non-blank transcripts cap at 2 lines with ellipsis plus a
+ * primary-tinted expand/collapse affordance shown ONLY when the text
+ * exceeds 2 lines (latched from onTextLayout overflow — expanded text
+ * never overflows, so a plain read would hide the collapse affordance). NULL/blank
+ * renders the duration-only fallback in identical styling (informational,
+ * never error-red — missing STT is not a user error).
+ *
+ * Expansion state is plain remember keyed by message id — rotation resets
+ * to collapsed, acceptable per UI-SPEC.
+ */
+@Composable
+private fun VoiceTranscriptCaption(
+    transcript: String?,
+    durationMs: Long,
+    messageKey: String,
+) {
+    if (transcript.isNullOrBlank()) {
+        val totalSec = (durationMs / 1000).toInt().coerceAtLeast(0)
+        Text(
+            text = stringResource(
+                R.string.voice_msg_transcript_fallback,
+                totalSec / 60,
+                totalSec % 60,
+            ),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+    var expanded by remember(messageKey) { mutableStateOf(false) }
+    var overflowed by remember(messageKey) { mutableStateOf(false) }
+    Text(
+        text = transcript,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = if (expanded) Int.MAX_VALUE else 2,
+        overflow = TextOverflow.Ellipsis,
+        onTextLayout = { layout ->
+            if (layout.hasVisualOverflow) overflowed = true
+        },
+    )
+    if (overflowed) {
+        TextButton(
+            onClick = { expanded = !expanded },
+            modifier = Modifier.sizeIn(minHeight = 48.dp),
+            contentPadding = PaddingValues(0.dp),
+        ) {
+            Text(
+                text = stringResource(
+                    if (expanded) R.string.voice_msg_show_less
+                    else R.string.voice_msg_show_more
+                ),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
     }
 }

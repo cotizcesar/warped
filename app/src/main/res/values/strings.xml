@@ -265,6 +265,10 @@
     <!-- Voice history bubbles (Phase 68) -->
     <string name="voice_msg_play_message">Play voice message, %1$d:%2$02d</string>
     <string name="voice_msg_pause_message">Pause voice message, %1$d:%2$02d</string>
+    <!-- Transcript captions (Phase 69) -->
+    <string name="voice_msg_show_more">Show more</string>
+    <string name="voice_msg_show_less">Show less</string>
+    <string name="voice_msg_transcript_fallback">%1$d:%2$02d voice message</string>
 
     <!-- Capability badges -->
     <string name="badge_vision">Vision</string>

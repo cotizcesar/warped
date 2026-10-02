@@ -537,9 +537,15 @@ class ChatViewModel @Inject constructor(
         // turns — a text send racing a voice send never steals the holders.
         val voicePath = if (audioBytes != null) lastSentVoicePath else null
         val voiceDuration = if (audioBytes != null) lastSentVoiceDurationMs else 0L
+        // Phase 69 Plan 02 (VMSG-07): stamp the frozen transcript holder
+        // onto voice turns (persisted by the existing EntityMappers into
+        // the 17-18 transcript column, hydrated on history load for free).
+        // Text/image sends leave it null. Consumed only for audio turns.
+        val voiceTranscript = if (audioBytes != null) lastSentVoiceTranscript else null
         if (audioBytes != null) {
             lastSentVoicePath = null
             lastSentVoiceDurationMs = 0L
+            lastSentVoiceTranscript = null
         }
         val userMessage = ChatMessage(
             role = Role.USER,
@@ -547,6 +553,7 @@ class ChatViewModel @Inject constructor(
             imageUris = imageDataUrls,
             audioPath = voicePath,
             audioDurationMs = voiceDuration,
+            transcript = voiceTranscript,
         )
         updateTranscript { it.copy(messages = it.messages + userMessage, isStreaming = true) }
         // 56-02: fresh turn clears any stale tool row (same position as the
@@ -1739,6 +1746,10 @@ class ChatViewModel @Inject constructor(
     fun startDictation() {
         // Phase 67 (VMSG-01): single live input mode — starting dictation
         // stops an active voice recording (keeps the clip for send).
+        // Phase 69 Plan 02 (VMSG-07): the transcript STT session stops
+        // FIRST — dictation and transcript STT never overlap (strictly
+        // sequential, ERROR_RECOGNIZER_BUSY avoidance).
+        stopTranscriptSession()
         if (_isVoiceRecording.value) stopVoiceRecording()
         // Phase 69 Plan 01 extension point (VMSG-07, Plan 02 owns): starting
         // dictation must also stop the transcript STT session first —
@@ -1943,6 +1954,137 @@ class ChatViewModel @Inject constructor(
     @VisibleForTesting
     internal var lastSentVoiceDurationMs: Long = 0L
 
+    /**
+     * Phase 69 Plan 02 (VMSG-07): parallel transcript STT session. A second
+     * VM-owned [VoiceDictationManager] instance runs DURING recording (not
+     * dictation) and fills the transcript buffer; send-time stamping follows
+     * the identical [lastSentVoicePath] holder pattern into the Room
+     * transcript column. Reuses the manager unchanged (zero new deps).
+     *
+     * Strictly sequential with dictation (ERROR_RECOGNIZER_BUSY avoidance):
+     * the session starts only after stopDictation() and stops on every
+     * recording end. STT failure degrades to a null holder (duration-only
+     * fallback) — voice-send is never blocked by STT state.
+     */
+    private var transcriptManager: VoiceDictationManager? = null
+
+    /** Test seam: a MockK fake replaces the platform manager in unit tests. */
+    internal var transcriptManagerOverride: VoiceDictationManager? = null
+
+    /** Committed finals this session (space-joined). Written from binder threads — volatile. */
+    @Volatile
+    private var transcriptFinalized: String = ""
+
+    /** Sticky session flag: any STT error degrades the holder to null. Written from binder threads — volatile. */
+    @Volatile
+    private var transcriptUnavailable: Boolean = false
+
+    /**
+     * Live transcript hypothesis (committed finals + current partial).
+     * Thread-safe StateFlow — callbacks only touch flows, never Compose
+     * state, never Main-blocked.
+     */
+    private val _voiceTranscriptLive = MutableStateFlow("")
+    internal val voiceTranscriptLive: StateFlow<String> = _voiceTranscriptLive.asStateFlow()
+
+    /**
+     * Phase 69 Plan 02 (VMSG-07): send-time transcript holder. Frozen from
+     * the live buffer on every recording end (trimmed, or null when blank /
+     * unavailable); stamped onto the voice turn's ChatMessage in
+     * [sendMessage] and cleared with the other holders. Text/image sends
+     * leave it null.
+     */
+    @VisibleForTesting
+    internal var lastSentVoiceTranscript: String? = null
+
+    private fun getTranscriptManager(): VoiceDictationManager {
+        transcriptManagerOverride?.let { return it }
+        return transcriptManager ?: VoiceDictationManager(
+            context = context,
+            onPartial = { onTranscriptPartial(it) },
+            onFinal = { onTranscriptFinal(it) },
+            // Degrade-to-null policy: failures never touch inputText and
+            // never emit UI events — the dictation callbacks stay
+            // dictation-only.
+            onError = { onTranscriptError(it) },
+        ).also { transcriptManager = it }
+    }
+
+    /**
+     * Phase 69 Plan 02 (VMSG-07): transcript partial — the latest hypothesis
+     * REPLACES the standing one (platform partials are cumulative, not
+     * deltas). Writes ONLY to the transcript buffer.
+     */
+    internal fun onTranscriptPartial(text: String) {
+        _voiceTranscriptLive.value = joinTranscript(transcriptFinalized, text)
+    }
+
+    /**
+     * Phase 69 Plan 02 (VMSG-07): transcript final — appends-if-new (trimmed,
+     * space-joined; skipped when blank or already the suffix, guarding
+     * duplicate delivery). Writes ONLY to the transcript buffer.
+     */
+    internal fun onTranscriptFinal(text: String) {
+        val clean = text.trim()
+        if (clean.isEmpty()) return
+        if (transcriptFinalized.endsWith(clean)) {
+            _voiceTranscriptLive.value = transcriptFinalized
+            return
+        }
+        transcriptFinalized = joinTranscript(transcriptFinalized, clean)
+        _voiceTranscriptLive.value = transcriptFinalized
+    }
+
+    /**
+     * Phase 69 Plan 02 (VMSG-07): transcript error — sticky unavailable for
+     * the session. Recording + send proceed normally; the holder degrades
+     * to null. Never touches inputText, never emits UI events.
+     */
+    internal fun onTranscriptError(@Suppress("unused") code: Int) {
+        transcriptUnavailable = true
+    }
+
+    private fun joinTranscript(base: String, addition: String): String {
+        val clean = addition.trim()
+        if (clean.isEmpty()) return base
+        if (base.isEmpty()) return clean
+        if (base.endsWith(clean)) return base
+        return "$base $clean"
+    }
+
+    /** Stop the transcript STT session (idempotent, best-effort). */
+    private fun stopTranscriptSession() {
+        try {
+            (transcriptManagerOverride ?: transcriptManager)?.stop()
+        } catch (e: Exception) {
+            Timber.w(e, "VoiceMsg: transcript stop failed")
+        }
+    }
+
+    /**
+     * Phase 69 Plan 02 (VMSG-07): stop the transcript session and freeze the
+     * send-time holder from the live buffer (trimmed, or null when blank /
+     * unavailable). Called on every recording end that keeps inspectable
+     * state; cancel/delete paths clear instead (see below).
+     */
+    private fun freezeTranscriptHolder() {
+        stopTranscriptSession()
+        val buffer = _voiceTranscriptLive.value.trim()
+        lastSentVoiceTranscript = if (transcriptUnavailable || buffer.isEmpty()) null else buffer
+    }
+
+    /**
+     * Phase 69 Plan 02 (VMSG-07): drop the transcript session, buffer, and
+     * holder — a rejected recording leaves no transcript behind.
+     */
+    private fun clearTranscriptState() {
+        stopTranscriptSession()
+        transcriptFinalized = ""
+        _voiceTranscriptLive.value = ""
+        transcriptUnavailable = false
+        lastSentVoiceTranscript = null
+    }
+
     private fun getVoicePlayer(): VoiceMessagePlayer {
         val fresh = voicePlayerOverride ?: voicePlayer ?: VoiceMessagePlayer(context).also {
             voicePlayer = it
@@ -1984,10 +2126,18 @@ class ChatViewModel @Inject constructor(
     fun startVoiceRecording() {
         if (voiceStarting || _isVoiceRecording.value) return
         stopDictation()
-        // Phase 69 Plan 01 extension point (VMSG-07, Plan 02 owns): the
-        // transcript STT session must start only AFTER the stopDictation()
-        // above (strictly sequential — never concurrent with dictation) and
-        // stop on every recording end (stop/cancel/auto-stop/delete).
+        // Phase 69 Plan 02 (VMSG-07): a new session owns the transcript
+        // slot — reset the LIVE buffer now (synchronously) so a spin-up
+        // stop that never ran STT can never freeze stale text. The holder
+        // is untouched: it still belongs to a possibly-kept previous draft
+        // until this session freezes or clears it.
+        transcriptFinalized = ""
+        _voiceTranscriptLive.value = ""
+        transcriptUnavailable = false
+        // Phase 69 Plan 02 (VMSG-07): the transcript STT session starts
+        // only AFTER the stopDictation() above (strictly sequential —
+        // never concurrent with dictation) and stops on every recording
+        // end (stop/cancel/auto-stop/delete) — see the accept block below.
         voiceStarting = true
         viewModelScope.launch(Dispatchers.IO + coroutineExceptionHandler) {
             try {
@@ -2010,6 +2160,10 @@ class ChatViewModel @Inject constructor(
                         }
                         // Phase 68: spin-up stops validate through the same
                         // sub-1 s choke point as every other stop path.
+                        // Phase 69 Plan 02 (VMSG-07): no STT ran in the
+                        // spin-up window (the buffer was reset at entry),
+                        // so freezing yields a null holder — honest.
+                        freezeTranscriptHolder()
                         keepClipAfterDurationCheck(kept, announceCap = false)
                     } else {
                         try {
@@ -2017,6 +2171,9 @@ class ChatViewModel @Inject constructor(
                         } catch (e: Exception) {
                             Timber.w(e, "VoiceMsg: pending-cancel failed")
                         }
+                        // Phase 69 Plan 02 (VMSG-07): spin-up cancel drops
+                        // transcript state like the cancel path below.
+                        clearTranscriptState()
                         voiceClipFile = null
                         _hasVoiceClip.value = false
                     }
@@ -2028,6 +2185,20 @@ class ChatViewModel @Inject constructor(
                 _voiceElapsedSec.value = 0
                 _voiceAmplitude.value = 0
                 _hasVoiceClip.value = false
+                // Phase 69 Plan 02 (VMSG-07): parallel transcript STT starts
+                // only once the recorder accepted the session (strictly
+                // after stopDictation above). Best-effort: start failure
+                // degrades to unavailable — recording continues and
+                // voice-send is never blocked by STT.
+                transcriptFinalized = ""
+                _voiceTranscriptLive.value = ""
+                transcriptUnavailable = false
+                try {
+                    if (!getTranscriptManager().start()) transcriptUnavailable = true
+                } catch (e: Exception) {
+                    Timber.w(e, "VoiceMsg: transcript STT start failed")
+                    transcriptUnavailable = true
+                }
                 // WR-03: a new live session invalidates any in-flight
                 // duration validation from the previous stop.
                 voiceClipSession++
@@ -2070,6 +2241,9 @@ class ChatViewModel @Inject constructor(
             Timber.w(e, "VoiceMsg: stop failed")
             null
         }
+        // Phase 69 Plan 02 (VMSG-07): every recording end stops the
+        // transcript session and freezes the send-time holder.
+        freezeTranscriptHolder()
         _isVoiceRecording.value = false
         _voiceAmplitude.value = 0
         return file
@@ -2204,6 +2378,9 @@ class ChatViewModel @Inject constructor(
         voiceClipSession++
         // A kept clip from an earlier stop is also discarded: cancel
         // means the user rejected the recording, not deferred it.
+        // Phase 69 Plan 02 (VMSG-07): cancel drops the transcript session,
+        // buffer, and holder with it.
+        clearTranscriptState()
         try {
             voiceClipFile?.takeIf { it.exists() }?.delete()
         } catch (e: Exception) {
@@ -2391,6 +2568,9 @@ class ChatViewModel @Inject constructor(
         // WR-03: the slot is discarded — a racing validation must not
         // resurrect the card.
         voiceClipSession++
+        // Phase 69 Plan 02 (VMSG-07): deleting the draft drops the frozen
+        // transcript holder with it (the row delete removes both).
+        clearTranscriptState()
         try {
             voiceClipFile?.takeIf { it.exists() }?.delete()
         } catch (e: Exception) {
@@ -3149,6 +3329,11 @@ class ChatViewModel @Inject constructor(
         super.onCleared()
         dictationManager?.destroy()
         dictationManager = null
+        // Phase 69 Plan 02 (VMSG-07): destroy the transcript STT manager
+        // next to the dictation manager — no recognizer leaks past the
+        // screen (same discipline as Phase 65).
+        transcriptManager?.destroy()
+        transcriptManager = null
         // Phase 67 (VMSG-01): cancel the recording session jobs and
         // destroy the recorder so nothing leaks past the screen.
         voiceSessionJob?.cancel()
