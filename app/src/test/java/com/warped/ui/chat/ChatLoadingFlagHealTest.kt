@@ -46,12 +46,13 @@ import org.junit.jupiter.api.Test
  * Regression tests for the stuck "Loading …litertlm" indicator heal in
  * [ChatViewModel.refreshActiveBackend].
  *
- * The indicator derives from `localSelection` (`modelId != null &&
- * !connected`), but several paths leave `LocalSelection(modelId,
- * connected=false)` behind while the engine is already loaded for that same
- * path (restart restore, cancelled preload, provider lazy-load). The heal
- * reconciles selection state against engine truth, so the untouched
- * collector clears `isLoadingModel` itself.
+ * The indicator derives from the explicit `LocalSelection.isLoading` load
+ * signal (set only by `markLocalLoading` on the send path, cleared by
+ * `connectLocal`/`markLocalDisconnected`) — never from the
+ * selected-but-unconnected derivation, so a pending selection (marked,
+ * engine not yet mounted) shows selected-not-loaded with no spinner.
+ * The heal reconciles selection state against engine truth, so the
+ * untouched collector clears `isLoadingModel` itself.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatLoadingFlagHealTest {
@@ -252,12 +253,29 @@ class ChatLoadingFlagHealTest {
     }
 
     @Test
-    fun `restart restore heals the rehydrated unconnected selection`() = runTest {
+    fun `pending selection shows no spinner`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val modelPath = "/models/tiny.litertlm"
+        val fixture = buildFixture(enginePath = null)
+        val vm = fixture.vm
+        runCurrent()
+
+        fixture.selection.selectLocalPending(modelPath)
+        advanceUntilIdle()
+
+        // Marked but not loading: selected-not-loaded, input enabled.
+        assertThat(vm.connectionState.value.selectedLocalModelId).isEqualTo(modelPath)
+        assertThat(vm.connectionState.value.isLoadingModel).isFalse()
+        assertThat(vm.connectionState.value.isLocalModelLoaded).isFalse()
+    }
+
+    @Test
+    fun `restart restore rehydrates pending never stuck loading`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val modelPath = "/models/tiny.litertlm"
         // Process restart: the persisted selection rehydrates as
-        // LocalSelection(modelId, connected=false) while the engine is
-        // already warm for the same path.
+        // LocalSelection(modelId, connected=false, loading=false) while
+        // the engine is already warm for the same path.
         val fixture = buildFixture(
             persistedLocalJson = """{"modelId":"$modelPath"}""",
             enginePath = modelPath,
@@ -265,9 +283,9 @@ class ChatLoadingFlagHealTest {
         val vm = fixture.vm
         advanceUntilIdle()
 
-        // The stuck state is visible right after restore.
+        // Pending: selected without the spinner (never stuck loading).
         assertThat(vm.connectionState.value.selectedLocalModelId).isEqualTo(modelPath)
-        assertThat(vm.connectionState.value.isLoadingModel).isTrue()
+        assertThat(vm.connectionState.value.isLoadingModel).isFalse()
 
         vm.refreshActiveBackendReflective()
         advanceUntilIdle()

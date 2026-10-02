@@ -134,8 +134,9 @@ class ModelActivationNewChatTest {
             assertThat(endpointId.captured).isEqualTo(0L)
             assertThat(viewModel.pendingChatId.value).isEqualTo(99L)
             verify { fixture.activeSelection.saveLastConversation(99L) }
-            // Existing connect logic kept: selection connects first.
-            verify { fixture.activeSelection.connectLocal("/models/test.litertlm", ProviderType.LITE_RT_LM) }
+            // Lazy load: activation marks pending — the engine mounts on
+            // the first send, never here.
+            verify { fixture.activeSelection.selectLocalPending("/models/test.litertlm") }
         }
 
     @Test
