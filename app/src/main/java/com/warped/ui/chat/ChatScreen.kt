@@ -770,21 +770,6 @@ private fun InlineModelSelectorBar(
 }
 
 /**
- * Quick-task (phase53-trio + thinking-header-feelings): model-sheet web
- * tri-state. Reads the existing per-chat `webOverride` tri-state — no new
- * state, no global resolution (inherit renders as inherit, never as the
- * effective value).
- */
-internal enum class WebOverrideIndicator { ON, OFF, INHERIT }
-
-internal fun webOverrideIndicator(webOverride: Boolean?): WebOverrideIndicator =
-    when (webOverride) {
-        true -> WebOverrideIndicator.ON
-        false -> WebOverrideIndicator.OFF
-        null -> WebOverrideIndicator.INHERIT
-    }
-
-/**
  * Unified turn status row (quick-turn-status): the single transient row in
  * the bottomBar slot above the input bar — tool > fetch/search > streaming
  * gap. Same slot visuals as the rows it replaces (16dp ring + 8dp gap +
