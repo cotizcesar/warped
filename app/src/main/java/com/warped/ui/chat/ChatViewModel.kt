@@ -1860,11 +1860,15 @@ class ChatViewModel @Inject constructor(
     internal var voiceDurationReader: (java.io.File) -> Long = { readClipDurationMs(it) }
 
     /**
-     * Rapid-toggle debounce mirroring [voiceStarting]: play/pause taps
-     * while a play is in flight are ignored.
+     * Rapid-toggle debounce shared by BOTH play paths (WR-01): draft and
+     * history share one [VoiceMessagePlayer], so independent per-path flags
+     * let near-simultaneous draft+history taps both pass their own gate,
+     * dual-arming flags and poll jobs while the player holds one clip. One
+     * gate — the loser tap is ignored; the winner's stop-then-play already
+     * clears the other path via [stopPlaybackInternal].
      */
     @Volatile
-    private var draftPlayStarting = false
+    private var anyPlayStarting = false
 
     private var draftPollJob: Job? = null
 
@@ -2173,8 +2177,8 @@ class ChatViewModel @Inject constructor(
      */
     fun playVoiceDraft() {
         val file = voiceClipFile ?: return
-        if (_isDraftPlaying.value || draftPlayStarting) return
-        draftPlayStarting = true
+        if (_isDraftPlaying.value || anyPlayStarting) return
+        anyPlayStarting = true
         viewModelScope.launch(Dispatchers.IO + coroutineExceptionHandler) {
             try {
                 val player = getVoicePlayer()
@@ -2196,7 +2200,7 @@ class ChatViewModel @Inject constructor(
                 _isDraftPlaying.value = true
                 startDraftPoll(player)
             } finally {
-                draftPlayStarting = false
+                anyPlayStarting = false
             }
         }
     }
@@ -2302,14 +2306,6 @@ class ChatViewModel @Inject constructor(
     private var historyPollJob: Job? = null
 
     /**
-     * Rapid-toggle debounce mirroring [draftPlayStarting]: history taps
-     * while a play is in flight are ignored (UI-SPEC single-player
-     * backstop).
-     */
-    @Volatile
-    private var historyPlayStarting = false
-
-    /**
      * Play a sent voice bubble. Missing file renders the graceful
      * unavailable Snackbar and never touches the player (T-68-05:
      * audioPath is untrusted stored text — existence-checked before
@@ -2317,8 +2313,8 @@ class ChatViewModel @Inject constructor(
      */
     fun playHistoryVoice(message: ChatMessage) {
         val path = message.audioPath?.takeIf { it.isNotBlank() } ?: return
-        if (historyPlayStarting) return
-        historyPlayStarting = true
+        if (anyPlayStarting) return
+        anyPlayStarting = true
         viewModelScope.launch(Dispatchers.IO + coroutineExceptionHandler) {
             try {
                 val file = java.io.File(path)
@@ -2346,7 +2342,7 @@ class ChatViewModel @Inject constructor(
                 _historyDurationMs.value = message.audioDurationMs
                 startHistoryPoll(player)
             } finally {
-                historyPlayStarting = false
+                anyPlayStarting = false
             }
         }
     }
