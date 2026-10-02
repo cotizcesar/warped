@@ -88,7 +88,7 @@
 
     <!-- Settings review card -->
     <string name="settings_review_title">Calificar Warped</string>
-    <string name="settings_review_desc">¿Te gusta Warped? Dejá una calificación en Play Store.</string>
+    <string name="settings_review_desc">¿Te gusta Warped? Deja una calificación en Play Store.</string>
     <string name="settings_review_action">Calificar</string>
 
     <!-- Wizard step titles -->
