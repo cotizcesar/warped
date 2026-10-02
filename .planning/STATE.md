@@ -3,25 +3,24 @@ gsd_state_version: "1.0"
 milestone: v3.1
 milestone_name: Voice Messages + New Tool
 current_phase: 70
-current_phase_name: Document Reader Tool
-status: planning
-stopped_at: Phase 69 complete, ready to plan Phase 70
-last_updated: "2026-10-02T21:16:55.482Z"
+status: completed
+stopped_at: Phase 70 complete — all phases complete
+last_updated: "2026-10-02T22:19:38.130Z"
 last_activity: 2026-10-02
-last_activity_desc: Phase 69 complete, transitioned to Phase 70
-state_head: ecc2c0ee45e8d1a8b3795b0deef96be1b5291706
+last_activity_desc: Phase 70 complete
+state_head: 286d8b46ef00fa19ac0ffa9ea77a11f646674727
 progress:
   total_phases: 4
-  completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
-  percent: 75
+  completed_phases: 4
+  total_plans: 10
+  completed_plans: 10
+  percent: 100
 ---
 
 # Project State: Warped
 
 **Last updated:** 2026-09-30
-**Last activity:** 2026-10-02 — Phase 69 complete, transitioned to Phase 70
+**Last activity:** 2026-10-02 — Phase 70 complete
 
 ## Project Reference
 
@@ -32,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-10-01, v2.5 shipped)
 
 ## Current Position
 
-Phase: 70 — Document Reader Tool
+Phase: 70
 Plan: Not started
-Status: Ready to plan
+Status: All phases complete
 Last activity: 2026-10-02 — Milestone v3.1 started
 
 ## Phase Structure (v3.1 — PLANNED)
@@ -93,6 +92,7 @@ None yet.
 | Release-UAT | 67 voice device smoke (record→send→response on audio-capable allowlist model; 60 s cap toast; >30 s note; cancel/denial/background/rotation — runbook in 67/deferred-items.md) | Accepted, release UAT | Phase 67 close |
 | Release-UAT | 68 voice device smoke (draft audibility; sub-1 s on all 3 stop paths; focus-loss pause; replay-across-restart; hardware preempt; unavailable row; file cleanup; rotation/background; long-caption visual — runbook in 68/deferred-items.md) | Accepted, release UAT | Phase 68 close |
 | Release-UAT | 69 voice device smoke (parallel-STT accuracy; coachmark/gate/caption visuals; CR-01/WR-02 concurrency interleavings; rotation resume + preempt — runbook in 69/deferred-items.md) | Accepted, release UAT | Phase 69 close |
+| Release-UAT | 70 doc-reader device smoke (picker visuals/TalkBack; local grounding + truncation E2E; degradation paths; per-provider remote E2E; Fuentes card/rotation/ES locale; CR-01 accented filenames; CR-02 invalid bytes — runbook in 70/deferred-items.md) | Accepted, release UAT | Phase 70 close |
 | Release-UAT | 61 Leg 1B model-B switch (needs second complete model) | Accepted, release UAT | Phase 61 close |
 | Release-UAT | 60 follow-ups: 3-button nav visuals; light-theme visuals (blocked, no toggle); Play Console target warnings; foldable posture; quota-pressure platform stop | Accepted, release UAT | Phase 60 close |
 | Release-UAT | G-59-01 16KB chat turn (healthy 16 KB system + smallest-model download + local chat turn, zero native failures) | Accepted, release UAT | Phase 59 close |
@@ -146,7 +146,7 @@ See prior STATE history for v2.2–v2.4 quick-task log (archived at roadmap rewr
 **Resume file:** —
 
 Last session: 2026-10-02
-Stopped at: Phase 69 complete, ready to plan Phase 70
+Stopped at: Phase 70 complete — all phases complete
 Resume: `/gsd-plan-phase 67` (after `/clear`)
 
 ## Operator Next Steps
