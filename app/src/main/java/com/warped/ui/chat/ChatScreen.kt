@@ -199,10 +199,12 @@ fun ChatScreen(
                 viewModel.refreshSpeechAvailability()
             }
             // Phase 67 (VMSG-01 full): backgrounding auto-stops recording
-            // and keeps the clip (no foreground service). Rotation is a
-            // config change, not a pause, so VM-owned state survives it.
+            // and keeps the clip (no foreground service). Silent stop —
+            // the 60 s cap toast belongs to the ticker path only (CR-01).
+            // Rotation is a config change, not a pause, so VM-owned state
+            // survives it.
             if (event == Lifecycle.Event.ON_PAUSE) {
-                viewModel.autoStopVoiceRecording()
+                viewModel.autoStopVoiceRecording(announceCap = false)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
