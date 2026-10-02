@@ -101,6 +101,9 @@ class VoiceHistoryPlaybackTest {
         helper: LlmModelHelper,
         modelPath: String,
         models: List<LocalModel> = emptyList(),
+        // WR-05: source-of-truth lookup for the delete path (null = row
+        // gone / non-voice — the VM falls back to the transcript).
+        repoAudioPath: String? = null,
     ): ChatViewModel {
         val chatRepository = mockk<ChatRepository>()
         val endpointRepository = mockk<EndpointRepository>()
@@ -114,11 +117,15 @@ class VoiceHistoryPlaybackTest {
         every { context.getString(any<Int>()) } returns ""
         every { context.getString(any<Int>(), *anyVararg<Any>()) } returns ""
         every { context.getString(R.string.voice_msg_clip_unavailable) } returns "NO_CLIP"
+        // Production clips live in filesDir/voice (recorder outputDir) —
+        // the delete path confines itself there.
+        every { context.filesDir } returns tempDir
 
         every { chatRepository.observeConversations() } returns MutableStateFlow(emptyList())
         coEvery { chatRepository.createConversation(any(), any(), any(), any()) } returns 42L
         coEvery { chatRepository.saveMessage(any(), any()) } returns Unit
         coEvery { chatRepository.deleteMessage(any<Long>()) } returns Unit
+        coEvery { chatRepository.getMessageAudioPath(any()) } returns repoAudioPath
         every { endpointRepository.observeEndpoints() } returns MutableStateFlow(emptyList())
         every { localModelRepository.observeModels() } returns MutableStateFlow(models)
         every { activeModelSelection.activeModel } returns MutableStateFlow(null)
@@ -527,7 +534,10 @@ class VoiceHistoryPlaybackTest {
         val vm = buildViewModel(idleHelper(), path, listOf(audioModel(path)))
         runCurrent()
         advanceUntilIdle()
-        val clip = File(tempDir, "doomed.m4a").apply { writeText("fake-audio") }
+        val clip = File(tempDir, "voice/doomed.m4a").apply {
+            parentFile?.mkdirs()
+            writeText("fake-audio")
+        }
         vm.lastSentVoicePath = clip.absolutePath
         vm.lastSentVoiceDurationMs = 2_000L
 
@@ -541,5 +551,31 @@ class VoiceHistoryPlaybackTest {
 
         assertThat(clip.exists()).isFalse()
         assertThat(vm.transcriptState.value.messages.none { it.id == id }).isTrue()
+    }
+
+    @Test
+    fun `deleting an unloaded-row voice message deletes its file via repository`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
+        val path = modelFile.absolutePath
+        // WR-05: the row is NOT in the transcript (stale id / unloaded row) —
+        // the clip path resolves from the Room row instead of leaking.
+        val clip = File(tempDir, "voice/orphan.m4a").apply {
+            parentFile?.mkdirs()
+            writeText("fake-audio")
+        }
+        val vm = buildViewModel(
+            idleHelper(),
+            path,
+            listOf(audioModel(path)),
+            repoAudioPath = clip.absolutePath,
+        )
+        runCurrent()
+        advanceUntilIdle()
+
+        vm.deleteMessage(123L)
+        advanceUntilIdle()
+
+        assertThat(clip.exists()).isFalse()
     }
 }
