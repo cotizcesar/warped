@@ -286,7 +286,7 @@ fun WarpedNavGraph() {
                         val isModels = isOn(Screen.Selector::class)
                         NavigationDrawerItem(
                             icon = { Icon(Icons.Filled.Memory, null, tint = if (isModels) DrawerAccent else DrawerTextSecondary, modifier = Modifier.size(20.dp)) },
-                            label = { Text(stringResource(R.string.tab_models), color = if (isModels) DrawerAccent else DrawerTextSecondary, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) },
+                            label = { Text(stringResource(R.string.tab_models), color = if (isModels) DrawerAccent else DrawerTextSecondary, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             selected = isModels,
                             colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = DrawerSelectedBg, unselectedContainerColor = Color.Transparent),
                             modifier = Modifier.weight(1f),
@@ -301,7 +301,7 @@ fun WarpedNavGraph() {
                         val isHelp = isOn(Screen.Help::class)
                         NavigationDrawerItem(
                             icon = { Icon(Icons.Filled.Info, null, tint = if (isHelp) DrawerAccent else DrawerTextSecondary, modifier = Modifier.size(20.dp)) },
-                            label = { Text(stringResource(R.string.help_title), color = if (isHelp) DrawerAccent else DrawerTextSecondary, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) },
+                            label = { Text(stringResource(R.string.help_title), color = if (isHelp) DrawerAccent else DrawerTextSecondary, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             selected = isHelp,
                             colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = DrawerSelectedBg, unselectedContainerColor = Color.Transparent),
                             modifier = Modifier.weight(1f),
@@ -316,7 +316,7 @@ fun WarpedNavGraph() {
                         val isSettings = isOn(Screen.Settings::class)
                         NavigationDrawerItem(
                             icon = { Icon(Icons.Filled.Settings, null, tint = if (isSettings) DrawerAccent else DrawerTextSecondary, modifier = Modifier.size(20.dp)) },
-                            label = { Text(stringResource(R.string.settings), color = if (isSettings) DrawerAccent else DrawerTextSecondary, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) },
+                            label = { Text(stringResource(R.string.settings), color = if (isSettings) DrawerAccent else DrawerTextSecondary, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             selected = isSettings,
                             colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = DrawerSelectedBg, unselectedContainerColor = Color.Transparent),
                             modifier = Modifier.weight(1f),
