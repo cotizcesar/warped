@@ -309,7 +309,6 @@
         <item quantity="other">This will permanently delete all %1$d conversations and their messages. This cannot be undone.</item>
     </plurals>
     <string name="settings_delete_all">Delete All</string>
-    <string name="settings_msg_key_deleted">API key deleted</string>
 
     <!-- Presets -->
     <string name="preset_params_title">Generation Parameters</string>

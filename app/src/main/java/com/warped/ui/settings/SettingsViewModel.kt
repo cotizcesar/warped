@@ -16,7 +16,6 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 
 import javax.inject.Inject
-import com.warped.R
 import timber.log.Timber
 
 @HiltViewModel
@@ -70,17 +69,6 @@ class SettingsViewModel @Inject constructor(
     fun setWebGroundingEnabled(enabled: Boolean) {
         viewModelScope.launch(coroutineExceptionHandler) {
             advancedPreferences.setWebGroundingEnabled(enabled)
-        }
-    }
-
-    fun deleteEndpointKey(endpointId: Long) {
-        viewModelScope.launch(coroutineExceptionHandler) {
-            try {
-                apiKeyStore.deleteKey(endpointId)
-                _uiState.update { it.copy(message = context.getString(R.string.settings_msg_key_deleted)) }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message) }
-            }
         }
     }
 

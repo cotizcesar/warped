@@ -3,7 +3,6 @@ package com.warped.ui.settings
 import com.warped.domain.model.SyntaxTheme
 
 data class SettingsUiState(
-    val showDeleteEndpointDialog: Long? = null,
     val message: String? = null,
     val error: String? = null,
     val codeTheme: SyntaxTheme = SyntaxTheme.MONOKAI,
