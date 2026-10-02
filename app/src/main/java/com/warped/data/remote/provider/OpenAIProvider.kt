@@ -8,7 +8,6 @@ import com.warped.data.agentic.parseToolArgs
 import com.warped.data.grounding.GroundingPrecedence
 import com.warped.data.grounding.MultiUrlFetcher
 import com.warped.data.grounding.DuckDuckGoSearchRepository
-import com.warped.data.grounding.TavilySearchRepository
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.inference.InputSanitizer
 import com.warped.data.local.preferences.AdvancedPreferences
@@ -72,9 +71,8 @@ class OpenAIProvider(
      * ONLY; loop code never references it (T-57-02).
      */
     /**
-     * Quick-task (DDG-default): web_search goes through the DDG-primary /
-     * Tavily-fallback repository (same outcome type — downstream mapping
-     * untouched).
+     * Quick-task (DDG-default): web_search goes through the DDG-only
+     * repository (keyless outcome — downstream mapping untouched).
      */
     private val ddg: DuckDuckGoSearchRepository? = null,
     private val multiUrlFetcher: MultiUrlFetcher? = null,
@@ -361,11 +359,11 @@ class OpenAIProvider(
                         // Explicit args (no Kotlin defaults): keeps the call
                         // on the instance method so MockK can stub it.
                         // Quick-task (loop-images): includeImages=true ALWAYS
-                        // — the DDG leg ignores it; only the keyed Tavily
-                        // fallback leg uses it (credit-capped).
+                        // — the DDG leg ignores it (no image API); loop
+                        // search calls fuse zero images.
                         val outcome = repo.search(
                             query = query,
-                            maxResults = TavilySearchRepository.DEFAULT_MAX_RESULTS,
+                            maxResults = DuckDuckGoSearchRepository.DEFAULT_MAX_RESULTS,
                             contextSize = contextSize,
                             includeImages = true,
                         )

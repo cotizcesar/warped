@@ -23,9 +23,9 @@ import kotlin.math.min
  * Quick-task (search OG enrichment): best-effort parallel `og:title` /
  * `og:image` / `og:description` scrape for fused search-result rows.
  *
- * Search-grounded cards show favicon + host only because DDG/Tavily `fuse()`
+ * Search-grounded cards show favicon + host only because DDG `fuse()`
  * never captured page metadata. This enricher runs once per search turn
- * inside the two repository `search()` methods (right after their own
+ * inside the repository `search()` method (right after its own
  * `fuse()` returns `Grounded`), covering the `ChatViewModel` pre-search
  * branch and tool-loop search callers for free. Fetched-page OG
  * (`WebPageFetcher` HTML branch) and `MultiUrlFetcher` are untouched.

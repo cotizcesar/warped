@@ -57,8 +57,8 @@ class LmStudioHelper @Inject constructor(
      * on the live chat path. Nullable with null defaults so legacy
      * manual call sites keep compiling; Hilt always provides bindings.
      *
-     * Quick-task (DDG-default): the search collaborator is the DDG-primary
-     * / Tavily-fallback repository.
+     * Quick-task (DDG-default): the search collaborator is the DDG-only
+     * repository.
      */
     private val ddg: DuckDuckGoSearchRepository? = null,
     private val multiUrlFetcher: MultiUrlFetcher? = null,

@@ -472,21 +472,6 @@ private fun ModelOnlyBanner(
                     } else {
                         stringResource(R.string.bubble_fetch_failed_one)
                     }
-                // Phase 55 (TAV-03): distinct actionable copy per search
-                // gate — resolved from string resources (EN/ES), all naming
-                // the Settings path. None is OFFLINE so retryGrounding stays
-                // OFFLINE-only.
-                ModelOnlyNotice.TAVILY_MISSING_KEY ->
-                    stringResource(R.string.bubble_tavily_missing)
-                // Quick-task (image-turn routing): unkeyed image-intent
-                // turn — grounded text (when DDG served it) stays, the grid
-                // stays empty, and this banner names the Settings fix.
-                ModelOnlyNotice.IMAGES_NEED_KEY ->
-                    stringResource(R.string.bubble_images_need_key)
-                ModelOnlyNotice.TAVILY_INVALID_KEY ->
-                    stringResource(R.string.bubble_tavily_invalid)
-                ModelOnlyNotice.TAVILY_LIMIT ->
-                    stringResource(R.string.bubble_tavily_limit)
                 // Phase 57 (57-02): tools[] rejected by the endpoint —
                 // one retry without tools, model-only answer. Copy
                 // mirrors ToolCapabilityMatrix.TOOLS_UNSUPPORTED_NOTICE

@@ -11,7 +11,7 @@ package com.warped.ui.chat
  * Fetch branch mirrors today's slot logic:
  * - `perSource` non-empty → real fan-out progress ([FetchFanout] when
  *   `total > 1`, else [FetchSingle] — same `isMulti` check the old chip used).
- * - `perSource` EMPTY → [Searching]: the DDG/Tavily single-fuse search path
+ * - `perSource` EMPTY → [Searching]: the DDG single-fuse search path
  *   emits `WebFetchProgress(done = 0, total = searchCount, perSource = [])`,
  *   which is not a 0-of-N fetch — the indeterminate "Searching…" row covers
  *   it and the done/total values never surface.

@@ -36,7 +36,7 @@ data class GroundedSourceEntity(
     @ColumnInfo(name = "status") val status: String,
     /**
      * Phase 58 (OG-01): nullable OpenGraph columns, no backfill default.
-     * NULL means no OG captured (pre-58 rows, plain/markdown sources, Tavily rows).
+     * NULL means no OG captured (pre-58 rows, plain/markdown sources, legacy keyed-provider rows).
      */
     @ColumnInfo(name = "og_title") val ogTitle: String? = null,
     @ColumnInfo(name = "og_description") val ogDescription: String? = null,

@@ -10,8 +10,8 @@ import org.jsoup.Jsoup
  * [WebPageFetcher.fetch] on the HTML branch only; plain/markdown bodies
  * yield `openGraph = null` at the call site.
  *
- * All fields nullable: null means "no OG captured" (Tavily rows, plain-text
- * sources, pre-58 rows). Images are accepted only when they resolve to
+ * All fields nullable: null means "no OG captured" (legacy keyed-provider
+ * rows, plain-text sources, pre-58 rows). Images are accepted only when they resolve to
  * http(s) (T-58-01); they are NEVER fetched at scrape time — Coil loads
  * them on demand in plan 58-02.
  */

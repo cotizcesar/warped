@@ -11,8 +11,8 @@ import com.google.ai.edge.litertlm.ToolSet
  * the ONLY tool schemas in the app — no file/system/shell surface exists.
  *
  * The body is schema-only: the manual loop (plan 02) executes
- * `DuckDuckGoSearchRepository.search()` (DDG-primary, Tavily-fallback —
- * same outcome type) as a suspend call on `Dispatchers.IO`
+ * `DuckDuckGoSearchRepository.search()` (DDG-only — keyless outcome)
+ * as a suspend call on `Dispatchers.IO`
  * and feeds the fused-block string back via `Content.ToolResponse` — the
  * engine never invokes this body (`automaticToolCalling=false`). It returns
  * [HOST_EXECUTED] instead of throwing (47 never-throw lesson: a throw

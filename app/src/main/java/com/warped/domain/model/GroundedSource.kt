@@ -2,8 +2,8 @@ package com.warped.domain.model
 
 /**
  * Quick-task (card-snippet): max stored snippet chars. Search excerpts are
- * short by nature; the cap only binds Tavily `content` heads stored as
- * snippets (the card render caps again at 160 for density).
+ * short by nature; the cap only binds legacy keyed-provider `content`
+ * heads stored as snippets (the card render caps again at 160 for density).
  */
 const val GROUNDED_SNIPPET_MAX_CHARS = 500
 
@@ -27,7 +27,7 @@ data class GroundedSource(
     /**
      * Phase 58 (OG-01): OpenGraph fields threaded from [com.warped.data.grounding.OpenGraphParser]
      * via GroundingResult.Grounded. Null means no OG captured (pre-58 rows,
-     * plain/markdown sources, Tavily rows) — renders as a text-only card.
+     * plain/markdown sources, legacy keyed-provider rows) — renders as a text-only card.
      */
     val ogTitle: String? = null,
     val ogDescription: String? = null,

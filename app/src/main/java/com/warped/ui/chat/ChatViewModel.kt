@@ -16,12 +16,10 @@ import com.warped.data.grounding.CodeIntent
 import com.warped.data.grounding.AnaphoraAnchor
 import com.warped.data.grounding.NeedsWeb
 import com.warped.data.grounding.MultiUrlResult
-import com.warped.data.grounding.TavilySearchOutcome
-import com.warped.data.grounding.TavilySearchRepository
+import com.warped.data.grounding.SearchOutcome
 import com.warped.data.grounding.UrlDetector
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.inference.BackendType
-import com.warped.data.local.security.ApiKeyStore
 import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.preferences.AdvancedPreferences
@@ -64,21 +62,9 @@ class ChatViewModel @Inject constructor(
     private val multiUrlFetcher: MultiUrlFetcher,
     /**
      * Quick-task (DDG-default): the search branch goes through the
-     * DDG-primary/Tavily-fallback repository (same outcome type, same
-     * signatures in/out). Tavily stays in the graph as the DDG repo's
-     * internal fallback delegate + the Settings key probe — not as a
-     * direct VM dependency.
+     * DDG-only repository (keyless outcome, same signatures in/out).
      */
     private val ddgSearchRepository: DuckDuckGoSearchRepository,
-    /**
-     * Quick-task (image-turn routing): read-only Tavily key-presence probe
-     * for the unkeyed image-intent notice. The Tavily-direct call itself
-     * lives inside [DuckDuckGoSearchRepository] (image-intent + keyed
-     * skips the DDG leg there) — the VM never calls Tavily directly, so
-     * this store is consulted only to decide the notice, never for key
-     * material (zero-fill pattern, never logged).
-     */
-    private val apiKeyStore: ApiKeyStore,
     /**
      * Quick-task (always-search): the VM no longer mirrors loop-arming —
      * the provider owns arming (computeArmSnapshot /
@@ -454,7 +440,7 @@ class ChatViewModel @Inject constructor(
                 val loopSourceDetails = mutableListOf<GroundedSource>()
                 // Quick-task (loop-images): per-turn loop-image
                 // accumulator. Loop drivers emit one `ToolCompleted` per
-                // executed search call carrying the call's fused Tavily
+                // executed search call carrying the call's fused search
                 // `images[]`; they union here (first-seen order, distinct)
                 // and merge with the pre-search `groundedImages` on Done
                 // below. The always-on VM pre-search runs on every grounded
@@ -602,12 +588,9 @@ class ChatViewModel @Inject constructor(
                         // mid-turn), validated internet (offline yields the
                         // existing OFFLINE model-only path with no socket
                         // opened), and — NEW — no key gate at all: the DDG
-                        // repository searches keylessly, so no-key + DDG-OK
-                        // is a silent success (no notice) and no-key +
-                        // DDG-fail is the FETCH_FAILED notice (no key nag).
-                        // Key present-but-bad (401 via the Tavily fallback
-                        // leg) keeps the invalid-key message; MissingKey
-                        // survives only as the key-race edge.
+                        // repository searches keylessly, so a DDG-OK turn
+                        // is a silent success (no notice) and a DDG-fail
+                        // turn is the FETCH_FAILED notice.
                         // Success fuses through the IDENTICAL downstream
                         // path as URL grounding: GroundingPrompt.augment of
                         // requestUserText, groundedSources/okUrls, the
@@ -631,12 +614,10 @@ class ChatViewModel @Inject constructor(
                         // model-driven fetch, and loop ToolCompleted rows
                         // keep merging with pre-search details in the Done
                         // union below. There is deliberately NO VM-level
-                        // direct Tavily call and NO loop-cap change — Tavily
-                        // fires only inside
-                        // DuckDuckGoSearchRepository.search: direct with
-                        // include_images on image-intent turns when a key is
-                        // stored (DDG has no image API), as fallback when
-                        // DDG yields nothing usable AND a key is stored.
+                        // direct keyed call and NO loop-cap change — the
+                        // DDG-only `DuckDuckGoSearchRepository.search`
+                        // serves every turn keylessly; image-intent turns
+                        // fuse zero images (DDG has no image API).
                         if (!online) {
                             modelOnlyNotice = ModelOnlyNotice.OFFLINE
                             requestUserText = GroundingPrompt.augment(
@@ -646,12 +627,12 @@ class ChatViewModel @Inject constructor(
                             )
                         } else {
                             // Quick-task (image-grid): intent-gated
-                            // include_images — the Tavily leg only (the DDG
-                            // leg has no image API and fuses zero images).
-                            // Non-intent turns pass false: byte-identical
-                            // to today, no extra payload.
+                            // include_images — the DDG leg has no image API
+                            // and fuses zero images. Non-intent turns pass
+                            // false: byte-identical to today, no extra
+                            // payload.
                             val wantImages = ImageIntent.hasImageIntent(userMessage.content)
-                            val searchCount = TavilySearchRepository.DEFAULT_MAX_RESULTS
+                            val searchCount = DuckDuckGoSearchRepository.DEFAULT_MAX_RESULTS
                             updateInput {
                                 it.copy(
                                     isFetchingWeb = true,
@@ -673,9 +654,8 @@ class ChatViewModel @Inject constructor(
                                 // AnaphoraAnchor. No-history turns return the
                                 // raw message (today's behavior,
                                 // byte-identical). Query-text only: DDG stays
-                                // free/keyless (latency, not credits), Tavily
-                                // keeps its keyed + DDG-empty-only caps (<=1
-                                // call/turn), loop cap untouched.
+                                // free/keyless (latency, not credits),
+                                // loop cap untouched.
                                 val priorMessages = _transcript.value.messages.dropLast(1)
                                 val anchoredQuery = AnaphoraAnchor.buildQuery(
                                     userMessage.content,
@@ -690,7 +670,7 @@ class ChatViewModel @Inject constructor(
                                         includeImages = wantImages,
                                     )
                                 ) {
-                                    is TavilySearchOutcome.Grounded -> {
+                                    is SearchOutcome.Grounded -> {
                                         val fused = outcome.fused
                                         requestUserText = GroundingPrompt.augment(
                                             requestUserText,
@@ -715,7 +695,7 @@ class ChatViewModel @Inject constructor(
                                             )
                                         }
                                     }
-                                    is TavilySearchOutcome.ModelOnly -> {
+                                    is SearchOutcome.ModelOnly -> {
                                         modelOnlyNotice = when (outcome.failed.reason) {
                                             GroundingResult.Reason.OFFLINE -> ModelOnlyNotice.OFFLINE
                                             GroundingResult.Reason.FETCH_FAILED -> ModelOnlyNotice.FETCH_FAILED
@@ -726,54 +706,10 @@ class ChatViewModel @Inject constructor(
                                             groundingEnabled = doGround,
                                         )
                                     }
-                                    TavilySearchOutcome.MissingKey -> {
-                                        modelOnlyNotice = ModelOnlyNotice.TAVILY_MISSING_KEY
-                                        requestUserText = GroundingPrompt.augment(
-                                            requestUserText,
-                                            null,
-                                            groundingEnabled = doGround,
-                                        )
-                                    }
-                                    TavilySearchOutcome.InvalidKey -> {
-                                        modelOnlyNotice = ModelOnlyNotice.TAVILY_INVALID_KEY
-                                        requestUserText = GroundingPrompt.augment(
-                                            requestUserText,
-                                            null,
-                                            groundingEnabled = doGround,
-                                        )
-                                    }
-                                    TavilySearchOutcome.UsageLimit -> {
-                                        modelOnlyNotice = ModelOnlyNotice.TAVILY_LIMIT
-                                        requestUserText = GroundingPrompt.augment(
-                                            requestUserText,
-                                            null,
-                                            groundingEnabled = doGround,
-                                        )
-                                    }
                                 }
-                                // Quick-task (image-turn routing): unkeyed
-                                // image-intent turns ground via DDG text above
-                                // but the grid stays empty — attach the
-                                // actionable images-need-key notice (Settings
-                                // path) alongside the grounded text or the
-                                // outcome notice. Single banner slot, so the
-                                // key notice takes precedence here: the user
-                                // asked for images and the fix (store a
-                                // Tavily key) is actionable, while a DDG
-                                // failure is not user-fixable. Scoped to
-                                // wantImages + empty grid + no stored key, so
-                                // keyed turns (images or outcome mapping
-                                // intact) and non-image turns are untouched.
-                                // Key copy zeroed after the presence check;
-                                // never logged.
-                                if (wantImages && groundedImages.isEmpty()) {
-                                    val keyChars = apiKeyStore.getTavilyKey()
-                                    val hasKey = keyChars != null && keyChars.isNotEmpty()
-                                    keyChars?.fill('0')
-                                    if (!hasKey) {
-                                        modelOnlyNotice = ModelOnlyNotice.IMAGES_NEED_KEY
-                                    }
-                                }
+                                // Image-intent turns fuse zero images (DDG
+                                // has no image API) with text grounding
+                                // preserved — no notice attached.
                             } finally {
                                 updateInput { it.copy(isFetchingWeb = false, webFetchProgress = null) }
                             }

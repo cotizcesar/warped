@@ -16,7 +16,6 @@ import com.warped.data.agentic.WebSearchToolSet
 import com.warped.data.grounding.DuckDuckGoSearchRepository
 import com.warped.data.grounding.GroundingPrecedence
 import com.warped.data.grounding.MultiUrlFetcher
-import com.warped.data.grounding.TavilySearchRepository
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.preferences.AdvancedPreferences
 import com.warped.data.remote.provider.HistoryImageCarry
@@ -73,9 +72,8 @@ class LiteRTLmProvider @Inject constructor(
     private val inputSanitizer: InputSanitizer,
     private val activeModelSelection: ActiveModelSelection,
     /**
-     * Quick-task (DDG-default): web_search goes through the DDG-primary /
-     * Tavily-fallback repository (same outcome type — downstream mapping
-     * untouched).
+     * Quick-task (DDG-default): web_search goes through the DDG-only
+     * repository (keyless outcome — downstream mapping untouched).
      */
     private val ddg: DuckDuckGoSearchRepository,
     private val multiUrlFetcher: MultiUrlFetcher,
@@ -615,12 +613,11 @@ class LiteRTLmProvider @Inject constructor(
                     // Explicit args (no Kotlin defaults): keeps the call on the
                     // instance method so MockK can stub it in JVM tests.
                     // Quick-task (loop-images): includeImages=true ALWAYS —
-                    // the DDG leg ignores it (no image API); only the keyed
-                    // Tavily fallback leg uses it (credit-capped). Keyless
+                    // the DDG leg ignores it (no image API); keyless
                     // turns behave byte-identically.
                     val outcome = ddg.search(
                         query = query,
-                        maxResults = TavilySearchRepository.DEFAULT_MAX_RESULTS,
+                        maxResults = DuckDuckGoSearchRepository.DEFAULT_MAX_RESULTS,
                         contextSize = contextSize,
                         includeImages = true,
                     )

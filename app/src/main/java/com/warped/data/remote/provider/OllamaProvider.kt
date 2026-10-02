@@ -55,8 +55,8 @@ class OllamaProvider(
      * present (see [isLoopArmed]). Ollama takes no endpoint key; loop
      * code only ever touches the search/fetch singletons (T-57-07).
      *
-     * Quick-task (DDG-default): the search collaborator is the DDG-primary
-     * / Tavily-fallback repository.
+     * Quick-task (DDG-default): the search collaborator is the DDG-only
+     * repository.
      */
     private val ddg: DuckDuckGoSearchRepository? = null,
     private val multiUrlFetcher: MultiUrlFetcher? = null,

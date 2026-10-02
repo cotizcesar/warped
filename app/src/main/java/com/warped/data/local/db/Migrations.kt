@@ -135,8 +135,8 @@ val MIGRATION_14_15 = object : Migration(14, 15) {
 }
 
 // Phase 58 (OG-01): three nullable OG columns on grounded_sources.
-// NULL means no OG captured (pre-58 rows, plain/markdown sources, Tavily
-// rows). No index (no query filters on OG columns), no backfill — mirrors
+// NULL means no OG captured (pre-58 rows, plain/markdown sources, legacy
+// keyed-provider rows). No index (no query filters on OG columns), no backfill — mirrors
 // the MIGRATION_14_15 ALTER-only shape.
 val MIGRATION_15_16 = object : Migration(15, 16) {
     override fun migrate(db: SupportSQLiteDatabase) {

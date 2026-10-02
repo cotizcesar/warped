@@ -33,7 +33,7 @@ sealed interface StreamToken {
      * short-circuit, offline, cap string, key/limit outcomes). Local manual
      * loop emits this too (one per executed search/fetch call).
      *
-     * Quick-task (loop-images): [images] carries the call's fused Tavily
+     * Quick-task (loop-images): [images] carries the call's fused search
      * `images[]` URLs verbatim — the ViewModel unions them across the turn
      * into the ephemeral `groundedImages` the grid reads. Empty for fetch
      * calls and non-grounded search outcomes.
