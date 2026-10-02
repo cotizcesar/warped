@@ -1,3 +1,8 @@
+---
+status: complete
+date: 2026-10-02
+---
+
 # Summary: lazy model load on first send
 
 **Status:** complete

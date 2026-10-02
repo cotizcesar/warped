@@ -1,3 +1,8 @@
+---
+status: complete
+date: 2026-10-02
+---
+
 # Summary: dictation auto-stop + cursor to end + card alignment
 
 **Status:** complete
