@@ -1617,6 +1617,9 @@ class ChatViewModel @Inject constructor(
     }
 
     fun selectConversation(conversationId: Long) {
+        // Phase 70 fix (WR-03): per-turn attachment must not leak across
+        // conversation boundaries — drop it before loading the new state.
+        _attachedDocument.value = null
         viewModelScope.launch(coroutineExceptionHandler) {
             val result = chatRepository.loadConversation(conversationId)
             if (result != null) {
@@ -1695,6 +1698,8 @@ class ChatViewModel @Inject constructor(
     fun newConversation() {
         unloadLocalModels()
         pendingWebOverride = null
+        // Phase 70 fix (WR-03): see selectConversation — same leak guard.
+        _attachedDocument.value = null
         updateTranscript {
             it.copy(
                 conversationId = null,
