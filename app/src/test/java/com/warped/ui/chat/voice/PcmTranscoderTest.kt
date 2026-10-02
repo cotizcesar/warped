@@ -75,4 +75,51 @@ class PcmTranscoderTest {
         assertThat(out).isEmpty()
         assertThat(truncated).isFalse()
     }
+
+    @Test
+    fun `wrapWav emits a valid 44-byte RIFF header`() {
+        val wav = PcmTranscoder.wrapWav(shortArrayOf(1, -1, 32767, -32768))
+
+        fun tag(at: Int) = wav.sliceArray(at until at + 4).toString(Charsets.US_ASCII)
+        assertThat(tag(0)).isEqualTo("RIFF")
+        assertThat(tag(8)).isEqualTo("WAVE")
+        assertThat(tag(12)).isEqualTo("fmt ")
+        assertThat(tag(36)).isEqualTo("data")
+
+        fun le32(at: Int) = (wav[at].toInt() and 0xFF) or
+            ((wav[at + 1].toInt() and 0xFF) shl 8) or
+            ((wav[at + 2].toInt() and 0xFF) shl 16) or
+            ((wav[at + 3].toInt() and 0xFF) shl 24)
+        fun le16(at: Int) = (wav[at].toInt() and 0xFF) or ((wav[at + 1].toInt() and 0xFF) shl 8)
+
+        val dataSize = 4 * 2
+        assertThat(wav.size).isEqualTo(44 + dataSize)
+        assertThat(le32(4)).isEqualTo(36 + dataSize) // chunkSize
+        assertThat(le32(16)).isEqualTo(16) // fmt size
+        assertThat(le16(20)).isEqualTo(1) // PCM
+        assertThat(le16(22)).isEqualTo(1) // mono
+        assertThat(le32(24)).isEqualTo(16_000) // sample rate
+        assertThat(le32(28)).isEqualTo(32_000) // byte rate
+        assertThat(le16(32)).isEqualTo(2) // block align
+        assertThat(le16(34)).isEqualTo(16) // bits per sample
+        assertThat(le32(40)).isEqualTo(dataSize)
+    }
+
+    @Test
+    fun `wrapWav round-trips samples little-endian`() {
+        val pcm = shortArrayOf(0, 1000, -1000, 32767, -32768)
+        val wav = PcmTranscoder.wrapWav(pcm)
+        val payload = wav.sliceArray(44 until wav.size)
+        val back = ShortArray(pcm.size) { i ->
+            ((payload[i * 2].toInt() and 0xFF) or ((payload[i * 2 + 1].toInt()) shl 8)).toShort()
+        }
+        assertThat(back.toList()).containsExactlyElementsIn(pcm.toList())
+    }
+
+    @Test
+    fun `wrapWav empty input is header only`() {
+        val wav = PcmTranscoder.wrapWav(ShortArray(0))
+        assertThat(wav.size).isEqualTo(44)
+        assertThat(wav.sliceArray(0 until 4).toString(Charsets.US_ASCII)).isEqualTo("RIFF")
+    }
 }

@@ -73,7 +73,44 @@ object PcmTranscoder {
         return pcm16Mono.copyOf(MAX_SAMPLES) to true
     }
 
+    /**
+     * Wrap mono PCM16 samples in a minimal 44-byte WAV (RIFF) header.
+     * Pure function, JVM-tested. Zero dependencies — manual little-endian
+     * writes, no containers beyond the header miniaudio requires.
+     *
+     * Layout: "RIFF" + chunkSize + "WAVE" + "fmt " + 16 + PCM(1) +
+     * channels(1) + sampleRate + byteRate + blockAlign(2) + bits(16) +
+     * "data" + dataSize + payload.
+     */
+    fun wrapWav(pcm16Mono: ShortArray, sampleRate: Int = TARGET_RATE): ByteArray {
+        val dataSize = pcm16Mono.size * 2
+        val out = ByteBuffer.allocate(44 + dataSize).order(ByteOrder.LITTLE_ENDIAN)
+        out.put("RIFF".toByteArray(Charsets.US_ASCII))
+        out.putInt(36 + dataSize)
+        out.put("WAVE".toByteArray(Charsets.US_ASCII))
+        out.put("fmt ".toByteArray(Charsets.US_ASCII))
+        out.putInt(16)
+        out.putShort(1) // PCM
+        out.putShort(1) // mono
+        out.putInt(sampleRate)
+        out.putInt(sampleRate * 2) // byteRate = rate * channels * bytesPerSample
+        out.putShort(2) // blockAlign
+        out.putShort(16) // bitsPerSample
+        out.put("data".toByteArray(Charsets.US_ASCII))
+        out.putInt(dataSize)
+        pcm16Mono.forEach { out.putShort(it) }
+        return out.array()
+    }
+
     data class TranscodeResult(
+        /**
+         * WAV bytes (44-byte RIFF header + mono 16 kHz PCM16 payload)
+         * ready for the `audioBytes` path. The header is REQUIRED: the
+         * LiteRT-LM native audio preprocessor decodes the payload with
+         * miniaudio, which rejects headerless raw PCM as MA_INVALID_FILE
+         * (device report: `audio_preprocessor_miniaudio.cc:157`,
+         * error code -10).
+         */
         val bytes: ByteArray,
         val truncated: Boolean,
         val durationMs: Long,
@@ -234,10 +271,10 @@ object PcmTranscoder {
             val channels = if (actualChannels > 0) actualChannels else 1
             val mono = resampleTo16kMono(samples.toShortArray(), rate, channels)
             val (capped, truncated) = truncateTo30s(mono)
-            val bytes = ByteBuffer.allocate(capped.size * 2)
-                .order(ByteOrder.LITTLE_ENDIAN)
-                .also { buf -> capped.forEach { buf.putShort(it) } }
-                .array()
+            // WAV container (not raw PCM): the LiteRT-LM native
+            // preprocessor decodes audioBytes with miniaudio, which
+            // requires a file header (raw PCM fails as MA_INVALID_FILE).
+            val bytes = wrapWav(capped, TARGET_RATE)
             val durationMs = (capped.size * 1000L) / TARGET_RATE
             TranscodeResult(bytes, truncated, durationMs)
         } catch (e: TranscodeException) {
