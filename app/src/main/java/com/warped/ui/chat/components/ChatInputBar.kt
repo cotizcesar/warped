@@ -71,6 +71,12 @@ fun ChatInputBar(
     // recording flag + recording-row UI; resource the copy.
     isVoiceRecording: Boolean = false,
     onVoiceClick: () -> Unit = {},
+    // Phase 67 (VMSG-01 full): recording-row state. Timer + amplitude
+    // render inline while recording; cancel discards immediately.
+    // TODO(67-02-Task3): resource the content descriptions + TalkBack copy.
+    voiceElapsedSec: Int = 0,
+    voiceAmplitude: Int = 0,
+    onCancelRecording: () -> Unit = {},
     // Model-loading gate (2026-10-02): while a model loads, the WHOLE
     // input is disabled — text field, image/think buttons, mic, and send.
     isLoadingModel: Boolean = false,
@@ -146,7 +152,53 @@ fun ChatInputBar(
                 }
                 onCursorChange(fieldValue.selection.start)
             }
-            OutlinedTextField(
+            // Phase 67 (VMSG-01 full): recording replaces the input row
+            // inline — mm:ss timer + amplitude bar + explicit cancel (X).
+            // The voice-send button in Row 2 doubles as the stop toggle.
+            // Timer + bar render onSurfaceVariant, switching to error red
+            // in the last 10 s (>= 50 s). No other recolor, no pulse.
+            if (isVoiceRecording) {
+                val capWarning = voiceElapsedSec >= 50
+                val recColor = if (capWarning) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                // TalkBack throttle (Phase 65 pattern): the live-region
+                // description only changes every 5 s so announcements
+                // never spam, while the visual timer ticks each second.
+                val announceBucket = voiceElapsedSec / 5
+                val announceText =
+                    "Recording, ${announceBucket * 5 / 60}:${(announceBucket * 5 % 60).toString().padStart(2, '0')}"
+                Row(
+                    modifier = Modifier.fillMaxWidth().semantics {
+                        stateDescription = announceText
+                    },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onCancelRecording, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Filled.Close, "Cancel recording",
+                            tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(24.dp))
+                    }
+                    Text(
+                        "%d:%02d".format(voiceElapsedSec / 60, voiceElapsedSec % 60),
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontFeatureSettings = "tnum"
+                        ),
+                        color = recColor
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    LinearProgressIndicator(
+                        progress = { (voiceAmplitude / 32767f).coerceIn(0f, 1f) },
+                        modifier = Modifier.weight(1f),
+                        color = recColor,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    IconButton(onClick = onVoiceClick, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Filled.Stop, "Stop recording",
+                            tint = recColor, modifier = Modifier.size(24.dp))
+                    }
+                }
+            } else {
+                OutlinedTextField(
                 value = fieldValue,
                 onValueChange = { next ->
                     fieldValue = next
@@ -179,7 +231,8 @@ fun ChatInputBar(
                     focusedContainerColor = Color.Transparent,
                     unfocusedContainerColor = Color.Transparent
                 )
-            )
+                )
+            }
 
             Spacer(Modifier.height(10.dp))
 
@@ -258,7 +311,14 @@ fun ChatInputBar(
                 // dictation mic, same visibility conditions. Waveform
                 // glyph (GraphicEq family), never a mic; doubles as the
                 // stop toggle while recording.
+                // TODO(67-02-Task3): resource Record/Stop copy.
                 if (speechAvailable && !isGenerating && !isLoadingModel) {
+                    // Adopt the pre-existing dead onAudioRecordingChanged
+                    // channel: it now fires with the live recording flag so
+                    // the screen-level isRecording state stays real.
+                    LaunchedEffect(isVoiceRecording) {
+                        onAudioRecordingChanged?.invoke(isVoiceRecording)
+                    }
                     IconButton(
                         onClick = onVoiceClick,
                         modifier = Modifier.size(40.dp),
@@ -267,7 +327,7 @@ fun ChatInputBar(
                         )
                     ) {
                         if (isVoiceRecording) {
-                            Icon(Icons.Filled.Stop, stringResource(R.string.cd_stop),
+                            Icon(Icons.Filled.Stop, "Stop recording",
                                 tint = Color.White, modifier = Modifier.size(24.dp))
                         } else {
                             Icon(Icons.Filled.GraphicEq, "Record voice message",

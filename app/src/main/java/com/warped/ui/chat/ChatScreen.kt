@@ -77,6 +77,16 @@ import com.warped.ui.chat.components.MessageBubble
 import com.warped.ui.chat.components.ModelSelectorSheet
 import com.warped.ui.components.WarpedAlertDialog
 
+/**
+ * Phase 67 (VMSG-01 full): post-grant intent distinguishing which input
+ * mode requested RECORD_AUDIO, so the shared permission launcher routes
+ * the grant result back to the right starter.
+ */
+private enum class PendingVoiceRequest {
+    DICTATION,
+    VOICE,
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
@@ -104,6 +114,9 @@ fun ChatScreen(
     // no crash); the full rationale/Snackbar flow lands in Plan 02.
     val isVoiceRecording by viewModel.isVoiceRecording.collectAsStateWithLifecycle()
     val hasVoiceClip by viewModel.hasVoiceClip.collectAsStateWithLifecycle()
+    // Phase 67 (VMSG-01 full): recording-row state (timer + amplitude).
+    val voiceElapsedSec by viewModel.voiceElapsedSec.collectAsStateWithLifecycle()
+    val voiceAmplitude by viewModel.voiceAmplitude.collectAsStateWithLifecycle()
     // 48-01 (PERF-15): keyed LazyColumn state. isAtBottom follows 48-UI-SPEC
     // §3 ("last item visible and within 48dp of the end").
     val listState = rememberLazyListState()
@@ -131,6 +144,11 @@ fun ChatScreen(
     // Phase 65 (VOICE-02): first-tap rationale visibility. Shown only when
     // RECORD_AUDIO is ungranted; confirm fires the system request.
     var showVoiceRationale by remember { mutableStateOf(false) }
+    // Phase 67 (VMSG-01 full): post-grant intent distinguishing dictation
+    // vs voice-send taps, routed through the EXISTING micPermissionLauncher
+    // (no second launcher). Set before showing the rationale or firing
+    // the request; consumed and cleared on the grant/denial result.
+    var pendingVoiceRequest by remember { mutableStateOf<PendingVoiceRequest?>(null) }
     // IN-02: first-tap rationale per UI-SPEC section 4. The dialog shows
     // once; later ungranted taps request the permission directly.
     // rememberSaveable so rotation does not re-trigger it (process death
@@ -284,14 +302,22 @@ fun ChatScreen(
 
     // Phase 65 (VOICE-02): RECORD_AUDIO runtime request. Follows the
     // imagePickerLauncher shape above with ActivityResultContracts
-    // .RequestPermission. Granted → start dictation; permanent denial
-    // (shouldShowRequestPermissionRationale false after denial) emits the
-    // Settings-escape Snackbar; transient denial stays silent.
+    // .RequestPermission. Phase 67 routes BOTH dictation and voice-send
+    // intents through this launcher via pendingVoiceRequest: granted
+    // starts the requested mode; denial applies the per-mode policy
+    // (dictation keeps the Phase 65 silent-transient + Settings-escape
+    // permanent; voice-send emits the voice-denied Snackbar / escape).
     val micPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
+        val request = pendingVoiceRequest
+        pendingVoiceRequest = null
         if (granted) {
-            viewModel.startDictation()
+            when (request) {
+                PendingVoiceRequest.DICTATION -> viewModel.startDictation()
+                PendingVoiceRequest.VOICE -> viewModel.startVoiceRecording()
+                null -> Unit
+            }
         } else {
             // IN-01: a non-Activity context (previews, wrapped test
             // contexts) used to misclassify silently. Log the fallback so
@@ -304,7 +330,18 @@ fun ChatScreen(
                 Timber.w("Voice: non-Activity context, assuming transient denial")
                 false
             }
-            if (permanent) viewModel.emitMicDenied()
+            when (request) {
+                PendingVoiceRequest.VOICE -> {
+                    // Phase 67: denial never starts recording and never
+                    // crashes — transient gets the plain Snackbar, permanent
+                    // reuses the Settings-escape channel with voice copy.
+                    if (permanent) viewModel.emitVoiceDenied()
+                    else viewModel.emitVoiceDeniedTransient()
+                }
+                else -> {
+                    if (permanent) viewModel.emitMicDenied()
+                }
+            }
         }
     }
 
@@ -319,21 +356,31 @@ fun ChatScreen(
         ) {
             if (isListening) viewModel.stopDictation() else viewModel.startDictation()
         } else if (!voiceRationaleSeen) {
+            pendingVoiceRequest = PendingVoiceRequest.DICTATION
             showVoiceRationale = true
         } else {
+            pendingVoiceRequest = PendingVoiceRequest.DICTATION
             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
-    // Phase 67 (VMSG-01 tracer): voice-send tap gate. Temporary
-    // permission bypass — recording never starts without the runtime
-    // grant (no-op otherwise, no crash). Plan 02 adds the first-tap
-    // rationale + denial Snackbar + Settings escape.
+    // Phase 67 (VMSG-01 full): voice-send tap gate. Granted toggles
+    // start/stop; first ungranted tap opens the in-context rationale,
+    // later taps request directly — both carrying the VOICE intent so the
+    // shared launcher result routes back to recording. Recording never
+    // starts without the runtime grant (no-op otherwise, no crash).
+    // Capability guards (text-only / remote toasts) land in Task 2.
     val onVoiceClick = {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
         ) {
             if (isVoiceRecording) viewModel.stopVoiceRecording() else viewModel.startVoiceRecording()
+        } else if (!voiceRationaleSeen) {
+            pendingVoiceRequest = PendingVoiceRequest.VOICE
+            showVoiceRationale = true
+        } else {
+            pendingVoiceRequest = PendingVoiceRequest.VOICE
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
@@ -462,6 +509,10 @@ fun ChatScreen(
                 // Phase 67 (VMSG-01 tracer): minimal voice-send toggle.
                 isVoiceRecording = isVoiceRecording,
                 onVoiceClick = onVoiceClick,
+                // Phase 67 (VMSG-01 full): recording row + cancel path.
+                voiceElapsedSec = voiceElapsedSec,
+                voiceAmplitude = voiceAmplitude,
+                onCancelRecording = { viewModel.cancelVoiceRecording() },
                 // WR-03: report the caret so dictation inserts at cursor.
                 onCursorChange = { viewModel.updateInputCursor(it) },
                 // Model-loading gate: the whole bar locks while loading.
@@ -669,6 +720,9 @@ fun ChatScreen(
                     onDismissRequest = {
                         voiceRationaleSeen = true
                         showVoiceRationale = false
+                        // Dismissed without confirming: drop the pending
+                        // intent so a later grant result cannot act on it.
+                        pendingVoiceRequest = null
                     },
                     title = { Text(stringResource(R.string.voice_rationale_title)) },
                     text = {
@@ -690,6 +744,7 @@ fun ChatScreen(
                         TextButton(onClick = {
                             voiceRationaleSeen = true
                             showVoiceRationale = false
+                            pendingVoiceRequest = null
                         }) {
                             Text(stringResource(R.string.dismiss))
                         }

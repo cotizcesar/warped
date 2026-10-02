@@ -66,7 +66,7 @@ private class RealRecorderHandle(private val recorder: MediaRecorder) : Recorder
 }
 
 class VoiceMessageRecorder(
-    private val context: Context,
+    context: Context,
     private val outputDir: File,
     private val factory: RecorderFactory = RealRecorderFactory(),
 ) {

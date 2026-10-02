@@ -1678,6 +1678,9 @@ class ChatViewModel @Inject constructor(
      * recognizer.
      */
     fun startDictation() {
+        // Phase 67 (VMSG-01): single live input mode — starting dictation
+        // stops an active voice recording (keeps the clip for send).
+        if (_isVoiceRecording.value) stopVoiceRecording()
         lastPartial = ""
         partialAnchor = null
         _isListening.value = getDictationManager().start()
@@ -1716,6 +1719,35 @@ class ChatViewModel @Inject constructor(
                 actionLabel = context.getString(R.string.voice_open_settings),
                 action = SnackbarAction.OPEN_APP_SETTINGS,
             ),
+        )
+    }
+
+    /**
+     * Phase 67 (VMSG-01): permanent-denial escape for voice-send. Mirrors
+     * [emitMicDenied] with the voice-message copy. Call ONLY on permanent
+     * denial — transient denial uses [emitVoiceDeniedTransient].
+     *
+     * TODO(67-02-Task3): move hardcoded copy to voice_msg_* resources.
+     */
+    fun emitVoiceDenied() {
+        _events.tryEmit(
+            ChatEvent.SnackbarWithAction(
+                message = "Microphone access needed — grant permission to record voice messages",
+                actionLabel = context.getString(R.string.voice_open_settings),
+                action = SnackbarAction.OPEN_APP_SETTINGS,
+            ),
+        )
+    }
+
+    /**
+     * Phase 67 (VMSG-01): transient-denial notice for voice-send. Plain
+     * non-blocking Snackbar (no Settings action); recording never starts.
+     *
+     * TODO(67-02-Task3): move hardcoded copy to voice_msg_* resources.
+     */
+    fun emitVoiceDeniedTransient() {
+        _events.tryEmit(
+            ChatEvent.Snackbar("Microphone access needed — grant permission to record voice messages"),
         )
     }
 
@@ -1849,7 +1881,10 @@ class ChatViewModel @Inject constructor(
         _voiceCapEvent.tryEmit(Unit)
     }
 
-    /** Explicit cancel (X): discard the file immediately. */
+    /**
+     * Explicit cancel (X): discard the file immediately — both an
+     * in-progress recording and a previously kept clip.
+     */
     fun cancelVoiceRecording() {
         voiceSessionJob?.cancel()
         voiceSessionJob = null
@@ -1857,6 +1892,13 @@ class ChatViewModel @Inject constructor(
             peekVoiceRecorder()?.cancel()
         } catch (e: Exception) {
             Timber.w(e, "VoiceMsg: cancel failed")
+        }
+        // A kept clip from an earlier stop is also discarded: cancel
+        // means the user rejected the recording, not deferred it.
+        try {
+            voiceClipFile?.takeIf { it.exists() }?.delete()
+        } catch (e: Exception) {
+            Timber.w(e, "VoiceMsg: cancel delete of kept clip failed")
         }
         voiceClipFile = null
         _hasVoiceClip.value = false
