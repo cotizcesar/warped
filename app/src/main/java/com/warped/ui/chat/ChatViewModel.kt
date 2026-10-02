@@ -387,6 +387,20 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
+     * Phase 65 fix (WR-04): re-probe recognizer availability. The init probe
+     * runs once; if the service is installed/enabled/updated afterwards (or
+     * the first probe raced a slow package load) the mic would never appear
+     * for the process lifetime. Called on ON_RESUME next to
+     * [refreshConnectivity] — cheap, off the main thread, never on the
+     * composition hot path.
+     */
+    fun refreshSpeechAvailability() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _speechAvailable.value = getDictationManager().isAvailable()
+        }
+    }
+
+    /**
      * Phase 53 (TOGGLE-01): tri-state per-chat override write. Applies to the
      * next send only — history is never refetched. Before the first send
      * (no conversation row yet) the value is held as [pendingWebOverride]

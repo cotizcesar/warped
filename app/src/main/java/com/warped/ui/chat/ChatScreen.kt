@@ -162,6 +162,10 @@ fun ChatScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewModel.refreshConnectivity()
+                // WR-04: re-probe recognizer availability on resume (cheap,
+                // off the main thread) so a late-installed recognizer shows
+                // the mic without a process restart.
+                viewModel.refreshSpeechAvailability()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
