@@ -119,6 +119,7 @@ v2.5 all phases complete (59: 4/5 with G-59-01 closed by 62; 60/61/62 passed). S
 |------|------|--------|
 | 2026-10-01 | `quick/20261001-play-warnings-fix` (Play warnings: edge-to-edge deprecated attrs, bitmap OOM sites → Coil/bounded decode, ndk debugSymbolLevel FULL; commit on beta, no push) | complete (native-symbols warning honestly unfixable: prebuilt .so stripped upstream) |
 | 2026-10-01 | `quick/20261001-branch-restructure` (delete production, beta → main, main → Beta track, manual prod promotion; local only, no push) | complete |
+| 2026-10-01 | `quick/20261001-abi-filters` (32-bit exclusion via abiFilters arm64-v8a+x86_64; AAB verified 2-ABI-only + 16KB OK; commit on main, no push) | complete |
 
 See prior STATE history for v2.2–v2.4 quick-task log (archived at roadmap rewrite). 44 quick-task backlog items acknowledged at v2.5 close (see Deferred Items above).
 
