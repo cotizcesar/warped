@@ -324,7 +324,7 @@ fun ChatInputBar(
                     .fillMaxWidth()
                     .onFocusChanged { inputFocused = it.isFocused }
                     .onKeyEvent { event ->
-                        val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null
+                        val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip
                         if (event.key == Key.Enter && canSend && !isGenerating && !isLoadingModel && hasContent) {
                             onSend()
                             true
@@ -335,7 +335,7 @@ fun ChatInputBar(
                 maxLines = 4,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = {
-                    val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null
+                    val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip
                     if (canSend && !isGenerating && !isLoadingModel && hasContent) onSend()
                 }),
                 shape = MaterialTheme.shapes.medium,
@@ -543,7 +543,7 @@ fun ChatInputBar(
                         Icon(Icons.Filled.Stop, stringResource(R.string.cd_stop), tint = Color.White, modifier = Modifier.size(24.dp))
                     }
                 } else {
-                    val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null
+                    val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip
                     if (hasContent && canSend && !isLoadingModel) {
                         IconButton(
                             onClick = onSend,
