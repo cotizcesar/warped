@@ -8,6 +8,14 @@ An Android application equivalent to LM Studio for mobile, enabling users to run
 
 Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
 
+## Previous Milestone: v3.0 Chat UX + Voice Dictation — COMPLETE ✅
+
+**Shipped:** 2026-10-02 | [Archive →](.planning/milestones/v3.0-ROADMAP.md)
+
+4 phases (63-66), 7 plans, 19/19 requirements verified. Tavily integration fully removed (DDG-only search, grep-clean, startup Keystore alias cleanup, legacy citations render read-only). Drawer/settings/catalog/help polished (sheet CTA, uniform footer, drawer-bottom delete-all, Settings removals, Help EN+ES rewrite, Use-in-Chat + empty-state CTAs). Voice dictation (SpeechRecognizer, single-insertion state machine, first-tap rationale + Settings escape). Ambient Play In-App Review (mutex-serialized 5/21d/3 policy + Settings Store entry). 914 unit tests green, security SECURED 18/18.
+
+**Known deferred:** POL-01 review-threshold tuning, POL-02 offline-dictation hint, POL-03 Pixel 7 benchmarks, POL-04 standing release-UAT device smokes (see STATE.md Deferred Items).
+
 ## Previous Milestone: v1.6 Code Syntax Highlighting — COMPLETE ✅
 
 **Shipped:** 2026-05-15 | [Archive →](.planning/milestones/v1.6-ROADMAP.md)
