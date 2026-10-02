@@ -640,6 +640,9 @@ class ChatViewModel @Inject constructor(
         // WR-04: atomic increment — @Volatile ++ is a non-atomic read-modify-write.
         val turnId = generationSeq.incrementAndGet()
         generationJob = viewModelScope.launch(coroutineExceptionHandler) {
+            // Phase 70 fix (WR-02): set immediately before runInference
+            // collection; see the finally below.
+            var consumed = false
             try {
                 // Lazy model load (quick-task lazy-model-load): selection
                 // only marks pending — the engine mounts here on the first
@@ -1180,6 +1183,11 @@ class ChatViewModel @Inject constructor(
                 // below is the single collector. Rotation-safe: collection lives in
                 // the ViewModel (survives config change); replay covers UI
                 // re-subscription with no duplicate upstream work.
+                // Phase 70 fix (WR-02): the turn consumes the attachment
+                // only from here — validation early-returns above (missing
+                // model, load failure, capability gates) leave the chip
+                // intact for the next send.
+                consumed = true
                 helper.runInference(
                     request = request,
                     enableThinking = _input.value.enableThinking && _input.value.supportsThinking,
@@ -1424,10 +1432,12 @@ class ChatViewModel @Inject constructor(
                 // 46-01: clear the serving helper on turn end — but only if no newer
                 // turn has started since (stale-finally guard via turnId/seq).
                 if (turnId == generationSeq.get()) activeHelper = null
-                // Phase 70 (70-02): per-turn attachment — clear the consumed
-                // instance only (ref-equality: a newer pick replacing it
-                // mid-turn survives for the next send).
-                if (sentDocument != null && _attachedDocument.value === sentDocument) {
+                // Phase 70 (70-02) + fix (WR-02): per-turn attachment — clear
+                // the consumed instance only (ref-equality: a newer pick
+                // replacing it mid-turn survives for the next send), and
+                // only when the turn actually consumed it (validation
+                // early-returns preserve the chip).
+                if (consumed && sentDocument != null && _attachedDocument.value === sentDocument) {
                     _attachedDocument.value = null
                 }
                 // Phase 54 (RETRY-01): the send may have crossed a
