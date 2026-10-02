@@ -7,6 +7,12 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- WR-05: RECORD_AUDIO implies a microphone hardware requirement at
+         Play filtering time. The app is engineered for graceful
+         no-recognizer fallback (VOICE-03, speechAvailable gate), so declare
+         the feature as not required to stay installable on mic-less
+         devices. -->
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
     <!-- Removed 2026-10-01 (pre-public audit): SCHEDULE_EXACT_ALARM
          (no alarm code), ACCESS_FINE/COARSE_LOCATION (zero code usage).
          Re-add only with a real feature + runtime request. RECORD_AUDIO
