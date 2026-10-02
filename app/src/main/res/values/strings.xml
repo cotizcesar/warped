@@ -86,6 +86,11 @@
     <string name="settings_wizard_desc">Re-run the onboarding wizard to explore Warped features.</string>
     <string name="settings_wizard_run">Run</string>
 
+    <!-- Settings review card -->
+    <string name="settings_review_title">Rate Warped</string>
+    <string name="settings_review_desc">Enjoying Warped? Leave a rating on the Play Store.</string>
+    <string name="settings_review_action">Rate</string>
+
     <!-- Wizard step titles -->
     <string name="wizard_step_1_title">Welcome to Warped</string>
     <string name="wizard_step_2_title">Local Engines</string>

@@ -234,6 +234,9 @@ dependencies {
     // DataStore
     implementation(libs.datastore.preferences)
 
+    // Play In-App Review (Phase 66, RATE-01/RATE-02)
+    implementation(libs.play.review.ktx)
+
     // WorkManager
     implementation(libs.work.runtime.ktx)
 

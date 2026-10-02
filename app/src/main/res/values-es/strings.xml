@@ -86,6 +86,11 @@
     <string name="settings_wizard_desc">Volver a ejecutar el wizard para explorar las funciones de Warped.</string>
     <string name="settings_wizard_run">Ejecutar</string>
 
+    <!-- Settings review card -->
+    <string name="settings_review_title">Calificar Warped</string>
+    <string name="settings_review_desc">¿Te gusta Warped? Dejá una calificación en Play Store.</string>
+    <string name="settings_review_action">Calificar</string>
+
     <!-- Wizard step titles -->
     <string name="wizard_step_1_title">Bienvenida a Warped</string>
     <string name="wizard_step_2_title">Motores locales</string>

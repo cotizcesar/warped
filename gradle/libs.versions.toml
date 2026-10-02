@@ -20,6 +20,10 @@ coil3 = "3.4.0"  # Phase 58 (OG-02): Coil image loader for OG thumbnails (Maven 
   # 3.5.0 raised compile SDK to 36, 3.6.x to 37 (changelog-confirmed 2026-09-29);
   # repo holds compileSdk 35 (android-37 platform unavailable stable).
 datastore = "1.2.1"
+# Play In-App Review (Phase 66, RATE-01/RATE-02): ambient review prompt +
+# Settings Store entry. First-party Google (com.google.android.play);
+# verified latest stable 2.0.2 via Google Maven metadata 2026-10-02.
+play-review = "2.0.2"
 workmanager = "2.12.0"
 security-crypto = "1.1.0"  # latest stable
 core-splashscreen = "1.2.0"  # RUNTIME-08 / PERF-11: SplashScreen API integration
@@ -132,6 +136,9 @@ kotlinx-collections-immutable = { group = "org.jetbrains.kotlinx", name = "kotli
 
 # DataStore
 datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+
+# Play In-App Review (Phase 66): review-ktx only, no other new dependencies
+play-review-ktx = { group = "com.google.android.play", name = "review-ktx", version.ref = "play-review" }
 
 # Security
 security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "security-crypto" }
