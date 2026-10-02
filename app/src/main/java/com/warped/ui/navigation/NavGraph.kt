@@ -416,6 +416,11 @@ fun WarpedNavGraph() {
                 HuggingFaceScreen(
                     onNavigateToModels = {
                         navController.popBackStack()
+                    },
+                    onUseInChat = { conversationId ->
+                        navController.navigate(Screen.ChatDetail(conversationId)) {
+                            popUpTo(Screen.Chat) { inclusive = true }
+                        }
                     }
                 )
             }

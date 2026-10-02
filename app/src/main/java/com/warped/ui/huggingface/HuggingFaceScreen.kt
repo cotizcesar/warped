@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Audiotrack
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -34,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,10 +71,22 @@ import com.warped.ui.components.formatFileSize
 @Composable
 fun HuggingFaceScreen(
     viewModel: CatalogViewModel = hiltViewModel(),
-    onNavigateToModels: () -> Unit = {}
+    onNavigateToModels: () -> Unit = {},
+    onUseInChat: (conversationId: Long) -> Unit = {}
 ) {
     val downloadStates by viewModel.downloadStates.collectAsStateWithLifecycle()
     val downloadedFileNames by viewModel.downloadedFileNames.collectAsStateWithLifecycle()
+
+    // FUN-01: activation creates the bound conversation asynchronously —
+    // navigate once its id lands, then consume so a later recomposition
+    // never re-navigates (same chain as ModelsScreen).
+    val pendingChatId by viewModel.pendingChatId.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingChatId) {
+        pendingChatId?.let { id ->
+            onUseInChat(id)
+            viewModel.consumePendingChat()
+        }
+    }
 
     Scaffold(
         // API-02: explicit system-bars content insets (same as the Scaffold
@@ -134,7 +149,8 @@ fun HuggingFaceScreen(
                             viewModel = viewModel,
                             downloadStates = downloadStates,
                             isOnDevice = true,
-                            onDeleteDownloaded = { viewModel.deleteDownloaded(entry) }
+                            onDeleteDownloaded = { viewModel.deleteDownloaded(entry) },
+                            onUseInChat = { viewModel.useDownloadedModel(entry) }
                         )
                     }
                 }
@@ -187,7 +203,8 @@ private fun CatalogCardItem(
     viewModel: CatalogViewModel,
     downloadStates: Map<String, DownloadState>,
     isOnDevice: Boolean,
-    onDeleteDownloaded: () -> Unit = {}
+    onDeleteDownloaded: () -> Unit = {},
+    onUseInChat: () -> Unit = {}
 ) {
     val downloadId = viewModel.downloadId(entry)
     CatalogModelCard(
@@ -199,7 +216,8 @@ private fun CatalogCardItem(
         onPause = { viewModel.pauseDownload(downloadId) },
         onResume = { viewModel.resumeDownload(downloadId) },
         onRetry = { viewModel.resumeDownload(downloadId) },
-        onDeleteDownloaded = onDeleteDownloaded
+        onDeleteDownloaded = onDeleteDownloaded,
+        onUseInChat = onUseInChat
     )
 }
 
@@ -250,7 +268,8 @@ private fun CatalogModelCard(
     onPause: () -> Unit,
     onResume: () -> Unit,
     onRetry: () -> Unit = {},
-    onDeleteDownloaded: () -> Unit = {}
+    onDeleteDownloaded: () -> Unit = {},
+    onUseInChat: () -> Unit = {}
 ) {
     // A "Cancelled" error is terminal-idle: the partial file is deleted and a
     // fresh Download restarts cleanly.
@@ -316,13 +335,26 @@ private fun CatalogModelCard(
         expandable = expandable,
         trailingActions = {
             if (downloaded) {
-                IconButton(onClick = { showDeleteConfirm = true }) {
-                    Icon(
-                        imageVector = Icons.Filled.Delete,
-                        contentDescription = stringResource(R.string.delete),
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(22.dp)
-                    )
+                // FUN-01: compact Use in Chat beside the unchanged delete
+                // icon — same row pattern as ModelsScreen ModelCard.
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = onUseInChat,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97757)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { Text(stringResource(R.string.use_in_chat), color = Color.White) }
+                    IconButton(onClick = { showDeleteConfirm = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            contentDescription = stringResource(R.string.delete),
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
             } else {
                 CatalogDownloadActions(
