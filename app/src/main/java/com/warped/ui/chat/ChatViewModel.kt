@@ -232,6 +232,8 @@ class ChatViewModel @Inject constructor(
 
     /** Monotonic turn counter backing the [activeHelper] stale-finally guard. */
     private val generationSeq = AtomicLong(0L)
+    /** Phase 70 fix (WR-04): orders concurrent attachDocument reads. */
+    private val attachSeq = AtomicLong(0L)
 
     /**
      * Phase 50 (WEB-06): grounding toggle snapshot, collected from
@@ -3512,12 +3514,28 @@ class ChatViewModel @Inject constructor(
      * CONTEXT.md trust-boundary rule the converter stays UNBUILT.
      */
     fun attachDocument(uri: Uri) {
+        // Phase 70 fix (WR-04): rapid re-picks race — each pick takes a
+        // sequence number and only the latest pick's read wins; a stale
+        // finisher is dropped (notices included) so the last PICK wins,
+        // not the last finisher.
+        val mySeq = attachSeq.incrementAndGet()
         viewModelScope.launch(coroutineExceptionHandler) {
             val outcome = withContext(Dispatchers.IO) { readAttachedDocument(uri) }
+            if (mySeq != attachSeq.get()) return@launch
             if (outcome.status == AttachStatus.UNSUPPORTED) {
                 _events.tryEmit(
                     ChatEvent.Snackbar(
                         context.getString(R.string.doc_reader_unsupported, outcome.filename),
+                    ),
+                )
+            } else if (outcome.status == AttachStatus.FAILED) {
+                // Phase 70 fix (WR-01): a doc-only FAILED send can never
+                // reach the send-time notice (blank-text early-return), so
+                // notify at pick time like UNSUPPORTED; the send-time
+                // notice stays as a backstop.
+                _events.tryEmit(
+                    ChatEvent.Snackbar(
+                        context.getString(R.string.doc_reader_failed, outcome.filename),
                     ),
                 )
             }
