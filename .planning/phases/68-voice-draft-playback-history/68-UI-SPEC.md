@@ -94,7 +94,7 @@ Exactly two surfaces change, both in `ChatScreen.kt`. No new screens, no new dia
 - Own sent voice bubbles render a player row inside the existing bubble chrome: play/pause toggle + `LinearProgressIndicator` + duration readout. Same bubble container, corner shape, and padding as text/image messages so Phase 69 transcript captions slot underneath without re-layout (locked by CONTEXT.md specifics).
 - Live progress during playback; starting one clip stops any other (single-player discipline — mirrors single-flight inference cancel, locked by CONTEXT.md).
 - Content description: "Play voice message, 0:12" / "Pause voice message" (toggle, duration interpolated).
-- Playback position resets to 0 on rotation — simple and honest (locked by CONTEXT.md). Rotation during playback pauses and keeps bubble state; user resumes with one tap.
+- Playback position is kept across rotation: rotation pauses playback and keeps bubble selection + position; user resumes with one tap (amended post-implementation — code-review WR-06: resetting to 0 contradicted the keep-bubble-state decision; pause-and-keep is strictly better UX and is what shipped).
 - Missing-file state: bubble renders the same chrome with an informational row — audio-off/blocked-style icon + "Voice clip unavailable" text in `onSurfaceVariant`, no play button. Never a silent drop, never a crash (locked by CONTEXT.md). Exact icon choice within `Icons.Filled` set at executor's discretion.
 - Players only on own sent voice bubbles — received/model-side audio is future VF-03, out of scope. No player row on assistant bubbles.
 - Stop playback on chat exit (no leaks past screen); pause on audio-focus loss (calls/other-app audio); backgrounding pauses playback and keeps position, resumes with one tap (locked by CONTEXT.md).
@@ -135,7 +135,7 @@ Applicable state considerations resolved: 7 covered, 1 backstop, 1 unresolved.
 | error | sub-1 s clip rejection | ✅ covered | Clips under 1 second are deleted and render the documented 'Recording too short' Snackbar; draft card never appears |
 | error | missing audio file in history | ✅ covered | Bubbles whose file is gone render the documented 'Voice clip unavailable' row — never silent drop, never crash |
 | partial | rotation during draft | ✅ covered | Draft survives rotation via VM-owned state plus file on disk |
-| partial | rotation during playback | ✅ covered | Rotation pauses playback and resets position to 0; user resumes with one tap |
+| partial | rotation during playback | ✅ covered | Rotation pauses playback and keeps bubble selection + position (amended post-implementation per code-review WR-06); user resumes with one tap |
 | partial | backgrounding mid-draft / mid-playback | ✅ covered | Backgrounding keeps the draft; playback pauses and keeps its position without a foreground service |
 | long-text | caption + voice bubble layout | 🧪 backstop | Held-out visual UI-state test: long caption text beside a voice clip wraps without clipping the send affordance (carried from Phase 67) |
 | zero-one-many | multiple rapid play taps / second clip while playing | ⚠ unresolved | Planner treats as assumption: single-player discipline — starting one clip stops any other; rapid toggle taps debounce in VM |
