@@ -1,145 +1,140 @@
-# Feature Research
+# Feature Research: v3.0 Chat UX + Voice Dictation
 
-**Domain:** Android Play compliance (16 KB pages, API 36) + memory-leak audit for on-device LLM chat app
-**Researched:** 2026-09-30
-**Confidence:** HIGH (16 KB + API 36 behavior changes from official Android Developers docs; leak-audit practice from LeakCanary official docs + community consensus — MEDIUM on Play deadline exact dates, which shifted via extensions)
+**Domain:** Android LLM chat app (Warped — LM Studio equivalent, Kotlin + Compose)
+**Researched:** 2026-10-02
+**Confidence:** HIGH (Play In-App Review + STT patterns verified against official Android docs; scope items are deletions/simplifications of already-built surfaces)
+**Scope:** Subsequent milestone — covers ONLY the 11 new v3.0 items. Everything else (local/remote chat, static catalog + downloads, Models & Endpoints CRUD, grounding, syntax highlighting, settings, help) already exists.
 
 ## Feature Landscape
 
 ### Table Stakes (Users Expect These)
 
-Play compliance and stability items. Missing these = app can't ship updates on Play, or crashes/OOMs in long sessions. All scoped to the v2.5 milestone — existing features (chat, catalog, grounding, OG thumbnails, agentic loops) are already built and out of scope except as leak-audit surfaces.
+Features users assume exist. Missing these = product feels incomplete.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| 16 KB page-size support (ELF 16 KB alignment) | Play blocks updates targeting API 35+ without it (deadline Nov 1 2025, extensions to mid-2026/2027 per Play notices); 16 KB devices can't install/run unaligned native libs | LOW | Warped is Kotlin-first so likely near-free: AGP 8.5.1+ auto-aligns uncompressed .so at packaging; NDK r28+ compiles 16 KB-aligned by default. Work = bump AGP/NDK, verify every `.so` (LiteRT-LM AAR, Coil/OkHttp transitive natives if any) with APK Analyzer + `check_elf_alignment.sh`, smoke-test on 16 KB emulator image (arm64 v8a). No code change if pure Kotlin. |
-| Target API 36 (compileSdk 36 + targetSdk 36) with behavior-change audit | Play annual target-API requirement (~Aug 2026 for API 36); targeting 36 flips runtime behaviors even with no code change | MEDIUM | Two-step: `compileSdk 36` first (zero behavior change, surfaces deprecations), then `targetSdk 36` + audit. Mandatory fixes: edge-to-edge (opt-out flag dead), predictive back, large-screen resizability, JobScheduler/WorkManager quota sensitivity. |
-| Mandatory edge-to-edge UI | API 36 ignores `windowOptOutEdgeToEdgeEnforcement` / `setDecorFitsSystemWindows(false)`-style opt-outs; content renders behind status/nav bars without insets | MEDIUM | Compose: `enableEdgeToEdge()` in Activity + `WindowInsets` consumption (`safeContent`/`systemBars`, Scaffold `contentWindowInsets`), remove any opt-out attr. Acceptance: no overlap/bleed on gesture-nav + 3-button nav, light/dark icon contrast. Chat screen (pill input, bottom sheet, Fuentes list) is the highest-risk surface. |
-| Predictive-back compliance | API 36 enables predictive back by default; `onBackPressed()` no longer called, `KEYCODE_BACK` not dispatched | LOW | Migrate back interception to `OnBackInvokedCallback` / Compose `PredictiveBackHandler` / `OnBackPressedDispatcher.addCallback`. Audit: chat back (exit sheet? exit conversation?), bottom-sheet dismiss, settings/preset screens. Or explicit `android:enableOnBackInvokedCallback=false` opt-out as stopgap (document as tech debt). |
-| Large-screen adaptability (sw ≥ 600dp) | API 36 ignores orientation/resize/aspect constraints (`resizeableActivity=false`, min/maxAspectRatio) on tablets/foldables/ChromeOS; pillarboxing gone | LOW | Remove reliance on portrait lock / aspect limits; verify chat + catalog + bottom sheets fill window on tablet/foldable emulator. Temporary opt-out exists via manifest compat flag — prefer real adaptivity (this app is a scrolling chat list, inherently adaptive). |
-| Foreground-service types + JobScheduler/WorkManager quota conformance | Android 16 enforces FGS types/timeouts and JobScheduler runtime quotas by standby bucket (affects WorkManager model downloads + any `DownloadManager`/periodic jobs) | MEDIUM | Work = declare precise FGS types for download workers, use user-initiated data-transfer jobs where applicable, log `WorkInfo.getStopReason()` / `JobParameters.getStopReason()` (incl. new `STOP_REASON_TIMEOUT_ABANDONED`), test download progress/cancel/retry under quota pressure. Existing background-download + offline-retry flows are the test bed. |
-| Full memory-leak audit with fixes (EngineManager, ViewModels, chat Flows, grounding pipeline, Coil/OkHttp) | Long chat + model-load/unload + multi-URL grounding sessions OOM or jank without it; users expect an LLM app to survive hours of use | MEDIUM | LeakCanary (debug-only dep) scripted pass over: model load/switch/unload, streaming chat + Stop/cancel, 5-URL grounding fan-out + cancel, offline→retry, OG thumbnail scroll, endpoint CRUD, config rotation/process death. Fix classes: uncancelled `Flow` collections, singleton holding Activity context, leaked `JobParameters`/callbacks, OkHttp `Call`/`ResponseBody` not closed, Coil requests outliving composables, SSE streams not cancelled. Acceptance: zero application leaks on scripted pass. |
-| Release verification gates (aligned AAB + 16 KB emulator + no-leak pass) | Compliance is only real if CI/device-verified; Play Console flags non-compliant AABs | LOW | `check_elf_alignment.sh` on release AAB in CI, `assembleRelease` + R8 green, smoke on 16 KB system image, LeakCanary pass clean, Play Console pre-launch report with no 16 KB/target-API warnings. |
+| Voice dictation into chat input (STT → text field) | Every major chat/messaging app (WhatsApp, Telegram, Gboard mic) offers mic-to-text in the message box; chat is the app's core surface so a mic button is expected, not a novelty | LOW | Use `RecognizerIntent.ACTION_RECOGNIZE_SPEECH` + `LANGUAGE_MODEL_FREE_FORM` via Activity Result API, append best match to existing input text (don't overwrite). No `RECORD_AUDIO` permission needed for the Intent path (recognition Activity owns the mic). Graceful fallback: disable/hide mic button when no recognizer resolves (`queryIntentActivities` empty) or on `ActivityNotFoundException`. Dictation only — recognized text lands in the input field for editing before send, no audio messages stored/sent. Dependency: existing chat input pill composable. |
+| Model-drawer empty-state "Download a model" CTA → catalog | An empty picker that strands the user with no next step is a dead end; Material empty-state guidance is illustration + explanation + single primary action. User has no local model = the only sensible action is the catalog | LOW | Text-button/CTA in the existing model-drawer (unified model+endpoint picker from v1.7/v1.8) visible only when downloaded-models list is empty; navigates to existing Model Catalog screen via existing nav route. Dependency: model drawer + catalog route. Zero new screens. |
+| Models & Endpoints empty-state CTAs ("Download a local model" / "Add a new Endpoint") | Same dead-end principle, one per section: empty local-models list → catalog; empty endpoints list → existing endpoint add/edit screen. Two CTAs because the screen has two independent lists | LOW | Conditional empty-state rows in the existing Models & Endpoints screen reusing its current navigation actions (catalog route, endpoint editor). Dependency: Models & Endpoints screen only. |
+| Catalog "Use in Chat" on downloaded models | After downloading, forcing the user to hunt through a drawer to activate the model breaks the download→chat funnel; competitors (LM Studio "load model", AI Edge Gallery task screens) complete the loop in place | LOW | Button on catalog cards where `download_status == DOWNLOADED`; on tap: set active model (same ViewModel call the drawer uses) + navigate to chat. Dependency: catalog card composable + existing model-activation path. Must be hidden/disabled while downloading. |
+| Chat-drawer footer parity (Models/Help/Settings = New Chat text size) | Uniform footer sizing is baseline visual hygiene; mismatched sizes read as a bug, not a design choice | LOW | Single typography token change in the existing chat drawer footer. Dependency: chat drawer composable only. Trivial, batch with item below. |
+| Help screen rewrite (short/minimal) | Help must be scannable; the current screen still references removed surfaces (Tavily key step, `help_s7_step5`) which actively misleads after the DDG-only cut | LOW | Rewrite `HelpScreen.kt` + `help_*` strings (EN + ES `values-es`) as a short minimal list; delete stale Tavily/search-key steps. Dependency: HelpScreen + strings; MUST be sequenced after/with Tavily removal or help will document a dead feature. Batch the string edits together. |
 
 ### Differentiators (Competitive Advantage)
 
-Not required by Play, but valuable for an on-device LLM app where sessions are long and models are huge.
+Features that set the product apart. Not required, but valuable.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Leak-free multi-hour chat sessions (ViewModel + Flow hygiene) | On-device LLM apps die by a thousand retained chat states; surviving long sessions is the core-value multiplier | MEDIUM | `collectAsStateWithLifecycle`, `viewModelScope` cancellation on clear, single-flight `runInference` cancel propagation, transient Using-rows cleanup. Builds directly on v2.1 cancellable-inference work. |
-| Model-memory discipline (load/unload without retained engine) | A 4–8 GB model that can't fully unload bricks the phone; clean unload → reload is the LM-Studio-grade expectation | MEDIUM | EngineManager releases native handles on switch/unload, no static `LlmInference` refs, memory-pressure listener suggests smaller quant. Device-verified on real phone (emulator RAM behavior differs). |
-| Grounding-pipeline cancellation hygiene (5-fan-out + Tavily + SSE) | Parallel fetch + streaming + search is the leakiest surface (5 concurrent OkHttp calls, SSE accumulators, per-source progress); clean cancel = no zombie network + no retained chat rows | MEDIUM | Structured-concurrency scope per message-send, `Stop` cancels fan-out + SSE + Tavily, same-row reuse without retaining old jobs. v2.3/v2.4 cancel guards are the foundation. |
-| Coil thumbnail cache discipline (disk-bounded, composable-scoped) | OG thumbnails per source can balloon image cache across long grounded threads; bounded cache = smooth scroll without OOM | LOW | Coil 3.4.0 singleton + disk cache (already in v2.4), verify requests cancel on list recycle, cap memory cache for chat context. |
-| Faster cold start / lower battery from 16 KB pages | Google cites 3–30% launch improvement, ~4.5% battery gain on 16 KB devices — free marketing + real UX win for a heavyweight app | LOW | No extra work beyond 16 KB support; optionally record before/after cold-start on reference device as release note. |
+| Play in-app star rating | Timely ratings lift Play listing conversion; in-app flow (no store redirect) measurably raises review volume vs "rate us" links | LOW | `com.google.android.play:review:2.0.2` (+ `review-ktx`), `ReviewManagerFactory` → `requestReviewFlow()` (pre-cache) → `launchReviewFlow()`. **Critical official constraints:** (a) NEVER trigger from a "Rate us" CTA button — quota (~1/month, undisclosed, silently no-ops) makes buttons look broken; fire at a natural success moment (e.g. after N successful chat turns / returning to chat), (b) no pre-qualifying questions ("Do you like the app?") — Play policy violation risk, (c) swallow all errors silently, never block user flow, (d) test via internal test track (quota not enforced there) + `FakeReviewManager` for unit tests. So the v3.0 "Play star rating in-app" item = automatic/ambient trigger, NOT a settings button. Dependency: chat screen lifecycle + DataStore counter (turns completed / days installed). Sources: developer.android.com/guide/playcore/in-app-review (+kotlin-java, +test). |
+| Delete-all-chats relocated to chat-drawer bottom above Models | Destructive action lives where the objects live (drawer lists the chats) instead of buried in Settings → Data; matches messaging-app convention (bulk delete near the list) and shortens the path | LOW | Move existing delete-all logic (confirmation dialog + Room clear) from Settings Data section into chat drawer footer above Models entry; delete the Settings Data section entirely. Dependency: chat drawer + Settings screen + existing delete-allChats path. Requires confirm dialog (destructive, irreversible) — keep the existing one, just re-parent it. Batch with footer-parity item (same file). |
+| Web Options removed from model drawer (settings only) | Declutters the critical chat-entry path: model drawer goes back to one job (pick a model/endpoint). Grounding toggles (tri-state Sí/No/Heredar + Sin web from v2.3) remain fully available in Settings | LOW | Delete the Web Options block from the model-drawer composable; no Settings work needed (controls already there). Dependency: model drawer only. Pure deletion — lowest risk item in the milestone. |
+| Tavily removal → DuckDuckGo-only search | Removes the last API-key friction in the app (Tavily key in Keystore + test-connection + settings UI + error strings + fallback legs in `OpenAIProvider`/`CompatToolLoop`/`LocalToolLoop`/`WebSearchToolSet`); DDG needs no key so grounding becomes zero-config for every user | MEDIUM | Delete: `TavilySearchRepository` + key/settings UI + `tavily_*`/`bubble_tavily_*` strings (EN+ES) + fallback call sites (keep DDG leg as the single path) + Keystore `tavily` entry read/write. Keep DDG repository and the `[WEB CONTEXT]` fusion pipeline untouched. Regression net: grounding tests that mock the Tavily fallback must be updated/removed. Cross-cuts providers + agentic loops + settings + help strings, so it is the highest-blast-radius item despite being "just a deletion". Sequence help rewrite + error-string cleanup in the same phase. |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| Rewriting inference/network stack "while we're at it" | Compliance milestone feels like a good time to modernize | Scope explosion; LiteRT-LM 0.17.1 + OkHttp/SSE + Coil stack is proven (494/494 green in v2.4). Touching it risks regressions with zero Play benefit | Freeze engine/network deps; only bump AGP/NDK/compileSdk/targetSdk + what's needed for alignment |
-| Shipping LeakCanary (or any heap-dump tooling) in release | "Detect leaks in production" | Heap dumps freeze the app, leak PII/chat content to disk, bloat release APK; Play pre-launch + debug pass is the right venue | `debugImplementation` only; release gets lightweight `WorkInfo.getStopReason()` logging + crash-handler OOM breadcrumbs |
-| `android:largeHeap="true"` as the leak fix | Quick OOM suppression | Masks real leaks, hurts system-wide memory, doesn't survive Play review scrutiny for behavior; delays the actual audit | Fix retention roots; use `largeHeap` only if a specific model-load path proves it necessary with profiler evidence |
-| Blanket `enableOnBackInvokedCallback=false` + orientation-lock compat flags as permanent fixes | Fastest way to silence API 36 behavior changes | Accumulates compat debt; Google removes these escape hatches (as it just did with edge-to-edge opt-out) | Use opt-outs only as stopgaps with a tracked follow-up; ship real edge-to-edge + predictive back + adaptive layout |
-| Dropping 32-bit ABIs / minSdk bump to dodge 16 KB work | Fewer .so to align | 16 KB requirement targets 64-bit; 32-bit alignment has its own edge cases, and minSdk bumps cut off real users for no benefit | Keep ABI/minSdk surface unchanged; align what ships, verify per-ABI with the alignment script |
-| Custom native memory manager / manual `mmap` tuning for 16 KB | "Optimize" page handling by hand | LiteRT-LM owns native allocation; hand-tuning against its allocator invites corruption that only reproduces on 16 KB hardware | Rebuild with NDK r28+ defaults, test, and file upstream issues if a bundled .so is misaligned |
+| Explicit "Rate this app" button wired to `launchReviewFlow` | Feels like giving users control over when to rate | Quota silently suppresses the dialog → button appears broken; Google explicitly forbids CTA-triggered review flow. A button must deep-link to the Play Store listing instead | Ambient trigger after success moments (the actual v3.0 item) + optional store-link in Settings/Help |
+| Pre-rating sentiment gate ("Do you love the app? Yes→review, No→feedback") | Tries to filter 5-star reviews | Direct Play policy violation ("shouldn't ask the user any questions before or while presenting the rating button or card") — removal risk | Trigger unconditionally at good moments; handle feedback via existing channels |
+| Continuous/background voice listening or audio messages | "Full voice mode" sounds premium | `SpeechRecognizer` docs warn against continuous recognition (battery/bandwidth); audio messages need storage schema, playback UI, and provider multimodal support — all out of scope (PROJECT.md explicitly defers voice I/O) | One-shot dictation → editable text (the actual v3.0 item); revisit voice mode only after text chat is solid |
+| Custom in-app STT engine / on-device model for dictation | Offline dictation parity | Heavy native dependency + model downloads for a convenience feature; platform recognizer already handles offline via `EXTRA_PREFER_OFFLINE` where supported | Platform `RecognizerIntent` (default), `EXTRA_PREFER_OFFLINE=true` hint if offline parity matters later |
+| `SpeechRecognizer` + custom listening UI for v1 of dictation | More control, inline UX | Requires `RECORD_AUDIO` runtime permission (new Play declaration + rationale UI), main-thread-only API, manual error/restart handling — all for zero user-visible gain over the Intent dialog in a dictation-only scope | `RecognizerIntent` via Activity Result API; graduate to `SpeechRecognizer` only if partial-results/live-transcription is later requested |
+| Keystore key-deletion UI (the item being removed) | "Let users manage keys" | With Tavily gone there are no user-managed keys left (HF token already removed in v2.2); a deletion UI for zero keys is dead surface that suggests secrets exist | Remove as scoped; reintroduce only if a new keyed integration lands |
+| Settings Data section / per-chat delete (the items being removed) | Fine-grained data control | Duplicates the drawer bulk action one tap away from the list; two delete paths = two confirmation flows to maintain and test | Single delete-all-chats in drawer (the actual v3.0 item) |
 
 ## Feature Dependencies
 
 ```
-16 KB page support
-    └──requires──> AGP 8.5.1+ / NDK r28+ toolchain bump
-                       └──requires──> LiteRT-LM AAR (0.17.1) ships 16 KB-aligned .so
-                                              (if misaligned: needs upstream fix or repackaging)
+[Play in-app rating]
+    └──requires──> [chat success signal (completed turn counter)]
+                       └──requires──> [existing chat ViewModel / DataStore]
 
-targetSdk 36 audit
-    ├──requires──> compileSdk 36 first (zero-behavior-change step)
-    ├──requires──> Edge-to-edge UI ──enhances──> chat/bottom-sheet visuals
-    ├──requires──> Predictive-back migration
-    └──requires──> FGS types + WorkManager quota conformance ──enhances──> model downloads + offline retry
+[Catalog "Use in Chat"]
+    └──requires──> [existing model-activation path (drawer uses it)]
+                       └──requires──> [catalog download_status field]
 
-Memory-leak audit + fixes
-    ├──requires──> LeakCanary debug harness
-    ├──covers──> EngineManager / model load-unload
-    ├──covers──> Chat Flows + single-flight runInference cancel
-    ├──covers──> Grounding fan-out (multi-URL + Tavily) + SSE accumulators
-    ├──covers──> Coil OG thumbnails + OkHttp clients
-    └──requires──> NOTHING new in user features (audit-only; no behavior change expected)
-
-Release gates ──requires──> all three above (alignment script + 16 KB emulator smoke + zero-leak pass)
+[Drawer empty-state CTA] ──navigates──> [existing Model Catalog route]
+[Endpoints empty-state CTA] ──navigates──> [existing endpoint editor]
+[Delete-all-chats in drawer] ──reparents──> [existing delete-all logic + confirm dialog]
+[Help rewrite] ──requires──> [Tavily removal strings finalized]
+[Tavily removal] ──touches──> [OpenAIProvider, CompatToolLoop, LocalToolLoop, WebSearchToolSet, Settings, HelpScreen, strings EN+ES]
+[Voice dictation] ──requires──> [chat input pill composable]
+[Footer parity + delete-all + drawer CTA + Web Options removal]
+    └──all touch──> [model/chat drawer composables — batch in one phase]
 ```
 
 ### Dependency Notes
 
-- **16 KB requires toolchain bump:** AGP auto-aligns at packaging and NDK r28 compiles aligned by default — the cheapest path is upgrading, not hand-editing linker flags (`-Wl,-z,max-page-size=16384` is the legacy manual route for NDK ≤ r27).
-- **LiteRT-LM .so is the critical external dependency:** Warped ships no hand-written JNI (llama.cpp removed in v1.5); if the bundled LiteRT-LM native lib is misaligned, the fix is an upstream version bump or ABI repackaging — verify first with APK Analyzer before assuming work is needed.
-- **compileSdk before targetSdk:** raising `compileSdk` to 36 changes nothing at runtime and surfaces deprecations; `targetSdk 36` is what flips edge-to-edge/predictive-back/resizability — sequence them as separate verifiable steps.
-- **Leak audit conflicts with feature work in the same phase:** audit needs a frozen surface to get a stable baseline; combining with UI rewrites invalidates the pass. Keep v2.5 audit-only.
-- **WorkManager quota work enhances downloads:** existing background-download progress/cancel + offline-retry flows become the conformance test bed — no new download feature needed.
+- **Help rewrite requires Tavily removal (ordering):** help currently documents the Tavily key step; rewriting before the cut re-documents a dead feature. Same phase, Tavily deletion first.
+- **Drawer cluster batches:** footer parity + delete-all relocation + drawer empty-state CTA + Web Options removal all edit the same drawer composables — one phase avoids merge churn.
+- **Tavily removal is the blast-radius item:** it is the only v3.0 change touching data-layer providers and grounding tests; everything else is UI-surface only.
+- **Voice dictation is independent:** touches only the chat input pill + result appending; no permission, manifest, or data-layer changes on the Intent path. Can parallelize with anything.
+- **Play rating is independent but needs a trigger definition:** decide the success-moment rule (e.g. 3+ successful turns AND 2+ days installed, once per version) before implementation; DataStore counter is new but trivial.
 
 ## MVP Definition
 
-(v2.5 is a compliance + stability milestone, so "MVP" = minimum shippable Play-compliant release.)
+v3.0 is a polish milestone, not a product launch — "MVP" here = the shippable slice if the milestone had to be cut.
 
-### Launch With (v1 — this milestone, P1)
+### Launch With (must-ship for the milestone goal)
 
-- [ ] 16 KB alignment verified — every shipped `.so` 16 KB-aligned (`check_elf_alignment.sh` green), AGP/NDK bumped, 16 KB emulator smoke passes — without it Play blocks updates
-- [ ] targetSdk 36 + behavior audit closed — edge-to-edge real (no opt-out), predictive back migrated, large-screen smoke, FGS/WorkManager quota conformance for downloads — without it Play blocks updates on the annual deadline
-- [ ] Zero-application-leak pass — scripted LeakCanary sweep over model load/switch/unload, streaming + Stop, 5-URL grounding + cancel, offline→retry, thumbnail scroll; all found application leaks fixed and re-verified
-- [ ] Release gates green — aligned AAB, `assembleRelease` + R8, Play Console with no 16 KB/target warnings
+- [ ] Voice dictation into chat input — the only new user-facing capability; the milestone's headline
+- [ ] Tavily removal (DDG-only) — breaking-behavior change justifying the major bump; everything referencing keys must die together
+- [ ] Drawer cluster (empty-state CTA, footer parity, delete-all relocation, Web Options removal) — the visible "polish" users judge v3.0 on
+- [ ] Catalog "Use in Chat" + Models & Endpoints empty-state CTAs — closes the download→chat funnel gaps
 
-### Add After Validation (v1.x — only if the pass surfaces them)
+### Add After Validation (same milestone, separable)
 
-- [ ] Cold-start / battery before-after numbers on reference device — trigger: 16 KB device available; feeds release notes
-- [ ] Memory-pressure UX (suggest smaller quant on low RAM) — trigger: audit finds OOM-adjacent paths that aren't leaks per se
-- [ ] Per-screen predictive-back animations polish — trigger: default migration works but feels abrupt in chat/sheets
+- [ ] Play in-app rating — ambient, invisible when quota-suppressed; safe to land late, zero UI coupling
+- [ ] Help rewrite — must follow Tavily removal; land any time after
+- [ ] Settings cleanup (key-delete + Data section) — mechanical once delete-all is reparented
 
-### Future Consideration (v2+ — explicitly out of v2.5)
+### Future Consideration (explicitly out of v3.0)
 
-- [ ] Engine/network dependency modernization — why defer: zero Play benefit, high regression risk on a 494-green stack
-- [ ] Production memory telemetry (telemetry-gated, privacy-reviewed) — why defer: needs PII story for chat content first
-- [ ] Tablet/foldable bespoke layouts — why defer: adaptive-fill compliance is enough; bespoke layouts are product work, not compliance
+- [ ] Audio messages / voice replies (TTS) — PROJECT.md Out of Scope ("Voice input/output — defer")
+- [ ] Continuous listening / live transcription via `SpeechRecognizer` — graduate only on user demand
+- [ ] New keyed search provider replacing Tavily — would resurrect key UI just deleted
 
 ## Feature Prioritization Matrix
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| 16 KB alignment verification | HIGH (installable on new devices; Play shippable) | LOW | P1 |
-| targetSdk 36 + edge-to-edge | HIGH (Play shippable; visible UI correctness) | MEDIUM | P1 |
-| Predictive-back migration | MEDIUM (correct back everywhere) | LOW | P1 |
-| FGS/WorkManager quota conformance | HIGH (downloads survive Android 16 quotas) | MEDIUM | P1 |
-| Memory-leak audit + fixes | HIGH (long-session stability = core value) | MEDIUM | P1 |
-| Large-screen adaptability smoke | MEDIUM (foldable/tablet correctness) | LOW | P1 |
-| Release gates (alignment CI + pre-launch) | MEDIUM (prevents regressions) | LOW | P1 |
-| Cold-start/battery numbers | LOW (release-note fodder) | LOW | P2 |
-| Memory-pressure UX | MEDIUM (graceful degradation) | MEDIUM | P2 |
-| Predictive-back animation polish | LOW (feel, not function) | LOW | P3 |
+| Voice dictation | HIGH (headline capability) | LOW (Intent path, no permission) | P1 |
+| Tavily removal DDG-only | HIGH (zero-config grounding, justifies major) | MEDIUM (cross-cutting deletion + test updates) | P1 |
+| Model-drawer empty-state CTA | HIGH (unblocks no-model users) | LOW | P1 |
+| Catalog "Use in Chat" | HIGH (closes download→chat funnel) | LOW | P1 |
+| Delete-all-chats relocation | MEDIUM (better placement, removes settings clutter) | LOW | P1 |
+| Models & Endpoints empty CTAs | MEDIUM | LOW | P2 |
+| Web Options drawer removal | MEDIUM (declutter) | LOW (pure deletion) | P2 |
+| Footer font parity | LOW (cosmetic) | LOW (batch free) | P2 |
+| Help rewrite | MEDIUM (removes misleading docs) | LOW | P2 |
+| Settings cleanup | LOW (removes dead surface) | LOW | P2 |
+| Play in-app rating | MEDIUM (ratings lift, invisible infra) | LOW | P2 |
 
 **Priority key:**
-- P1: Must have for launch
-- P2: Should have, add when possible
-- P3: Nice to have, future consideration
+- P1: Must have for milestone goal (headline + breaking changes + core funnel)
+- P2: Should have, separable, batch where files overlap
 
 ## Competitor Feature Analysis
 
-| Feature | Google AI Edge Gallery (reference impl) | LM Studio (desktop) | Our Approach |
-|---------|----------------------------------------|---------------------|--------------|
-| 16 KB / target-API currency | Tracks latest AGP/NDK via Google maintainers; de-facto compliance reference for LiteRT-LM apps | Desktop — N/A (no Play policy pressure) | Match Gallery's toolchain posture (AGP 8.5.1+/NDK r28+), verify LiteRT-LM .so alignment the same way |
-| Edge-to-edge / predictive back | Compose-first, adopts new platform behaviors early | Desktop windowing — N/A | Real Compose insets + back-handler migration, no permanent opt-outs |
-| Leak/stability discipline | Sample-grade; not held to long-session bar | Long-session desktop app; process memory is abundant | Differentiate: audit explicitly for multi-hour chat + model switch + grounding cancel — the mobile-hard part neither reference fully covers |
+| Feature | LM Studio (desktop) | AI Edge Gallery (Android, Google) | Our Approach |
+|---------|---------------------|-----------------------------------|--------------|
+| Voice input | None (desktop typing assumed) | None (task-runner focus) | One-shot dictation → editable text; differentiator on mobile, no competitor has it |
+| In-app rating | N/A (direct download) | Play listing only | Ambient In-App Review at success moments; no CTA button per Google guidance |
+| Empty-state CTAs | Model-load prompts point at search | Task screens assume models present | Inline CTAs routing to existing catalog/editor — matches Material empty-state pattern |
+| Download → use funnel | "Load model" in place | Model auto-loads into task | "Use in Chat" on downloaded catalog cards — parity with LM Studio behavior |
+| Search grounding keys | N/A (local only) | N/A | DDG-only zero-config; removing Tavily removes the last key friction — unique simplicity vs key-heavy wrappers |
 
 ## Sources
 
-- Android Developers — "Support 16 KB page sizes" (official guide: Play requirement for API 35+ on 64-bit, AGP 8.5.1+ auto-align, NDK r28+ default, APK Analyzer + `check_elf_alignment.sh`, 16 KB emulator images) — https://developer.android.com/guide/practices/page-sizes — HIGH
-- Android Developers Blog — "Prepare your apps for Google Play's 16 KB page size compatibility requirement" (Nov 1 2025 enforcement, benefits data) — https://android-developers.googleblog.com/2025/05/prepare-play-apps-for-devices-with-16kb-page-size.html — HIGH
-- Android Developers Blog — "Transition to using 16 KB page sizes for Android apps and games using Android Studio" (who must recompile, Studio tooling table) — https://android-developers.googleblog.com/2025/07/transition-to-16-kb-page-sizes-android-apps-games-android-studio.html — HIGH
-- Android Developers — "Behavior changes: Apps targeting Android 16" (edge-to-edge opt-out removal, predictive back default, large-screen constraint ignore, fixed-rate scheduling) — https://developer.android.com/about/versions/16/behavior-changes-16 — HIGH
-- Android Developers — "Behavior changes: all apps" (JobScheduler quota by standby bucket, FGS-concurrent quota, `STOP_REASON_TIMEOUT_ABANDONED`, affects WorkManager/DownloadManager) — https://developer.android.com/about/versions/16/behavior-changes-all — HIGH
-- Community migration guides (API 34/35 → 36 practical guide; Halodoc Android 16 journey: FGS types, edge-to-edge, compat-flag sequencing) — MEDIUM (single-source, consistent with official docs)
-- LeakCanary official docs — "How LeakCanary works" (ObjectWatcher on destroyed Activity/Fragment/View/ViewModel, retained threshold → heap dump → analysis → categorization) — https://github.com/square/leakcanary/blob/main/docs/fundamentals-how-leakcanary-works.md — HIGH
-- LeakCanary GitHub (square/leakcanary, ~30k stars, Apache-2.0; debug-only integration, instrumentation fail-on-leak listener) — HIGH
-- Community LeakCanary fix patterns (remove callbacks on destroy, avoid Activity-context singletons, cancel unscoped coroutines) — MEDIUM (patterns consensus, verify per-leak against heap trace)
+- Play In-App Review guide — https://developer.android.com/guide/playcore/in-app-review (HIGH: quota behavior, no-CTA rule, no pre-questions rule)
+- Integrate in-app reviews (Kotlin/Java), `review:2.0.2` + `review-ktx:2.0.2`, `ReviewManagerFactory` — https://developer.android.com/guide/playcore/in-app-review/kotlin-java (HIGH)
+- Test in-app reviews (internal track bypasses quota, `FakeReviewManager`) — https://developer.android.com/guide/playcore/in-app-review/test (HIGH)
+- `SpeechRecognizer` API reference (main-thread only, `RECORD_AUDIO` required, not for continuous use) — https://developer.android.com/reference/android/speech/SpeechRecognizer (HIGH)
+- `RecognizerIntent` API reference (`ACTION_RECOGNIZE_SPEECH`, `LANGUAGE_MODEL_FREE_FORM`, `EXTRA_PREFER_OFFLINE`) — https://developer.android.com/reference/android/speech/RecognizerIntent (HIGH)
+- RecognizerIntent vs SpeechRecognizer tradeoffs (Intent = simple + consistent UI + no permission; SpeechRecognizer = control + custom UI + permission + error handling) — StackOverflow/community consensus (MEDIUM)
+- Existing codebase: `HelpScreen.kt`, `TavilySearchRepository` usages (`OpenAIProvider`, `CompatToolLoop`, `LocalToolLoop`, `WebSearchToolSet`), Tavily strings in `values/strings.xml` + `values-es/strings.xml`, manifest note on removed `RECORD_AUDIO` (HIGH — verified in repo)
 
 ---
-*Feature research for: v2.5 Play Compliance + Leaks (16 KB, API 36, memory-leak audit)*
-*Researched: 2026-09-30*
+*Feature research for: v3.0 Chat UX + Voice Dictation*
+*Researched: 2026-10-02*

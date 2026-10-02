@@ -1,238 +1,280 @@
-# Architecture Research: v2.5 Play Compliance + Leaks
+# Architecture Research: v3.0 Chat UX + Voice Dictation
 
-**Domain:** Android LLM chat app (Warped) — Play-compliance + memory-leak milestone on existing codebase
-**Researched:** 2026-09-30
-**Confidence:** HIGH (all structural claims verified against the live codebase; Android 16/16KB claims from official developer.android.com docs fetched same day)
+**Domain:** Android (Kotlin + Compose + Hilt, Clean architecture) — incremental milestone on existing app Warped
+**Researched:** 2026-10-02
+**Confidence:** HIGH (codebase-verified: every integration point below cites an existing file/symbol; Play/SpeechRecognizer API details MEDIUM — framework-stable APIs, no new third-party SDK)
 
-## Standard Architecture
+## Standard Architecture (as built — verified in tree)
 
-### System Overview — what v2.5 touches (and what it doesn't)
+v3.0 adds to an existing, healthy Clean-architecture app. Nothing in the layering changes. All v3.0 work is
+**new leaves or deletions on the existing tree**, not restructuring:
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│  BUILD LAYER (16KB work lives here — zero Kotlin changes)         │
-│  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────┐   │
-│  │ AGP 9.3.0    │  │ packaging{}  │  │ deps' .so files        │   │
-│  │ (≥ 8.5.1 ✓)  │  │ legacy=false │  │ LiteRT 0.17.1 / SQLCipher│
-│  │ 16KB zip-    │  │ uncompressed │  │ verify alignment,      │   │
-│  │ align default│  │ .so ✓        │  │ never rebuild          │   │
-│  └──────────────┘  └──────────────┘  └────────────────────────┘   │
+┌─────────────────────────────────────────────────────────────────┐
+│  UI LAYER (Compose + ViewModel, Hilt @AndroidEntryPoint)        │
+│  ┌──────────────┐ ┌──────────────┐ ┌───────────┐ ┌────────────┐  │
+│  │ ChatScreen + │ │ NavGraph     │ │ Settings  │ │ Models /   │  │
+│  │ ChatInputBar │ │ Drawer +     │ │ Screen +  │ │ Endpoints /│  │
+│  │ ModelSelector│ │ NavHost (14  │ │ ViewModel │ │ Catalog    │  │
+│  │              │ │ destinations)│ │           │ │ screens    │  │
+│  └──────┬───────┘ └──────┬───────┘ └─────┬─────┘ └─────┬──────┘  │
+│         │                │               │             │          │
+├─────────┴────────────────┴───────────────┴─────────────┴──────────┤
+│  DOMAIN LAYER (pure Kotlin interfaces + models)                   │
+│  LlmModelHelper (keystone) · LlmProvider · repositories (interfaces)│
+│  GroundingPrecedence (pure tri-state) · SmartPresetCalculator      │
 ├──────────────────────────────────────────────────────────────────┤
-│  MANIFEST + OS BEHAVIOR LAYER (API 36 audit lives here)           │
-│  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────┐   │
-│  │ targetSdk 36 │  │ WorkManager  │  │ MainActivity/NavGraph  │   │
-│  │ ALREADY set  │  │ download FGS │  │ edge-to-edge / back    │   │
-│  │ (audit only) │  │ dataSync ✓   │  │ handling verify/fix    │   │
-│  └──────────────┘  └──────────────┘  └────────────────────────┘   │
-├──────────────────────────────────────────────────────────────────┤
-│  APP RUNTIME (leak audit lives here — existing layers, no new)    │
-│  ┌──────────────────┐  ┌──────────────┐  ┌───────────────────┐    │
-│  │ Singletons       │  │ ChatViewModel│  │ Network singletons│    │
-│  │ EngineManager →  │  │ generationJob│  │ base / sse /      │    │
-│  │ LiteRTLmEngine → │  │ retryJob,    │  │ tavily / Coil     │    │
-│  │ native Engine +  │  │ shareIn turn │  │ OkHttp clients +  │    │
-│  │ openSessions set │  │ scope, flows │  │ callbackFlow SSE  │    │
-│  └──────────────────┘  └──────────────┘  └───────────────────┘    │
-│  ┌────────────────────────────────────────────────────────────┐   │
-│  │ Compose (ChatScreen, sheets, OgSourceCard, MarkdownText)   │   │
-│  │ collectAsStateWithLifecycle ✓ / DisposableEffect audit     │   │
-│  └────────────────────────────────────────────────────────────┘   │
-├──────────────────────────────────────────────────────────────────┤
-│  OBSERVABILITY (NEW — debug builds only, zero release footprint)  │
-│  ┌────────────────────────────────────────────────────────────┐   │
-│  │ LeakCanary 2.14 + plumber-android (debugImplementation)    │   │
-│  │ auto-installs via App Startup; no code, no Hilt binding    │   │
-│  └────────────────────────────────────────────────────────────┘   │
-└──────────────────────────────────────────────────────────────────┘
+│  DATA LAYER (Hilt @Singleton, Dispatchers.IO)                     │
+│  grounding/ : MultiUrlFetcher · DuckDuckGoSearchRepository        │
+│    · TavilySearchRepository ← DELETE · WebPageFetcher ·           │
+│    SearchOgEnricher · GroundedImages · GroundingBudget             │
+│  remote/api: TavilyApi ← DELETE · remote/provider/* (consumers)    │
+│  local/security: ApiKeyStore (tavily alias ← DELETE)               │
+│  Room v16 · DataStore prefs · OkHttp/Retrofit (@Named clients)    │
+└─────────────────────────────────────────────────────────────────┘
 ```
-
-The single most important architectural fact for this milestone: **there is no new feature subsystem.** All three workstreams integrate into seams that already exist:
-
-1. **16KB** integrates at the *build/packaging* seam only. The app ships **zero first-party native code** (no `src/main/cpp/`, no CMake, no `ndkVersion` anywhere in Gradle files — verified by grep). Every `.so` in the APK arrives inside a dependency AAR — primarily `litertlm-android:0.17.1` (`liblitertlm_jni.so` + GPU delegate libs + `libcdsprpc.so` for the NPU path) and SQLCipher (`libsqlcipher.so`). Therefore no `LOCAL_LDFLAGS` / `target_link_options` changes exist to make; the work is **verify → escalate-or-bump → test on 16KB image**.
-2. **API 36** integrates at the *manifest + WorkManager + navigation* seams, and the codebase is already most of the way there: `compileSdk = 36`, `targetSdk = 36` are set in `app/build.gradle.kts`; `POST_NOTIFICATIONS` runtime request exists in `MainActivity`; `SCHEDULE_EXACT_ALARM` is declared; the download worker already runs as a `dataSync` foreground service (`SystemForegroundService` merge in the manifest). What remains is a **behavior-change audit**, not a migration.
-3. **Leak fixes** integrate *inside* existing components (no new layers, no new repositories). The fix surface is: singleton native-handle lifecycle, ViewModel job/flow discipline, OkHttp client/stream lifecycle, Compose effect/collector discipline, grounding-pipeline coroutine scopes. LeakCanary itself is a **debug-only observer** — it adds no architecture, only visibility.
 
 ### Component Responsibilities
 
-| Component | Responsibility | Implementation in this codebase |
-|-----------|----------------|---------------------------------|
-| AGP + `packaging.jniLibs` | 16KB zip-alignment of uncompressed `.so` | AGP 9.3.0 (≥ 8.5.1 requirement ✓); `useLegacyPackaging = false` already (verified `app/build.gradle.kts` lines 81–84). **No change needed.** |
-| Dependency AAR `.so` files | 16KB ELF-alignment (`LOAD align 2**14`) | Owned by Google (LiteRT-LM) / Zetetic (SQLCipher). Warped's only lever is version bumps. **Verify, don't rebuild.** |
-| `AndroidManifest.xml` | API 36 declarations | `targetSdk 36` via Gradle; FGS `dataSync` service merge; native-lib `required="false"` entries. May gain `enableOnBackInvokedCallback` decision (see Pattern 2). |
-| `ModelDownloadWorker` / `ModelBenchmarkWorker` | Deferrable work under Android 16 JobScheduler quotas | Download worker already foreground + `dataSync` (exempt path). Benchmark worker is the audit target for quota-stop handling (`WorkInfo.getStopReason()` logging). |
-| `MainActivity` + `NavGraph` | Edge-to-edge, predictive back | Audit: confirm no `windowOptOutEdgeToEdgeEnforcement` usage (attr is dead on target-36/API-36); confirm back handling uses supported APIs or opt out. |
-| `EngineManager` → `LiteRTLmEngine` → native `Engine` | Native handle lifecycle (largest leak surface) | `@Singleton` chain; `openSessions` tracking + ordered close (sessions → engine) already exists; `ioScope` is never cancelled (singleton-scoped — acceptable, document). |
-| `ChatViewModel` | Turn-scoped job/flow lifecycle | `generationJob` + `retryJob` with pre-cancel discipline (lines ~377–391, ~1266–1287); per-turn `shareIn` scoped to the generation job (line ~904); `onCleared()` exists (line ~1919 — audit its body). |
-| `LMStudioProvider` / `LmStudioHelper` / remote providers | SSE `Call` + `callbackFlow` lifecycle | `activeCall` AtomicReference + `callHook` + `onCompletion` null-out already in `LmStudioHelper`; `callbackFlow` in `LMStudioProvider` (line ~278) is the `awaitClose` audit target. |
-| OkHttp clients (`NetworkModule` + Coil) | Connection/client lifecycle | 4 clients: base, `@Named("sse")` (50 MB cache), `@Named("tavily")`, Coil bare client in `WarpedApplication.newImageLoader`. All `@Singleton`/singleton-factory — pools live for app lifetime by design. |
-| `WebPageFetcher` + `MultiUrlFetcher` + search repos | Grounding fetch scope lifecycle | `activeCalls` ConcurrentHashMap registry + `cancel()` already; audit: parallel fan-out children must die with the turn scope, never `GlobalScope`. |
-| Compose screens | Collector/effect discipline | `collectAsStateWithLifecycle` used throughout (ChatScreen, PromptLab, Benchmark, Wizard ✓); `DisposableEffect` observer properly removed ✓; `DisposableEffect(Unit) { unloadLocalModels() }` in ChatScreen is a *correctness* smell to review (model unload on composition leave), not a leak per se. |
-| LeakCanary 2.14 + plumber (sibling STACK.md decision) | Debug-only leak detection + framework-leak plumber | `debugImplementation` only; auto-installs via App Startup provider; no Hilt module, no Application code. |
+| Component | Responsibility | v3.0 change |
+|-----------|----------------|-------------|
+| `ChatInputBar` (`ui/chat/components/ChatInputBar.kt`, 195 lines) | Stateless pill input: text, image attach, think toggle, send/stop | **MODIFY** — add mic button + listening state params; stays stateless, all logic hoisted |
+| `ChatScreen` (`ui/chat/ChatScreen.kt`, 865 lines, calls `ChatInputBar` ~line 298) | Hosts input, owns `RECORD_AUDIO`-adjacent launchers after change | **MODIFY** — permission launcher + recognizer lifecycle owner |
+| `ChatViewModel` | Grounding orchestration, DDG-primary/Tavily-fallback branches (`MissingKey`/`InvalidKey`/`UsageLimit`) | **MODIFY** — collapse to DDG-only outcomes |
+| `DuckDuckGoSearchRepository` | Today: DDG-primary/Tavily-fallback executor + Tavily-direct image leg | **MODIFY** — becomes the sole `web_search` producer; fallback + image-direct legs deleted |
+| `TavilySearchOutcome` sealed interface (defined in `TavilySearchRepository.kt`) | Shared producer→consumer contract used by VM, `LocalToolLoop`, `CompatToolLoop`, providers | **MOVE + RENAME** to `SearchOutcome` (or keep name) in DDG file — this is the highest-risk edit; every consumer imports it |
+| `NavGraph.kt` drawer content | `ModalNavigationDrawer` + custom full-width `Surface` sheet; footer row Models/Help/Settings at 12sp | **MODIFY** — footer parity, delete-all-chats row, (verify Web-Options anchor — no web row exists in this drawer today) |
+| `ModelSelector.kt` line ~164 `if (localModels.isEmpty() && endpoints.isEmpty())` | Model-pick bottom sheet empty state | **MODIFY** — "Download a model" CTA → Catalog |
+| `SettingsScreen` + `SettingsViewModel` + `SettingsUiState` | `TavilyKeyCard` (~line 403/361), Data section (~line 137), key-delete actions | **MODIFY (deletion)** — remove card, Data section, key-delete; Web section (grounding toggle) stays |
+| `HelpScreen.kt` (236 lines, string-resource-driven sections) | Long tutorial help | **MODIFY (rewrite)** — content-only, structure (`HelpSection` composable) stays |
+| `ModelsScreen` line ~247 empty-state; `EndpointsScreen` line ~50 empty-state | Empty hints | **MODIFY** — add CTA buttons with existing nav callbacks |
+| `HuggingFaceScreen` (catalog) | Static-catalog downloads | **MODIFY** — "Use in Chat" on downloaded rows (ModelsScreen already has `onUseInChat: (Long) -> Unit` pattern to copy) |
+| `NetworkModule` `@Named("tavily")` client + retrofit + api | Dedicated zero-interceptor Tavily stack | **DELETE** three providers + `TavilyApi.kt`, `TavilyDtos.kt` |
+| `ApiKeyStore` `TAVILY_ALIAS` + `store/get/deleteTavilyKey` + `deleteAllKeys` call | Keystore Tavily surface | **MODIFY** — delete Tavily methods (keep stored-key orphan note: same harmless-orphan precedent as `huggingface_token`) |
+| NEW: `ReviewManager` wrapper (data or util, `@Singleton`, Hilt-injected) | Play In-App Review: `requestReviewFlow` + `launchReviewFlow`, quota guard via DataStore | **NEW** — thin wrapper, no business logic in UI |
+| NEW: voice dictation state holder | `SpeechRecognizer` lifecycle + `RecognitionListener` → text-field append | **NEW** — prefer small `VoiceInputManager` (or `rememberVoiceInputState`) over putting recognizer code in ChatScreen; see Pattern 2 |
 
-## Recommended Project Structure
-
-No new packages. v2.5 adds at most debug scaffolding and fix-local code inside existing files:
+## Recommended Project Structure (deltas only)
 
 ```
-app/
-├── build.gradle.kts                  # MODIFY (maybe) — LeakCanary debugImplementation lines only;
-│                                     #   16KB needs NO build change (AGP 9.3 + legacy=false already)
-├── src/main/AndroidManifest.xml      # MODIFY (maybe) — enableOnBackInvokedCallback decision;
-│                                     #   NEVER add android:pageSizeCompat (would mask misalignment)
-├── src/main/java/com/warped/
-│   ├── data/local/inference/
-│   │   ├── EngineManager.kt          # MODIFY (fix) — unload/close discipline gaps only
-│   │   └── LiteRTLmEngine.kt         # MODIFY (fix) — session/engine close ordering gaps only
-│   ├── data/remote/provider/
-│   │   ├── LMStudioProvider.kt       # AUDIT — callbackFlow awaitClose
-│   │   └── LmStudioHelper.kt         # AUDIT — activeCall null-out (already present, verify)
-│   ├── data/grounding/               # AUDIT — scope discipline (no GlobalScope, turn-bound)
-│   ├── di/NetworkModule.kt           # AUDIT — client singleton-ness (already @Singleton, verify Coil)
-│   ├── ui/chat/
-│   │   ├── ChatViewModel.kt          # MODIFY (fix) — onCleared body, job null-outs, shareIn scope
-│   │   └── ChatScreen.kt             # AUDIT — DisposableEffect review
-│   └── WarpedApplication.kt          # UNCHANGED — Coil factory already singleton-scoped
-└── scripts/
-    └── verify-16kb.sh                # NEW (optional) — check_elf_alignment + zipalign gate for CI
+app/src/main/java/com/warped/
+├── data/
+│   ├── grounding/
+│   │   ├── TavilySearchRepository.kt      ← DELETE (move outcome iface out first)
+│   │   └── DuckDuckGoSearchRepository.kt  ✎ strip fallback + image-direct legs
+│   ├── remote/api/
+│   │   ├── TavilyApi.kt                   ← DELETE
+│   │   └── dto/TavilyDtos.kt              ← DELETE
+│   ├── local/security/ApiKeyStore.kt      ✎ delete Tavily fns (keep endpoint-key fns)
+│   └── review/
+│       └── ReviewManager.kt               ＋ NEW wrapper (or util/review/)
+├── di/
+│   └── NetworkModule.kt                   ✎ delete 3× @Named("tavily") providers
+└── ui/
+    ├── chat/
+    │   ├── ChatScreen.kt                  ✎ launcher + recognizer host + drawer CTA wiring
+    │   ├── ChatViewModel.kt               ✎ DDG-only branches; review-trigger hook
+    │   └── components/
+    │       ├── ChatInputBar.kt            ✎ mic button + isListening param (stateless)
+    │       └── ModelSelector.kt           ✎ empty-state CTA (line ~164)
+    ├── voice/
+    │   └── VoiceInputManager.kt (or VoiceInputState.kt) ＋ NEW (see Pattern 2)
+    ├── navigation/NavGraph.kt             ✎ drawer footer + delete-all row
+    ├── settings/ (Screen+VM+UiState)      ✎ deletions only
+    ├── help/HelpScreen.kt                 ✎ content rewrite (keep HelpSection)
+    ├── models/ModelsScreen.kt             ✎ empty-state CTA
+    ├── endpoints/EndpointsScreen.kt       ✎ empty-state CTA
+    └── huggingface/HuggingFaceScreen.kt   ✎ "Use in Chat" on downloaded rows
+AndroidManifest.xml                        ✎ re-add RECORD_AUDIO (was removed 2026-10-01, noted dead-code)
+gradle/libs.versions.toml                  ✎ add play-review (+ activity-compose if missing — verify)
 ```
 
 ### Structure Rationale
 
-- **No new production packages** because none of the three workstreams introduces a capability — 16KB is a packaging property, API 36 is behavioral conformance, leaks are lifecycle corrections. A new `util/leaks/` or `di/LeakModule` would be pure ceremony; LeakCanary needs no binding.
-- **Fixes land at the owner, not in a central "leak fixer."** The codebase already follows single-owner discipline (48-01 sub-states, per-component cancel methods). Each leak fix is a 5–20 line change inside the owning component (null the `Call` ref, close the session, scope the `shareIn`). Centralizing would break the ownership pattern that makes the current discipline work.
-- **The one permissible NEW file is a verification script**, not app code: a `verify-16kb.sh` wrapping `check_elf_alignment.sh` + `zipalign -c -P 16` so CI gates alignment on every release build. This is build tooling, invisible to the app architecture.
+- **Voice holder lives outside ChatScreen.** `ChatScreen` is already 865 lines; embedding
+  `SpeechRecognizer` + `RecognitionListener` + permission handling inline repeats the exact bloat
+  the v2.x milestones kept paying down. A small lifecycle-aware holder (`VoiceInputManager` injected
+  into the VM, or a `rememberVoiceInputState()` in `ui/voice/`) keeps `ChatInputBar` stateless and
+  the recognizer testable without Compose.
+- **Review wrapper lives in data/util, not UI.** Play's API needs an `Activity` at launch time and
+  has an opaque quota — both are reasons to centralize, not sprinkle `ReviewManagerFactory` calls
+  across screens. One entry point (`maybePromptForReview(activity)`), called from exactly one place
+  (post-successful-chat-turn hook in `ChatViewModel` or ChatScreen), guarded by DataStore counters.
+- **Tavily deletion is a vertical slice, not scattered edits.** Delete order matters (see Build Order):
+  outcome-interface move → consumer re-point → producer simplification → DI/keystore/UI removal → test updates.
 
 ## Architectural Patterns
 
-### Pattern 1: Verify-don't-rebuild for transitive native code
+### Pattern 1: Play In-App Review via thin Hilt wrapper + quota guard
 
-**What:** For 16KB, treat every `.so` as a third-party artifact: extract the APK/AAB, run `check_elf_alignment.sh` + `zipalign -c -P 16`, and map each `UNALIGNED` library back to its Maven dependency. The only fixes available at Warped's layer are (a) bump the dependency to a 16KB-aligned release, or (b) file/escalate upstream. There is no CMake/ndk-build file in this repo to add linker flags to.
-**When to use:** The entire 16KB workstream.
-**Trade-offs:** + zero app-code risk; aligns with Google's own guidance ("update tools + use 16KB-compatible prebuilt dependencies → compatible by default"). − if LiteRT-LM 0.17.1 ships an unaligned `.so`, Warped is blocked on Google's release train; mitigation is the documented 16KB backcompat mode (works but shows a system dialog and is explicitly second-best) — never set `android:pageSizeCompat` in the manifest to silence it, since that hides the debt instead of tracking it.
-
-**Example:**
-```bash
-# verify-16kb.sh sketch (CI gate on release APK)
-unzip -o app-release.apk -d /tmp/warped_apk
-./check_elf_alignment.sh app-release.apk          # expect ALIGNED for arm64-v8a
-zipalign -c -P 16 -v 4 app-release.apk            # expect "Verification successful"
-adb shell getconf PAGE_SIZE                       # 16384 on the 16KB test image
-```
-
-### Pattern 2: API-36 audit as allowlist — assert each behavior change, change as little as possible
-
-**What:** Walk the two official behavior-change lists and record a disposition per item against the current code, defaulting to "already conformant, verified by X." From this research, the dispositions are:
-- *All-apps / JobScheduler quotas* → download worker already foreground `dataSync`; **benchmark worker** is the one component that must log `WorkInfo.getStopReason()` and tolerate quota stops. Only fix if observed.
-- *All-apps / 16KB compat mode* → converges with Pattern 1; no manifest property.
-- *Target-36 / edge-to-edge opt-out removed* → target-35 already enforced edge-to-edge; grep for `windowOptOutEdgeToEdgeEnforcement` and delete any use (the attribute is silently ignored on API 36, so stale uses are dead weight, not crashes).
-- *Target-36 / predictive back* → if back handling uses only NavController/`OnBackPressedDispatcher` with supported APIs, no change; only if custom `onBackPressed`/key interception exists, either migrate or set `android:enableOnBackInvokedCallback="false"` as a deliberate, documented deferral.
-- *Target-36 / `scheduleAtFixedRate` single-catch-up* → grep scheduled executors (`MemorySampler`, benchmark sampling); only matters if code counts missed executions.
-- *Local Network Permission* → **opt-in phase only, not enforced**; Ollama/LM Studio-on-LAN and Tavily flows need no permission code today. Record as monitored future work, do not add `NEARBY_WIFI_DEVICES` permission requests now (would confuse users for zero benefit).
-- *Intent hardening / Safer Intents* → Warped's `BrowserIntents` (external browser opens) and share intents are standard explicit intents; no `removeLaunchSecurityProtection` needed; do not opt into `enforceIntentFilter` prematurely.
-**When to use:** The whole API-36 workstream — it is a checklist with evidence, not a refactor.
-**Trade-offs:** + minimal diff, minimal regression risk on a shipped app. − requires real-device/API-36-emulator verification per item; emulator-only gaps must be recorded as release-UAT items (house precedent: v2.2/v2.3/v2.4 all carry device-smoke deferrals).
-
-### Pattern 3: Turn-scoped structured concurrency for every cancellable stream
-
-**What:** Every streaming resource (inference tokens, SSE `Call`s, grounding fetch fan-out, retry jobs) is owned by exactly one coroutine scope whose lifetime equals one chat turn (`generationJob`), and every handle is nulled/closed on all three exit paths: new-turn pre-cancel, Stop, `onCleared`. This pattern is **already the codebase norm** (`generationJob` + `fetcher.cancel()` + `stopResponse()` triple-cancel; `shareIn(this, …)` scoped to the generation job at ChatViewModel ~line 904; `activeCall` AtomicReference with `onCompletion` null-out in `LmStudioHelper`). The leak audit's job is to *verify completeness* of this pattern at each site and close the gaps ( научной: `callbackFlow` without `awaitClose { call.cancel() }`, sessions created but never closed, jobs nulled on some paths but not others).
-**When to use:** All leak fixes in chat, providers, and grounding.
-**Trade-offs:** + consistent with the v2.1 CR-02 interleaving fix and v2.4 channel-hygiene work — reviewers already know the shape. − the triple-exit-path discipline is easy to regress; each fix should add or extend a unit test asserting cancel/close (e.g. "stop cancels all activeCalls", "close() with live sessions releases sessions first").
+**What:** `com.google.android.play:review` (or `review-ktx`) — `ReviewManagerFactory.create(context)`,
+`requestReviewFlow()` → `launchReviewFlow(activity, reviewInfo)`. Play enforces its own display quota;
+calls are fire-and-forget (no callback on whether UI showed).
+**When to use:** exactly this — one wrapper, one call site.
+**Trade-offs:** Pro: official API, no permission, works offline-queued. Con: quota is opaque (never
+assume the dialog showed; never gate features on it; never call on every launch).
 
 **Example:**
 ```kotlin
-// Canonical turn-scoped SSE stream (what the audit should confirm everywhere):
-fun stream(url: String): Flow<StreamToken> = callbackFlow {
-    val call = client.newCall(request)
-    activeCall.set(call)
+@Singleton
+class PlayReviewManager @Inject constructor(
+  @ApplicationContext private val context: Context,
+  private val prefs: ReviewPrefs, // DataStore: success-turn count + last-prompt epoch
+) {
+  suspend fun maybePrompt(activity: Activity) {
+    if (!prefs.isEligible()) return          // e.g. ≥N successful turns AND cooldown elapsed
     try {
-        call.execute().use { response ->   // use{} closes the body on all paths
-            // ... parse SSE, trySend tokens ...
-        }
-    } finally {
-        activeCall.set(null)
-    }
-    awaitClose { call.cancel() }           // THE audit line: must exist
+      val manager = ReviewManagerFactory.create(context)
+      val info = manager.requestReviewFlow().await()   // Tasks API → coroutine
+      manager.launchReviewFlow(activity, info)
+      prefs.markPrompted()                   // record attempt regardless of display
+    } catch (_: Exception) { /* never crash chat for a rating prompt */ }
+  }
 }
 ```
 
-### Pattern 4: Singleton owns native, Application owns pressure signals, nothing else holds either
+**Entry point (opinionated):** post-successful-chat-turn in `ChatViewModel` (it already owns turn
+completion/stream-stop states), not Settings and not app-launch. Settings entry is a fallback link at most.
 
-**What:** The native `Engine` (hundreds of MB via mmap) is referenced only through the `EngineManager` → `LiteRTLmEngine` `@Singleton` chain; the only lifecycle signals are `Application.onTrimMemory → handleTrimMemory` (already wired, with RUNNING_LOW soft-cap vs RUNNING_CRITICAL unload+evict tiers) and explicit user/model-switch unload. No ViewModel, Composable, or repository may cache `Engine`, `Conversation`, or `modelPath` references beyond the turn. The audit checks for exactly this: any `Conversation` stored outside `openSessions`, any engine handle in a ViewModel field, any `remember {}` holding a session across recompositions.
-**When to use:** Native-side leak audit.
-**Trade-offs:** + single ownership makes the 4 GB-model OOM story tractable (`largeHeap` + `MemoryChecker` gate + trim handling already form a coherent defense). − singleton-scoped `ioScope` (never cancelled) is *by design* but must stay free of per-turn state — a `launch` that captures a `Conversation` or callback there outlives the turn silently.
+### Pattern 2: SpeechRecognizer lifecycle owned outside the text field
+
+**What:** Framework `android.speech.SpeechRecognizer` (no new dependency) + `RECORD_AUDIO` runtime
+permission via `rememberLauncherForActivityResult(RequestPermission())`. Listener partial results
+(`onPartialResults`) stream into the existing `onTextChange` path — dictation appends/inserts text,
+it never sends.
+**When to use:** this milestone's "speech-to-text only, no audio messages" scope.
+**Trade-offs:** Pro: zero-dependency, on-device on GMS devices, partial results feel live. Con:
+`SpeechRecognizer` availability varies (`isRecognitionAvailable()` check required); error codes
+(`ERROR_NO_MATCH`, `ERROR_SPEECH_TIMEOUT`) must reset UI state or the mic button sticks in "listening".
+
+**Example:**
+```kotlin
+@Composable
+fun rememberVoiceInputState(onResult: (String) -> Unit): VoiceInputState {
+  val context = LocalContext.current
+  val recognizer = remember {
+    if (SpeechRecognizer.isRecognitionAvailable(context))
+      SpeechRecognizer.createSpeechRecognizer(context) else null
+  }
+  val permission = rememberLauncherForActivityResult(RequestPermission()) { granted ->
+    if (granted) recognizer?.startListening(recognizerIntent()) // ACTION_RECOGNIZE_SPEECH, partial results
+  }
+  DisposableEffect(Unit) { onDispose { recognizer?.destroy() } } // hard requirement
+  ...
+}
+```
+
+Rules: (1) `destroy()` in `DisposableEffect.onDispose` — recognizer holds a service connection;
+(2) stop listening on send/stop-turn and on navigate-away; (3) mic button hidden (not dimmed) when
+`!isRecognitionAvailable()` — matches the codebase's "no dead affordances" convention in `ChatInputBar`;
+(4) re-add `RECORD_AUDIO` to the manifest (it was deliberately removed 2026-10-01 as dead — this
+milestone is the "real feature + runtime request" that justifies its return).
+
+### Pattern 3: Deletion-slice for Tavily removal (contract-first)
+
+**What:** The shared `TavilySearchOutcome` sealed interface is the load-bearing contract — `ChatViewModel`
+(~10 references), `LocalToolLoop`, `CompatToolLoop`, all five remote providers route through it.
+Delete in contract-first order: (1) move/rename the outcome interface into `DuckDuckGoSearchRepository.kt`
+(e.g. `SearchOutcome`), (2) re-point all consumer imports, (3) simplify DDG repo to DDG-only,
+(4) delete `TavilyApi`/`TavilyDtos`/`TavilySearchRepository`/DI providers/keystore fns/Settings UI,
+(5) update/delete Tavily tests.
+**When to use:** any removal where a deleted file owns a type others import.
+**Trade-offs:** Slightly more steps than delete-and-fix-compile, but each step compiles, so bisectability
+and reviewability survive. The v2.2 milestone already proved this team can land net-deletion slices cleanly.
+
+### Pattern 4: Drawer/catalog CTA navigation reuses existing callbacks
+
+**What:** Every CTA in this milestone maps to an already-existing nav callback — no new destinations,
+no NavGraph route changes. `ModelsScreen.onUseInChat: (Long) -> Unit`, `onOpenHuggingFace`,
+`UnifiedSelectorScreen.onNavigateToChat`, drawer `navController.navigate(Screen.Selector/Help/Settings)`
+are all in place.
+**When to use:** all six navigation touchpoints in v3.0.
+**Trade-offs:** Pro: zero navigation risk; footer parity and delete-all relocation are pure UI moves
+inside `NavGraph.kt` drawer content. Con: temptation to add a dedicated "review" or "voice" screen —
+do not; neither needs one.
 
 ## Data Flow
 
-### Request Flow — v2.5 adds no data flow
-
-There is deliberately no new data flow in this milestone. The flows the audit traces (to prove nothing is retained) are the existing ones:
+### Request Flow — voice dictation
 
 ```
-[Turn start] ChatViewModel.sendMessage()
-    ↓ generationJob = viewModelScope.launch { ... }   (turn scope — AUDIT: cancelled on all exits?)
-    ↓ fetcher/multiUrlFetcher fan-out                 (AUDIT: children inherit turn scope?)
-    ↓ provider stream (callbackFlow + Call)           (AUDIT: awaitClose cancels Call? body use{}?)
-    ↓ engine.createConversation → Conversation        (AUDIT: session closed before engine close?)
-[Turn end / Stop / new send / onCleared]
-    ↓ fetcher.cancel() + stopResponse() + job.cancel()(AUDIT: all three, all paths?)
-    ↓ activeCall.set(null), openSessions pruned       (AUDIT: no stale handle reuse?)
+[mic tap] → permission launcher (granted?) → recognizer.startListening
+    ↓ onPartialResults / onResults
+[VoiceInputState] → onTextChange(existing VM path) → input.inputText
+    ↓ send validated as usual (text non-blank) — dictation never auto-sends
+[ChatViewModel.sendMessage] → unchanged grounding + inference pipeline
+[onDispose / onSend / onStop] → recognizer.stopListening/destroy
 ```
 
-### State Management
+### Request Flow — grounding after Tavily removal (DDG-only)
 
 ```
-LeakCanary (debug only) observes; fixes change ownership discipline, not state shape:
-  _transcript / _input / _connection (48-01 single-owner) — UNCHANGED shape
-  generationJob / retryJob nullable handles            — FIX: null-out verified on every path
-  openSessions set in LiteRTLmEngine                   — FIX: close-before-engine invariant kept
-  activeCalls registry / activeCall ref                — FIX: cancel + null verified
-  OkHttp pools/caches (app-lifetime singletons)        — NO CHANGE (by design)
-  Coil memory (25%) + disk (50 MB og_thumbnails)       — NO CHANGE; trim handled by Coil internally
+[send with web intent] → DuckDuckGoSearchRepository.search()   (sole producer)
+    ↓ HTML fetch → parse-only extract → sanitize → fuse [WEB CONTEXT 1..N]
+[TavilySearchOutcome.* → SearchOutcome.*] → ChatViewModel branches collapse:
+  Grounded / ModelOnly stay · MissingKey·InvalidKey·UsageLimit DELETE
+  (no key exists anymore → no key-error UI; DDG-fail = FETCH_FAILED path)
+[image-intent turns] → Tavily-direct leg DELETED → DDG text grounding only,
+  image grid empty (GroundedImages stays — render-side gate, harmless with empty input)
 ```
 
-Key state decisions:
-1. **LeakCanary is debug-only and installs itself.** No `Application.onCreate` code, no Hilt module, no `ContentProvider` entry — `leakcanary-android` ships its own startup provider. Release APK is byte-identical except the absent dependency. (Per sibling STACK.md: `leakcanary-android:2.14` + `plumber-android:2.14`, `debugImplementation`.)
-2. **Heap dumps never leave the device by default.** Large LLM-session heaps may need `shark-cli` off-device analysis (sibling STACK.md) — that is a developer-workstation step, not an app data flow; no new permissions, no upload code.
-3. **`onTrimMemory` tiers stay the memory-pressure contract.** The audit must not "fix" leaks by unloading more aggressively (that would regress the v1.5 "resume without model-not-loaded" requirement). Leak fixes remove *unintended* retention; pressure handling stays as designed.
+### State Management — review eligibility
+
+```
+[successful turn completes] → ChatViewModel → PlayReviewManager.maybePrompt(activity)
+    ↓ DataStore: turn-count++ ; eligible? (count ≥ N AND cooldown elapsed)
+[requestReviewFlow → launchReviewFlow] → markPrompted (attempt recorded either way)
+```
+
+### Key Data Flows
+
+1. **Review flow:** single call site, DataStore-guarded, exception-swallowing — a rating prompt must
+   never crash or block chat.
+2. **Voice flow:** recognizer output re-enters through the exact same `updateInput` path as typing,
+   so validation, send-enabling, and grounding triggers behave identically.
+3. **Grounding flow (post-removal):** producer count goes 2 → 1; downstream (fusion, persist, Fuentes,
+   preview, citations) untouched — same guarantee the DDG file's own header documents for its shape parity.
 
 ## Scaling Considerations
 
-| Scale | Architecture Adjustments |
-|-------|--------------------------|
-| v2.5 scope (one release, existing user base) | No scaling work. 16KB verification is per-APK, API-36 audit is per-behavior, leak fixes are per-site. All linear in the existing codebase. |
-| Future: 16KB-only devices (post Feb-2027 Play gate) | The `verify-16kb.sh` CI gate becomes release-blocking; LiteRT-LM version bumps must re-run it (new AAR = new `.so` set). |
-| Future: local-network permission enforcement | When Google moves LNP from opt-in to enforced, add the Nearby-devices permission flow around LAN endpoint connections only — remote-cloud and on-device paths unaffected. |
+Not applicable (on-device app, no backend). The analogous "what breaks" list for this milestone:
 
-### Scaling Priorities
-
-1. **First bottleneck: LiteRT-LM AAR alignment (external dependency).** If `liblitertlm_jni.so` (or its GPU delegate `.so`s) is `UNALIGNED`, Warped cannot ship Play-compliant until Google ships an aligned release. Check this *first* — it is the only item that can block the milestone from outside the repo.
-2. **Second bottleneck: heap-dump size during leak triage.** Debug builds chatting with multi-GB models produce heaps too large for on-device Shark analysis; plan workstation-based `shark-cli` analysis from the start rather than discovering it mid-audit.
+1. **First bottleneck: outcome-interface rename blast radius.** ~15 files import Tavily symbols
+   (VM, 2 tool loops, 5+ providers, Settings ×3, Chat UI ×2, grounding internals). Mitigation: rename-first,
+   compile-after-each-step; keep the sealed-interface *shape* identical so branch bodies barely change.
+2. **Second bottleneck: ChatScreen/ChatInputBar review churn.** Both are high-traffic files; keep
+   `ChatInputBar` stateless (new params only) and voice/review logic in the new holder + wrapper so
+   diffs stay additive.
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Adding linker flags / NDK config to "fix" 16KB
+### Anti-Pattern 1: SpeechRecognizer inline in the Composable
 
-**What people do:** Add `ndkVersion`, CMake `target_link_options(-z max-page-size=16384)`, or `Android.mk` changes to a project with no native sources.
-**Why it's wrong:** There is nothing to compile — every `.so` is prebuilt inside AARs. Linker flags on an empty native build change nothing while creating the illusion of compliance; the Play Console warning would persist.
-**Do this instead:** Verify with `check_elf_alignment.sh` + `zipalign -P 16`; fix by bumping the offending dependency.
+**What people do:** `createSpeechRecognizer` + anonymous `RecognitionListener` inside `ChatInputBar` or `ChatScreen`.
+**Why it's wrong:** service-connection leak on recomposition/navigation; untestable; balloons the two
+most-edited files. (The v2.5 leak-hunt milestone exists precisely because lifecycle discipline matters here.)
+**Do this instead:** lifecycle-aware holder with `DisposableEffect.destroy()` + `isRecognitionAvailable()` gate.
 
-### Anti-Pattern 2: Setting `android:pageSizeCompat` to silence the backcompat dialog
+### Anti-Pattern 2: Prompting review from multiple places or on launch
 
-**What people do:** Add the manifest property so the 16KB compat-mode warning stops appearing during testing.
-**Why it's wrong:** It opts the app into the degraded compat path permanently and hides genuine misalignment from CI and testers. Google's guidance is explicit: align the app; compat mode is a safety net, not a target.
-**Do this instead:** Leave the property unset; treat any compat dialog during testing as a failing test.
+**What people do:** review calls in `onCreate`, Settings, and post-chat simultaneously to "maximize ratings."
+**Why it's wrong:** Play's quota silently suppresses all of them, and launch-time prompts train users to dismiss.
+**Do this instead:** one post-success call site + DataStore cooldown. One screen (Settings → rate link) optional.
 
-### Anti-Pattern 3: "Fixing" leaks by widening unload (aggressive engine eviction)
+### Anti-Pattern 3: Deleting Tavily files before moving the shared outcome type
 
-**What people do:** On finding retained memory, add extra `unloadCurrent()` calls (e.g. on every backgrounding, every navigation).
-**Why it's wrong:** Directly regresses the validated v1.5 requirement "app resumes active chat without model-not-loaded warning after backgrounding" and makes every resume pay a multi-second reload. It treats the symptom (heap size) while the disease (unintended retention) remains.
-**Do this instead:** Remove the unintended reference (scope the job, close the session, null the handle); keep pressure-driven eviction exactly where it is.
+**What people do:** delete `TavilySearchRepository.kt` first, then chase 15 broken files.
+**Why it's wrong:** repo doesn't compile at any intermediate commit; review becomes a wall of red.
+**Do this instead:** Pattern 3 — move/rename contract type first, re-point, then delete leaves.
 
-### Anti-Pattern 4: Leaking the audit into feature refactors
+### Anti-Pattern 4: Leaving key-delete / Data-section ViewModel functions wired to nothing
 
-**What people do:** While auditing `ChatViewModel`, "simplify" the turn pipeline, merge `generationJob`/`retryJob`, or rework the grounding orchestration.
-**Why it's wrong:** v2.5 ships conformance + stability on a codebase with 12 shipped milestones. Refactors widen the blast radius and invalidate the device-smoke history (v2.2–v2.4 deferrals assume current structure). The house rule from v2.1 applies: finish what's there before reshaping it.
-**Do this instead:** Minimal diffs at the owning component; each fix paired with a regression test; no signature changes to `LlmModelHelper`, provider interfaces, or Room schema (no migration in this milestone — none is needed).
+**What people do:** remove the Settings rows but leave `deleteAllApiKeys()`, `showDeleteChatsDialog()`,
+Tavily VM functions in place "in case."
+**Why it's wrong:** dead public VM surface + orphaned strings; the delete-all-chats function must *move*
+(its logic is reused by the drawer row), the Tavily ones must die with their UI.
+**Do this instead:** relocate chat-deletion logic to the drawer call path (VM function reused or moved to
+`ChatRepository`-backed action); delete Tavily VM state/functions/tests outright.
 
 ## Integration Points
 
@@ -240,40 +282,48 @@ Key state decisions:
 
 | Service | Integration Pattern | Notes |
 |---------|---------------------|-------|
-| Google Play Console | 16KB compliance signal + target-36 gate | Play warns on 4KB-only updates targeting API 35+; hard block from Feb-2027. Verification is local (`zipalign -P 16`); Console is the confirm, not the test. |
-| LiteRT-LM Maven (`litertlm-android:0.17.1`) | Transitive `.so` supplier; version-bump lever only | Check its `.so` alignment first (Pattern 1, priority 1). NPU path keeps `libcdsprpc.so required=false`. No JNI code changes in Warped. |
-| SQLCipher (+ other AARs with `.so`) | Same verify-and-bump treatment | Enumerate via APK Analyzer `lib/` folder; every `arm64-v8a` + `x86_64` `.so` must be `ALIGNED`. |
-| Android 16 device / 16KB emulator image | Test environments, not code deps | `adb shell getconf PAGE_SIZE` → `16384`; compat-flag `adb` overrides for quota testing (`OVERRIDE_QUOTA_ENFORCEMENT_TO_TOP_STARTED_JOBS`, `…_TO_FGS_JOBS`). |
+| Play In-App Review (`com.google.android.play:review`) | Thin Hilt wrapper; `requestReviewFlow` + `launchReviewFlow(activity, info)` | NEW dependency (verify latest version at plan time — catalog has no play dep today). Quota opaque; never gate features. MEDIUM confidence on artifact coordinates |
+| Android `SpeechRecognizer` (framework) | Holder + `RequestPermission` launcher + `ACTION_RECOGNIZE_SPEECH` intent with partial results | No dependency. Requires `RECORD_AUDIO` manifest re-add + `isRecognitionAvailable()` gate. HIGH confidence (stable framework API) |
+| DuckDuckGo HTML endpoint (existing) | Unchanged — becomes sole producer | Brittleness note already documented in DDG repo header (markup-shape dependency); unchanged by this milestone |
 
-### Internal Boundaries
+### Internal Boundaries (new vs modified — explicit)
 
-| Boundary | Communication | New vs modified | Notes |
-|----------|---------------|-----------------|-------|
-| Gradle build ↔ APK `.so` set | `check_elf_alignment` + `zipalign` gate | NEW script (optional), MODIFIED nothing | Zero app-code impact; CI-gate candidate. |
-| Manifest ↔ Android 16 OS | `targetSdk 36` (set), FGS type (set), back-callback decision | MODIFIED at most 1 attr | No new permissions in v2.5 (LNP not enforced; notifications/alarms already declared). |
-| WorkManager ↔ JobScheduler quotas | `getStopReason()` logging | MODIFIED benchmark worker only if gaps found | Download worker already foreground-exempt. |
-| `Application` ↔ `EngineManager` | `onTrimMemory` tiers | UNCHANGED | Audit must preserve; not a leak-fix lever. |
-| `EngineManager` ↔ `LiteRTLmEngine` ↔ native | `init` / `createConversation` / ordered `close` | MODIFIED (fix-only, close/session gaps) | No interface change; `LlmModelHelper` untouched. |
-| `ChatViewModel` ↔ providers ↔ grounding | Turn scope + cancel triple | MODIFIED (fix-only, scope/handle gaps) | No pipeline rework (Anti-Pattern 4). |
-| LeakCanary ↔ everything | Debug-only observation | NEW dependency, ZERO integration code | Auto-install; release footprint nil. |
-| Room schema (v16) | No migration | UNCHANGED (explicit non-goal) | Stating so the phase plan doesn't invent one. |
+| Boundary | New / Modified | Notes |
+|----------|---------------|-------|
+| `ChatInputBar` ← voice holder | MODIFIED (additive params: `isListening`, `onMicClick`, `voiceAvailable`) | stays stateless; no recognizer imports in this file |
+| `ChatScreen` ↔ voice holder + permission launcher | MODIFIED | launcher + `DisposableEffect` host; mic affordance placement next to send/stop row |
+| `ChatViewModel` → `PlayReviewManager` | MODIFIED (one call site) | needs Activity handle at launch — pass from Composable, don't hold Activity in VM |
+| `ChatViewModel` ↔ `DuckDuckGoSearchRepository` | MODIFIED (branch collapse) | delete `MissingKey`/`InvalidKey`/`UsageLimit` arms; simplify key-presence probe (~line 770) |
+| `DuckDuckGoSearchRepository` ← former Tavily callers | MODIFIED | fallback + `include_images` Tavily-direct legs deleted; DDG-only + FETCH_FAILED |
+| Outcome interface → all consumers | MOVE+RENAME then re-point | the critical-path edit; keep case shape identical |
+| `NetworkModule` → rest of graph | MODIFIED (delete 3 `@Named("tavily")` providers) | verify no other `@Inject @Named("tavily")` sites beyond `TavilySearchRepository` |
+| `ApiKeyStore` ↔ `SettingsViewModel` | MODIFIED (delete Tavily fns + `deleteAllKeys` Tavily line) | endpoint-key fns + `deleteKey` stay (key-deletion *ability* removal is a UI-scope question — milestone says remove key-delete affordance; keep store-level `deleteKey` for endpoint deletion flows — verify at plan time) |
+| Drawer ↔ `ChatRepository.deleteConversation` (+ delete-all) | MODIFIED | drawer row above Models footer; reuse existing delete path + confirm dialog pattern (`WarpedAlertDialog`) |
+| Catalog rows → chat | MODIFIED | copy `ModelsScreen.onUseInChat` wiring into `HuggingFaceScreen` downloaded rows |
+| `HelpScreen` ↔ `strings.xml` | MODIFIED (content only) | short/minimal rewrite; ES + EN values (`values-es`) both updated |
 
-## Suggested Build Order (dependency-gated)
+### Suggested Build Order (removals before additions where they overlap)
 
-1. **16KB dependency verification (blocks Play submission — do first).** Extract release APK → `check_elf_alignment.sh` → attribute every `.so` to its AAR → `zipalign -P 16` → record aligned/misaligned per dependency. If LiteRT-LM 0.17.1 (or SQLCipher) is misaligned: bump-or-escalate decision before anything else. *No code; unblocks the release regardless of what follows.*
-2. **API-36 behavior-change audit with evidence.** Walk the all-apps + target-36 lists (Pattern 2 dispositions), verifying each against code + API-36 emulator/device. Land the small fixes (edge-to-edge dead attr, back-callback decision, benchmark stop-reason logging) as they are found. *Depends on nothing; parallelizable with 1.*
-3. **LeakCanary instrumentation + guided audit.** Add the two `debugImplementation` lines (sibling STACK.md), run the scripted leak tour (cold start → load model → chat turns → Stop mid-stream → model switch → grounding turns → OG thumbnails → background/foreground → endpoint CRUD), triage heap dumps per layer (native → VM → network → Compose). *Depends on 1–2 only for scheduling (needs a runnable API-36/16KB build to be meaningful); technically independent.*
-4. **Fix → regression-test → re-verify loop, per owning component.** Each fix at its owner with a cancel/close unit test; full `289+`-style unit gate + release assemble green; close with a 16KB-image + API-36-device smoke (fold into the existing release-UAT deferral pattern if hardware is unavailable).
+1. **Tavily contract move** — move/rename outcome interface, re-point consumers, green build. (Unblocks everything grounding-adjacent; zero behavior change.)
+2. **Tavily deletion slice** — DDG simplification → delete API/DTO/repo/DI/keystore/Settings card/tests. (Must precede Help rewrite + Settings cleanup which reference the same screens; behavior change lands here.)
+3. **Settings cleanup + drawer/footer/delete-all + empty-state CTAs + Help rewrite** — all pure-UI, parallelizable once (2) is done; no interdependencies. Suggested split: settings/drawer one plan, CTAs/catalog/help another.
+4. **Voice dictation** — manifest + holder + `ChatInputBar` mic + launcher wiring. Independent of (1–3); can run parallel, but schedule after UI churn settles to avoid `ChatScreen` merge conflicts.
+5. **Play Review** — dependency + wrapper + DataStore prefs + single call site. Fully independent; smallest slice, good last-plan candidate.
 
 ## Sources
 
-- Official docs (HIGH): `developer.android.com/guide/practices/page-sizes` (Play 16KB requirement for target-35+, Feb-2027 block; AGP ≥ 8.5.1 + NDK r28 default-align; verify via `check_elf_alignment.sh` + `zipalign -P 16`; RELRO check) — fetched 2026-09-30
-- Official docs (HIGH): `developer.android.com/about/versions/16/behavior-changes-all` (JobScheduler quota enforcement, incl. FGS-concurrent jobs; 16KB compat mode + `android:pageSizeCompat`) — fetched 2026-09-30
-- Official docs (HIGH): `developer.android.com/about/versions/16/behavior-changes-16` (edge-to-edge opt-out dead on target-36; predictive-back default + `enableOnBackInvokedCallback` opt-out; `scheduleAtFixedRate` single catch-up; Local Network Permission opt-in phase via `RESTRICT_LOCAL_NETWORK` compat flag; Safer Intents opt-in) — fetched 2026-09-30
-- Live codebase (HIGH): `app/build.gradle.kts` (AGP via catalog 9.3.0, compile/target 36, `useLegacyPackaging=false`, `largeHeap`, `extractNativeLibs=false`); `gradle/libs.versions.toml` (litertlm 0.17.1, coil3 3.4.0 ceiling note); `AndroidManifest.xml` (FGS dataSync merge, permissions, native-lib `required=false`); `EngineManager.kt` / `LiteRTLmEngine.kt` (singleton chain, `openSessions`, ordered close, trim tiers); `ChatViewModel.kt` (job discipline, turn-scoped `shareIn`, `onCleared`); `LmStudioHelper.kt` / `LMStudioProvider.kt` (`activeCall`, `callbackFlow`); `NetworkModule.kt` (4-client shape); `WarpedApplication.kt` (Coil singleton factory, StrictMode, trim forwarding); `ChatScreen.kt` (collectors, DisposableEffects); `WebPageFetcher.kt` (`activeCalls` registry)
-- Sibling research (MEDIUM — consumed as input, not re-verified): `.planning/research/STACK.md` (LeakCanary 2.14 + plumber-android `debugImplementation`, Coil ceiling, Kotlin hold)
-- No `cpp/`, CMake, or `ndkVersion` in repo (HIGH — grep-verified): the basis for the verify-don't-rebuild recommendation
+- Codebase (HIGH): `NavGraph.kt` (drawer + 14 destinations), `Screen.kt`, `ChatInputBar.kt` (195 lines),
+  `ChatScreen.kt` (~line 298 input wiring), `ModelSelector.kt` (line ~164 empty-state),
+  `SettingsScreen.kt` (Data §137, Web §~190, `TavilyKeyCard` ~403), `SettingsViewModel.kt` (Tavily fns),
+  `ApiKeyStore.kt` (`TAVILY_ALIAS`), `NetworkModule.kt` (`@Named("tavily")` ×3),
+  `TavilySearchRepository.kt` (outcome iface + Bearer discipline), `DuckDuckGoSearchRepository.kt`
+  (DDG-primary/fallback policy header), `WebSearchToolSet.kt`, `GroundedImages.kt`,
+  `AndroidManifest.xml` (RECORD_AUDIO removal note), `gradle/libs.versions.toml` (no play/activity deps),
+  `.planning/PROJECT.md` (v3.0 scope, v2.2/v2.4/v2.5 precedents).
+- Framework knowledge (MEDIUM, verify at plan time): Play In-App Review artifact coordinates + latest
+  version; `SpeechRecognizer` partial-results + error-code behavior (stable for years, low drift risk);
+  `androidx.activity:activity-compose` launcher APIs (verify catalog needs the explicit dep).
 
 ---
-*Architecture research for: Warped v2.5 Play Compliance + Leaks*
-*Researched: 2026-09-30*
+*Architecture research for: v3.0 Chat UX + Voice Dictation*
+*Researched: 2026-10-02*
