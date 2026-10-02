@@ -1865,16 +1865,18 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Idempotent keep-and-stop entry used by BOTH the 60 s ticker and the
-     * background lifecycle observer: stops, keeps the clip, and fires the
-     * one-shot cap event for the toast.
+     * Idempotent keep-and-stop entry for the 60 s ticker (announceCap =
+     * true) and the background lifecycle observer (announceCap = false).
+     * The cap toast fires ONLY when a clip was actually kept at the cap
+     * (CR-01: background auto-stop and too-short null stops stay
+     * silent — no bogus "limit reached" toast).
      */
-    fun autoStopVoiceRecording() {
+    fun autoStopVoiceRecording(announceCap: Boolean = true) {
         if (!_isVoiceRecording.value) return
         val file = keepAndStopVoice()
         voiceClipFile = file
         _hasVoiceClip.value = file != null
-        _voiceCapEvent.tryEmit(Unit)
+        if (announceCap && file != null) _voiceCapEvent.tryEmit(Unit)
     }
 
     /**
