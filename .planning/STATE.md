@@ -2,26 +2,26 @@
 gsd_state_version: "1.0"
 milestone: v3.1
 milestone_name: Voice Messages + New Tool
-current_phase: 69
-current_phase_name: Voice Differentiation + Gating + Transcript
+current_phase: 70
+current_phase_name: Document Reader Tool
 status: planning
-stopped_at: Phase 68 complete, ready to plan Phase 69
-last_updated: "2026-10-02T20:39:58.784Z"
+stopped_at: Phase 69 complete, ready to plan Phase 70
+last_updated: "2026-10-02T21:16:55.482Z"
 last_activity: 2026-10-02
-last_activity_desc: Phase 68 complete, transitioned to Phase 69
-state_head: 32c1ec4f880e4ce8c34164f5489ced754e50e8ed
+last_activity_desc: Phase 69 complete, transitioned to Phase 70
+state_head: ecc2c0ee45e8d1a8b3795b0deef96be1b5291706
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
-  percent: 50
+  completed_phases: 3
+  total_plans: 8
+  completed_plans: 8
+  percent: 75
 ---
 
 # Project State: Warped
 
 **Last updated:** 2026-09-30
-**Last activity:** 2026-10-02 — Phase 68 complete, transitioned to Phase 69
+**Last activity:** 2026-10-02 — Phase 69 complete, transitioned to Phase 70
 
 ## Project Reference
 
@@ -32,7 +32,7 @@ See: .planning/PROJECT.md (updated 2026-10-01, v2.5 shipped)
 
 ## Current Position
 
-Phase: 69 — Voice Differentiation + Gating + Transcript
+Phase: 70 — Document Reader Tool
 Plan: Not started
 Status: Ready to plan
 Last activity: 2026-10-02 — Milestone v3.1 started
@@ -92,6 +92,7 @@ None yet.
 |----------|------|--------|-------------|
 | Release-UAT | 67 voice device smoke (record→send→response on audio-capable allowlist model; 60 s cap toast; >30 s note; cancel/denial/background/rotation — runbook in 67/deferred-items.md) | Accepted, release UAT | Phase 67 close |
 | Release-UAT | 68 voice device smoke (draft audibility; sub-1 s on all 3 stop paths; focus-loss pause; replay-across-restart; hardware preempt; unavailable row; file cleanup; rotation/background; long-caption visual — runbook in 68/deferred-items.md) | Accepted, release UAT | Phase 68 close |
+| Release-UAT | 69 voice device smoke (parallel-STT accuracy; coachmark/gate/caption visuals; CR-01/WR-02 concurrency interleavings; rotation resume + preempt — runbook in 69/deferred-items.md) | Accepted, release UAT | Phase 69 close |
 | Release-UAT | 61 Leg 1B model-B switch (needs second complete model) | Accepted, release UAT | Phase 61 close |
 | Release-UAT | 60 follow-ups: 3-button nav visuals; light-theme visuals (blocked, no toggle); Play Console target warnings; foldable posture; quota-pressure platform stop | Accepted, release UAT | Phase 60 close |
 | Release-UAT | G-59-01 16KB chat turn (healthy 16 KB system + smallest-model download + local chat turn, zero native failures) | Accepted, release UAT | Phase 59 close |
@@ -145,7 +146,7 @@ See prior STATE history for v2.2–v2.4 quick-task log (archived at roadmap rewr
 **Resume file:** —
 
 Last session: 2026-10-02
-Stopped at: Phase 68 complete, ready to plan Phase 69
+Stopped at: Phase 69 complete, ready to plan Phase 70
 Resume: `/gsd-plan-phase 67` (after `/clear`)
 
 ## Operator Next Steps
