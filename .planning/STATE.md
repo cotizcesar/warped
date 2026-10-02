@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-10-02T13:30:10.823Z"
 last_activity: 2026-10-02
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -23,25 +23,25 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-01, v2.5 shipped)
 
 **Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** Planning next milestone (v2.5 Play Compliance + Leaks shipped 2026-10-01 — 4 phases, 15/15 requirements satisfied)
+**Current focus:** v3.0 Chat UX + Voice Dictation roadmap ready (Phases 63-66, 19/19 requirements mapped) — next: plan Phase 63
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 63 (Tavily Removal → DDG-only Search) — ready to plan
 Plan: —
-Status: Defining requirements
-Last activity: 2026-10-02 — Milestone v3.0 started
+Status: Roadmap approved-pending, planning Phase 63
+Last activity: 2026-10-02 — v3.0 roadmap created (Phases 63-66)
 
-## Phase Structure (v2.5 — PLANNED)
+## Phase Structure (v3.0 — PLANNED)
 
 | Phase | Name | Requirements | Status | Depends On |
 |-------|------|--------------|--------|------------|
-| 59 | 16 KB Dependency Verification | PAGE-01..04 (4) | Complete (4/5, G-59-01 → release-UAT) | Phase 58 |
-| 60 | API-36 Behavior Audit | API-01..05 (5) | Complete (5/5, 5 release-UAT follow-ups) | Phase 59 |
-| 61 | LeakCanary Instrumentation + Guided Audit | LEAK-01 (1) | Complete (3/3, 6/6 legs clean, zero leaks) | Phase 60 |
-| 62 | Fix Loop + Release Hardening | LEAK-02..05, REL-01 (5) | Complete (5/5, 932 tests, release hardened) | Phase 61 |
+| 63 | Tavily Removal → DDG-only Search | SEARCH-01..04 (4) | Not started | Phase 62 |
+| 64 | Drawer + Settings + Help + Funnel Polish | DRAWER-01..04, SET-01/02, HELP-01, FUN-01..03 (10) | Not started | Phase 63 |
+| 65 | Voice Dictation | VOICE-01..03 (3) | Not started | Phase 64 |
+| 66 | Play In-App Review | RATE-01/02 (2) | Not started | Phase 65 |
 
-**Total v2.5:** 4 phases, 15 requirements mapped (15/15 ✓). Coarse granularity.
+**Total v3.0:** 4 phases, 19 requirements mapped (19/19 ✓). Coarse granularity.
 
 ## Performance Metrics
 
@@ -54,6 +54,8 @@ Last activity: 2026-10-02 — Milestone v3.0 started
 ## Accumulated Context
 
 ### Decisions
+
+- [v3.0]: 4 phases per research (compressed 5→4: regression sweep folded into per-phase verification — it carries zero requirements and coarse granularity forbids standalone maintenance phases) — Tavily contract-move + deletion first, drawer/settings/help/funnel batch second (same composables), voice third (after ChatScreen churn), Play Review last (smallest, independent). Continues numbering at Phase 63 (v2.5 ended at 62).
 
 - [v2.5]: 4 phases per research — 16 KB verification first (gates Play submission, zero code), API-36 audit second (contracts before churn), LeakCanary baseline third (needs runnable build), fix loop + hardening last (owner-local, dependency-gated order). Coarse granularity.
 - [v2.5]: Fix by version bump only for misaligned `.so` — never hand-patched `.so`, never linker-flag hacks, never `pageSizeCompat`.

@@ -7,6 +7,7 @@
 - ✅ **v2.3 Web Grounding v2** — Phases 52-54 (shipped 2026-09-28)
 - ✅ **v2.4 Agentic Web** — Phases 55-58 (shipped 2026-09-29)
 - ✅ **v2.5 Play Compliance + Leaks** — Phases 59-62 (shipped 2026-10-01)
+- 🚧 **v3.0 Chat UX + Voice Dictation** — Phases 63-66 (in progress)
 
 ## Phases
 
@@ -43,3 +44,75 @@
 ---
 
 **Cumulative state after v2.5:** 62 phases shipped, 352 requirements delivered across v1.0–v2.5.
+
+---
+
+### 🚧 v3.0 Chat UX + Voice Dictation (In Progress)
+
+**Milestone Goal:** Simplify web search to DuckDuckGo-only (Tavily removed), polish drawer/settings/catalog/help surfaces, and add voice dictation + ambient Play rating.
+
+**Phases:**
+
+- [ ] **Phase 63: Tavily Removal → DDG-only Search** - Delete Tavily integration, single DuckDuckGo producer behind existing interface
+- [ ] **Phase 64: Drawer + Settings + Help + Funnel Polish** - Drawer cluster, settings cleanup, help rewrite, empty-state CTAs
+- [ ] **Phase 65: Voice Dictation** - Speech-to-text into chat input with permission flow and fallback
+- [ ] **Phase 66: Play In-App Review** - Ambient rating trigger plus always-reachable Store entry
+
+## Phase Details
+
+### Phase 63: Tavily Removal → DDG-only Search
+**Goal**: Users get grounded answers from DuckDuckGo-only search with no API-key friction
+**Depends on**: Phase 62
+**Requirements**: SEARCH-01, SEARCH-02, SEARCH-03, SEARCH-04
+**Success Criteria** (what must be TRUE):
+  1. User asking a web-grounded question gets an answer grounded in DuckDuckGo results with zero API-key setup
+  2. User never sees a Tavily key field, Tavily settings card, or any API-key prompt for web search
+  3. Upgrading user keeps working search with no orphaned Tavily Keystore entry left behind
+  4. Legacy chats with Tavily citations still open and render read-only without crashes
+**Plans**: TBD
+
+### Phase 64: Drawer + Settings + Help + Funnel Polish
+**Goal**: Users navigate drawers, settings, catalog and help without dead ends or clutter
+**Depends on**: Phase 63 (help rewrite and copy audit must follow the Tavily cut)
+**Requirements**: DRAWER-01, DRAWER-02, DRAWER-03, DRAWER-04, SET-01, SET-02, HELP-01, FUN-01, FUN-02, FUN-03
+**Success Criteria** (what must be TRUE):
+  1. User with no models sees a "Download a model" button in the chat model drawer that navigates to Model Catalog
+  2. User sees Models, Help and Settings footer items in the same text size as New Chat, with delete-all-chats at the drawer bottom (confirm dialog intact) and no Web Options in the drawer
+  3. User no longer sees a key-deletion affordance or a Data section in Settings; bulk chat delete lives only in the drawer and key rotation still works via endpoint edit
+  4. User sees a "Use in Chat" button on downloaded catalog models that activates the model, plus "Download a local model" / "Add a new Endpoint" empty-state buttons that navigate correctly
+  5. User reads a short, minimal, to-the-point Help screen (EN+ES) with no Tavily/key steps
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 65: Voice Dictation
+**Goal**: Users dictate chat messages by voice on the chat input screen instead of typing
+**Depends on**: Phase 64 (scheduled after drawer/chat UI churn settles to avoid ChatScreen merge conflicts)
+**Requirements**: VOICE-01, VOICE-02, VOICE-03
+**Success Criteria** (what must be TRUE):
+  1. User taps the mic, speaks, and sees recognized text land editable in the chat input without auto-sending
+  2. User tapping mic the first time gets an in-context rationale plus permission request, and a Settings escape on permanent denial
+  3. User on a device without speech recognition gets a graceful fallback with no crash
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 66: Play In-App Review
+**Goal**: Users can rate the app via Play at success moments without ever hitting a dead button
+**Depends on**: Phase 65 (smallest slice last; fully independent, no shared files)
+**Requirements**: RATE-01, RATE-02
+**Success Criteria** (what must be TRUE):
+  1. User completing chats occasionally gets an ambient Play review prompt at success moments, silently absent when quota-suppressed
+  2. User can always reach the Play Store listing from an in-app entry even when the Review dialog is quota-suppressed
+  3. Chat send/streaming never stalls waiting on the review flow
+**Plans**: TBD
+
+## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 63 → 64 → 65 → 66
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 63. Tavily Removal → DDG-only Search | 0/TBD | Not started | - |
+| 64. Drawer + Settings + Help + Funnel Polish | 0/TBD | Not started | - |
+| 65. Voice Dictation | 0/TBD | Not started | - |
+| 66. Play In-App Review | 0/TBD | Not started | - |

@@ -72,30 +72,30 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RATE-01 | TBD | Pending |
-| RATE-02 | TBD | Pending |
-| DRAWER-01 | TBD | Pending |
-| DRAWER-02 | TBD | Pending |
-| DRAWER-03 | TBD | Pending |
-| DRAWER-04 | TBD | Pending |
-| HELP-01 | TBD | Pending |
-| SEARCH-01 | TBD | Pending |
-| SEARCH-02 | TBD | Pending |
-| SEARCH-03 | TBD | Pending |
-| SEARCH-04 | TBD | Pending |
-| SET-01 | TBD | Pending |
-| SET-02 | TBD | Pending |
-| FUN-01 | TBD | Pending |
-| FUN-02 | TBD | Pending |
-| FUN-03 | TBD | Pending |
-| VOICE-01 | TBD | Pending |
-| VOICE-02 | TBD | Pending |
-| VOICE-03 | TBD | Pending |
+| RATE-01 | Phase 66 | Pending |
+| RATE-02 | Phase 66 | Pending |
+| DRAWER-01 | Phase 64 | Pending |
+| DRAWER-02 | Phase 64 | Pending |
+| DRAWER-03 | Phase 64 | Pending |
+| DRAWER-04 | Phase 64 | Pending |
+| HELP-01 | Phase 64 | Pending |
+| SEARCH-01 | Phase 63 | Pending |
+| SEARCH-02 | Phase 63 | Pending |
+| SEARCH-03 | Phase 63 | Pending |
+| SEARCH-04 | Phase 63 | Pending |
+| SET-01 | Phase 64 | Pending |
+| SET-02 | Phase 64 | Pending |
+| FUN-01 | Phase 64 | Pending |
+| FUN-02 | Phase 64 | Pending |
+| FUN-03 | Phase 64 | Pending |
+| VOICE-01 | Phase 65 | Pending |
+| VOICE-02 | Phase 65 | Pending |
+| VOICE-03 | Phase 65 | Pending |
 
 **Coverage:**
 - v3.0 requirements: 19 total
-- Mapped to phases: 0
-- Unmapped: 19 ⚠️
+- Mapped to phases: 19
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-10-02*
