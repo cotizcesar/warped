@@ -266,6 +266,7 @@ Warped has shipped 12 milestones (v1.0 through v2.2) across 51 phases and 315 re
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | v3.1-67 voice capture + send path (2026-10-02) | VM-owned VoiceMessageRecorder + PcmTranscoder in `ui/chat/voice/`; full 60 s m4a kept for playback, first 30 s → mono 16 kHz PCM via existing audioBytes path with user-visible note; zero new deps; review fixed 2 critical + 5 warnings; SECURED 8/8; UI review 19/24 priority fixes applied; device smoke deferred to release-UAT | ✓ Good, 956 tests green |
+| v3.1-68 voice draft + playback history (2026-10-02) | VM-owned VoiceMessagePlayer (MediaPlayer, transient focus) + draft card + single-player history bubbles (Room 17→18: audio_path + audio_duration_ms + transcript placeholder); sub-1 s guard, immediate file delete, filesDir/voice delete-confinement; review fixed 1 critical + 7 warnings; SECURED 8/8; UI review 20/24 priority fixes applied; GroundingPromptTest full-suite flake proven pre-existing via stash A/B; device smoke deferred to release-UAT | ✓ Good, 996 tests green |
 | Kotlin + Compose over Flutter/React Native | Native Android performance for JNI/NDK integration, idiomatic platform APIs | ✓ Good |
 | Clean Architecture with Hilt | Testability, separation of concerns, industry standard for Android | ✓ Good |
 | Room for structured data | Official Android recommendation, Compose integration, type-safe queries | ✓ Good |
@@ -305,4 +306,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-02 — Phase 67 complete*
+*Last updated: 2026-10-02 — Phase 68 complete*
