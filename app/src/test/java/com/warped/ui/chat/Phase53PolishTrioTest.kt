@@ -20,34 +20,10 @@ import org.junit.jupiter.api.Test
 class Phase53PolishTrioTest {
 
     // ------------------------------------------------------------------
-    // (a) override indicator.
+    // (a) override indicator — removed with the dead WebOverrideIndicator
+    // helpers (phase 64 IN-01); the per-chat tri-state persists only in
+    // the data layer via ChatViewModel.setWebOverride.
     // ------------------------------------------------------------------
-
-    @Test
-    fun `override on maps to ON`() {
-        assertThat(webOverrideIndicator(true)).isEqualTo(WebOverrideIndicator.ON)
-    }
-
-    @Test
-    fun `override off maps to OFF`() {
-        assertThat(webOverrideIndicator(false)).isEqualTo(WebOverrideIndicator.OFF)
-    }
-
-    @Test
-    fun `override null maps to INHERIT never to an effective value`() {
-        assertThat(webOverrideIndicator(null)).isEqualTo(WebOverrideIndicator.INHERIT)
-    }
-
-    @Test
-    fun `all three states are distinguishable`() {
-        assertThat(
-            setOf(
-                webOverrideIndicator(true),
-                webOverrideIndicator(false),
-                webOverrideIndicator(null),
-            ),
-        ).hasSize(3)
-    }
 
     // ------------------------------------------------------------------
     // (c) all-omitida honesty block.
