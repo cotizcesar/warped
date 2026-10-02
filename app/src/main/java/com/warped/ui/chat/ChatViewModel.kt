@@ -1822,6 +1822,19 @@ class ChatViewModel @Inject constructor(
 
     private enum class PendingVoiceStop { KEEP, DISCARD }
 
+    /**
+     * WR-03: monotonic session token invalidating stale sub-1 s
+     * validations. [startVoiceRecording] bumps it when a new session goes
+     * live; [cancelVoiceRecording], [deleteVoiceDraft], and
+     * [sendVoiceMessage] bump it when they take/clear the slot.
+     * [keepClipAfterDurationCheck] captures the token at stop time and
+     * drops the IO result when it moved on — a validation landing after
+     * the next session started (or after cancel/delete/send) deletes only
+     * its own orphan file and never touches live state.
+     */
+    @Volatile
+    private var voiceClipSession = 0L
+
     private fun getVoiceRecorder(): VoiceMessageRecorder {
         voiceRecorderOverride?.let { return it }
         return voiceRecorder ?: VoiceMessageRecorder(
@@ -1967,6 +1980,9 @@ class ChatViewModel @Inject constructor(
                 _voiceElapsedSec.value = 0
                 _voiceAmplitude.value = 0
                 _hasVoiceClip.value = false
+                // WR-03: a new live session invalidates any in-flight
+                // duration validation from the previous stop.
+                voiceClipSession++
                 voiceSessionJob?.cancel()
                 voiceSessionJob = viewModelScope.launch(coroutineExceptionHandler) {
                     // WR-03: the 100 ms amplitude sampler is binder IPC —
@@ -2038,12 +2054,28 @@ class ChatViewModel @Inject constructor(
             _draftDurationMs.value = 0L
             return
         }
+        // WR-03: token captured at stop time; the IO result below applies
+        // only while no newer session/slot-taker moved on.
+        val session = voiceClipSession
         viewModelScope.launch(Dispatchers.IO + coroutineExceptionHandler) {
             val durationMs = try {
                 voiceDurationReader(file)
             } catch (e: Exception) {
                 Timber.w(e, "VoiceMsg: duration check failed")
                 0L
+            }
+            if (session != voiceClipSession) {
+                // Stale stop: a newer session owns the slot (or the slot
+                // was cancelled/deleted/sent). Remove only this orphan file
+                // — never the live slot — and leave state untouched.
+                try {
+                    if (voiceClipFile?.absolutePath != file.absolutePath && file.exists()) {
+                        file.delete()
+                    }
+                } catch (e: Exception) {
+                    Timber.w(e, "VoiceMsg: stale-clip delete failed")
+                }
+                return@launch
             }
             if (durationMs < 1_000L) {
                 try {
@@ -2119,6 +2151,9 @@ class ChatViewModel @Inject constructor(
         } catch (e: Exception) {
             Timber.w(e, "VoiceMsg: cancel failed")
         }
+        // WR-03: the slot is taken back — any in-flight validation from an
+        // earlier stop is stale and must not resurrect the card.
+        voiceClipSession++
         // A kept clip from an earlier stop is also discarded: cancel
         // means the user rejected the recording, not deferred it.
         try {
@@ -2154,6 +2189,10 @@ class ChatViewModel @Inject constructor(
         voiceClipFile = null
         _hasVoiceClip.value = false
         _draftDurationMs.value = 0L
+        // WR-03: the slot is cleared for send — a racing validation from an
+        // earlier stop must not resurrect pre-send state (WR-02 owns the
+        // newer-clip-recorded-mid-send case on top of this).
+        voiceClipSession++
         viewModelScope.launch(Dispatchers.IO + coroutineExceptionHandler) {
             val result = try {
                 PcmTranscoder.transcodeFirst30s(file.absolutePath)
@@ -2286,6 +2325,9 @@ class ChatViewModel @Inject constructor(
      */
     fun deleteVoiceDraft() {
         stopPlaybackInternal()
+        // WR-03: the slot is discarded — a racing validation must not
+        // resurrect the card.
+        voiceClipSession++
         try {
             voiceClipFile?.takeIf { it.exists() }?.delete()
         } catch (e: Exception) {
