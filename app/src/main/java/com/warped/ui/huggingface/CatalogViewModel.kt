@@ -11,6 +11,7 @@ import com.warped.data.local.inference.ModelImportManager
 import com.warped.data.repository.AllowlistedModel
 import com.warped.data.repository.ModelAllowlistRepository
 import com.warped.domain.model.ActiveModelSelection
+import com.warped.domain.model.LocalModel
 import com.warped.domain.model.ProviderType
 import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.LocalModelRepository
@@ -144,12 +145,8 @@ class CatalogViewModel @Inject constructor(
     fun deleteDownloaded(entry: AllowlistedModel) {
         viewModelScope.launch {
             try {
-                // Match by file name: the entry carries only the bare name
-                // while the DB row stores the absolute path.
                 val models = localModelRepository.observeModels().first()
-                val model = models.firstOrNull {
-                    it.filePath.substringAfterLast("/") == entry.modelFile
-                } ?: return@launch Timber.w(
+                val model = findLocalModelForEntry(models, entry) ?: return@launch Timber.w(
                     "CatalogVM: delete requested for missing file %s",
                     entry.modelFile
                 )
@@ -178,9 +175,7 @@ class CatalogViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val models = localModelRepository.observeModels().first()
-                val model = models.firstOrNull {
-                    it.filePath.substringAfterLast("/") == entry.modelFile
-                } ?: run {
+                val model = findLocalModelForEntry(models, entry) ?: run {
                     Timber.w(
                         "CatalogVM: use requested for missing file %s",
                         entry.modelFile
@@ -225,4 +220,40 @@ class CatalogViewModel @Inject constructor(
             _error.value = e.message
         }
     }
+}
+
+/**
+ * Shared catalog-to-library resolver (WR-03). The allowlist entry carries
+ * only the bare [AllowlistedModel.modelFile] basename while the DB row
+ * stores the absolute path, so both the delete and activation paths funnel
+ * through this single match instead of duplicating `firstOrNull`
+ * basename logic.
+ *
+ * NOTE: a repo-substring refinement
+ * (`filePath.contains(repoSlug.substringAfter("/"))`) was deliberately
+ * NOT applied — on-device rows live under `filesDir/models/<basename>`
+ * and never contain the repo slug, so that check would fail every lookup
+ * and break activation entirely. Full repo-qualified resolution needs the
+ * repo slug persisted alongside the row (schema change, out of scope).
+ * When several rows share a basename the ambiguity is logged loudly so a
+ * wrong-file activation is diagnosable; all 6 current allowlist basenames
+ * are unique, so the collision path is latent-only today. Pure and
+ * JVM-testable.
+ */
+internal fun findLocalModelForEntry(
+    models: List<LocalModel>,
+    entry: AllowlistedModel,
+): LocalModel? {
+    val matches = models.filter {
+        it.filePath.substringAfterLast("/") == entry.modelFile
+    }
+    if (matches.size > 1) {
+        Timber.w(
+            "CatalogVM: %d rows share basename %s — activating the first; " +
+                "persist the repo slug per row for qualified resolution",
+            matches.size,
+            entry.modelFile,
+        )
+    }
+    return matches.firstOrNull()
 }
