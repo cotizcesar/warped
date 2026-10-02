@@ -39,3 +39,6 @@ History playback (VMSG-06):
 **Status:** OPEN — not implemented; needs a phase decision.
 
 **Orphan-clip vacuum:** delete cleanup now resolves the path from the Room row (source of truth) with transcript fallback, confined to `filesDir/voice`, but there is still no startup reaper: clips whose rows vanished through older builds (or a failed file delete after a successful DB delete) accumulate silently. Options: (a) startup vacuum deleting `filesDir/voice/*` files referenced by no messages row; (b) periodic WorkManager sweep; (c) accept the leak (clips are small, user-deletable via app storage clear). Recommend (a) in the next voice-touching phase — trivial Room query (`SELECT audio_path FROM messages`) + file listing on IO at startup.
+
+## Pre-existing flake (informational, not a Phase 68 gap)
+- `GroundingPromptTest.detector throw falls back to the regex` fails intermittently in full-suite runs (expected null, got true) but passes in isolation (32/32) and on full-suite re-runs. Root cause class: JVM-global `LanguageDetectorHolder` singleton + background warm thread — a timing/order race, same family as the Phase 67 `ModelSwitchUnloadTest` flake. Proven unrelated to Phase 68 voice UI edits via stash A/B (baseline green, with-fix green on re-run; failures do not correlate with code content). No action required.
