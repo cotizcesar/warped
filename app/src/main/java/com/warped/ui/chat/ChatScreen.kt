@@ -187,9 +187,8 @@ fun ChatScreen(
             }
         }
     }
-    // Phase 68: screen Context hoisted above the lifecycle observer (the
-    // ON_PAUSE branch reads isChangingConfigurations for the
-    // rotation-vs-background playback distinction).
+    // Phase 68: screen Context hoisted for the lifecycle observer (the
+    // ON_RESUME branch and permission flows below need it).
     val context = LocalContext.current
     DisposableEffect(Unit) {
         onDispose {
@@ -224,23 +223,15 @@ fun ChatScreen(
             // survives it.
             if (event == Lifecycle.Event.ON_PAUSE) {
                 viewModel.autoStopVoiceRecording(announceCap = false)
-                // Phase 68 (VMSG-02): pause draft playback without a
-                // foreground service. Rotation (config change) stops via
-                // stopPlayback so the position resets to 0 by construction
-                // (VM keeps no saved position — recreation restarts at 0
-                // and the user resumes with one tap); plain backgrounding
-                // pauses and keeps the position. The draft file stays
-                // on disk either way.
-                val changing = (context as? Activity)?.isChangingConfigurations == true
-                // Phase 68 Plan 03: history playback pauses alongside the
-                // draft (same keep-position, one-tap-resume contract);
-                // rotation stops both via stopPlayback (positions to 0).
-                if (changing) {
-                    viewModel.stopPlayback()
-                } else {
-                    viewModel.pauseVoiceDraft()
-                    viewModel.pauseHistoryVoice()
-                }
+                // Phase 68 (VMSG-02 + Plan 03, WR-06): pause draft AND history
+                // playback on every pause — rotation (config change) AND
+                // plain backgrounding both keep bubble state (selection +
+                // position) for one-tap resume, per CONTEXT. The player is
+                // VM-owned (no Activity handle), so the paused handle
+                // survives recreation; the draft file stays on disk either
+                // way. Chat exit still stops via stopPlayback (DisposableEffect).
+                viewModel.pauseVoiceDraft()
+                viewModel.pauseHistoryVoice()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

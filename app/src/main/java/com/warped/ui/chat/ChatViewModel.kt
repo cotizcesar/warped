@@ -2350,11 +2350,11 @@ class ChatViewModel @Inject constructor(
      * [VoiceMessagePlayer] with draft preview — starting any clip stops the
      * other (single-player discipline via [stopPlayback]).
      *
-     * Rotation note (CONTEXT): all playback state is VM memory and the VM
-     * survives rotation by construction; the VM does NOT save/restore the
-     * position, so post-rotation state is paused-at-0 by construction
-     * (ChatScreen stops playback on config-change pause, pauses-and-keeps
-     * on plain backgrounding).
+     * Rotation note (CONTEXT, WR-06): all playback state is VM memory and
+     * the VM survives rotation by construction; the player handle is
+     * VM-owned (no Activity reference), so ChatScreen pauses (never stops)
+     * on config-change pause — selection + position survive and the user
+     * resumes with one tap. Chat exit stops via [stopPlayback].
      */
     private val _playingMessageId = MutableStateFlow<String?>(null)
     val playingMessageId: StateFlow<String?> = _playingMessageId.asStateFlow()
