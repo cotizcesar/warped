@@ -343,6 +343,13 @@ fun WarpedNavGraph() {
         }
 
         NavHost(navController, startDestination = Screen.Chat) {
+            // IN-04: single help-navigation target shared by all chat
+            // destinations (identical lambda was pasted 3x).
+            val navigateToHelp = {
+                navController.navigate(Screen.Help) {
+                    launchSingleTop = true
+                }
+            }
             composable<Screen.Chat> {
                 ChatScreen(
                     onOpenDrawer = { scope.launch { drawerState.open() } },
@@ -357,11 +364,7 @@ fun WarpedNavGraph() {
                             launchSingleTop = true
                         }
                     },
-                    onNavigateToHelp = {
-                        navController.navigate(Screen.Help) {
-                            launchSingleTop = true
-                        }
-                    }
+                    onNavigateToHelp = navigateToHelp
                 )
             }
             composable<Screen.NewChat> {
@@ -379,11 +382,7 @@ fun WarpedNavGraph() {
                             launchSingleTop = true
                         }
                     },
-                    onNavigateToHelp = {
-                        navController.navigate(Screen.Help) {
-                            launchSingleTop = true
-                        }
-                    }
+                    onNavigateToHelp = navigateToHelp
                 )
             }
             composable<Screen.ChatDetail> { backStackEntry ->
@@ -405,11 +404,7 @@ fun WarpedNavGraph() {
                             launchSingleTop = true
                         }
                     },
-                    onNavigateToHelp = {
-                        navController.navigate(Screen.Help) {
-                            launchSingleTop = true
-                        }
-                    }
+                    onNavigateToHelp = navigateToHelp
                 )
             }
             composable<Screen.Selector> {
