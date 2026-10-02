@@ -2733,19 +2733,53 @@ class ChatViewModel @Inject constructor(
         // row is the source of truth, so the file goes best-effort right
         // after the DB delete (draft-or-bubble delete removes the file
         // immediately, per CONTEXT).
-        val audioPath = _transcript.value.messages.firstOrNull { it.id == messageId }?.audioPath
+        //
+        // WR-05: resolve from the repository first (Room row), not just the
+        // in-memory transcript — a delete for a row outside the loaded
+        // transcript otherwise leaks its clip in filesDir/voice forever.
+        // Transcript stays as the fallback (UUID ids of just-sent rows have
+        // no numeric key; repository failure must never block the delete).
+        val transcriptPath = _transcript.value.messages.firstOrNull { it.id == messageId }?.audioPath
         viewModelScope.launch(coroutineExceptionHandler) {
-            messageId.toLongOrNull()?.let { chatRepository.deleteMessage(it) }
+            val numericId = messageId.toLongOrNull()
+            var repoPath: String? = null
+            if (numericId != null) {
+                try {
+                    repoPath = chatRepository.getMessageAudioPath(numericId)
+                } catch (e: Exception) {
+                    Timber.w(e, "VoiceMsg: audio-path lookup failed, using transcript")
+                }
+            }
+            numericId?.let { chatRepository.deleteMessage(it) }
             updateTranscript { state ->
                 state.copy(messages = state.messages.filter { it.id != messageId })
             }
-            if (!audioPath.isNullOrBlank()) {
-                try {
-                    java.io.File(audioPath).takeIf { it.exists() }?.delete()
-                } catch (e: Exception) {
-                    Timber.w(e, "VoiceMsg: voice message file delete failed")
-                }
+            val audioPath = repoPath ?: transcriptPath
+            deleteVoiceClipFile(audioPath)
+        }
+    }
+
+    /**
+     * WR-05 (+ IN-06 hardening for this path): best-effort voice-clip
+     * delete confined to filesDir/voice. Canonical-path check keeps a
+     * tampered DB row from aiming the delete at an arbitrary app file; a
+     * failed delete after a successful DB delete is logged loudly (leak
+     * visibility) instead of swallowed.
+     */
+    private fun deleteVoiceClipFile(audioPath: String?) {
+        if (audioPath.isNullOrBlank()) return
+        try {
+            val voiceDir = java.io.File(context.filesDir, "voice").canonicalPath
+            val target = java.io.File(audioPath).canonicalFile
+            if (!target.path.startsWith("$voiceDir/")) {
+                Timber.w("VoiceMsg: refusing clip delete outside voice dir: %s", audioPath)
+                return
             }
+            if (target.exists() && !target.delete()) {
+                Timber.w("VoiceMsg: voice message file delete returned false: %s", target.path)
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "VoiceMsg: voice message file delete failed")
         }
     }
 

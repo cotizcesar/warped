@@ -88,6 +88,14 @@ class ChatRepositoryImpl @Inject constructor(
         messageDao.deleteById(messageId)
     }
 
+    override suspend fun getMessageAudioPath(messageId: Long): String? =
+        try {
+            messageDao.getById(messageId)?.audioPath
+        } catch (e: Exception) {
+            Timber.e(e, "ChatRepository: getMessageAudioPath(%d) failed", messageId)
+            null
+        }
+
     // Phase 53 (SRC-02/TOGGLE-01): row-id save plus override read/write.
     //
     // WARNING for Phase 54 retry: MessageDao.insert uses REPLACE — re-saving

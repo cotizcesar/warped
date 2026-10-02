@@ -16,6 +16,12 @@ interface ChatRepository {
     suspend fun deleteConversation(conversationId: Long)
     suspend fun deleteAllConversations()
     suspend fun deleteMessage(messageId: Long)
+    /**
+     * Phase 68 (VMSG-06, WR-05): source-of-truth audio path for one row.
+     * Delete cleanup resolves here first so unloaded-row deletes still
+     * remove their clips; null when the row is gone or carries no audio.
+     */
+    suspend fun getMessageAudioPath(messageId: Long): String?
     // Phase 53 (SRC-01/TOGGLE-01): source + override contracts. Implementation in 53-02.
     /** Inserts the message plus its source rows; returns the assistant row id. */
     suspend fun saveMessageWithSources(
