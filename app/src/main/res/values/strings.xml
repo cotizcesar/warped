@@ -179,7 +179,6 @@
     <string name="cd_resume_download">Resume download</string>
     <string name="cd_connection_status">Connection status</string>
     <string name="cd_select_model">Select model</string>
-    <string name="cd_web_options">Web options</string>
     <string name="cd_thinking_generating">Thinking. Generating answer.</string>
     <string name="cd_menu">Menu</string>
     <string name="cd_back_to_models">Back to models</string>
@@ -191,13 +190,6 @@
     <string name="cd_stop">Stop</string>
     <string name="cd_send">Send</string>
     <string name="cd_parameters">Parameters</string>
-
-    <!-- Web override menu -->
-    <string name="web_on">Web: On</string>
-    <string name="web_off">Web: Off</string>
-    <string name="web_inherit">Web: Inherit</string>
-    <string name="web_inherit_on">Inherit (global on)</string>
-    <string name="web_inherit_off">Inherit (global off)</string>
 
     <!-- Reading progress -->
     <string name="reading_page">Reading page…</string>

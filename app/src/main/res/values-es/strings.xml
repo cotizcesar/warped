@@ -179,7 +179,6 @@
     <string name="cd_resume_download">Reanudar descarga</string>
     <string name="cd_connection_status">Estado de conexión</string>
     <string name="cd_select_model">Seleccionar modelo</string>
-    <string name="cd_web_options">Opciones web</string>
     <string name="cd_thinking_generating">Pensando. Generando respuesta.</string>
     <string name="cd_menu">Menú</string>
     <string name="cd_back_to_models">Volver a modelos</string>
@@ -191,13 +190,6 @@
     <string name="cd_stop">Detener</string>
     <string name="cd_send">Enviar</string>
     <string name="cd_parameters">Parámetros</string>
-
-    <!-- Menú de control web -->
-    <string name="web_on">Web: Sí</string>
-    <string name="web_off">Web: No</string>
-    <string name="web_inherit">Web: Heredar</string>
-    <string name="web_inherit_on">Heredar (global activado)</string>
-    <string name="web_inherit_off">Heredar (global desactivado)</string>
 
     <!-- Progreso de lectura -->
     <string name="reading_page">Leyendo página…</string>
