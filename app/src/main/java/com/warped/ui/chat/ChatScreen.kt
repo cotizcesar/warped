@@ -273,10 +273,17 @@ fun ChatScreen(
         if (granted) {
             viewModel.startDictation()
         } else {
+            // IN-01: a non-Activity context (previews, wrapped test
+            // contexts) used to misclassify silently. Log the fallback so
+            // the transient assumption is observable; production always
+            // composes under MainActivity.
             val activity = context as? Activity
-            val permanent = activity?.let {
+            val permanent = if (activity != null) {
                 !ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.RECORD_AUDIO)
-            } ?: false
+            } else {
+                Timber.w("Voice: non-Activity context, assuming transient denial")
+                false
+            }
             if (permanent) viewModel.emitMicDenied()
         }
     }
