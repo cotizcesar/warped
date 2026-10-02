@@ -243,10 +243,8 @@
     <string name="voice_msg_rationale_body">Allow microphone access to record voice messages. Clips are kept on this device and the first 30 seconds are sent to the audio model.</string>
     <string name="voice_msg_stop">Stop recording</string>
     <string name="voice_msg_recording_state">Recording, %1$d:%2$02d</string>
-    <!-- Voice-send gating (Phase 69: disabled-with-reason explainer copy) -->
-    <string name="voice_msg_gate_audio_hint">Needs audio model</string>
+    <!-- Voice-send gating (Phase 69: explainer copy; gated button is hidden, not disabled) -->
     <string name="voice_msg_gate_audio">Voice messages need an audio model. Switch to an audio-capable model to send voice.</string>
-    <string name="voice_msg_gate_remote_hint">Device-only for now</string>
     <string name="voice_msg_gate_remote">Voice messages stay on this device for now.</string>
     <string name="voice_msg_view_models">View models</string>
     <string name="voice_msg_learn_more">Learn more</string>

@@ -60,13 +60,12 @@ fun ChatInputBar(
     onAddImage: () -> Unit = {},
     attachedImages: List<Uri> = emptyList(),
     onRemoveImage: (Int) -> Unit = {},
-    // Phase 69 Plan 01 (VMSG-04/08): voice-send gate. Replaces the dead
-    // modelHasAudio flag (declared, passed, consumed nowhere) — the VM
+    // Phase 69 Plan 01 (VMSG-04/08): voice-send gate. The VM
     // voiceSendGate flow is the single source of truth. A gated button
-    // RENDERS (never hidden) at reduced opacity with an inline hint and
-    // stays TAPPABLE into onGatedVoiceClick (never a dead button).
+    // is HIDDEN (no hint, no affordance) — unsupported models and
+    // remote endpoints show no voice-send surface at all. Send-path
+    // gate blocks (draft kept + explainer) still live in the VM.
     voiceGate: GateState = GateState.Allowed,
-    onGatedVoiceClick: () -> Unit = {},
     onAudioRecorded: ((ByteArray) -> Unit)? = null,
     onAudioRecordingChanged: ((Boolean) -> Unit)? = null,
     // Phase 65 (VOICE-02 UI): dictation mic affordance. speechAvailable
@@ -462,12 +461,9 @@ fun ChatInputBar(
                 // dictation mic, same visibility conditions. Waveform
                 // glyph (GraphicEq family), never a mic. Hidden while
                 // recording — the Row-1 recording row owns stop/cancel.
-                // Phase 69 Plan 01 (VMSG-04/08): gated rendering — the same
-                // GraphicEq glyph at reduced opacity (~38% onSurface, no
-                // container recolor, no error-red) with the inline hint in
-                // onSurfaceVariant. Tappable into the explainer (never
-                // enabled=false with no handler). Allowed keeps the
-                // Phase 67/68 rendering untouched.
+                // Gated configs (text-only model, remote endpoint) render
+                // NOTHING — no button, no hint. The send-path VM guards
+                // still block gated sends (draft kept + explainer).
                 if (speechAvailable && !isGenerating && !isLoadingModel && !isVoiceRecording) {
                     // Adopt the pre-existing dead onAudioRecordingChanged
                     // channel: it now fires with the live recording flag so
@@ -475,30 +471,7 @@ fun ChatInputBar(
                     LaunchedEffect(isVoiceRecording) {
                         onAudioRecordingChanged?.invoke(isVoiceRecording)
                     }
-                    if (voiceGate != GateState.Allowed) {
-                        val gatedHint = stringResource(
-                            if (voiceGate == GateState.GatedTextOnly) R.string.voice_msg_gate_audio_hint
-                            else R.string.voice_msg_gate_remote_hint
-                        )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                gatedHint,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            IconButton(
-                                onClick = onGatedVoiceClick,
-                                modifier = Modifier.size(48.dp).semantics {
-                                    stateDescription = gatedHint
-                                },
-                            ) {
-                                Icon(Icons.Filled.GraphicEq, stringResource(R.string.voice_msg_record),
-                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                                    modifier = Modifier.size(24.dp))
-                            }
-                        }
-                    } else {
+                    if (voiceGate == GateState.Allowed) {
                         // Phase 69 Plan 03 (VMSG-03): first-use coachmark
                         // anchored to the enabled voice button. The M3
                         // PlainTooltip (Compose BOM, zero new deps) shows

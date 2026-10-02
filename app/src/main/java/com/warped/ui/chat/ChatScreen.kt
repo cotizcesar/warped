@@ -607,11 +607,10 @@ fun ChatScreen(
                 attachedImages = attachedImages,
                 onRemoveImage = { i -> attachedImages = attachedImages.filterIndexed { idx, _ -> idx != i } },
                 // Phase 69 Plan 01 (VMSG-04/08): the collected VM gate
-                // drives the button + hint (no screen-local capability
-                // read); gated taps open the explainer (never a dead
-                // button).
+                // drives button visibility (hidden when gated — no
+                // screen-local capability read). Gated sends still
+                // route to the explainer via the VM send-path guards.
                 voiceGate = voiceGate,
-                onGatedVoiceClick = { showVoiceGateExplainer(voiceGate) },
                 // Phase 69 Plan 03 (VMSG-03): one-shot coachmark on the
                 // enabled voice button; any tap dismisses (VM persists).
                 showVoiceCoachmark = showVoiceCoachmark,
