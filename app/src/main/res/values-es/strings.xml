@@ -314,7 +314,6 @@
     <string name="settings_code_theme_desc">Esquema de colores para los bloques de código en el chat</string>
     <string name="settings_code_font">Tamaño de fuente del código</string>
     <string name="settings_section_app">App</string>
-    <string name="settings_section_websearch">Búsqueda web</string>
     <string name="settings_section_security">Seguridad</string>
     <string name="settings_security_desc">Las API keys se cifran con Android Keystore (AES-256-GCM)</string>
     <string name="settings_delete_all_keys_btn">Eliminar todas las claves</string>
