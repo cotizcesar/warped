@@ -2915,6 +2915,11 @@ class ChatViewModel @Inject constructor(
                 return
             }
         }
+        // The new selection fits (or isn't a local model): drop any stale
+        // warning left by a previously selected bigger model.
+        if (_connection.value.memoryWarningModel != null) {
+            updateConnection { it.copy(memoryWarningModel = null) }
+        }
         viewModelScope.launch(coroutineExceptionHandler) {
             setSelectedModel(modelId, providerType, endpointId, isSameModel = false)
         }
