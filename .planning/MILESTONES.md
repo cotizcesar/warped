@@ -1,5 +1,19 @@
 # Milestones
 
+## v3.1 Voice Messages + New Tool (Shipped: 2026-10-02)
+
+**Phases completed:** 4 phases, 10 plans, 7 tasks
+
+**Key accomplishments:**
+
+- VM-owned MediaRecorder capture into filesDir/voice with 60 s auto-stop-and-keep, AAC→mono-16kHz first-30s transcode on Dispatchers.IO, and send through the existing audioBytes path behind a GraphicEq toggle.
+- Shippable VMSG-01/VMSG-05 experience — inline recording row with red last-10 s, shared-launcher permission flow with Settings escape, cap toast, First-30s note, text-only/remote guard toasts, background auto-stop, and nine EN+ES strings with the full 955-test suite green.
+- Provider-keyed VoiceSendGate helper, live-flipping VM gate flow with draft-kept send block, and disabled-with-reason voice button (38% opacity + hint + tappable explainer) with catalog / Learn-more actions
+- Second on-device STT session during recording with send-time stamping into the Room transcript column, and own-bubble captions (2-line cap + Show more/Less, duration-only fallback when STT is unavailable)
+- One-shot PlainTooltip coachmark ("Voice message") on the voice-send button with any-tap dismissal persisted in DataStore, and Help Section 9 (voice vs dictation, 60 s cap, local-only) reached via Learn more from all three chat entry points, EN+ES
+
+---
+
 ## v2.5 Play Compliance + Leaks (Shipped: 2026-10-01)
 
 **Phases completed:** 4 phases (59-62), 8 plans, 10 tasks

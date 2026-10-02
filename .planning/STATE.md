@@ -2,25 +2,24 @@
 gsd_state_version: "1.0"
 milestone: v3.1
 milestone_name: Voice Messages + New Tool
-current_phase: 70
-status: completed
+status: Awaiting next milestone
 stopped_at: Phase 70 complete — all phases complete
-last_updated: "2026-10-02T22:19:38.130Z"
+last_updated: "2026-10-02T22:25:20.784Z"
 last_activity: 2026-10-02
-last_activity_desc: Phase 70 complete
-state_head: 286d8b46ef00fa19ac0ffa9ea77a11f646674727
+state_head: a1306b3050fe77df51c73c4c5fbf9ab4f32c06ed
 progress:
   total_phases: 4
   completed_phases: 4
   total_plans: 10
   completed_plans: 10
   percent: 100
+current_phase: 70
 ---
 
 # Project State: Warped
 
 **Last updated:** 2026-09-30
-**Last activity:** 2026-10-02 — Phase 70 complete
+**Last activity:** 2026-10-02
 
 ## Project Reference
 
@@ -31,10 +30,10 @@ See: .planning/PROJECT.md (updated 2026-10-01, v2.5 shipped)
 
 ## Current Position
 
-Phase: 70
-Plan: Not started
-Status: All phases complete
-Last activity: 2026-10-02 — Milestone v3.1 started
+Phase: Milestone v3.1 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-10-02 — Milestone v3.1 completed and archived
 
 ## Phase Structure (v3.1 — PLANNED)
 
@@ -107,6 +106,21 @@ None yet.
 | Tech debt | Orphaned Keystore `huggingface_token` entry on upgrades (harmless, never read) | Accepted | v2.2 close |
 | Coverage | Nyquist VALIDATION.md missing for phases 49/50/51 | TODO, not a compliance failure | v2.2 close |
 | Coverage | Nyquist VALIDATION.md missing for v2.5 phases 59-62 (discovery only, not a compliance failure) | TODO | v2.5 close |
+
+### v3.1 Closeout Acknowledgments (2026-10-02, override_closeout)
+
+12 open artifacts acknowledged at milestone close (suppression lapses automatically if artifact state changes); 47 carried forward from v2.5 close:
+
+| Category | Item | Status | Milestone |
+|----------|------|--------|-----------|
+| deferred | 67/deferred-items.md release-UAT device smoke | acknowledged, release UAT | v3.1 |
+| deferred | 67/deferred-items.md ModelSwitchUnloadTest flake | acknowledged, info | v3.1 |
+| deferred | 68/deferred-items.md release-UAT device smoke (12 checks) | acknowledged, release UAT | v3.1 |
+| deferred | 68/deferred-items.md GroundingPromptTest flake | acknowledged, info | v3.1 |
+| deferred | 69/deferred-items.md release-UAT device smoke | acknowledged, release UAT | v3.1 |
+| deferred | 69/deferred-items.md turbine timeout flake-watch | acknowledged, info | v3.1 |
+| deferred | 70/deferred-items.md UAT-70-01…05 + NOTE-70-06 | acknowledged, release UAT | v3.1 |
+| quick_tasks | 20261002 dictation-autostop-cursor-card, lazy-model-load | complete (frontmatter fixed, scanner clears) | v3.1 |
 
 ### v2.5 Closeout Acknowledgments (2026-10-01, override_closeout)
 

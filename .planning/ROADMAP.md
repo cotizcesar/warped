@@ -8,128 +8,20 @@
 - ✅ **v2.4 Agentic Web** — Phases 55-58 (shipped 2026-09-29)
 - ✅ **v2.5 Play Compliance + Leaks** — Phases 59-62 (shipped 2026-10-01)
 - ✅ **v3.0 Chat UX + Voice Dictation** — Phases 63-66 (shipped 2026-10-02)
-- 🚧 **v3.1 Voice Messages + New Tool** — Phases 67-70 (in progress)
+- ✅ **v3.1 Voice Messages + New Tool** — Phases 67-70 (shipped 2026-10-02)
 
 ## Phases
 
 <details>
-<summary>✅ v2.5 Play Compliance + Leaks (Phases 59-62) — SHIPPED 2026-10-01</summary>
+<summary>✅ v3.1 Voice Messages + New Tool (Phases 67-70) — SHIPPED 2026-10-02</summary>
 
-- [x] Phase 59: 16 KB Dependency Verification (2/2 plans) — completed 2026-09-30
-- [x] Phase 60: API-36 Behavior Audit (2/2 plans) — completed 2026-09-30
-- [x] Phase 61: LeakCanary Instrumentation + Guided Audit (2/2 plans) — completed 2026-09-30
-- [x] Phase 62: Fix Loop + Release Hardening (2/2 plans) — completed 2026-10-01
+- [x] Phase 67: Voice Capture + Send Path (2/2 plans) — completed 2026-10-02
+- [x] Phase 68: Voice Draft + Playback History (3/3 plans) — completed 2026-10-02
+- [x] Phase 69: Voice Differentiation + Gating + Transcript (3/3 plans) — completed 2026-10-02
+- [x] Phase 70: Document Reader Tool (2/2 plans) — completed 2026-10-02
 
 </details>
 
-### Shipped: v2.1 Finish v2.0 Leftovers (2026-09-28)
-
-4 phases (45–48), 18/18 requirements MET. Full archive: [`milestones/v2.1-ROADMAP.md`](milestones/v2.1-ROADMAP.md)
-
-### Shipped: v2.2 Simplificación + Web Grounding (2026-09-28)
-
-3 phases (49–51), 5 plans, 14 requirements — 10 MET, 4 PARTIAL (device smoke deferred, user-accepted). Full archive: [`milestones/v2.2-ROADMAP.md`](milestones/v2.2-ROADMAP.md)
-
-### Shipped: v2.3 Web Grounding v2 (2026-09-28)
-
-3 phases (52–54), 8 plans, 12 requirements — 12/12 verified. Full archive: [`milestones/v2.3-ROADMAP.md`](milestones/v2.3-ROADMAP.md)
-
-### Shipped: v2.4 Agentic Web (2026-09-29)
-
-4 phases (55–58), 9 plans, 10 requirements — 10/10 verified. Full archive: [`milestones/v2.4-ROADMAP.md`](milestones/v2.4-ROADMAP.md)
-
-### Shipped: v2.5 Play Compliance + Leaks (2026-10-01)
-
-4 phases (59–62), 8 plans, 15 requirements — 15/15 satisfied (audit passed, G-59-01 closed by Phase 62). Full archive: [`milestones/v2.5-ROADMAP.md`](milestones/v2.5-ROADMAP.md)
-
 ---
 
-**Cumulative state after v3.0:** 66 phases shipped, 371 requirements delivered across v1.0–v3.0.
-
----
-
-### Shipped: v3.0 Chat UX + Voice Dictation (2026-10-02)
-
-4 phases (63–66), 7 plans, 19 requirements — 19/19 verified (63: 7/7, 64: 5/5, 65: 3/3, 66: 3/3). 914 unit tests green. Security SECURED 18/18 (64: 6/6, 65: 8/8, 66: 4/4). UI reviews advisory (64: 17/24, 65: 22/24 — priority fixes applied). Full archive: [`milestones/v3.0-ROADMAP.md`](milestones/v3.0-ROADMAP.md)
-
----
-
-### 🚧 v3.1 Voice Messages + New Tool (In Progress)
-
-**Milestone Goal:** Send time-capped voice messages to audio-capable LiteRT-LM models with icons clearly separated from STT dictation, and analyze + build one new high-value tool for the app.
-
-**Key contracts (from research):** zero new Gradle deps; send-first-30-s (60 s kept for playback); voice-send local-only at launch; transcript via parallel STT with duration-only fallback; recorder/player VM-owned in `ui/chat/voice/`; audio bytes in `filesDir/voice/`, Room holds paths only; TOOL-03 contingency-only (no work unless triggered). Hardening folded into per-phase verification (zero requirements, coarse granularity).
-
-## Phases
-
-- [x] **Phase 67: Voice Capture + Send Path** - Record with 60 s cap and send to audio-capable local models (completed 2026-10-02)
-- [x] **Phase 68: Voice Draft + Playback History** - Preview-before-send draft and replayable history bubbles (completed 2026-10-02)
-- [ ] **Phase 69: Voice Differentiation + Gating + Transcript** - Distinct icons, model gating, transcript captions
-- [ ] **Phase 70: Document Reader Tool** - readTextFile grounding locally and on remote endpoints
-
-## Phase Details
-
-### Phase 67: Voice Capture + Send Path
-
-**Goal**: Users can record a voice message and send it to an audio-capable local model
-**Depends on**: Phase 66 (v3.0 complete)
-**Requirements**: VMSG-01, VMSG-05
-**Success Criteria** (what must be TRUE):
-
-  1. User records voice from the chat input with live timer + amplitude feedback, auto-stops at 60 s keeping the clip, and cancel discards the file
-  2. User sends the voice message to an audio-capable local model — full 60 s kept for playback, first 30 s transcoded to mono 16 kHz PCM via the existing audioBytes path, with a user-visible note
-  3. Record → send → model response completes on-device against an audio-capable allowlist model (device smoke)
-
-**Plans**: TBD
-**UI hint**: yes
-
-### Phase 68: Voice Draft + Playback History
-
-**Goal**: Users can preview drafts before sending and replay voice messages from history
-**Depends on**: Phase 67
-**Requirements**: VMSG-02, VMSG-06
-**Success Criteria** (what must be TRUE):
-
-  1. User previews the recorded draft before sending (play/pause + send + delete); clips under 1 second are rejected with a graceful message
-  2. User replays sent voice messages from history (bubble with play + duration + progress) across app restarts
-  3. Recording/draft state survives rotation; backgrounding auto-stops and keeps the draft
-
-**Plans**: TBD
-**UI hint**: yes
-
-### Phase 69: Voice Differentiation + Gating + Transcript
-
-**Goal**: Users can tell voice-send apart from dictation and understand when voice-send is unavailable
-**Depends on**: Phase 68
-**Requirements**: VMSG-03, VMSG-04, VMSG-07, VMSG-08
-**Success Criteria** (what must be TRUE):
-
-  1. User sees a voice-send icon visually distinct from the STT dictation mic (waveform/audio-clip vs mic glyph); starting one input mode stops the other
-  2. User on a text-only model gets a gated voice-send affordance (hidden or disabled with reason — never a dead button)
-  3. User on a remote endpoint gets a gated voice-send with a local-only explanation
-  4. User sees a transcript caption under their own voice bubble (parallel on-device STT during recording; duration-only fallback when STT unavailable)
-
-**Plans**: TBD
-**UI hint**: yes
-
-### Phase 70: Document Reader Tool
-
-**Goal**: Users can ground answers in a picked text document, locally and on remote endpoints
-**Depends on**: Nothing (independent tool track, parallelizable with Phases 67-69)
-**Requirements**: TOOL-01, TOOL-02, TOOL-03
-**Success Criteria** (what must be TRUE):
-
-  1. User picks a text document via the system picker and its bounded content grounds the answer (size cap + truncation envelope, least-privilege read-only)
-  2. User invokes the document reader on remote endpoints too (remote tools[] mapping alongside the local loop)
-  3. TOOL-03 fallback (unit converter) stays contingency-only — implemented only if readTextFile proves unfit at plan time
-
-**Plans**: TBD
-
-## Progress
-
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 67. Voice Capture + Send Path | 2/2 | Complete    | 2026-10-02 |
-| 68. Voice Draft + Playback History | 3/3 | Complete    | 2026-10-02 |
-| 69. Voice Differentiation + Gating + Transcript | 0/TBD | Not started | - |
-| 70. Document Reader Tool | 0/TBD | Not started | - |
+**Cumulative state after v3.1:** 70 phases shipped, 382 requirements delivered across v1.0–v3.1.

@@ -120,14 +120,18 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 **Known deferred:** POL-01 review-threshold tuning, POL-02 offline-dictation hint, POL-03 Pixel 7 benchmarks, POL-04 standing release-UAT device smokes (see STATE.md Deferred Items).
 
-## Current Milestone: v3.1 Voice Messages + New Tool
+## Shipped Milestone: v3.1 Voice Messages + New Tool — COMPLETE ✅
 
-**Goal:** Send time-capped voice messages to audio-capable LiteRT-LM models with icons clearly separated from STT dictation, and analyze + build one new high-value tool for the app.
+**Shipped:** 2026-10-02 | [Archive →](.planning/milestones/v3.1-ROADMAP.md) · [Audit →](v3.1-MILESTONE-AUDIT.md) (passed, 11/11)
 
-**Target features:**
-- In-chat voice recorder with 60-second cap, playback, and send/cancel
-- Voice-send icon (audio attachment) vs dictation mic (speech-to-text) clearly differentiated, model-gated on audio capability
-- New tool analysis: candidate evaluation (effort, value, fit) + implementation of the winner
+4 phases (67–70), 10 plans, 11/11 requirements satisfied (TOOL-03 contingency satisfied-by-design, unbuilt by FIT verdict):
+- Voice capture + send (60 s cap, first-30 s PCM via audioBytes, VM-owned recorder/transcoder)
+- Draft preview + history playback (sub-1 s guard, single-player, Room 17→18)
+- Differentiation + gating + transcript (provider-keyed gate, disabled-with-reason, parallel STT captions, coachmark, Help §9)
+- Document reader tool (SAF pick, [DOCUMENT CONTEXT] envelope, local loop + remote tools[] mapping)
+- 1047 unit tests green; security SECURED (67: 8/8, 68: 8/8, 69: 8/8, 70: 7/7); UI reviews advisory with priority fixes applied (67: 19/24, 68: 20/24, 69: 20/24, 70: 17/24)
+
+**Known deferred:** standing release-UAT device smokes for all 4 phases (runbooks in phase deferred-items.md, see STATE.md Deferred Items); pre-existing test flakes documented (ModelSwitchUnloadTest, GroundingPromptTest, turbine timeouts — all proven pre-existing via stash A/B).
 
 ## Requirements
 
@@ -207,11 +211,15 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 - ✓ Model Catalog "Use in Chat" on downloaded models — v3.0
 - ✓ Voice dictation into chat input (speech-to-text, first-tap rationale) — v3.0
 
+### Validated
+
+- ✓ Voice message recording with 60-second cap + playback + send/cancel — v3.1
+- ✓ Voice-send icon vs dictation mic differentiation, gated on model audio capability — v3.1
+- ✓ New tool: candidate analysis + implementation of the winner (readTextFile document reader, local + remote; unit converter contingency unbuilt by FIT verdict) — v3.1
+
 ### Active
 
-- [ ] Voice message recording with 60-second cap + playback + send/cancel — v3.1
-- [ ] Voice-send icon vs dictation mic differentiation, gated on model audio capability — v3.1
-- [ ] New tool: candidate analysis + implementation of the winner — v3.1
+(None yet — next milestone defines its requirements via `/gsd-new-milestone`.)
 
 ### Out of Scope
 
@@ -308,4 +316,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-02 — Phase 70 complete (v3.1 all phases done)*
+*Last updated: 2026-10-02 — v3.1 Voice Messages + New Tool milestone shipped*
