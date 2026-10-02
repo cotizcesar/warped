@@ -34,10 +34,13 @@ import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.LocalModelRepository
 import com.warped.ui.chat.voice.VoiceDictationManager
+import com.warped.ui.chat.voice.VoiceMessageRecorder
+import com.warped.ui.chat.voice.PcmTranscoder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CancellationException
@@ -1716,6 +1719,181 @@ class ChatViewModel @Inject constructor(
         )
     }
 
+    /**
+     * Phase 67 (VMSG-01/05): voice-message capture state. The recorder is
+     * VM-owned (sibling to the dictation manager): created lazily with
+     * output dir filesDir/voice, destroyed in [onCleared] so no recorder
+     * leaks past the screen. Rotation survives by construction (flows).
+     *
+     * Session lifecycle: [startVoiceRecording] (Dispatchers.IO) flips
+     * [isVoiceRecording] ONLY on platform accept (WR-01 discipline) and
+     * launches a 1 s ticker (elapsed + 60 s auto-stop-and-keep) plus a
+     * ~100 ms amplitude sampler as children of [voiceSessionJob]; every
+     * exit path (stop/cancel/auto-stop/destroy) cancels the job.
+     */
+    private val _isVoiceRecording = MutableStateFlow(false)
+    val isVoiceRecording: StateFlow<Boolean> = _isVoiceRecording.asStateFlow()
+
+    private val _voiceElapsedSec = MutableStateFlow(0)
+    val voiceElapsedSec: StateFlow<Int> = _voiceElapsedSec.asStateFlow()
+
+    private val _voiceAmplitude = MutableStateFlow(0)
+    val voiceAmplitude: StateFlow<Int> = _voiceAmplitude.asStateFlow()
+
+    private val _hasVoiceClip = MutableStateFlow(false)
+    val hasVoiceClip: StateFlow<Boolean> = _hasVoiceClip.asStateFlow()
+
+    /** One-shot 60 s auto-stop event (the UI toasts once per emission). */
+    private val _voiceCapEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val voiceCapEvent: SharedFlow<Unit> = _voiceCapEvent.asSharedFlow()
+
+    private var voiceRecorder: VoiceMessageRecorder? = null
+
+    /** Test seam: a fake replaces the platform recorder in unit tests. */
+    internal var voiceRecorderOverride: VoiceMessageRecorder? = null
+
+    private var voiceClipFile: java.io.File? = null
+    private var voiceSessionJob: Job? = null
+
+    /** Single-flight guard: taps during recorder spin-up are ignored. */
+    @Volatile
+    private var voiceStarting = false
+
+    private fun getVoiceRecorder(): VoiceMessageRecorder {
+        voiceRecorderOverride?.let { return it }
+        return voiceRecorder ?: VoiceMessageRecorder(
+            context = context,
+            outputDir = java.io.File(context.filesDir, "voice"),
+        ).also { voiceRecorder = it }
+    }
+
+    private fun peekVoiceRecorder(): VoiceMessageRecorder? =
+        voiceRecorderOverride ?: voiceRecorder
+
+    /**
+     * Start voice capture. Stops dictation first (single live input mode).
+     * The recording flag flips only when the platform accepted the start;
+     * RECORD_AUDIO gating is owned by the caller (ChatScreen).
+     */
+    fun startVoiceRecording() {
+        if (voiceStarting || _isVoiceRecording.value) return
+        stopDictation()
+        voiceStarting = true
+        viewModelScope.launch(Dispatchers.IO + coroutineExceptionHandler) {
+            try {
+                val recorder = getVoiceRecorder()
+                if (!recorder.start()) return@launch
+                _isVoiceRecording.value = true
+                _voiceElapsedSec.value = 0
+                _voiceAmplitude.value = 0
+                _hasVoiceClip.value = false
+                voiceSessionJob?.cancel()
+                voiceSessionJob = viewModelScope.launch(coroutineExceptionHandler) {
+                    launch {
+                        while (true) {
+                            delay(100)
+                            _voiceAmplitude.value = recorder.maxAmplitude()
+                        }
+                    }
+                    launch {
+                        while (true) {
+                            delay(1_000)
+                            val next = _voiceElapsedSec.value + 1
+                            _voiceElapsedSec.value = next
+                            if (next >= 60) {
+                                autoStopVoiceRecording()
+                                break
+                            }
+                        }
+                    }
+                }
+            } finally {
+                voiceStarting = false
+            }
+        }
+    }
+
+    /** Shared keep-and-stop core: cancel jobs, stop recorder, keep file. */
+    private fun keepAndStopVoice(): java.io.File? {
+        voiceSessionJob?.cancel()
+        voiceSessionJob = null
+        val file = try {
+            peekVoiceRecorder()?.stop()
+        } catch (e: Exception) {
+            Timber.w(e, "VoiceMsg: stop failed")
+            null
+        }
+        _isVoiceRecording.value = false
+        _voiceAmplitude.value = 0
+        return file
+    }
+
+    /** Manual stop (second tap): keep the clip in memory for send. */
+    fun stopVoiceRecording() {
+        if (!_isVoiceRecording.value) return
+        val file = keepAndStopVoice()
+        voiceClipFile = file
+        _hasVoiceClip.value = file != null
+    }
+
+    /**
+     * Idempotent keep-and-stop entry used by BOTH the 60 s ticker and the
+     * background lifecycle observer: stops, keeps the clip, and fires the
+     * one-shot cap event for the toast.
+     */
+    fun autoStopVoiceRecording() {
+        if (!_isVoiceRecording.value) return
+        val file = keepAndStopVoice()
+        voiceClipFile = file
+        _hasVoiceClip.value = file != null
+        _voiceCapEvent.tryEmit(Unit)
+    }
+
+    /** Explicit cancel (X): discard the file immediately. */
+    fun cancelVoiceRecording() {
+        voiceSessionJob?.cancel()
+        voiceSessionJob = null
+        try {
+            peekVoiceRecorder()?.cancel()
+        } catch (e: Exception) {
+            Timber.w(e, "VoiceMsg: cancel failed")
+        }
+        voiceClipFile = null
+        _hasVoiceClip.value = false
+        _isVoiceRecording.value = false
+        _voiceAmplitude.value = 0
+    }
+
+    /**
+     * Transcode the kept clip (first 30 s to mono 16 kHz PCM on
+     * Dispatchers.IO) and send through the existing
+     * [sendMessage] audioBytes path so the capabilities.audio gate stays
+     * the backstop. Transcode failure emits a Snackbar and keeps the file
+     * for retry; failed sends keep the file (Phase 68 draft basis).
+     *
+     * TODO(67-02): move hardcoded copy to voice_msg_* string resources.
+     */
+    fun sendVoiceMessage(caption: String) {
+        val file = voiceClipFile ?: return
+        voiceClipFile = null
+        _hasVoiceClip.value = false
+        viewModelScope.launch(Dispatchers.IO + coroutineExceptionHandler) {
+            val result = try {
+                PcmTranscoder.transcodeFirst30s(file.absolutePath)
+            } catch (e: Exception) {
+                Timber.w(e, "VoiceMsg: transcode failed")
+                voiceClipFile = file
+                _hasVoiceClip.value = true
+                _events.tryEmit(ChatEvent.Snackbar("Voice message could not be processed."))
+                return@launch
+            }
+            if (result.truncated) {
+                _events.tryEmit(ChatEvent.Snackbar("First 30s sent to model"))
+            }
+            sendMessage(caption, audioBytes = result.bytes)
+        }
+    }
+
     fun launchModelSelection(modelId: String, providerType: ProviderType, endpointId: Long? = null) {
         val state = snapshot()
 
@@ -2291,6 +2469,12 @@ class ChatViewModel @Inject constructor(
         super.onCleared()
         dictationManager?.destroy()
         dictationManager = null
+        // Phase 67 (VMSG-01): cancel the recording session jobs and
+        // destroy the recorder so nothing leaks past the screen.
+        voiceSessionJob?.cancel()
+        voiceSessionJob = null
+        voiceRecorder?.destroy()
+        voiceRecorder = null
         unloadLocalModels()
     }
 }

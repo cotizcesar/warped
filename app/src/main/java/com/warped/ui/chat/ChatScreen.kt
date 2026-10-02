@@ -98,6 +98,12 @@ fun ChatScreen(
     // reading them here adds no composition-hot-path work.
     val speechAvailable by viewModel.speechAvailable.collectAsStateWithLifecycle()
     val isListening by viewModel.isListening.collectAsStateWithLifecycle()
+    // Phase 67 (VMSG-01 tracer): voice-message recording state. The
+    // permission gate is a temporary bypass — RECORD_AUDIO is assumed
+    // granted for the tracer path (check before start, no-op otherwise,
+    // no crash); the full rationale/Snackbar flow lands in Plan 02.
+    val isVoiceRecording by viewModel.isVoiceRecording.collectAsStateWithLifecycle()
+    val hasVoiceClip by viewModel.hasVoiceClip.collectAsStateWithLifecycle()
     // 48-01 (PERF-15): keyed LazyColumn state. isAtBottom follows 48-UI-SPEC
     // §3 ("last item visible and within 48dp of the end").
     val listState = rememberLazyListState()
@@ -319,6 +325,18 @@ fun ChatScreen(
         }
     }
 
+    // Phase 67 (VMSG-01 tracer): voice-send tap gate. Temporary
+    // permission bypass — recording never starts without the runtime
+    // grant (no-op otherwise, no crash). Plan 02 adds the first-tap
+    // rationale + denial Snackbar + Settings escape.
+    val onVoiceClick = {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            if (isVoiceRecording) viewModel.stopVoiceRecording() else viewModel.startVoiceRecording()
+        }
+    }
+
     val selectedModelName = run {
         val effectiveModelId = connection.selectedLocalModelId ?: connection.selectedRemoteModelId
         val effectiveProvider = if (connection.selectedLocalModelId != null) ProviderType.LITE_RT_LM
@@ -412,7 +430,13 @@ fun ChatScreen(
                     if (isListening) viewModel.stopDictation()
                     snapToBottomOnNextContent = true
                     hasNewContentBelow = false
-                    viewModel.sendMessage(input.inputText, attachedImages, audioBytes)
+                    // Phase 67 (VMSG-05 tracer): a kept voice clip routes
+                    // through the transcode-and-send path with the caption.
+                    if (hasVoiceClip) {
+                        viewModel.sendVoiceMessage(input.inputText)
+                    } else {
+                        viewModel.sendMessage(input.inputText, attachedImages, audioBytes)
+                    }
                     attachedImages = emptyList()
                     audioBytes = null
                 },
@@ -435,6 +459,9 @@ fun ChatScreen(
                 speechAvailable = speechAvailable,
                 isListening = isListening,
                 onMicClick = onMicClick,
+                // Phase 67 (VMSG-01 tracer): minimal voice-send toggle.
+                isVoiceRecording = isVoiceRecording,
+                onVoiceClick = onVoiceClick,
                 // WR-03: report the caret so dictation inserts at cursor.
                 onCursorChange = { viewModel.updateInputCursor(it) },
                 // Model-loading gate: the whole bar locks while loading.

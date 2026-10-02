@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
@@ -64,6 +65,12 @@ fun ChatInputBar(
     // dictation (UI-SPEC section 3). Fires on every selection change;
     // the ViewModel inserts dictated text at the last reported position.
     onCursorChange: (Int) -> Unit = {},
+    // Phase 67 (VMSG-01 tracer): voice-send toggle. Tapping toggles
+    // start/stop through the ViewModel; content description flips with
+    // state. TODO(67-02): adopt onAudioRecordingChanged for the
+    // recording flag + recording-row UI; resource the copy.
+    isVoiceRecording: Boolean = false,
+    onVoiceClick: () -> Unit = {},
     // Model-loading gate (2026-10-02): while a model loads, the WHOLE
     // input is disabled — text field, image/think buttons, mic, and send.
     isLoadingModel: Boolean = false,
@@ -241,6 +248,29 @@ fun ChatInputBar(
                                 tint = Color.White, modifier = Modifier.size(24.dp))
                         } else {
                             Icon(Icons.Filled.Mic, stringResource(R.string.cd_dictate),
+                                tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
+                        }
+                    }
+                    Spacer(Modifier.width(8.dp))
+                }
+
+                // Phase 67 (VMSG-01 tracer): voice-send button beside the
+                // dictation mic, same visibility conditions. Waveform
+                // glyph (GraphicEq family), never a mic; doubles as the
+                // stop toggle while recording.
+                if (speechAvailable && !isGenerating && !isLoadingModel) {
+                    IconButton(
+                        onClick = onVoiceClick,
+                        modifier = Modifier.size(40.dp),
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = if (isVoiceRecording) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent
+                        )
+                    ) {
+                        if (isVoiceRecording) {
+                            Icon(Icons.Filled.Stop, stringResource(R.string.cd_stop),
+                                tint = Color.White, modifier = Modifier.size(24.dp))
+                        } else {
+                            Icon(Icons.Filled.GraphicEq, "Record voice message",
                                 tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
                         }
                     }
