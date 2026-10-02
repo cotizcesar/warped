@@ -19,6 +19,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontStyle
@@ -247,13 +248,45 @@ fun WarpedNavGraph() {
                         }
                     }
 
+                    // DRAWER-04: drawer-owned bulk delete. Gated on non-empty
+                    // recents (T-64-01) with the per-row WarpedAlertDialog
+                    // confirm intact.
+                    if (conversations.isNotEmpty()) {
+                        var showDeleteAllConfirm by remember { mutableStateOf(false) }
+                        if (showDeleteAllConfirm) {
+                            WarpedAlertDialog(
+                                onDismissRequest = { showDeleteAllConfirm = false },
+                                title = { Text(stringResource(R.string.settings_delete_chats_title)) },
+                                text = { Text(pluralStringResource(R.plurals.settings_delete_chats_msg, conversations.size, conversations.size)) },
+                                confirmButton = {
+                                    TextButton(onClick = {
+                                        scope.launch {
+                                            chatRepository.deleteAllConversations()
+                                            showDeleteAllConfirm = false
+                                            activeConversationId = null
+                                            activeModelSelection.clearLastConversation()
+                                            engineManager.scheduleUnload()
+                                            navController.navigate(Screen.NewChat(newChat = true)) {
+                                                popUpTo(Screen.Chat) { inclusive = true }
+                                            }
+                                        }
+                                    }) { Text(stringResource(R.string.settings_delete_all), color = MaterialTheme.colorScheme.error) }
+                                },
+                                dismissButton = { TextButton(onClick = { showDeleteAllConfirm = false }) { Text(stringResource(R.string.cancel)) } }
+                            )
+                        }
+                        TextButton(
+                            onClick = { showDeleteAllConfirm = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text(stringResource(R.string.settings_delete_all), color = MaterialTheme.colorScheme.error) }
+                    }
                     HorizontalDivider(color = Color(0xFF333333), thickness = 0.5.dp)
                     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly) {
                         val isModels = isOn(Screen.Selector::class)
                         NavigationDrawerItem(
                             icon = { Icon(Icons.Filled.Memory, null, tint = if (isModels) DrawerAccent else DrawerTextSecondary, modifier = Modifier.size(20.dp)) },
-                            label = { Text(stringResource(R.string.tab_models), color = if (isModels) DrawerAccent else DrawerTextSecondary, fontSize = 12.sp) },
+                            label = { Text(stringResource(R.string.tab_models), color = if (isModels) DrawerAccent else DrawerTextSecondary, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) },
                             selected = isModels,
                             colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = DrawerSelectedBg, unselectedContainerColor = Color.Transparent),
                             modifier = Modifier.weight(1f),
@@ -268,7 +301,7 @@ fun WarpedNavGraph() {
                         val isHelp = isOn(Screen.Help::class)
                         NavigationDrawerItem(
                             icon = { Icon(Icons.Filled.Info, null, tint = if (isHelp) DrawerAccent else DrawerTextSecondary, modifier = Modifier.size(20.dp)) },
-                            label = { Text(stringResource(R.string.help_title), color = if (isHelp) DrawerAccent else DrawerTextSecondary, fontSize = 12.sp) },
+                            label = { Text(stringResource(R.string.help_title), color = if (isHelp) DrawerAccent else DrawerTextSecondary, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) },
                             selected = isHelp,
                             colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = DrawerSelectedBg, unselectedContainerColor = Color.Transparent),
                             modifier = Modifier.weight(1f),
@@ -283,7 +316,7 @@ fun WarpedNavGraph() {
                         val isSettings = isOn(Screen.Settings::class)
                         NavigationDrawerItem(
                             icon = { Icon(Icons.Filled.Settings, null, tint = if (isSettings) DrawerAccent else DrawerTextSecondary, modifier = Modifier.size(20.dp)) },
-                            label = { Text(stringResource(R.string.settings), color = if (isSettings) DrawerAccent else DrawerTextSecondary, fontSize = 12.sp) },
+                            label = { Text(stringResource(R.string.settings), color = if (isSettings) DrawerAccent else DrawerTextSecondary, fontWeight = FontWeight.SemiBold, fontSize = 16.sp) },
                             selected = isSettings,
                             colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = DrawerSelectedBg, unselectedContainerColor = Color.Transparent),
                             modifier = Modifier.weight(1f),
@@ -318,7 +351,8 @@ fun WarpedNavGraph() {
                             popUpTo(Screen.Selector) { inclusive = true }
                             launchSingleTop = true
                         }
-                    }
+                    },
+                    onNavigateToCatalog = { navController.navigate(Screen.HuggingFace) }
                 )
             }
             composable<Screen.NewChat> {
@@ -330,7 +364,8 @@ fun WarpedNavGraph() {
                             popUpTo(Screen.Selector) { inclusive = true }
                             launchSingleTop = true
                         }
-                    }
+                    },
+                    onNavigateToCatalog = { navController.navigate(Screen.HuggingFace) }
                 )
             }
             composable<Screen.ChatDetail> { backStackEntry ->
@@ -346,7 +381,8 @@ fun WarpedNavGraph() {
                             popUpTo(Screen.Chat) { inclusive = false }
                             launchSingleTop = true
                         }
-                    }
+                    },
+                    onNavigateToCatalog = { navController.navigate(Screen.HuggingFace) }
                 )
             }
             composable<Screen.Selector> {
