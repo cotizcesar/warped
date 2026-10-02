@@ -104,6 +104,36 @@ fun UnifiedSelectorScreen(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                if (uiState.localModels.isEmpty() && uiState.endpoints.isEmpty() && uiState.activeDownloads.isEmpty()) {
+                    // FUN-02/03: combined empty gate mirroring ModelsScreen —
+                    // download CTA to the catalog, endpoint CTA inline.
+                    item(key = "combined-empty") {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(stringResource(R.string.no_models_endpoints_yet), style = MaterialTheme.typography.bodyLarge, color = Color(0xFF9CA3AF))
+                            Spacer(Modifier.height(8.dp))
+                            Text(stringResource(R.string.models_empty_hint), style = MaterialTheme.typography.bodySmall, color = Color(0xFF9CA3AF))
+                            Spacer(Modifier.height(16.dp))
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = onOpenHuggingFace,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97757)),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) { Text(stringResource(R.string.models_empty_download_cta), color = Color.White) }
+                                OutlinedButton(
+                                    onClick = { viewModel.showEndpointForm() },
+                                    shape = RoundedCornerShape(8.dp)
+                                ) { Text(stringResource(R.string.models_empty_add_endpoint_cta)) }
+                            }
+                        }
+                    }
+                } else {
+
                 if (uiState.activeDownloads.isNotEmpty()) {
                     item(key = "downloads-header") {
                         Text(stringResource(R.string.active_downloads), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp))
@@ -179,6 +209,7 @@ fun UnifiedSelectorScreen(
                             onDelete = { viewModel.deleteEndpoint(endpoint) }
                         )
                     }
+                }
             }
         }
 

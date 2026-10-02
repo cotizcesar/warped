@@ -249,15 +249,28 @@ fun ModelsScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(horizontal = 32.dp)
+                    ) {
                         Text(stringResource(R.string.no_models_endpoints_yet), style = MaterialTheme.typography.bodyLarge, color = Color(0xFF9CA3AF))
                         Spacer(Modifier.height(8.dp))
                         Text(stringResource(R.string.models_empty_hint), style = MaterialTheme.typography.bodySmall, color = Color(0xFF9CA3AF))
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedButton(
-                            onClick = { showAddWizard = true },
-                            shape = RoundedCornerShape(8.dp)
-                        ) { Text(stringResource(R.string.add_model)) }
+                        Spacer(Modifier.height(16.dp))
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = onOpenHuggingFace,
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97757)),
+                                shape = RoundedCornerShape(8.dp)
+                            ) { Text(stringResource(R.string.models_empty_download_cta), color = Color.White) }
+                            OutlinedButton(
+                                onClick = { viewModel.showEndpointForm() },
+                                shape = RoundedCornerShape(8.dp)
+                            ) { Text(stringResource(R.string.models_empty_add_endpoint_cta)) }
+                        }
                     }
                 }
             } else {
