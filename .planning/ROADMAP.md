@@ -96,7 +96,12 @@ Plans:
   4. User sees a "Use in Chat" button on downloaded catalog models that activates the model, plus "Download a local model" / "Add a new Endpoint" empty-state buttons that navigate correctly
   5. User reads a short, minimal, to-the-point Help screen (EN+ES) with no Tavily/key steps
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+
+- [ ] 64-01-PLAN.md — Drawer sheet CTA + footer + delete-all row, Settings removals-only cleanup
+- [ ] 64-02-PLAN.md — Catalog Use in Chat + two-CTA empty states + Help rewrite (EN+ES)
 **UI hint**: yes
 
 ### Phase 65: Voice Dictation
