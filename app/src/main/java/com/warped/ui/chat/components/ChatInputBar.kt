@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.layout.ContentScale
@@ -116,14 +117,27 @@ fun ChatInputBar(
             // Row 1: Input only. WR-03: TextFieldValue (not raw String) so
             // dictation inserts at the selection via onCursorChange.
             // External text changes (dictation commits) snap the caret to
-            // the END of the text (user decision 2026-10-02: keep typing
-            // after what was dictated) and report it so the ViewModel's
-            // lastKnownCursor stays in sync. Typing is untouched: this
-            // block only runs when the text actually changed externally.
+            // the END only when the field is NOT focused (user decision
+            // 2026-10-02: never steal the caret mid-edit); when focused,
+            // the caret is preserved. Either way the position is reported
+            // so the ViewModel's lastKnownCursor stays in sync. Typing is
+            // untouched: this block only runs on external change.
             var fieldValue by remember { mutableStateOf(TextFieldValue(text, TextRange(text.length))) }
+            var inputFocused by remember { mutableStateOf(false) }
             if (fieldValue.text != text) {
-                fieldValue = TextFieldValue(text, TextRange(text.length))
-                onCursorChange(text.length)
+                fieldValue = if (inputFocused) {
+                    val kept = fieldValue.selection
+                    fieldValue.copy(
+                        text = text,
+                        selection = TextRange(
+                            kept.start.coerceIn(0, text.length),
+                            kept.end.coerceIn(0, text.length),
+                        ),
+                    )
+                } else {
+                    TextFieldValue(text, TextRange(text.length))
+                }
+                onCursorChange(fieldValue.selection.start)
             }
             OutlinedTextField(
                 value = fieldValue,
@@ -134,6 +148,7 @@ fun ChatInputBar(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
+                    .onFocusChanged { inputFocused = it.isFocused }
                     .onKeyEvent { event ->
                         val hasContent = text.isNotBlank() || attachedImages.isNotEmpty()
                         if (event.key == Key.Enter && canSend && !isGenerating && !isLoadingModel && hasContent) {
