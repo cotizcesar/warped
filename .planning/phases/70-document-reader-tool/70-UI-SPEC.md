@@ -79,6 +79,8 @@ Document source card color rule: the turn's document source renders inside the e
 
 Exactly three surfaces change, all in the chat flow. No new screens, no new dialogs, no drawer/settings changes. TOOL-03 (unit converter) is contingency-only per CONTEXT.md — no UI surface unless the planner triggers it with evidence.
 
+- Visual anchor (focal point): the conversation turn list remains the primary anchor — the attachment chip, truncation notice, and document source card are subordinate elements that never compete with message content for attention.
+
 ### Surface 1 — Attach affordance in `ChatInputBar`
 
 - Paperclip-style `IconButton` (`Icons.Filled.AttachFile`) in the same icon row as the image (`AddPhotoAlternate`), dictation (mic), and voice-send (waveform) affordances. Exact order within the row at executor's discretion, but it must sit in that row — never in the text field, never in a menu.
