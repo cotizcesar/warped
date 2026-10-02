@@ -48,8 +48,13 @@ class VoiceDictationManager(
      * Start listening. Creates the platform recognizer once, attaches the
      * listener, and issues the async start call. Recognition language
      * follows the system locale.
+     *
+     * @return true when the platform accepted the start request. False
+     * when the synchronous start threw (the async [onError] path also
+     * fired, so the owner must NOT flip its listening flag on in this
+     * case — WR-01). Async failures always surface via [onError].
      */
-    fun start() {
+    fun start(): Boolean {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(
                 RecognizerIntent.EXTRA_LANGUAGE_MODEL,
@@ -98,9 +103,11 @@ class VoiceDictationManager(
                 current.setRecognitionListener(listener)
             }
             current.startListening(intent)
+            return true
         } catch (e: Exception) {
             Timber.w(e, "Voice: startListening failed")
             onError(SpeechRecognizer.ERROR_CLIENT)
+            return false
         }
     }
 

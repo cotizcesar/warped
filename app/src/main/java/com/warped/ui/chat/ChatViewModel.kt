@@ -179,6 +179,26 @@ class ChatViewModel @Inject constructor(
     private var dictationManager: VoiceDictationManager? = null
 
     /**
+     * Phase 65 fix (CR-01): single-insertion dictation tracking. Platform
+     * partials are cumulative hypotheses ("hel" → "hello" → "hello world"),
+     * not deltas, so each [onDictationPartial] REPLACES the previous
+     * hypothesis in place instead of appending. [lastPartial] is the text
+     * currently standing in the draft for this utterance; [partialAnchor]
+     * is the draft offset where it starts. The final result replaces the
+     * standing hypothesis once — one utterance yields exactly one insertion.
+     */
+    private var lastPartial: String = ""
+    private var partialAnchor: Int? = null
+
+    /**
+     * Phase 65 fix (WR-03): last cursor position reported by the input bar.
+     * -1 means unknown (fall back to end-of-text). Recorded on every
+     * selection change so dictation inserts where the user is editing,
+     * not always at the end.
+     */
+    private var lastKnownCursor: Int = -1
+
+    /**
      * Phase 53 (TOGGLE-01): override chosen before the first send (no
      * conversation row yet). Applied once in [ensureConversation], then
      * cleared. Either this or hiding the control pre-conversation satisfies
@@ -1442,13 +1462,20 @@ class ChatViewModel @Inject constructor(
 
     /**
      * Phase 65 (VOICE-01): start platform dictation. Creates the manager
-     * lazily, flips listening on, and streams partial/final results into
-     * [appendDictation]. Callers own the RECORD_AUDIO runtime-permission
-     * gate (plan 65-02).
+     * lazily and streams partial/final results into the single-insertion
+     * handlers. Callers own the RECORD_AUDIO runtime-permission gate
+     * (plan 65-02).
+     *
+     * WR-01: the listening flag flips ONLY when the platform accepted the
+     * start ([VoiceDictationManager.start] returns false on synchronous
+     * failure after firing onError). Unconditional set-true here used to
+     * overwrite the error path's clear, stranding the UI on a dead
+     * recognizer.
      */
     fun startDictation() {
-        getDictationManager().start()
-        _isListening.value = true
+        lastPartial = ""
+        partialAnchor = null
+        _isListening.value = getDictationManager().start()
     }
 
     /** Phase 65 (VOICE-01): stop platform dictation and clear listening. */
