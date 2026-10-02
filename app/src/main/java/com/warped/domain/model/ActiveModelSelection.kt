@@ -20,7 +20,13 @@ data class ActiveModel(
 data class LocalSelection(
     val modelId: String? = null,
     val isConnected: Boolean = false,
-    val instanceId: String? = null
+    val instanceId: String? = null,
+    /**
+     * Quick-task lazy-model-load: true only while the engine is mounting
+     * (load START signal). Selection alone is pending ([isLoading] false) —
+     * the engine loads on the first send, then generates.
+     */
+    val isLoading: Boolean = false
 )
 
 data class RemoteSelection(
@@ -67,7 +73,7 @@ class ActiveModelSelection @Inject constructor(
     }
 
     fun connectLocal(modelId: String, providerType: ProviderType, instanceId: String? = null) {
-        _localSelection.value = LocalSelection(modelId = modelId, isConnected = true, instanceId = instanceId)
+        _localSelection.value = LocalSelection(modelId = modelId, isConnected = true, instanceId = instanceId, isLoading = false)
         try { persistLocal() } catch (e: Exception) { Timber.e(e, "ActiveModel: persist local failed") }
         deriveActiveModel()
     }
@@ -79,13 +85,25 @@ class ActiveModelSelection @Inject constructor(
     }
 
     fun markLocalLoading(modelId: String, instanceId: String? = null) {
-        _localSelection.value = LocalSelection(modelId = modelId, isConnected = false, instanceId = instanceId)
+        _localSelection.value = LocalSelection(modelId = modelId, isConnected = false, instanceId = instanceId, isLoading = true)
         try { persistLocal() } catch (e: Exception) { Timber.e(e, "ActiveModel: persist local loading failed") }
         deriveActiveModel()
     }
 
+    /**
+     * Quick-task lazy-model-load: mark a model selected but NOT loading.
+     * Selection never touches the engine — the load happens on the first
+     * send ([ChatViewModel.sendMessage] mounts via `preloadLocalModel`
+     * when the engine path mismatches the selection).
+     */
+    fun selectLocalPending(modelId: String, instanceId: String? = null) {
+        _localSelection.value = LocalSelection(modelId = modelId, isConnected = false, instanceId = instanceId, isLoading = false)
+        try { persistLocal() } catch (e: Exception) { Timber.e(e, "ActiveModel: persist local pending failed") }
+        deriveActiveModel()
+    }
+
     fun markLocalDisconnected() {
-        _localSelection.value = _localSelection.value.copy(isConnected = false)
+        _localSelection.value = _localSelection.value.copy(isConnected = false, isLoading = false)
     }
 
     fun selectRemote(modelId: String, providerType: ProviderType, endpointId: Long) {
