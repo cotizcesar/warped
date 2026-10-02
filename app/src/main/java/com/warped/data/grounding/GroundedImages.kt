@@ -11,7 +11,7 @@ package com.warped.data.grounding
  */
 object GroundedImages {
 
-    /** Render-list cap (matches the fuse-time cap). */
+    /** Render-list cap for the image grid (the DDG fuse path always emits an empty list). */
     const val MAX_GRID_IMAGES = 10
 
     fun visibleImages(images: List<String>): List<String> =

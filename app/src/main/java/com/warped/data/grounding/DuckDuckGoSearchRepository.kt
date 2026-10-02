@@ -344,9 +344,6 @@ class DuckDuckGoSearchRepository @Inject constructor(
         /** Client-side query cap (pass-through, no rewriting). */
         const val MAX_QUERY_CHARS = 500
 
-        /** Render-list cap for fused image URLs (DDG fuses none). */
-        const val MAX_IMAGES = 10
-
         /** Documented DDG HTML endpoint (GET only — parse-only, never form-POST). */
         internal const val HTML_ENDPOINT = "https://html.duckduckgo.com/html/"
 
