@@ -47,6 +47,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -738,7 +739,18 @@ private fun VoicePlayerRow(
         return
     }
     val totalSec = (durationMs / 1000).toInt().coerceAtLeast(0)
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    // Draft-card parity: row-level TalkBack state so the bubble announces
+    // play state without focusing the inner button first.
+    val rowState = stringResource(
+        if (isPlaying) R.string.voice_msg_pause_message
+        else R.string.voice_msg_play_message,
+        totalSec / 60,
+        totalSec % 60,
+    )
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.semantics { stateDescription = rowState },
+    ) {
         IconButton(
             onClick = { if (isPlaying) onPause() else onPlay() },
             modifier = Modifier.size(48.dp),

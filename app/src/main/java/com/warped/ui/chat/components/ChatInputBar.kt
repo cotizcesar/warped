@@ -459,7 +459,7 @@ private fun DraftPreviewCard(
                 },
                 modifier = Modifier.weight(1f),
                 color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             )
             Spacer(Modifier.width(8.dp))
             Text(
