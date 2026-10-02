@@ -112,20 +112,22 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 
 **Known deferred:** Play Console pre-launch + target-API dashboard reads (human); Leg 1B model-B switch; Phase 60 follow-ups (5); standing device smokes (v2.2–v2.4). 47 closeout acknowledgments recorded in STATE.md Deferred Items.
 
-## Current Milestone: v3.0 Chat UX + Voice Dictation
+## Previous Milestone: v3.0 Chat UX + Voice Dictation — COMPLETE ✅
 
-**Goal:** Polish chat drawers, settings, catalog and help surfaces, simplify web search to DuckDuckGo-only, and add voice dictation + Play in-app rating.
+**Shipped:** 2026-10-02 | [Archive →](.planning/milestones/v3.0-ROADMAP.md)
+
+4 phases (63-66), 7 plans, 19/19 requirements verified. Tavily integration fully removed (DDG-only search, grep-clean, startup Keystore alias cleanup, legacy citations render read-only). Drawer/settings/catalog/help polished (sheet CTA, uniform footer, drawer-bottom delete-all, Settings removals, Help EN+ES rewrite, Use-in-Chat + empty-state CTAs). Voice dictation (SpeechRecognizer, single-insertion state machine, first-tap rationale + Settings escape). Ambient Play In-App Review (mutex-serialized 5/21d/3 policy + Settings Store entry). 914 unit tests green, security SECURED 18/18.
+
+**Known deferred:** POL-01 review-threshold tuning, POL-02 offline-dictation hint, POL-03 Pixel 7 benchmarks, POL-04 standing release-UAT device smokes (see STATE.md Deferred Items).
+
+## Current Milestone: v3.1 Voice Messages + New Tool
+
+**Goal:** Send time-capped voice messages to audio-capable LiteRT-LM models with icons clearly separated from STT dictation, and analyze + build one new high-value tool for the app.
 
 **Target features:**
-- Play in-app star rating from within the app
-- Model drawer empty-state: "Download a model" CTA → Model Catalog; Web Options removed from drawer (stays in Settings)
-- Chat drawer footer parity: Models/Help/Settings same text size as New Chat; Delete-all-chats moved to drawer bottom above Models
-- Help screen rewrite: short, minimal, to-the-point
-- Search simplification: remove Tavily integration, DuckDuckGo only
-- Settings cleanup: remove Keystore key-deletion ability; remove Data section + delete-chats
-- Models & Endpoints empty-states: "Download a local model" + "Add a new Endpoint" CTAs
-- Model Catalog: "Use in Chat" button on downloaded models
-- Voice dictation into chat input (speech-to-text only, no audio messages yet)
+- In-chat voice recorder with 60-second cap, playback, and send/cancel
+- Voice-send icon (audio attachment) vs dictation mic (speech-to-text) clearly differentiated, model-gated on audio capability
+- New tool analysis: candidate evaluation (effort, value, fit) + implementation of the winner
 
 ## Requirements
 
@@ -195,18 +197,21 @@ Run and chat with any LLM — local or remote — from a single Android app, wit
 - ✓ Grounding pipeline cancels as one scope per send, retry reuses rows without old-job retention — v2.5
 - ✓ Coil + OkHttp scope discipline (recycle-cancel, bounded cache, never-closed shared clients) — v2.5
 - ✓ Release AAB passes all gates (alignment + R8 + 16 KB smoke + zero-leak pass green) — v2.5
+- ✓ Play in-app rating with eligibility policy + store fallback — v3.0
+- ✓ Model drawer empty-state CTA + Web Options relocation to Settings — v3.0
+- ✓ Chat drawer footer parity + delete-all-chats relocation — v3.0
+- ✓ Help screen rewrite (short/minimal, EN+ES) — v3.0
+- ✓ Tavily removal, DuckDuckGo-only search — v3.0
+- ✓ Settings cleanup (no key-delete, no Data section) — v3.0
+- ✓ Models & Endpoints empty-state CTAs — v3.0
+- ✓ Model Catalog "Use in Chat" on downloaded models — v3.0
+- ✓ Voice dictation into chat input (speech-to-text, first-tap rationale) — v3.0
 
 ### Active
 
-- [ ] Play in-app rating — v3.0
-- [ ] Model drawer empty-state CTA + Web Options relocation — v3.0
-- [ ] Chat drawer footer parity + delete-all-chats relocation — v3.0
-- [ ] Help screen rewrite (short/minimal) — v3.0
-- [ ] Tavily removal, DuckDuckGo-only search — v3.0
-- [ ] Settings cleanup (no key-delete, no Data section) — v3.0
-- [ ] Models & Endpoints empty-state CTAs — v3.0
-- [ ] Model Catalog "Use in Chat" on downloaded models — v3.0
-- [ ] Voice dictation into chat input — v3.0
+- [ ] Voice message recording with 60-second cap + playback + send/cancel — v3.1
+- [ ] Voice-send icon vs dictation mic differentiation, gated on model audio capability — v3.1
+- [ ] New tool: candidate analysis + implementation of the winner — v3.1
 
 ### Out of Scope
 
@@ -299,4 +304,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-02 — v3.0 Chat UX + Voice Dictation milestone started*
+*Last updated: 2026-10-02 — v3.1 Voice Messages + New Tool milestone started*

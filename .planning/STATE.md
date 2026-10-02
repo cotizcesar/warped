@@ -1,20 +1,16 @@
 ---
 gsd_state_version: "1.0"
-milestone: v3.0
-milestone_name: Chat UX + Voice Dictation
-current_phase: 66
-status: completed
-stopped_at: Phase 66 complete — all phases complete
-last_updated: "2026-10-02T16:48:10.851Z"
+milestone: v3.1
+milestone_name: Voice Messages + New Tool
+status: planning
+last_updated: "2026-10-02T18:21:33.815Z"
 last_activity: 2026-10-02
-last_activity_desc: Phase 66 complete
-state_head: 1fa40b7d7a28e4a9047096cc63dcfddd6fc9fc01
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 7
-  completed_plans: 7
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State: Warped
@@ -31,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-10-01, v2.5 shipped)
 
 ## Current Position
 
-Phase: 66
-Plan: Not started
-Status: All phases complete
-Last activity: 2026-10-02 — Phase 66 execution started
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-10-02 — Milestone v3.1 started
 
 ## Phase Structure (v3.0 — PLANNED)
 
