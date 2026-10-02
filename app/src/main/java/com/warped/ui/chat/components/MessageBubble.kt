@@ -4,6 +4,7 @@ import android.graphics.BitmapFactory
 import android.util.Base64
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
@@ -175,8 +176,18 @@ fun MessageBubble(
         Surface(
             color = if (isUser) Color(0xFF121212) else Color.Transparent,
             shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .widthIn(max = 340.dp)
+            // Assistant messages use the full chat width (ChatGPT-style
+            // plain text, no bubble cap) and grow line-by-line with a
+            // smooth size transition while streaming — the container
+            // expands instead of jumping when text wraps. User bubbles
+            // keep the 340dp cap.
+            modifier = if (isUser) {
+                Modifier.widthIn(max = 340.dp)
+            } else {
+                Modifier
+                    .fillMaxWidth()
+                    .animateContentSize()
+            }
         ) {
             Column(
                 modifier = Modifier.padding(
