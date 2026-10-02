@@ -214,8 +214,8 @@ fun ChatScreen(
     // flow. The ViewModel keeps only this provider (never the Activity);
     // cleared when the screen leaves so nothing leaks.
     DisposableEffect(context) {
-        viewModel.reviewActivityProvider = { context as? Activity }
-        onDispose { viewModel.reviewActivityProvider = null }
+        viewModel.setReviewActivityProvider { context as? Activity }
+        onDispose { viewModel.setReviewActivityProvider(null) }
     }
 
     // Phase 53 (TOGGLE-01/SRC-02): one-shot ViewModel events (toggle

@@ -222,9 +222,18 @@ class ChatViewModel @Inject constructor(
      * no Activity is ever retained. The turn-Done hook resolves it through
      * this provider at fire time — a null provider simply skips the
      * prompt (previews, tests).
+     *
+     * IN-03: privately settable — ChatScreen assigns via
+     * [setReviewActivityProvider] so no arbitrary caller can overwrite
+     * or leak a capturing lambda.
      */
     @Volatile
     var reviewActivityProvider: (() -> Activity?)? = null
+        private set
+
+    fun setReviewActivityProvider(provider: (() -> Activity?)?) {
+        reviewActivityProvider = provider
+    }
 
     init {
         // Restore persisted loaded instance ID
