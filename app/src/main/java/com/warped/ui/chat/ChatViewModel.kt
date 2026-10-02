@@ -1427,36 +1427,134 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Phase 65 (VOICE-01): append recognized dictation text into the
-     * existing draft. Routes exclusively through the private single-owner
-     * [updateInput] op helper (never writes `_input` directly). Appends with
-     * a separating space, never replaces, never auto-sends — the user
-     * reviews and sends manually.
+     * Phase 65 fix (WR-03): cursor position reported by the input bar's
+     * TextFieldValue selection. Dictation inserts here; -1 (unknown)
+     * falls back to end-of-text.
      */
-    fun appendDictation(text: String) {
-        val trimmed = text.trim()
+    fun updateInputCursor(position: Int) {
+        lastKnownCursor = position
+    }
+
+    /**
+     * Phase 65 fix (CR-01): provisional partial handler. Platform partials
+     * are cumulative hypotheses ("hel" → "hello" → "hello world"), not
+     * deltas — each call REPLACES the previous hypothesis ([lastPartial]
+     * at [partialAnchor]) instead of appending, so one utterance yields
+     * exactly one insertion. A new utterance (or the user editing under
+     * us, breaking the anchor match) falls back to a fresh cursor insert.
+     *
+     * Late callbacks arriving after the session ended (listening cleared
+     * by send/stop/error) are dropped so an orphaned recognizer can never
+     * pollute the next draft (CR-03).
+     */
+    internal fun onDictationPartial(hypothesis: String) {
+        if (!_isListening.value) return
+        val trimmed = hypothesis.trim()
         if (trimmed.isEmpty()) return
         updateInput { state ->
             val current = state.inputText
-            val appended = if (current.isBlank()) {
-                trimmed
+            val anchor = partialAnchor
+            if (anchor != null && lastPartial.isNotEmpty() &&
+                anchor <= current.length &&
+                current.regionMatches(anchor, lastPartial, 0, lastPartial.length)
+            ) {
+                // Same utterance, hypothesis revised: swap in place.
+                val oldLength = lastPartial.length
+                lastPartial = trimmed
+                state.copy(
+                    inputText = current.substring(0, anchor) + trimmed +
+                        current.substring(anchor + oldLength),
+                )
             } else {
-                "${current.trimEnd()} $trimmed"
+                // New utterance (or the draft moved under us): fresh insert
+                // at the last known cursor, remembering where it starts.
+                val (inserted, start) = insertAtCursor(current, trimmed, lastKnownCursor)
+                lastPartial = trimmed
+                partialAnchor = start
+                lastKnownCursor = start + trimmed.length
+                state.copy(inputText = inserted)
             }
-            state.copy(inputText = appended)
         }
     }
 
+    /**
+     * Phase 65 fix (CR-01/CR-02): final handler. Replaces the standing
+     * partial hypothesis once (no double-append) and ALWAYS clears the
+     * listening flag — the platform recognizer is single-shot and stops
+     * by itself on silence/timeout. Blank finals still end the session
+     * (flag cleared, draft untouched).
+     */
+    internal fun onDictationFinal(text: String) {
+        if (!_isListening.value) return
+        _isListening.value = false
+        val trimmed = text.trim()
+        val anchor = partialAnchor
+        val standing = lastPartial
+        lastPartial = ""
+        partialAnchor = null
+        if (trimmed.isEmpty()) return
+        updateInput { state ->
+            val current = state.inputText
+            if (anchor != null && standing.isNotEmpty() &&
+                anchor <= current.length &&
+                current.regionMatches(anchor, standing, 0, standing.length)
+            ) {
+                lastKnownCursor = anchor + trimmed.length
+                state.copy(
+                    inputText = current.substring(0, anchor) + trimmed +
+                        current.substring(anchor + standing.length),
+                )
+            } else {
+                val (inserted, start) = insertAtCursor(current, trimmed, lastKnownCursor)
+                lastKnownCursor = start + trimmed.length
+                state.copy(inputText = inserted)
+            }
+        }
+    }
+
+    /**
+     * Silent-error policy (UI-SPEC section 3): recognition failures
+     * (network, no-speech, timeout) only clear listening state plus the
+     * partial tracking. No event emission, no error copy — the draft keeps
+     * whatever partial text arrived.
+     */
+    internal fun onDictationError(error: Int) {
+        Timber.w("Voice: recognition error $error, keeping partial draft")
+        lastPartial = ""
+        partialAnchor = null
+        _isListening.value = false
+    }
+
+    /**
+     * Insert [insertion] into [current] at [cursor] with single-space
+     * separation. Returns the new text plus the offset where the inserted
+     * text starts (the partial-replacement anchor). Negative cursor means
+     * unknown → end-of-text.
+     */
+    private fun insertAtCursor(current: String, insertion: String, cursor: Int): Pair<String, Int> {
+        val clamped = if (cursor < 0) current.length else cursor.coerceIn(0, current.length)
+        val before = current.substring(0, clamped)
+        val after = current.substring(clamped)
+        val sepBefore = if (before.isEmpty() || before.endsWith(" ") || before.endsWith("\n")) "" else " "
+        val sepAfter = if (after.isEmpty() || after.startsWith(" ") || after.startsWith("\n")) "" else " "
+        val start = before.length + sepBefore.length
+        return (before + sepBefore + insertion + sepAfter + after) to start
+    }
+
+    /** Test seam: a MockK fake replaces the platform manager in unit tests. */
+    internal var dictationManagerOverride: VoiceDictationManager? = null
+
     private fun getDictationManager(): VoiceDictationManager {
+        dictationManagerOverride?.let { return it }
         return dictationManager ?: VoiceDictationManager(
             context = context,
-            onPartial = { appendDictation(it) },
-            onFinal = { appendDictation(it) },
+            onPartial = { onDictationPartial(it) },
+            onFinal = { onDictationFinal(it) },
             // Silent-error policy (UI-SPEC section 3): recognition failures
             // (network, no-speech, timeout) only clear listening state. No
             // event emission, no error copy — the draft keeps whatever
             // partial text arrived.
-            onError = { _isListening.value = false },
+            onError = { onDictationError(it) },
         ).also { dictationManager = it }
     }
 
@@ -1478,9 +1576,20 @@ class ChatViewModel @Inject constructor(
         _isListening.value = getDictationManager().start()
     }
 
-    /** Phase 65 (VOICE-01): stop platform dictation and clear listening. */
+    /**
+     * Phase 65 (VOICE-01): stop platform dictation and clear listening.
+     * Partial tracking resets (the committed hypothesis text stays in the
+     * draft); any late platform callback after this is dropped by the
+     * listening guard in [onDictationPartial]/[onDictationFinal].
+     */
     fun stopDictation() {
-        dictationManager?.stop()
+        lastPartial = ""
+        partialAnchor = null
+        try {
+            (dictationManagerOverride ?: dictationManager)?.stop()
+        } catch (e: Exception) {
+            Timber.w(e, "Voice: stopDictation failed")
+        }
         _isListening.value = false
     }
 
