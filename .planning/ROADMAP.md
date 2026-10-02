@@ -55,7 +55,7 @@
 
 - [x] **Phase 63: Tavily Removal → DDG-only Search** - Delete Tavily integration, single DuckDuckGo producer behind existing interface (completed 2026-10-02)
 - [x] **Phase 64: Drawer + Settings + Help + Funnel Polish** - Drawer cluster, settings cleanup, help rewrite, empty-state CTAs (completed 2026-10-02)
-- [ ] **Phase 65: Voice Dictation** - Speech-to-text into chat input with permission flow and fallback
+- [x] **Phase 65: Voice Dictation** - Speech-to-text into chat input with permission flow and fallback (completed 2026-10-02)
 - [ ] **Phase 66: Play In-App Review** - Ambient rating trigger plus always-reachable Store entry
 
 ## Phase Details
@@ -130,11 +130,12 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 65-01-PLAN.md — Foundation: RECORD_AUDIO manifest, 7 EN+ES strings, VoiceDictationManager wrapper, Chat state + ViewModel ownership
+- [x] 65-01-PLAN.md — Foundation: RECORD_AUDIO manifest, 7 EN+ES strings, VoiceDictationManager wrapper, Chat state + ViewModel ownership
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 65-02-PLAN.md — Input-bar mic button, permission launcher, rationale dialog, denial Snackbar, lifecycle teardown
+- [x] 65-02-PLAN.md — Input-bar mic button, permission launcher, rationale dialog, denial Snackbar, lifecycle teardown
+
 **UI hint**: yes
 
 ### Phase 66: Play In-App Review
@@ -159,5 +160,5 @@ Phases execute in numeric order: 63 → 64 → 65 → 66
 |-------|----------------|--------|-----------|
 | 63. Tavily Removal → DDG-only Search | 2/2 | Complete    | 2026-10-02 |
 | 64. Drawer + Settings + Help + Funnel Polish | 2/2 | Complete    | 2026-10-02 |
-| 65. Voice Dictation | 0/TBD | Not started | - |
+| 65. Voice Dictation | 2/2 | Complete    | 2026-10-02 |
 | 66. Play In-App Review | 0/TBD | Not started | - |

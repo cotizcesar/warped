@@ -43,9 +43,9 @@ Requirements for v3.0 Chat UX + Voice Dictation. Each maps to roadmap phases.
 
 ### Voice Dictation
 
-- [ ] **VOICE-01**: User dictates into the chat input via speech-to-text (recognized text lands editable in the input, never auto-sends; no audio messages)
-- [ ] **VOICE-02**: User grants RECORD_AUDIO in-context at first mic tap (rationale + Settings escape on permanent denial)
-- [ ] **VOICE-03**: User on a device without speech recognition gets a graceful fallback (availability gate, no crash; recognizer destroyed with the UI lifecycle)
+- [x] **VOICE-01**: User dictates into the chat input via speech-to-text (recognized text lands editable in the input, never auto-sends; no audio messages)
+- [x] **VOICE-02**: User grants RECORD_AUDIO in-context at first mic tap (rationale + Settings escape on permanent denial)
+- [x] **VOICE-03**: User on a device without speech recognition gets a graceful fallback (availability gate, no crash; recognizer destroyed with the UI lifecycle)
 
 ## Future Requirements
 
@@ -88,9 +88,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FUN-01 | Phase 64 | Complete |
 | FUN-02 | Phase 64 | Complete |
 | FUN-03 | Phase 64 | Complete |
-| VOICE-01 | Phase 65 | Pending |
-| VOICE-02 | Phase 65 | Pending |
-| VOICE-03 | Phase 65 | Pending |
+| VOICE-01 | Phase 65 | Complete |
+| VOICE-02 | Phase 65 | Complete |
+| VOICE-03 | Phase 65 | Complete |
 
 **Coverage:**
 
