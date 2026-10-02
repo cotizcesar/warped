@@ -88,7 +88,7 @@ class CatalogDownloadUrlTest {
                 )
             )
         }
-        return CatalogViewModel(repository, downloadManager, localRepo, mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true)) to captured
+        return CatalogViewModel(repository, downloadManager, localRepo, mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true)) to captured
     }
 
     @Test
@@ -150,7 +150,7 @@ class CatalogDownloadUrlTest {
                 capture(modelIdSlot), any(), capture(fileUrlSlot), any(), any()
             )
         } just Runs
-        val viewModel = CatalogViewModel(repository, downloadManager, localRepo, mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true))
+        val viewModel = CatalogViewModel(repository, downloadManager, localRepo, mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true))
 
         viewModel.startDownload(legacy)
 

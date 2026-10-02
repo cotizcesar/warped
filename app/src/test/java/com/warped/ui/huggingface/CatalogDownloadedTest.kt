@@ -76,7 +76,7 @@ class CatalogDownloadedTest {
         every { allowlist.models } returns emptyList()
         val downloadManager = mockk<ModelDownloadManager>()
         every { downloadManager.downloadStates } returns MutableStateFlow(emptyMap())
-        return CatalogViewModel(allowlist, downloadManager, localRepo, mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true))
+        return CatalogViewModel(allowlist, downloadManager, localRepo, mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true))
     }
 
     @Test

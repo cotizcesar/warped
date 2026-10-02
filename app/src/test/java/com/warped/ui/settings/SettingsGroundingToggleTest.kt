@@ -6,10 +6,6 @@ import com.warped.R
 import com.warped.data.local.preferences.AdvancedPreferences
 import com.warped.data.local.security.ApiKeyStore
 import com.warped.domain.model.SyntaxTheme
-import com.warped.domain.repository.ChatRepository
-import com.warped.domain.repository.EndpointRepository
-import com.warped.domain.repository.LocalModelRepository
-import com.warped.domain.repository.PresetRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -55,24 +51,12 @@ class SettingsGroundingToggleTest {
     private fun buildViewModel(
         advancedPreferences: AdvancedPreferences,
     ): SettingsViewModel {
-        val chatRepository = mockk<ChatRepository>()
-        val endpointRepository = mockk<EndpointRepository>()
-        val localModelRepository = mockk<LocalModelRepository>()
-        val presetRepository = mockk<PresetRepository>()
         val apiKeyStore = mockk<ApiKeyStore>()
 
-        every { chatRepository.observeConversations() } returns flowOf(emptyList())
-        every { endpointRepository.observeEndpoints() } returns flowOf(emptyList())
-        every { localModelRepository.observeModels() } returns flowOf(emptyList())
-        every { presetRepository.observePresets() } returns flowOf(emptyList())
         every { advancedPreferences.syntaxTheme } returns flowOf(SyntaxTheme.MONOKAI)
         every { advancedPreferences.codeFontScale } returns flowOf(1.0f)
 
         return SettingsViewModel(
-            chatRepository = chatRepository,
-            endpointRepository = endpointRepository,
-            localModelRepository = localModelRepository,
-            presetRepository = presetRepository,
             apiKeyStore = apiKeyStore,
             advancedPreferences = advancedPreferences,
             context = mockk(relaxed = true),
