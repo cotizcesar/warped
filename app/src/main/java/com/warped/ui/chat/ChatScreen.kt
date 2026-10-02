@@ -404,6 +404,8 @@ fun ChatScreen(
                 speechAvailable = speechAvailable,
                 isListening = isListening,
                 onMicClick = onMicClick,
+                // WR-03: report the caret so dictation inserts at cursor.
+                onCursorChange = { viewModel.updateInputCursor(it) },
             )
             }
         }

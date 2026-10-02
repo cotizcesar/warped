@@ -25,6 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -55,6 +57,10 @@ fun ChatInputBar(
     speechAvailable: Boolean = false,
     isListening: Boolean = false,
     onMicClick: () -> Unit = {},
+    // Phase 65 fix (WR-03): cursor reporting for append-at-cursor
+    // dictation (UI-SPEC section 3). Fires on every selection change;
+    // the ViewModel inserts dictated text at the last reported position.
+    onCursorChange: (Int) -> Unit = {},
 ) {
     Surface(
         color = Color(0xFF2B2B29),
@@ -100,10 +106,28 @@ fun ChatInputBar(
                 }
             }
 
-            // Row 1: Input only
+            // Row 1: Input only. WR-03: TextFieldValue (not raw String) so
+            // the cursor survives programmatic updates — dictation inserts
+            // at the selection via onCursorChange, and external text changes
+            // preserve the caret instead of jumping to the end.
+            var fieldValue by remember { mutableStateOf(TextFieldValue(text)) }
+            if (fieldValue.text != text) {
+                val kept = fieldValue.selection
+                fieldValue = fieldValue.copy(
+                    text = text,
+                    selection = TextRange(
+                        kept.start.coerceIn(0, text.length),
+                        kept.end.coerceIn(0, text.length),
+                    ),
+                )
+            }
             OutlinedTextField(
-                value = text,
-                onValueChange = onTextChange,
+                value = fieldValue,
+                onValueChange = { next ->
+                    fieldValue = next
+                    if (next.text != text) onTextChange(next.text)
+                    onCursorChange(next.selection.start)
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .onKeyEvent { event ->
