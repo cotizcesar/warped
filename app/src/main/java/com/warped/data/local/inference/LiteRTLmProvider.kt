@@ -165,17 +165,38 @@ class LiteRTLmProvider @Inject constructor(
 
     /**
      * Phase 70 (70-01/70-02): turn-bound document block for the
-     * `read_text_file` executor branch. Bound from
+     * `read_text_file` executor branch. Bound via [bindDocumentBlock] from
      * `ChatRequest.documentBlock` in [chatInternal] for the armed-turn
      * path only (the same fused `DocumentPrompt` block string the VM fused
      * into the turn text, so an explicit model call re-feeds identical
      * content — same cap, same loop call budget, never a second full-size
-     * copy) and cleared in `finally` (T-70-04: a missing attachment feeds
-     * the degradation string, never a previous turn's content).
-     * Volatile because the loop reads it off the collection context.
+     * copy) and cleared via [clearDocumentBlock] in `finally` (T-70-04: a
+     * missing attachment feeds the degradation string, never a previous
+     * turn's content).
+     * Private + accessor-bound (Phase 70 fix WR-06): the no-cross-turn-leak
+     * guarantee is enforced by the bind-in-`try`/`finally`-clear call
+     * shape instead of resting on every future caller remembering the
+     * discipline on a public var. Volatile because the loop reads it off
+     * the collection context.
      */
     @Volatile
-    var attachedDocumentBlock: String? = null
+    private var attachedDocumentBlock: String? = null
+
+    /**
+     * Phase 70 fix (WR-06): bind the turn's document block. The only
+     * writer path is [chatInternal]'s armed-turn branch.
+     */
+    fun bindDocumentBlock(block: String?) {
+        attachedDocumentBlock = block
+    }
+
+    /**
+     * Phase 70 fix (WR-06): clear the turn's document block. Called in
+     * `finally` so the binding never leaks across turns.
+     */
+    fun clearDocumentBlock() {
+        attachedDocumentBlock = null
+    }
 
     /**
      * Phase 56 (56-02, T-56-10): arming inputs baked into
@@ -376,11 +397,11 @@ class LiteRTLmProvider @Inject constructor(
             // Phase 70 (70-02): bind the turn's document block for the
             // `read_text_file` executor branch, cleared in finally so the
             // binding never leaks across turns (T-70-04).
-            attachedDocumentBlock = request.documentBlock
+            bindDocumentBlock(request.documentBlock)
             try {
                 sendAgenticWithRetry(currentContents, conversationConfig, armSnapshot, params.contextSize, 0)
             } finally {
-                attachedDocumentBlock = null
+                clearDocumentBlock()
             }
         } else {
             sendContentsWithRetry(currentContents, conversationConfig, armSnapshot, 0)
@@ -686,7 +707,9 @@ class LiteRTLmProvider @Inject constructor(
                 // ToolResponse exactly like fetch; null/blank attachment
                 // degrades to the failed-read string, never a throw.
                 try {
-                    val block = withContext(Dispatchers.IO) { attachedDocumentBlock }
+                    // Phase 70 fix (IN-01): direct volatile read — no
+                    // dispatcher hop to read a String reference.
+                    val block = attachedDocumentBlock
                     if (block.isNullOrBlank()) {
                         LocalToolLoop.ToolCallOutcome(LocalToolLoop.DOCUMENT_READ_FAILED_STRING)
                     } else {
