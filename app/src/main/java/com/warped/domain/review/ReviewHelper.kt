@@ -6,6 +6,7 @@ import com.google.android.play.core.review.ReviewManagerFactory
 import com.warped.data.local.preferences.ReviewPreferences
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
@@ -13,6 +14,8 @@ import kotlinx.coroutines.sync.withLock
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /**
  * Phase 66 (RATE-01): pure eligibility predicate for the ambient Play
@@ -58,16 +61,47 @@ fun interface ReviewFlowLauncher {
  * Phase 66 (RATE-01): production [ReviewFlowLauncher] owning the Play
  * `Task` → coroutine bridges.
  *
- * WR-03: both bridges guard the resume with `tryResume` (a Play
- * callback landing after cancellation completes the continuation token
- * as consumed — never an `IllegalStateException` on the callback
- * thread) and register `invokeOnCancellation` so a cancelled parent
- * job is observed instead of leaking the listener resumption.
+ * WR-03: both bridges guard the resume with `isActive` (a Play callback
+ * landing after cancellation logs instead of throwing
+ * `IllegalStateException` on the callback thread) and register
+ * `invokeOnCancellation` so a cancelled parent job is observed instead
+ * of leaking the listener resumption.
  */
 @Singleton
 class DefaultReviewFlowLauncher @Inject constructor(
     @ApplicationContext private val appContext: Context
 ) : ReviewFlowLauncher {
+
+    /**
+     * Resumes [cont] only while still active. A Play callback that wins
+     * the race against cancellation (inactive between the check and the
+     * resume) is swallowed as a debug log — never an
+     * `IllegalStateException` on the Play callback thread.
+     */
+    private fun <T> guardedResume(cont: CancellableContinuation<T>, value: () -> T) {
+        if (!cont.isActive) {
+            Timber.d("Review: Play callback arrived after cancellation")
+            return
+        }
+        try {
+            cont.resume(value())
+        } catch (_: IllegalStateException) {
+            Timber.d("Review: continuation cancelled mid-resume")
+        }
+    }
+
+    private fun guardedResumeWithException(cont: CancellableContinuation<*>, e: Exception) {
+        if (!cont.isActive) {
+            Timber.w(e, "Review: Play request failed after cancellation")
+            return
+        }
+        try {
+            cont.resumeWithException(e)
+        } catch (_: IllegalStateException) {
+            Timber.d("Review: continuation cancelled mid-resume")
+        }
+    }
+
     override suspend fun launch(activity: Activity) {
         val manager = ReviewManagerFactory.create(appContext)
         val reviewInfo = suspendCancellableCoroutine { cont ->
@@ -75,44 +109,16 @@ class DefaultReviewFlowLauncher @Inject constructor(
                 Timber.d("Review: review request cancelled")
             }
             manager.requestReviewFlow()
-                .addOnSuccessListener { result ->
-                    val token = cont.tryResume(result)
-                    if (token == null) {
-                        Timber.d("Review: request completed after cancellation")
-                    } else {
-                        cont.completeResume(token)
-                    }
-                }
-                .addOnFailureListener { e ->
-                    val token = cont.tryResumeWithException(e)
-                    if (token == null) {
-                        Timber.w(e, "Review: request failed after cancellation")
-                    } else {
-                        cont.completeResume(token)
-                    }
-                }
+                .addOnSuccessListener { result -> guardedResume(cont) { result } }
+                .addOnFailureListener { e -> guardedResumeWithException(cont, e) }
         }
         suspendCancellableCoroutine<Unit> { cont ->
             cont.invokeOnCancellation {
                 Timber.d("Review: review launch cancelled")
             }
             manager.launchReviewFlow(activity, reviewInfo)
-                .addOnSuccessListener {
-                    val token = cont.tryResume(Unit)
-                    if (token == null) {
-                        Timber.d("Review: launch completed after cancellation")
-                    } else {
-                        cont.completeResume(token)
-                    }
-                }
-                .addOnFailureListener { e ->
-                    val token = cont.tryResumeWithException(e)
-                    if (token == null) {
-                        Timber.w(e, "Review: launch failed after cancellation")
-                    } else {
-                        cont.completeResume(token)
-                    }
-                }
+                .addOnSuccessListener { guardedResume(cont) { Unit } }
+                .addOnFailureListener { e -> guardedResumeWithException(cont, e) }
         }
     }
 }
