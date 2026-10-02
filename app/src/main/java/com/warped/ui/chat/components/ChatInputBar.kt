@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.foundation.text.KeyboardActions
@@ -48,6 +49,12 @@ fun ChatInputBar(
     modelHasAudio: Boolean = false,
     onAudioRecorded: ((ByteArray) -> Unit)? = null,
     onAudioRecordingChanged: ((Boolean) -> Unit)? = null,
+    // Phase 65 (VOICE-02 UI): dictation mic affordance. speechAvailable
+    // gates visibility (hidden without a recognizer); isListening swaps
+    // the icon to a stop toggle; onMicClick owns the permission gate.
+    speechAvailable: Boolean = false,
+    isListening: Boolean = false,
+    onMicClick: () -> Unit = {},
 ) {
     Surface(
         color = Color(0xFF2B2B29),
@@ -164,6 +171,29 @@ fun ChatInputBar(
                 }
 
                 Spacer(Modifier.weight(1f))
+
+                // Phase 65 (VOICE-01/03): dictation mic, immediately left of
+                // the send/stop slot. Hidden without a recognizer
+                // (speechAvailable) and while generating so no two stop
+                // icons ever appear together.
+                if (speechAvailable && !isGenerating) {
+                    IconButton(
+                        onClick = onMicClick,
+                        modifier = Modifier.size(40.dp),
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = if (isListening) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent
+                        )
+                    ) {
+                        if (isListening) {
+                            Icon(Icons.Filled.Stop, stringResource(R.string.cd_stop_listening),
+                                tint = Color.White, modifier = Modifier.size(24.dp))
+                        } else {
+                            Icon(Icons.Filled.Mic, stringResource(R.string.cd_dictate),
+                                tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
+                        }
+                    }
+                    Spacer(Modifier.width(8.dp))
+                }
 
                 if (isGenerating) {
                     IconButton(onClick = onStop, modifier = Modifier.size(40.dp)) {
