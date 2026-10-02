@@ -2,7 +2,7 @@ package com.warped.data.agentic
 
 import com.warped.data.grounding.GroundingResult
 import com.warped.data.grounding.MultiUrlResult
-import com.warped.data.grounding.TavilySearchOutcome
+import com.warped.data.grounding.SearchOutcome
 import com.warped.domain.model.GroundedSource
 
 /**
@@ -32,10 +32,9 @@ const val HOST_EXECUTED = "executed by host loop"
  *   (`query`/`url` authored by the model and validated here); conversation
  *   history is never serialized into tool calls.
  * - T-56-04 (denial, wallet): the [MAX_TOOL_CALLS] cap counts CALLS, and
- *   `web_search` is DDG-primary (keyless, no credit burn) — only the
- *   Tavily fallback leg burns 1 credit (basic-depth default) — so worst
- *   case stays 5 credits/message; blank queries short-circuit
- *   pre-socket (no credit burn).
+ *   `web_search` is DDG-only (keyless, no credit burn) — worst
+ *   case stays 5 calls/message; blank queries short-circuit
+ *   pre-socket (no fetch).
  *
  * Executor gating order (cheapest first, plan 02 implements): grounding
  * armed check → validated-internet check (no socket offline) → repo call.
@@ -50,9 +49,8 @@ object LocalToolLoop {
 
     /**
      * Step cap: max TOOL CALLS per message (not rounds). Call-counting
-     * bounds worst-case fallback credits 1:1 (5 calls = at most 5 Tavily
-     * credits; DDG-primary calls burn none); multi-call rounds cannot
-     * multiply the burn.
+     * bounds worst-case work 1:1 (5 keyless DDG calls max per message);
+     * multi-call rounds cannot multiply the work.
      */
     const val MAX_TOOL_CALLS = 5
 
@@ -71,15 +69,6 @@ object LocalToolLoop {
     const val FETCH_FAILED_STRING =
         "Couldn't read the page. Model-only answer — " +
             "check your connection or paste another link."
-    const val MISSING_KEY_STRING =
-        "No Tavily key saved. Model-only answer — get a key at " +
-            "tavily.com and paste it in Settings > Web Search."
-    const val INVALID_KEY_STRING =
-        "Invalid Tavily key. Model-only answer — check the key " +
-            "in Settings > Web Search."
-    const val USAGE_LIMIT_STRING =
-        "Tavily usage limit reached. Model-only answer — check " +
-            "your plan usage and try again later."
     const val MODEL_ONLY_STRING =
         "Search returned no usable results. Answer from model knowledge."
 
@@ -168,7 +157,7 @@ object LocalToolLoop {
      * re-parsed from the fused string. Empty when the call produced no
      * persistable rows.
      *
-     * Quick-task (loop-images): [images] carries the fused Tavily `images[]`
+     * Quick-task (loop-images): [images] carries the fused search `images`
      * URLs verbatim (http(s)-gated upstream). Fetch outcomes and
      * non-grounded search outcomes carry an empty list.
      */
@@ -180,7 +169,7 @@ object LocalToolLoop {
          * Quick-task (tool-failure-note): true only when the tool was
          * attempted and threw (executor catch-all → [toolFailureMessage]).
          * Validation short-circuits, unknown names, offline, cap, and
-         * key/limit/model-only degradations are NOT failures (they never
+         * model-only degradations are NOT failures (they never
          * executed or carry their own surfaces) — drivers use this to
          * decide the transient note, never the outcome text.
          */
@@ -190,20 +179,20 @@ object LocalToolLoop {
     /**
      * Quick-task (agentic-rows): structured Fuentes details for a search
      * outcome — the `Fused.details` union verbatim (resolved URLs + texts +
-     * OG columns, OK and OMITIDA rows), empty for every non-grounded
-     * outcome (ModelOnly/key/limit paths persist no rows).
+     * OG columns, OK and OMITIDA rows), empty for the non-grounded
+     * outcome (ModelOnly persists no rows).
      */
-    fun searchSources(outcome: TavilySearchOutcome): List<GroundedSource> =
-        (outcome as? TavilySearchOutcome.Grounded)?.fused?.details.orEmpty()
+    fun searchSources(outcome: SearchOutcome): List<GroundedSource> =
+        (outcome as? SearchOutcome.Grounded)?.fused?.details.orEmpty()
 
     /**
-     * Quick-task (loop-images): fused Tavily `images[]` URLs verbatim for a
-     * search outcome — empty for every non-grounded outcome (ModelOnly/key/
-     * limit paths carry no images). Sits next to [searchSources]; the 4 loop
+     * Quick-task (loop-images): fused `images[]` URLs verbatim for a
+     * search outcome — empty for the non-grounded outcome (ModelOnly
+     * carries no images). Sits next to [searchSources]; the 4 loop
      * executors populate `ToolCallOutcome.images` from this.
      */
-    fun searchImages(outcome: TavilySearchOutcome): List<String> =
-        (outcome as? TavilySearchOutcome.Grounded)?.fused?.images.orEmpty()
+    fun searchImages(outcome: SearchOutcome): List<String> =
+        (outcome as? SearchOutcome.Grounded)?.fused?.images.orEmpty()
 
     /**
      * Quick-task (agentic-rows): structured Fuentes details for a fetch
@@ -213,21 +202,18 @@ object LocalToolLoop {
         (result as? MultiUrlResult.Fused)?.details.orEmpty()
 
     /**
-     * Maps every [TavilySearchOutcome] to the model-facing result string.
+     * Maps every [SearchOutcome] to the model-facing result string.
      * `Grounded` passes the fused block through VERBATIM (already
      * sanitized + budgeted, AGENT-02 trust falls out for free — never raw
-     * JSON); key/limit outcomes reuse the actionable Phase-55 copy.
+     * JSON); the model-only outcome reuses the Phase-55 copy.
      */
-    fun mapSearchOutcome(outcome: TavilySearchOutcome): String =
+    fun mapSearchOutcome(outcome: SearchOutcome): String =
         when (outcome) {
-            is TavilySearchOutcome.Grounded -> outcome.fused.block
-            is TavilySearchOutcome.ModelOnly -> when (outcome.failed.reason) {
+            is SearchOutcome.Grounded -> outcome.fused.block
+            is SearchOutcome.ModelOnly -> when (outcome.failed.reason) {
                 GroundingResult.Reason.OFFLINE -> OFFLINE_STRING
                 GroundingResult.Reason.FETCH_FAILED -> MODEL_ONLY_STRING
             }
-            TavilySearchOutcome.MissingKey -> MISSING_KEY_STRING
-            TavilySearchOutcome.InvalidKey -> INVALID_KEY_STRING
-            TavilySearchOutcome.UsageLimit -> USAGE_LIMIT_STRING
         }
 
     /**

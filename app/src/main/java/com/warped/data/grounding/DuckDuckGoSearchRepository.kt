@@ -1,6 +1,5 @@
 package com.warped.data.grounding
 
-import com.warped.data.local.security.ApiKeyStore
 import com.warped.data.remote.network.AuthInterceptor
 import com.warped.domain.model.GroundedSource
 import com.warped.domain.model.GroundedSourceStatus
@@ -22,54 +21,56 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * DDG-default search producer (parse-only HTML client + DDG-primary /
- * Tavily-fallback executor).
+ * DDG-only search producer (parse-only HTML client, no API key).
  *
- * Policy (locked): DuckDuckGo's HTML endpoint
- * `https://html.duckduckgo.com/html/?q=...` is the DEFAULT `web_search`
- * producer and needs no API key. [TavilySearchRepository] is used ONLY when
- * (a) DDG returns zero usable results or the fetch throws, AND (b) a Tavily
- * key is stored — the delegate outcome passes through verbatim (including
- * `InvalidKey` / `UsageLimit` / the `MissingKey` key-race edge). No key +
- * DDG-OK = silent success; no key + DDG-fail = FETCH_FAILED (no key nag).
+ * Policy (locked, Phase 63): DuckDuckGo's HTML endpoint
+ * `https://html.duckduckgo.com/html/?q=...` is the SINGLE `web_search`
+ * producer and needs no API key. There is no fallback chain — when DDG
+ * yields nothing usable the outcome is `ModelOnly(FETCH_FAILED)` via the
+ * existing unkeyed path. Image-intent turns (`includeImages = true`) fuse
+ * an empty images list with text grounding preserved (the DDG HTML
+ * endpoint has no image API); the single fusion path is [fuse].
  *
- * Image-turn exception (quick-task image-turn routing): when the caller
- * passes `includeImages = true` (image-intent turn) AND a Tavily key is
- * stored, the DDG leg is skipped entirely and Tavily runs direct with
- * `include_images=true` — the DDG HTML endpoint has no image API, so a
- * DDG-OK turn would otherwise starve the image grid. Unkeyed image-intent
- * turns keep the DDG-primary policy above (text grounding, empty grid).
- *
- * Producer shape mirrors [TavilySearchRepository.fuse] exactly: DDG title +
- * snippet pairs flow into [GroundingPrompt.buildFusedBlock] with the same
- * OK/OMITIDA semantics, snippets through [WebContextSanitizer], same
- * top-N (default 5, cap 10) and query-cap constants, and the SAME
- * [TavilySearchOutcome] sealed interface — no new outcome type, so every
- * caller (`ChatViewModel`, tool-loop executors, `LocalToolLoop`) compiles
- * and behaves identically downstream. `MissingKey` is nearly unreachable
- * now but stays for the key-race edge.
+ * Producer shape: DDG title + snippet pairs flow into
+ * [GroundingPrompt.buildFusedBlock] with the same OK/OMITIDA semantics,
+ * snippets through [WebContextSanitizer], same top-N (default 5, cap 10)
+ * and query-cap constants, and the keyless [SearchOutcome] sealed
+ * interface — every caller compiles and behaves identically downstream.
  *
  * Stripped-client policy (mirrors [WebPageFetcher]): the derived client
  * removes [AuthInterceptor] so endpoint keys can never leak to
  * duckduckgo.com, uses the same desktop Chrome User-Agent, and never logs
- * query or key contents (status-only logging).
+ * query contents (status-only logging).
  *
  * Honest brittleness note: DDG HTML scraping is inherently brittle — the
  * parser keys on the `a.result__a` / `.result__snippet` markup shape. A
- * DDG markup change yields zero usable results, which routes keyed users
- * to the Tavily fallback and unkeyed users to the fetch-failed path. This
- * is fail-safe by construction (never a crash, never a silent wrong
- * answer), but unkeyed search quality depends on DDG markup stability.
+ * DDG markup change yields zero usable results, which routes to the
+ * fetch-failed path. This is fail-safe by construction (never a crash,
+ * never a silent wrong answer), but search quality depends on DDG markup
+ * stability.
  *
  * Pure Kotlin apart from the injected client + collaborators — JVM-testable
  * by setting [htmlSupplier] (no socket opened when it is set).
  */
+/**
+ * Phase 63: keyless DDG-only search outcome. `Grounded` carries the fused
+ * `Source [N]` block; `ModelOnly` carries the failure (OFFLINE or
+ * FETCH_FAILED) for the model-only path. No key states exist — DDG needs
+ * no API key.
+ */
+sealed interface SearchOutcome {
+
+    /** Search fused into the identical `Source [N]` block as URL grounding. */
+    data class Grounded(val fused: MultiUrlResult.Fused) : SearchOutcome
+
+    /** No usable results (or transport failure) — model-only path. */
+    data class ModelOnly(val failed: MultiUrlResult.AllFailed) : SearchOutcome
+}
+
 @Singleton
 class DuckDuckGoSearchRepository @Inject constructor(
     baseClient: OkHttpClient,
     private val webPageFetcher: WebPageFetcher,
-    private val apiKeyStore: ApiKeyStore,
-    private val tavily: TavilySearchRepository,
     private val enricher: SearchOgEnricher,
 ) {
 
@@ -99,22 +100,19 @@ class DuckDuckGoSearchRepository @Inject constructor(
 
     suspend fun search(
         query: String,
-        maxResults: Int = TavilySearchRepository.DEFAULT_MAX_RESULTS,
+        maxResults: Int = DEFAULT_MAX_RESULTS,
         contextSize: Int = 4096,
         /**
-         * Quick-task (image-turn routing): pass-through to Tavily image
-         * search. When a key is stored, image-intent turns skip the DDG leg
-         * entirely and go STRAIGHT to Tavily with `include_images=true`
-         * (the DDG HTML endpoint has no image API, so a DDG-OK turn would
-         * fuse zero images and starve the grid). Unkeyed image-intent turns
-         * fall through to the DDG leg below (text grounding, empty grid) —
-         * the caller attaches the images-need-key notice.
+         * Image-intent turns pass true; the DDG HTML endpoint has no image
+         * API so the fused images list stays empty (text grounding
+         * preserved, grid empty). Kept as a parameter so existing call
+         * sites compile unchanged.
          */
         includeImages: Boolean = false,
-    ): TavilySearchOutcome = withContext(ioDispatcher) {
-        val trimmedQuery = query.take(TavilySearchRepository.MAX_QUERY_CHARS)
+    ): SearchOutcome = withContext(ioDispatcher) {
+        val trimmedQuery = query.take(MAX_QUERY_CHARS)
         if (trimmedQuery.isBlank()) {
-            return@withContext TavilySearchOutcome.ModelOnly(
+            return@withContext SearchOutcome.ModelOnly(
                 MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
             )
         }
@@ -127,34 +125,9 @@ class DuckDuckGoSearchRepository @Inject constructor(
             false
         }
         if (!online) {
-            return@withContext TavilySearchOutcome.ModelOnly(
+            return@withContext SearchOutcome.ModelOnly(
                 MultiUrlResult.AllFailed(GroundingResult.Reason.OFFLINE),
             )
-        }
-        // Quick-task (image-turn routing): image-intent turns with a stored
-        // key skip the DDG leg entirely and go STRAIGHT to Tavily with
-        // include_images=true — the DDG HTML endpoint has no image API, so
-        // a DDG-OK turn would fuse zero images and starve the grid (the
-        // Tavily fallback below only fires when DDG yields nothing usable).
-        // The key copy is zeroed after the presence check; the delegate
-        // re-reads the key itself when it runs (the MissingKey key-race
-        // edge is preserved). Unkeyed image-intent turns fall through to
-        // the DDG leg (text grounding, empty grid) — the caller attaches
-        // the images-need-key notice.
-        if (includeImages) {
-            val directKey = apiKeyStore.getTavilyKey()
-            val hasDirectKey = directKey != null && directKey.isNotEmpty()
-            directKey?.fill('0')
-            if (hasDirectKey) {
-                // Explicit args (no Kotlin defaults): keeps the call on the
-                // instance method so MockK can stub it in JVM tests.
-                return@withContext tavily.search(
-                    query = trimmedQuery,
-                    maxResults = maxResults,
-                    contextSize = contextSize,
-                    includeImages = true,
-                )
-            }
         }
         val pairs: List<DdgResult>? = try {
             val encoded = URLEncoder.encode(trimmedQuery, StandardCharsets.UTF_8.toString())
@@ -170,31 +143,17 @@ class DuckDuckGoSearchRepository @Inject constructor(
         }
         if (!pairs.isNullOrEmpty()) {
             val outcome = fuse(pairs, contextSize)
-            if (outcome is TavilySearchOutcome.Grounded) {
+            if (outcome is SearchOutcome.Grounded) {
                 return@withContext outcome.copy(
                     fused = outcome.fused.copy(details = enricher.enrich(outcome.fused.details)),
                 )
             }
             return@withContext outcome
         }
-        // DDG yielded nothing usable: Tavily fallback ONLY when keyed.
-        // The key copy is zeroed after the presence check; the delegate
-        // re-reads the key itself when it runs.
-        val keyChars = apiKeyStore.getTavilyKey()
-        val hasKey = keyChars != null && keyChars.isNotEmpty()
-        keyChars?.fill('0')
-        if (!hasKey) {
-            return@withContext TavilySearchOutcome.ModelOnly(
-                MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
-            )
-        }
-        // Explicit args (no Kotlin defaults): keeps the call on the
-        // instance method so MockK can stub it in JVM tests.
-        return@withContext tavily.search(
-            query = trimmedQuery,
-            maxResults = maxResults,
-            contextSize = contextSize,
-            includeImages = includeImages,
+        // DDG yielded nothing usable: DDG-only policy — model-only with
+        // FETCH_FAILED (no fallback chain, no key probe).
+        return@withContext SearchOutcome.ModelOnly(
+            MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
         )
     }
 
@@ -228,7 +187,7 @@ class DuckDuckGoSearchRepository @Inject constructor(
      */
     internal fun parseResults(html: String, maxResults: Int): List<DdgResult> {
         if (html.isBlank()) return emptyList()
-        val count = maxResults.coerceIn(1, TavilySearchRepository.MAX_RESULTS_CAP)
+        val count = maxResults.coerceIn(1, MAX_RESULTS_CAP)
         val doc = Jsoup.parse(html)
         val out = mutableListOf<DdgResult>()
         for (anchor in doc.select(RESULT_ANCHOR_SELECTOR)) {
@@ -296,7 +255,7 @@ class DuckDuckGoSearchRepository @Inject constructor(
     }
 
     /**
-     * DDG mirror of `TavilySearchRepository.fuse`: top-N pairs map to one
+     * DDG results → fused block: top-N pairs map to one
      * numbered source each (text = title + newline + sanitized snippet,
      * truncated to the per-page budget); blank url/snippet items become
      * OMITIDA rows (never silent drops); all-blank collapses to
@@ -305,9 +264,9 @@ class DuckDuckGoSearchRepository @Inject constructor(
     private fun fuse(
         results: List<DdgResult>,
         contextSize: Int,
-    ): TavilySearchOutcome {
+    ): SearchOutcome {
         if (results.isEmpty()) {
-            return TavilySearchOutcome.ModelOnly(
+            return SearchOutcome.ModelOnly(
                 MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
             )
         }
@@ -360,11 +319,11 @@ class DuckDuckGoSearchRepository @Inject constructor(
         }
 
         if (okPairs.isEmpty()) {
-            return TavilySearchOutcome.ModelOnly(
+            return SearchOutcome.ModelOnly(
                 MultiUrlResult.AllFailed(GroundingResult.Reason.FETCH_FAILED),
             )
         }
-        return TavilySearchOutcome.Grounded(
+        return SearchOutcome.Grounded(
             MultiUrlResult.Fused(
                 block = GroundingPrompt.buildFusedBlock(okPairs),
                 okUrls = okPairs.map { (url, _) -> url },
@@ -376,6 +335,18 @@ class DuckDuckGoSearchRepository @Inject constructor(
     }
 
     companion object {
+        /** Default result count for top-N searches. */
+        const val DEFAULT_MAX_RESULTS = 5
+
+        /** Hard cap per CONTEXT (top-N, max 10). */
+        const val MAX_RESULTS_CAP = 10
+
+        /** Client-side query cap (pass-through, no rewriting). */
+        const val MAX_QUERY_CHARS = 500
+
+        /** Render-list cap for fused image URLs (DDG fuses none). */
+        const val MAX_IMAGES = 10
+
         /** Documented DDG HTML endpoint (GET only — parse-only, never form-POST). */
         internal const val HTML_ENDPOINT = "https://html.duckduckgo.com/html/"
 

@@ -7,7 +7,6 @@ import com.warped.data.agentic.ToolCapabilityMatrix
 import com.warped.data.agentic.parseToolArgs
 import com.warped.data.grounding.MultiUrlFetcher
 import com.warped.data.grounding.DuckDuckGoSearchRepository
-import com.warped.data.grounding.TavilySearchRepository
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.remote.dto.OpenAiChatRequest
 import com.warped.data.remote.dto.OpenAiCompletedToolCall
@@ -81,9 +80,8 @@ internal object CompatToolLoop {
         baseMessages: List<OpenAiMessage>,
         request: ChatRequest,
         /**
-         * Quick-task (DDG-default): web_search goes through the DDG-primary
-         * / Tavily-fallback repository (same outcome type — mapping below
-         * untouched).
+         * Quick-task (DDG-only): web_search goes through the keyless DDG
+         * producer (single outcome type — mapping below untouched).
          */
         ddg: DuckDuckGoSearchRepository,
         multiUrlFetcher: MultiUrlFetcher,
@@ -256,11 +254,11 @@ internal object CompatToolLoop {
                         // Explicit args (no Kotlin defaults): keeps the call
                         // on the instance method so MockK can stub it.
                         // Quick-task (loop-images): includeImages=true ALWAYS
-                        // — the DDG leg ignores it; only the keyed Tavily
-                        // fallback leg uses it (credit-capped).
+                        // — the DDG leg fuses an empty images list (no
+                        // image API), text grounding preserved.
                         val outcome = ddg.search(
                             query = query,
-                            maxResults = TavilySearchRepository.DEFAULT_MAX_RESULTS,
+                            maxResults = DuckDuckGoSearchRepository.DEFAULT_MAX_RESULTS,
                             contextSize = contextSize,
                             includeImages = true,
                         )

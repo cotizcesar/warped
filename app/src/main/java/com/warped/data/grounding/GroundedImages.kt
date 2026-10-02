@@ -4,9 +4,10 @@ package com.warped.data.grounding
  * Quick-task (image-grid): render-side image-list mapping.
  *
  * http(s) gate + trim + distinct + cap. Pure Kotlin — JVM-testable.
- * Defense-in-depth over the fuse-time gate in
- * [TavilySearchRepository.fuseImages]; the grid calls this on the
- * ephemeral message field before rendering.
+ * Defense-in-depth over the (empty) DDG fuse-time images list;
+ * image-intent turns fuse zero images with text grounding preserved,
+ * and the grid calls this on the ephemeral message field before
+ * rendering.
  */
 object GroundedImages {
 
