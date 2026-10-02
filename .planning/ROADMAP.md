@@ -149,7 +149,12 @@ Plans:
   2. User can always reach the Play Store listing from an in-app entry even when the Review dialog is quota-suppressed
   3. Chat send/streaming never stalls waiting on the review flow
 
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+**Wave 1**
+
+- [ ] 66-01-PLAN.md — Tracer: review-ktx + ReviewPreferences + ReviewHelper, turn hook, Settings Store entry
 
 ## Progress
 
