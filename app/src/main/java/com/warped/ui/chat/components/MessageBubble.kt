@@ -705,7 +705,8 @@ private fun MessageImageStack(imageUris: List<String>) {    Column(verticalArran
  *
  * Duration convention (locked, same as the draft card): the readout is
  * ALWAYS the total m:ss — live position shows only as progress fill
- * (0 for non-playing rows, clamped 0..1 against absurd stored durations).
+ * (kept across pause for one-tap resume, clamped 0..1 against absurd
+ * stored durations).
  * A missing file renders the informational unavailable row in the same
  * chrome — onSurfaceVariant icon + text, no play button, never error-red,
  * never a silent drop, never a crash.
@@ -757,7 +758,7 @@ private fun VoicePlayerRow(
         Spacer(Modifier.width(4.dp))
         LinearProgressIndicator(
             progress = {
-                if (isPlaying && durationMs > 0) {
+                if (durationMs > 0) {
                     (positionMs.toFloat() / durationMs).coerceIn(0f, 1f)
                 } else {
                     0f
