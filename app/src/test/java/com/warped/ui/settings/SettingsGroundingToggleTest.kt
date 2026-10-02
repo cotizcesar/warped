@@ -1,10 +1,7 @@
 package com.warped.ui.settings
 
 import com.google.common.truth.Truth.assertThat
-import android.content.Context
-import com.warped.R
 import com.warped.data.local.preferences.AdvancedPreferences
-import com.warped.data.local.security.ApiKeyStore
 import com.warped.domain.model.SyntaxTheme
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -51,15 +48,11 @@ class SettingsGroundingToggleTest {
     private fun buildViewModel(
         advancedPreferences: AdvancedPreferences,
     ): SettingsViewModel {
-        val apiKeyStore = mockk<ApiKeyStore>()
-
         every { advancedPreferences.syntaxTheme } returns flowOf(SyntaxTheme.MONOKAI)
         every { advancedPreferences.codeFontScale } returns flowOf(1.0f)
 
         return SettingsViewModel(
-            apiKeyStore = apiKeyStore,
             advancedPreferences = advancedPreferences,
-            context = mockk(relaxed = true),
         )
     }
 

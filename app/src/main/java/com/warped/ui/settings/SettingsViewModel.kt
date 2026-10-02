@@ -1,13 +1,10 @@
 package com.warped.ui.settings
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.warped.data.local.preferences.AdvancedPreferences
-import com.warped.data.local.security.ApiKeyStore
 import com.warped.domain.model.SyntaxTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,9 +17,7 @@ import timber.log.Timber
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val apiKeyStore: ApiKeyStore,
     private val advancedPreferences: AdvancedPreferences,
-    @param:ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
