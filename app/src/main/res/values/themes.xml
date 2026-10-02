@@ -7,7 +7,9 @@
 
     <style name="Theme.Warped" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/window_background</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <!-- Edge-to-edge is enabled in code (MainActivity.enableEdgeToEdge);
+             android:statusBarColor / android:navigationBarColor theme attrs are
+             deprecated on API 35+ (applied via Window.setStatusBarColor /
+             setNavigationBarColor) — intentionally absent. -->
     </style>
 </resources>

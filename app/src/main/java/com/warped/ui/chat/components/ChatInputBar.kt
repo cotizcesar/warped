@@ -1,10 +1,8 @@
 package com.warped.ui.chat.components
 
-import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -26,11 +24,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import com.warped.R
 
 @Composable
@@ -68,23 +65,17 @@ fun ChatInputBar(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(attachedImages.size) { i ->
-                        val ctx = LocalContext.current
-                        val bitmap = remember(attachedImages[i]) {
-                            try {
-                                ctx.contentResolver.openInputStream(attachedImages[i])?.use {
-                                    BitmapFactory.decodeStream(it)
-                                }
-                            } catch (_: Exception) { null }
-                        }
                         Box(modifier = Modifier.size(72.dp)) {
-                            bitmap?.let { bmp ->
-                                Image(
-                                    bitmap = bmp.asImageBitmap(),
-                                    contentDescription = null,
-                                    modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.medium),
-                                    contentScale = ContentScale.Crop
-                                )
-                            }
+                            // Coil (memory+disk cached, auto-downsampled) replaces the
+                            // previous unbounded BitmapFactory.decodeStream — Play
+                            // bitmap-memory warning. Null/error renders empty, same
+                            // as the old failed-decode path (remove button stays).
+                            AsyncImage(
+                                model = attachedImages[i],
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.medium),
+                                contentScale = ContentScale.Crop
+                            )
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)

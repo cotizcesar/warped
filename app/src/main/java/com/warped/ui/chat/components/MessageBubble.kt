@@ -610,6 +610,29 @@ private fun formatToolTranscriptA11y(toolId: String, expanded: Boolean): String 
 private fun truncateToolSummary(text: String, maxChars: Int = 200): String =
     if (text.length <= maxChars) text else text.take(maxChars) + "…"
 
+/**
+ * Bounded in-memory decode for base64 data-URL images (Play bitmap-memory
+ * warning). Bounds-first pass + power-of-2 `inSampleSize` caps the decoded
+ * bitmap at [MAX_MESSAGE_IMAGE_DIMENSION_PX] on the long edge, so a
+ * multi-megapixel camera photo attached to a message can never OOM the
+ * transcript. Null on any failure (caller renders nothing, as before).
+ */
+private const val MAX_MESSAGE_IMAGE_DIMENSION_PX = 1024
+
+private fun decodeSampledBitmap(bytes: ByteArray, maxDimension: Int): android.graphics.Bitmap? {
+    return try {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        var sample = 1
+        while (bounds.outWidth / sample > maxDimension || bounds.outHeight / sample > maxDimension) {
+            sample *= 2
+        }
+        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+    } catch (_: Exception) { null }
+}
+
 @Composable
 private fun MessageImageStack(imageUris: List<String>) {    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         imageUris.forEach { dataUrl ->
@@ -618,7 +641,7 @@ private fun MessageImageStack(imageUris: List<String>) {    Column(verticalArran
                 try {
                     val base64 = dataUrl.substringAfter("base64,")
                     val bytes = Base64.decode(base64, Base64.DEFAULT)
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    decodeSampledBitmap(bytes, MAX_MESSAGE_IMAGE_DIMENSION_PX)
                 } catch (_: Exception) { null }
             }
             if (showFullImage) {

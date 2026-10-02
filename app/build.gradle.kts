@@ -58,6 +58,17 @@ android {
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
+            // Play warning (bundle 20400046): AAB contains native code but no
+            // debug symbols. FULL auto-packages symbols for native code built
+            // from module sources (none today — no externalNativeBuild; all
+            // .so are prebuilt). Verified 2026-10-01: sqlcipher/litertlm ship
+            // fully stripped .so (no .symtab), so no symbol file exists to
+            // upload for them — only the vendors could provide it. Kept as
+            // future-proofing: any first-party native source added later gets
+            // symbolication automatically.
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
