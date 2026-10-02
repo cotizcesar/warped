@@ -49,4 +49,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (pending roadmap) | | |
+| VMSG-01 | Phase 67 | Pending |
+| VMSG-05 | Phase 67 | Pending |
+| VMSG-02 | Phase 68 | Pending |
+| VMSG-06 | Phase 68 | Pending |
+| VMSG-03 | Phase 69 | Pending |
+| VMSG-04 | Phase 69 | Pending |
+| VMSG-07 | Phase 69 | Pending |
+| VMSG-08 | Phase 69 | Pending |
+| TOOL-01 | Phase 70 | Pending |
+| TOOL-02 | Phase 70 | Pending |
+| TOOL-03 | Phase 70 | Pending (contingency-only) |

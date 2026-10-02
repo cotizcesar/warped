@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-10-02T18:21:33.815Z"
 last_activity: 2026-10-02
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -23,7 +23,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-01, v2.5 shipped)
 
 **Core value:** Run and chat with any LLM — local or remote — from a single Android app, with a simple LM Studio-grade experience that works offline.
-**Current focus:** v3.0 complete — all 4 phases shipped (65 voice + 66 review done 2026-10-02), ready for milestone audit
+**Current focus:** v3.1 Voice Messages + New Tool — Phase 67 ready to plan
 
 ## Current Position
 
@@ -32,16 +32,16 @@ Plan: —
 Status: Defining requirements
 Last activity: 2026-10-02 — Milestone v3.1 started
 
-## Phase Structure (v3.0 — PLANNED)
+## Phase Structure (v3.1 — PLANNED)
 
 | Phase | Name | Requirements | Status | Depends On |
 |-------|------|--------------|--------|------------|
-| 63 | Tavily Removal → DDG-only Search | SEARCH-01..04 (4) | Complete (2026-10-02, 2/2 plans, 7/7 verified, 895 tests green) | Phase 62 |
-| 64 | Drawer + Settings + Help + Funnel Polish | DRAWER-01..04, SET-01/02, HELP-01, FUN-01..03 (10) | Complete (2026-10-02, 2/2 plans, 5/5 verified, 891 tests green, SECURED 6/6) | Phase 63 |
-| 65 | Voice Dictation | VOICE-01..03 (3) | Complete (2026-10-02, 2/2 plans, 3/3 verified, 899 tests green, SECURED 8/8) | Phase 64 |
-| 66 | Play In-App Review | RATE-01/02 (2) | Complete (2026-10-02, 1/1 plans, 3/3 verified, 914 tests green, SECURED 4/4) | Phase 65 |
+| 67 | Voice Capture + Send Path | VMSG-01, VMSG-05 (2) | Not started | Phase 66 |
+| 68 | Voice Draft + Playback History | VMSG-02, VMSG-06 (2) | Not started | Phase 67 |
+| 69 | Voice Differentiation + Gating + Transcript | VMSG-03, VMSG-04, VMSG-07, VMSG-08 (4) | Not started | Phase 68 |
+| 70 | Document Reader Tool | TOOL-01, TOOL-02, TOOL-03 (3) | Not started | Nothing (parallel track) |
 
-**Total v3.0:** 4 phases, 19 requirements mapped (19/19 ✓). Coarse granularity.
+**Total v3.1:** 4 phases, 11 requirements mapped (11/11 ✓). Coarse granularity. Hardening folded into per-phase verification (zero requirements). TOOL-03 contingency-only.
 
 ## Performance Metrics
 
@@ -137,9 +137,9 @@ See prior STATE history for v2.2–v2.4 quick-task log (archived at roadmap rewr
 
 **Resume file:** —
 
-Last session: 2026-10-01
-Stopped at: Phase 66 complete — all phases complete
-Resume: `/gsd-new-milestone` (after `/clear`)
+Last session: 2026-10-02
+Stopped at: v3.1 roadmap created — Phases 67-70 ready
+Resume: `/gsd-plan-phase 67` (after `/clear`)
 
 ## Operator Next Steps
 
