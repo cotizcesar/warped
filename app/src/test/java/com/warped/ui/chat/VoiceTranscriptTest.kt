@@ -48,6 +48,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import java.time.Instant
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * Phase 69 Plan 02 (VMSG-07): parallel transcript STT session discipline,
@@ -351,6 +353,61 @@ class VoiceTranscriptTest {
         verify { transcript.stop() }
         assertThat(vm.isListening.value).isTrue()
 
+        vm.cancelVoiceRecording()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `dictation during recorder spin-up suppresses transcript STT`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val audioFile = File(tempDir, "audio.litertlm").apply { writeText("fake") }
+        val audioPath = audioFile.absolutePath
+        modelsFlow.value = listOf(localModel(audioPath))
+        audioCapablePaths = setOf(audioPath)
+        val vm = buildViewModel(audioPath)
+        vm.voiceDurationReader = { 3_000L }
+        // CR-01: hold the spin-up IO coroutine inside recorder.start()
+        // (real Dispatchers.IO thread) so dictation can land mid-window.
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val recorder = mockk<VoiceMessageRecorder>()
+        every { recorder.start() } answers {
+            entered.countDown()
+            check(release.await(10, TimeUnit.SECONDS)) { "spin-up latch timeout" }
+            true
+        }
+        every { recorder.stop() } returns null
+        every { recorder.cancel() } just Runs
+        vm.voiceRecorderOverride = recorder
+        val transcript = FakeTranscript()
+        vm.transcriptManagerOverride = transcript
+        val dictation = mockk<VoiceDictationManager>()
+        every { dictation.start() } returns true
+        every { dictation.stop() } just Runs
+        vm.dictationManagerOverride = dictation
+        localSelection.value = LocalSelection(modelId = audioPath, isConnected = true)
+        advanceUntilIdle()
+
+        vm.startVoiceRecording()
+        assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue()
+
+        // Dictation tapped mid-spin-up records the pending-stop intent
+        // and starts dictation — never two live STT sessions.
+        vm.startDictation()
+        assertThat(vm.isListening.value).isTrue()
+
+        // Recorder accepts after dictation is live: the pending-KEEP path
+        // stops without ever starting transcript STT.
+        release.countDown()
+        verify(timeout = 10_000) { recorder.stop() }
+        verify(exactly = 0) { transcript.start() }
+        assertThat(vm.isVoiceRecording.value).isFalse()
+        assertThat(vm.isListening.value).isTrue()
+
+        // Let the trailing IO work settle (real threads) before teardown
+        // so the cancel below cannot plant a stale pending-stop.
+        Thread.sleep(500)
+        vm.stopDictation()
         vm.cancelVoiceRecording()
         advanceUntilIdle()
     }
