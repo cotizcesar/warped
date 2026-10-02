@@ -128,6 +128,7 @@ v2.5 all phases complete (59: 4/5 with G-59-01 closed by 62; 60/61/62 passed). S
 | 2026-10-02 | `quick/20261002-dictation-autostop-cursor-card` (restore dictation auto-stop, cursor snaps to end on external text changes, ModelCard below-header slots indented 22dp to title) | complete (919 tests green) |
 | 2026-10-02 | `quick/20261002-lazy-model-load` (Select > Prompt > carga > Respuesta: selection only marks pending, engine mounts on first send; caret snaps to end only when input unfocused) | complete (933 tests green) |
 | 2026-10-02 | `quick/20261002-loading-row-move` (model loading indicator moved from top to TurnStatusRow above input, top priority; ModelLoadingIndicator deleted) | complete (935 tests green) |
+| 2026-10-02 | `quick/20261002-loading-first-time` ("for the first time" copy only when the model never loaded in the session; everLoadedPaths + loadingFirstTime plumbing) | complete (937 tests green) |
 | 2026-10-01 | `quick/20261001-play-warnings-fix` (Play warnings: edge-to-edge deprecated attrs, bitmap OOM sites → Coil/bounded decode, ndk debugSymbolLevel FULL; commit on beta, no push) | complete (native-symbols warning honestly unfixable: prebuilt .so stripped upstream) |
 | 2026-10-01 | `quick/20261001-branch-restructure` (delete production, beta → main, main → Beta track, manual prod promotion) | complete, pushed; remote: main is default, beta/production deleted |
 | 2026-10-01 | `quick/20261001-abi-filters` (32-bit exclusion via abiFilters arm64-v8a+x86_64; AAB verified 2-ABI-only + 16KB OK; commit on main, no push) | complete |
