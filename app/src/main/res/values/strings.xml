@@ -457,7 +457,7 @@
     <string name="help_s7_title">7. Web Grounding</string>
     <string name="help_s7_step1">Paste links into a message to ground the answer in those pages.</string>
     <string name="help_s7_step2">Tap any source in the strip to preview it.</string>
-    <string name="help_s7_step3">Use the Sin web chip for one model-only reply.</string>
+    <string name="help_s7_step3">Turn off web grounding in Settings for a model-only reply.</string>
     <string name="help_s7_step4">Offline sends queue up — tap Retry when back online.</string>
     <string name="help_s7_step5">Web grounding adds cited search results — no setup needed.</string>
     <string name="help_s8_title">8. Tips &amp; Shortcuts</string>

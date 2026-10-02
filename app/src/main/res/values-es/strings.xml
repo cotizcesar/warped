@@ -461,7 +461,7 @@
     <string name="help_s7_title">7. Búsqueda web (grounding)</string>
     <string name="help_s7_step1">Pegá enlaces en un mensaje para basar la respuesta en esas páginas.</string>
     <string name="help_s7_step2">Tocá cualquier fuente de la tira para verla.</string>
-    <string name="help_s7_step3">Usá el chip Sin web para una respuesta solo-modelo.</string>
+    <string name="help_s7_step3">Desactivá la búsqueda web en Ajustes para una respuesta solo del modelo.</string>
     <string name="help_s7_step4">Sin conexión los envíos quedan en cola — tocá Reintentar al volver.</string>
     <string name="help_s7_step5">La búsqueda web agrega resultados citados — sin configuración.</string>
     <string name="help_s8_title">8. Consejos y atajos</string>
