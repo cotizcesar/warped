@@ -32,6 +32,7 @@ import com.warped.domain.model.SyntaxTheme
 import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.LocalModelRepository
+import com.warped.domain.review.ReviewHelper
 import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -154,6 +155,7 @@ class ChatCodeIntentGateTest {
             ddgSearchRepository = ddgSearchRepository,
             modelAllowlistRepository = allowlist,
             context = context,
+            reviewHelper = mockk(relaxed = true),
         )
     }
 

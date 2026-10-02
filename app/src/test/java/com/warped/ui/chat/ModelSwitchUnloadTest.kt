@@ -17,6 +17,7 @@ import com.warped.domain.model.SyntaxTheme
 import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.LocalModelRepository
+import com.warped.domain.review.ReviewHelper
 import io.mockk.every
 import io.mockk.just
 import io.mockk.Runs
@@ -121,6 +122,7 @@ class ModelSwitchUnloadTest {
             ddgSearchRepository = mockk(),
             modelAllowlistRepository = mockk<com.warped.data.repository.ModelAllowlistRepository>(),
             context = context,
+            reviewHelper = mockk(relaxed = true),
         )
         runCurrent()
         advanceUntilIdle()
@@ -186,6 +188,7 @@ class ModelSwitchUnloadTest {
             ddgSearchRepository = mockk(),
             modelAllowlistRepository = mockk<com.warped.data.repository.ModelAllowlistRepository>(),
             context = context,
+            reviewHelper = mockk(relaxed = true),
         )
         runCurrent()
         advanceUntilIdle()

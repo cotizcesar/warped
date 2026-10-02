@@ -20,6 +20,7 @@ import com.warped.domain.model.SyntaxTheme
 import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.LocalModelRepository
+import com.warped.domain.review.ReviewHelper
 import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
@@ -314,6 +315,7 @@ class ChatCancellationTest {
             ddgSearchRepository = mockk(),
             modelAllowlistRepository = mockk<com.warped.data.repository.ModelAllowlistRepository>().also(::stubEffectiveCapabilities),
             context = context,
+            reviewHelper = mockk(relaxed = true),
         )
     }
 

@@ -210,6 +210,14 @@ fun ChatScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // Phase 66 (RATE-01): Activity handle for the ambient Play review
+    // flow. The ViewModel keeps only this provider (never the Activity);
+    // cleared when the screen leaves so nothing leaks.
+    DisposableEffect(context) {
+        viewModel.reviewActivityProvider = { context as? Activity }
+        onDispose { viewModel.reviewActivityProvider = null }
+    }
+
     // Phase 53 (TOGGLE-01/SRC-02): one-shot ViewModel events (toggle
     // feedback, persist-failure notice) rendered as non-blocking Snackbars.
     LaunchedEffect(Unit) {

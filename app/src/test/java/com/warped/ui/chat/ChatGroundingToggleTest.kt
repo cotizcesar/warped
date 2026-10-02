@@ -21,6 +21,7 @@ import com.warped.domain.model.SyntaxTheme
 import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.LocalModelRepository
+import com.warped.domain.review.ReviewHelper
 import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -129,6 +130,7 @@ class ChatGroundingToggleTest {
             ddgSearchRepository = mockk(),
             modelAllowlistRepository = mockk<com.warped.data.repository.ModelAllowlistRepository>().also(::stubEffectiveCapabilities),
             context = context,
+            reviewHelper = mockk(relaxed = true),
         )
     }
 

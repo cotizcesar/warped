@@ -53,3 +53,51 @@ fun openUrlInBrowser(context: Context, url: String): Boolean {
         false
     }
 }
+
+/**
+ * Phase 66 (RATE-02, T-66-03): always-reachable Play Store listing entry.
+ * `market://` first (opens the Play app when present), `https://` fallback
+ * to the web listing. The URI is derived from [context.packageName] only —
+ * never user input — so no allowlist applies (unlike [openUrlInBrowser],
+ * whose http/https gate would reject `market:`).
+ *
+ * @return true when a Store intent was launched, false otherwise.
+ */
+fun openPlayStoreListing(context: Context): Boolean {
+    val packageName = context.packageName
+    return try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, "market://details?id=$packageName".toUri()))
+        true
+    } catch (_: ActivityNotFoundException) {
+        try {
+            context.startActivity(
+                Intent(
+                    Intent.ACTION_VIEW,
+                    "https://play.google.com/store/apps/details?id=$packageName".toUri()
+                )
+            )
+            true
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(
+                context,
+                context.getString(R.string.toast_no_browser),
+                Toast.LENGTH_SHORT,
+            ).show()
+            false
+        } catch (_: SecurityException) {
+            Toast.makeText(
+                context,
+                context.getString(R.string.toast_no_browser),
+                Toast.LENGTH_SHORT,
+            ).show()
+            false
+        }
+    } catch (_: SecurityException) {
+        Toast.makeText(
+            context,
+            context.getString(R.string.toast_no_browser),
+            Toast.LENGTH_SHORT,
+        ).show()
+        false
+    }
+}

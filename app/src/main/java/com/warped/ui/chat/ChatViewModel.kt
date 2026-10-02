@@ -1,5 +1,6 @@
 package com.warped.ui.chat
 
+import android.app.Activity
 import android.content.Context
 import android.net.Uri
 import android.util.Base64
@@ -26,6 +27,7 @@ import com.warped.data.local.preferences.AdvancedPreferences
 import com.warped.data.remote.provider.ProviderRouter
 import com.warped.data.repository.ModelAllowlistRepository
 import com.warped.domain.llm.LlmModelHelper
+import com.warped.domain.review.ReviewHelper
 import com.warped.domain.model.*
 import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
@@ -59,6 +61,7 @@ class ChatViewModel @Inject constructor(
     private val engineManager: EngineManager,
     private val memoryChecker: MemoryChecker,
     private val advancedPreferences: AdvancedPreferences,
+    private val reviewHelper: ReviewHelper,
     private val fetcher: WebPageFetcher,
     private val multiUrlFetcher: MultiUrlFetcher,
     /**
@@ -211,6 +214,17 @@ class ChatViewModel @Inject constructor(
     private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         timber.log.Timber.e(throwable, "Unhandled coroutine exception")
     }
+
+    /**
+     * Phase 66 (RATE-01): Activity handle for the ambient Play review
+     * flow. Set by ChatScreen from LocalContext (the ViewModel holds only
+     * `@ApplicationContext Context`); cleared when the screen leaves, so
+     * no Activity is ever retained. The turn-Done hook resolves it through
+     * this provider at fire time — a null provider simply skips the
+     * prompt (previews, tests).
+     */
+    @Volatile
+    var reviewActivityProvider: (() -> Activity?)? = null
 
     init {
         // Restore persisted loaded instance ID
@@ -1115,6 +1129,20 @@ class ChatViewModel @Inject constructor(
                                             context.getString(R.string.snack_sources_not_saved),
                                         ),
                                     )
+                                }
+                                // Phase 66 (RATE-01): ambient review —
+                                // fire-and-forget child launch off the turn
+                                // path (never a suspend on this path); a
+                                // null Activity handle skips silently
+                                // (previews/tests).
+                                viewModelScope.launch(coroutineExceptionHandler) {
+                                    try {
+                                        val activity = reviewActivityProvider?.invoke()
+                                            ?: return@launch
+                                        reviewHelper.maybePrompt(activity)
+                                    } catch (e: Exception) {
+                                        Timber.w(e, "Review prompt failed silently")
+                                    }
                                 }
                             } else {
                                 // Silent turn: clear streaming state so the

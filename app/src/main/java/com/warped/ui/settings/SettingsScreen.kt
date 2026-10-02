@@ -30,6 +30,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -40,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.R
 import com.warped.domain.model.SyntaxTheme
 import com.warped.domain.model.TokenType
+import com.warped.ui.chat.components.openPlayStoreListing
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -257,6 +259,32 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
                     Spacer(Modifier.height(8.dp))
                     TextButton(onClick = onNavigateToWizard) {
                         Text(stringResource(R.string.settings_wizard_run), color = Color(0xFFD97757))
+                    }
+                }
+            }
+        }
+        // Phase 66 (RATE-02): always-reachable Store listing — same
+        // Card/Column/TextButton shape as the wizard card above, so the
+        // row stays reachable even when the review dialog is
+        // quota-suppressed. market:// first with https fallback.
+        item {
+            val storeContext = LocalContext.current
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(stringResource(R.string.settings_review_title), style = MaterialTheme.typography.bodyLarge)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        stringResource(R.string.settings_review_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(onClick = { openPlayStoreListing(storeContext) }) {
+                        Text(stringResource(R.string.settings_review_action), color = Color(0xFFD97757))
                     }
                 }
             }

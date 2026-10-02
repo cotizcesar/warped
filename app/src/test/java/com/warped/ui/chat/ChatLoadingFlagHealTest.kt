@@ -22,6 +22,7 @@ import com.warped.domain.model.SyntaxTheme
 import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.EndpointRepository
 import com.warped.domain.repository.LocalModelRepository
+import com.warped.domain.review.ReviewHelper
 import io.mockk.every
 import io.mockk.just
 import io.mockk.Runs
@@ -143,6 +144,7 @@ class ChatLoadingFlagHealTest {
             ddgSearchRepository = mockk<DuckDuckGoSearchRepository>(),
             modelAllowlistRepository = mockk<ModelAllowlistRepository>(),
             context = context,
+            reviewHelper = mockk(relaxed = true),
         )
         return Fixture(vm, selection, engineManager)
     }
