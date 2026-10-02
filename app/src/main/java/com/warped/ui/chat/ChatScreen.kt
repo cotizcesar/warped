@@ -149,7 +149,10 @@ fun ChatScreen(
     // vs voice-send taps, routed through the EXISTING micPermissionLauncher
     // (no second launcher). Set before showing the rationale or firing
     // the request; consumed and cleared on the grant/denial result.
-    var pendingVoiceRequest by remember { mutableStateOf<PendingVoiceRequest?>(null) }
+    // WR-04: persisted as the enum name via rememberSaveable (the enum
+    // itself is not Parcelable) so rotation across the permission grant
+    // no longer drops the intent into a silent no-op.
+    var pendingVoiceRequestName by rememberSaveable { mutableStateOf<String?>(null) }
     // IN-02: first-tap rationale per UI-SPEC section 4. The dialog shows
     // once; later ungranted taps request the permission directly.
     // rememberSaveable so rotation does not re-trigger it (process death
@@ -312,15 +315,15 @@ fun ChatScreen(
     // Phase 65 (VOICE-02): RECORD_AUDIO runtime request. Follows the
     // imagePickerLauncher shape above with ActivityResultContracts
     // .RequestPermission. Phase 67 routes BOTH dictation and voice-send
-    // intents through this launcher via pendingVoiceRequest: granted
+    // intents through this launcher via pendingVoiceRequestName: granted
     // starts the requested mode; denial applies the per-mode policy
     // (dictation keeps the Phase 65 silent-transient + Settings-escape
     // permanent; voice-send emits the voice-denied Snackbar / escape).
     val micPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
-        val request = pendingVoiceRequest
-        pendingVoiceRequest = null
+        val request = pendingVoiceRequestName?.let { PendingVoiceRequest.valueOf(it) }
+        pendingVoiceRequestName = null
         if (granted) {
             when (request) {
                 PendingVoiceRequest.DICTATION -> viewModel.startDictation()
@@ -365,10 +368,10 @@ fun ChatScreen(
         ) {
             if (isListening) viewModel.stopDictation() else viewModel.startDictation()
         } else if (!voiceRationaleSeen) {
-            pendingVoiceRequest = PendingVoiceRequest.DICTATION
+            pendingVoiceRequestName = PendingVoiceRequest.DICTATION.name
             showVoiceRationale = true
         } else {
-            pendingVoiceRequest = PendingVoiceRequest.DICTATION
+            pendingVoiceRequestName = PendingVoiceRequest.DICTATION.name
             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
@@ -398,11 +401,11 @@ fun ChatScreen(
                 if (isVoiceRecording) viewModel.stopVoiceRecording() else viewModel.startVoiceRecording()
             }
             !voiceRationaleSeen -> {
-                pendingVoiceRequest = PendingVoiceRequest.VOICE
+                pendingVoiceRequestName = PendingVoiceRequest.VOICE.name
                 showVoiceRationale = true
             }
             else -> {
-                pendingVoiceRequest = PendingVoiceRequest.VOICE
+                pendingVoiceRequestName = PendingVoiceRequest.VOICE.name
                 micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             }
         }
@@ -754,7 +757,7 @@ fun ChatScreen(
                         showVoiceRationale = false
                         // Dismissed without confirming: drop the pending
                         // intent so a later grant result cannot act on it.
-                        pendingVoiceRequest = null
+                        pendingVoiceRequestName = null
                     },
                     title = { Text(stringResource(R.string.voice_rationale_title)) },
                     text = {
@@ -776,7 +779,7 @@ fun ChatScreen(
                         TextButton(onClick = {
                             voiceRationaleSeen = true
                             showVoiceRationale = false
-                            pendingVoiceRequest = null
+                            pendingVoiceRequestName = null
                         }) {
                             Text(stringResource(R.string.dismiss))
                         }
