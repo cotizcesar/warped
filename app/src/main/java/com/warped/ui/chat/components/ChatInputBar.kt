@@ -37,6 +37,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -286,6 +288,26 @@ fun ChatInputBar(
             val voiceVisible = micVisible && !isVoiceRecording && voiceGate == GateState.Allowed
             val sendVisible = (text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip) && canSend && !isLoadingModel
             val rightClusterDp = ((if (micVisible) 40 else 0) + (if (voiceVisible) 40 else 0) + (if (sendVisible) 40 else 0) + 4).dp
+            val focusRequester = remember { FocusRequester() }
+            // Line-count mirror at exactly the compact field width (same
+            // 48dp start + rightCluster end padding the field uses when
+            // compact), so expansion triggers precisely when the text
+            // would wrap to a second line there. Always composed at
+            // constant width: monotonic in text, never oscillates. (The
+            // TextFieldValue overload has no onTextLayout — hence a
+            // mirror instead of measuring the field itself.)
+            var inputLines by remember { mutableIntStateOf(0) }
+            val expandedInput = inputLines > 1
+            Text(
+                text = text.ifEmpty { " " },
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = Int.MAX_VALUE,
+                onTextLayout = { if (it.lineCount != inputLines) inputLines = it.lineCount },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 48.dp, end = rightClusterDp)
+                    .height(0.dp),
+            )
 
             // Input-row pieces as local composables (single static row —
             // the row stretches in place as the text wraps, nothing moves).
@@ -345,6 +367,7 @@ fun ChatInputBar(
                     onCursorChange(next.selection.start)
                 },
                 modifier = mod
+                    .focusRequester(focusRequester)
                     .padding(vertical = 10.dp)
                     .onFocusChanged { inputFocused = it.isFocused }
                     .onKeyEvent { event ->
@@ -509,6 +532,34 @@ fun ChatInputBar(
                 }
             }
 
+            // The text field MOVES between the compact row and the
+            // expanded column — movableContentOf keeps the SAME composition
+            // (text, selection, and focus node) across the move, so growth
+            // never recreates the field. A refocus safety net below
+            // re-opens the keyboard if the move still drops IME focus.
+            val movableInputField = remember {
+                movableContentOf { mod: Modifier -> InputField(mod) }
+            }
+            // Refocus safety net: runs ONLY when the layout flips (which
+            // only text edits trigger). Re-asserts focus on the moved node
+            // one frame after attach; harmless no-op when focus survived
+            // the move, and never fires on rotation, recording toggles,
+            // or manual keyboard dismissal (none of those flip expanded).
+            // Skips the initial composition so entering a chat never pops
+            // the keyboard uninvited.
+            var expandEffectArmed by remember { mutableStateOf(false) }
+            LaunchedEffect(expandedInput) {
+                if (!expandEffectArmed) {
+                    expandEffectArmed = true
+                } else {
+                    withFrameNanos { }
+                    try {
+                        focusRequester.requestFocus()
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+
             // Phase 67 (VMSG-01 full): recording replaces the input row
             // inline — mm:ss timer + amplitude bar + explicit cancel (X).
             // Timer + bar render onSurfaceVariant, switching to error red
@@ -558,31 +609,52 @@ fun ChatInputBar(
                     }
                 }
             } else {
-                // Overlay layout in ONE static tree (nothing is created or
-                // destroyed as the text grows, so focus and the keyboard
-                // survive): the field spans the full width with padding
-                // for the overlaid buttons; + anchors bottom-start,
-                // mic/voice/send bottom-end. The pill stretches in place
-                // via animateContentSize as the field wraps to more lines.
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    InputField(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(start = 48.dp, end = rightClusterDp)
-                    )
-                    Row(
-                        modifier = Modifier.align(Alignment.BottomStart),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        AttachGroup()
+                // Field-first static skeleton: the FIELD (via movable
+                // content) never changes slots, so focus and the keyboard
+                // survive growth; ONLY the stateless buttons relocate —
+                // overlaid at the row edges when compact, in a row below
+                // once the text wraps past one line. The field padding
+                // adapts per mode (full-bleed text when expanded).
+                if (expandedInput) {
+                    Column {
+                        movableInputField(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(end = 8.dp)
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AttachGroup()
+                            Spacer(Modifier.weight(1f))
+                            MicButton()
+                            VoiceButton()
+                            SendSlot()
+                        }
                     }
-                    Row(
-                        modifier = Modifier.align(Alignment.BottomEnd),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        MicButton()
-                        VoiceButton()
-                        SendSlot()
+                } else {
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        movableInputField(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(start = 48.dp, end = rightClusterDp)
+                        )
+                        Row(
+                            modifier = Modifier.align(Alignment.BottomStart),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AttachGroup()
+                        }
+                        Row(
+                            modifier = Modifier.align(Alignment.BottomEnd),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            MicButton()
+                            VoiceButton()
+                            SendSlot()
+                        }
                     }
                 }
         }
