@@ -12,8 +12,6 @@ import com.warped.data.repository.AllowlistedModel
 import com.warped.data.repository.ModelAllowlistRepository
 import com.warped.domain.model.ActiveModelSelection
 import com.warped.domain.model.LocalModel
-import com.warped.domain.model.ProviderType
-import com.warped.domain.repository.ChatRepository
 import com.warped.domain.repository.LocalModelRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -50,7 +48,6 @@ class CatalogViewModel @Inject constructor(
     private val activeModelSelection: ActiveModelSelection,
     private val engineManager: EngineManager,
     private val modelImportManager: ModelImportManager,
-    private val chatRepository: ChatRepository,
     @param:ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -95,19 +92,6 @@ class CatalogViewModel @Inject constructor(
 
     fun downloadId(entry: AllowlistedModel): String =
         "${entry.repoSlug}/${entry.modelFile}"
-
-    /**
-     * One-shot navigation id for catalog activation (FUN-01, T-64-03).
-     * Mirrors ModelsViewModel.pendingChatId: set once openBoundChat lands,
-     * consumed once by the screen — never re-navigates on recomposition.
-     */
-    private val _pendingChatId = MutableStateFlow<Long?>(null)
-    val pendingChatId: StateFlow<Long?> = _pendingChatId.asStateFlow()
-
-    /** Consume a delivered activation navigation (single-shot). */
-    fun consumePendingChat() {
-        _pendingChatId.value = null
-    }
 
     /**
      * Activation failure channel (WR-01). Mirrors the ModelsViewModel
@@ -175,69 +159,12 @@ class CatalogViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Activate a downloaded catalog model and open a bound chat (FUN-01,
-     * T-64-03). Resolves the LocalModel via localModelRepository by
-     * entry modelFile, then mirrors the ModelsViewModel bound-chat chain
-     * so the new conversation carries the verified model binding.
-     */
-    fun useDownloadedModel(entry: AllowlistedModel) {
-        viewModelScope.launch {
-            try {
-                val models = localModelRepository.observeModels().first()
-                val model = findLocalModelForEntry(models, entry) ?: run {
-                    Timber.w(
-                        "CatalogVM: use requested for missing file %s",
-                        entry.modelFile
-                    )
-                    _error.value =
-                        context.getString(R.string.catalog_activation_failed)
-                    return@launch
-                }
-                // Lazy load: mark pending only — the engine mounts on the
-                // first send, never on activation.
-                activeModelSelection.selectLocalPending(model.filePath)
-                openBoundChat(
-                    providerType = ProviderType.LITE_RT_LM,
-                    modelId = model.filePath,
-                    endpointId = 0L,
-                )
-            } catch (e: Exception) {
-                Timber.e(e, "CatalogVM: useDownloadedModel failed")
-            }
-        }
-    }
-
-    /**
-     * Bound-chat creation mirroring ModelsViewModel.openBoundChat: appends
-     * a fresh conversation row carrying the activated binding, titled
-     * "New Chat" until the first send retitles it.
-     */
-    private suspend fun openBoundChat(
-        providerType: ProviderType,
-        modelId: String,
-        endpointId: Long,
-    ) {
-        try {
-            val id = chatRepository.createConversation(
-                title = context.getString(R.string.new_chat),
-                providerType = providerType,
-                modelId = modelId,
-                endpointId = endpointId,
-            )
-            activeModelSelection.saveLastConversation(id)
-            _pendingChatId.value = id
-        } catch (e: Exception) {
-            Timber.e(e, "CatalogVM: activation chat creation failed")
-            _error.value = e.message
-        }
-    }
 }
 
 /**
  * Shared catalog-to-library resolver (WR-03). The allowlist entry carries
  * only the bare [AllowlistedModel.modelFile] basename while the DB row
- * stores the absolute path, so both the delete and activation paths funnel
+ * stores the absolute path, so the delete path funnels
  * through this single match instead of duplicating `firstOrNull`
  * basename logic.
  *

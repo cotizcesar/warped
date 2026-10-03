@@ -78,7 +78,7 @@ class CatalogDownloadedTest {
         every { allowlist.models } returns emptyList()
         val downloadManager = mockk<ModelDownloadManager>()
         every { downloadManager.downloadStates } returns MutableStateFlow(emptyMap())
-        return CatalogViewModel(allowlist, downloadManager, localRepo, mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true))
+        return CatalogViewModel(allowlist, downloadManager, localRepo, mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true))
     }
 
     @Test
@@ -142,46 +142,4 @@ class CatalogDownloadedTest {
         assertThat(isEffectivelyDownloaded(failed, true)).isTrue()
         assertThat(isEffectivelyDownloaded(failed, false)).isFalse()
     }
-
-    @Test
-    fun `useDownloadedModel marks pending never connects`() =
-        runTest(testDispatcher) {
-            val filePath = "/data/user/0/com.warped/files/models/gemma-4-E4B-it.litertlm"
-            val selection = mockk<com.warped.domain.model.ActiveModelSelection>(relaxed = true)
-            every { selection.localSelection } returns
-                MutableStateFlow(com.warped.domain.model.LocalSelection())
-            val chatRepo = mockk<com.warped.domain.repository.ChatRepository>()
-            io.mockk.coEvery {
-                chatRepo.createConversation(any(), any(), any(), any())
-            } returns 7L
-            val allowlist = mockk<ModelAllowlistRepository>()
-            every { allowlist.models } returns emptyList()
-            val downloadManager = mockk<ModelDownloadManager>()
-            every { downloadManager.downloadStates } returns MutableStateFlow(emptyMap())
-            val viewModel = CatalogViewModel(
-                allowlist,
-                downloadManager,
-                fakeLocalRepo(listOf(onDeviceModel(filePath))),
-                selection,
-                mockk(relaxed = true),
-                mockk(relaxed = true),
-                chatRepo,
-                mockk(relaxed = true),
-            )
-
-            viewModel.useDownloadedModel(
-                AllowlistedModel(
-                    name = "gemma-4-E4B-it",
-                    displayName = "Gemma 4 E4B",
-                    modelFile = "gemma-4-E4B-it.litertlm",
-                    sizeInBytes = 10,
-                )
-            )
-            advanceUntilIdle()
-
-            // Lazy load: activation marks pending — the engine mounts on
-            // the first send, never here.
-            io.mockk.verify { selection.selectLocalPending(filePath) }
-            io.mockk.verify(exactly = 0) { selection.connectLocal(any(), any()) }
-        }
 }

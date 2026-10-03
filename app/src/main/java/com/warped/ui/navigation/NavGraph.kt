@@ -447,11 +447,6 @@ fun WarpedNavGraph() {
                     onNavigateToModels = {
                         navController.popBackStack()
                     },
-                    onUseInChat = { conversationId ->
-                        navController.navigate(Screen.ChatDetail(conversationId)) {
-                            popUpTo(Screen.Chat) { inclusive = true }
-                        }
-                    }
                 )
             }
             composable<Screen.Presets> {

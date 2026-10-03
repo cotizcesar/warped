@@ -76,21 +76,9 @@ import com.warped.ui.theme.WarpedAccent
 fun HuggingFaceScreen(
     viewModel: CatalogViewModel = hiltViewModel(),
     onNavigateToModels: () -> Unit = {},
-    onUseInChat: (conversationId: Long) -> Unit = {}
 ) {
     val downloadStates by viewModel.downloadStates.collectAsStateWithLifecycle()
     val downloadedFileNames by viewModel.downloadedFileNames.collectAsStateWithLifecycle()
-
-    // FUN-01: activation creates the bound conversation asynchronously —
-    // navigate once its id lands, then consume so a later recomposition
-    // never re-navigates (same chain as ModelsScreen).
-    val pendingChatId by viewModel.pendingChatId.collectAsStateWithLifecycle()
-    LaunchedEffect(pendingChatId) {
-        pendingChatId?.let { id ->
-            onUseInChat(id)
-            viewModel.consumePendingChat()
-        }
-    }
 
     // WR-01: surface activation failures (missing file, chat creation
     // throw) via Snackbar — same show-then-clear pattern as ModelsScreen.
@@ -175,8 +163,7 @@ fun HuggingFaceScreen(
                             viewModel = viewModel,
                             downloadStates = downloadStates,
                             isOnDevice = onDevice,
-                            onDeleteDownloaded = { viewModel.deleteDownloaded(entry) },
-                            onUseInChat = { viewModel.useDownloadedModel(entry) }
+                            onDeleteDownloaded = { viewModel.deleteDownloaded(entry) }
                         )
                     }
                 }
@@ -193,8 +180,7 @@ fun HuggingFaceScreen(
                             viewModel = viewModel,
                             downloadStates = downloadStates,
                             isOnDevice = true,
-                            onDeleteDownloaded = { viewModel.deleteDownloaded(entry) },
-                            onUseInChat = { viewModel.useDownloadedModel(entry) }
+                            onDeleteDownloaded = { viewModel.deleteDownloaded(entry) }
                         )
                     }
                 }
@@ -248,7 +234,6 @@ private fun CatalogCardItem(
     downloadStates: Map<String, DownloadState>,
     isOnDevice: Boolean,
     onDeleteDownloaded: () -> Unit = {},
-    onUseInChat: () -> Unit = {}
 ) {
     val downloadId = viewModel.downloadId(entry)
     CatalogModelCard(
@@ -261,7 +246,6 @@ private fun CatalogCardItem(
         onResume = { viewModel.resumeDownload(downloadId) },
         onRetry = { viewModel.resumeDownload(downloadId) },
         onDeleteDownloaded = onDeleteDownloaded,
-        onUseInChat = onUseInChat
     )
 }
 
@@ -313,7 +297,6 @@ private fun CatalogModelCard(
     onResume: () -> Unit,
     onRetry: () -> Unit = {},
     onDeleteDownloaded: () -> Unit = {},
-    onUseInChat: () -> Unit = {}
 ) {
     // A "Cancelled" error is terminal-idle: the partial file is deleted and a
     // fresh Download restarts cleanly.
@@ -381,7 +364,6 @@ private fun CatalogModelCard(
         audio = entry.capabilities.audio,
         reasoning = entry.capabilities.supportsThinking,
         tools = entry.capabilities.supportsFunctionCalling,
-        dotConnected = downloaded,
         expandable = expandable,
         trailingActions = {
             if (entry.comingSoon) {
@@ -434,22 +416,6 @@ private fun CatalogModelCard(
                     onResume = onResume,
                     onRetry = onRetry
                 )
-            }
-            // Downloaded CTA: full-width bottom action, same accent as the
-            // Available download affordance.
-            if (downloaded) {
-                Spacer(Modifier.height(10.dp))
-                Button(
-                    onClick = onUseInChat,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = WarpedAccent),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.use_in_chat),
-                        color = Color.White
-                    )
-                }
             }
             } // end if (!entry.comingSoon)
         },
