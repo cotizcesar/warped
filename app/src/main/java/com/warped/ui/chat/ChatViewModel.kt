@@ -13,16 +13,13 @@ import androidx.lifecycle.viewModelScope
 import com.warped.data.grounding.DocumentPrompt
 import com.warped.data.grounding.DocumentReader
 import com.warped.data.grounding.DuckDuckGoSearchRepository
+// Retained for Hilt/test-fixture stability: the VM no longer pre-searches
+// (user decision 2026-10-03) — DDG serves the provider-side agentic loop.
 import com.warped.data.grounding.GroundingPrecedence
 import com.warped.data.grounding.GroundingPrompt
 import com.warped.data.grounding.GroundingResult
-import com.warped.data.grounding.ImageIntent
 import com.warped.data.grounding.MultiUrlFetcher
-import com.warped.data.grounding.CodeIntent
-import com.warped.data.grounding.AnaphoraAnchor
-import com.warped.data.grounding.NeedsWeb
 import com.warped.data.grounding.MultiUrlResult
-import com.warped.data.grounding.SearchOutcome
 import com.warped.data.grounding.UrlDetector
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.inference.BackendType
@@ -834,170 +831,12 @@ class ChatViewModel @Inject constructor(
                         } finally {
                             updateInput { it.copy(isFetchingWeb = false, webFetchProgress = null) }
                         }
-                    // Quick-task (attachments-skip-search): the no-URL
-                    // branch below runs ONLY on attachment-free turns.
-                    // Attachment turns (images/audio) skip the heuristic
-                    // no-URL pre-search entirely — v2.4 Phase 55
-                    // regression: blind text search on image/audio-question
-                    // turns injects junk context about the question words
-                    // while the question is about the attachment, and the
-                    // small model answers from the injected text ignoring
-                    // the attachment. Skipped turns keep requestUserText as
-                    // the original text with grounded*/notice empty/null
-                    // (no augment, no banner — the skip is deliberate, not
-                    // a failure). The URL branch above still fetches with
-                    // attachments; loop arming, the capability media gate,
-                    // and the provider attach path are untouched (the model
-                    // may still tool-search with full multimodal context).
-                    } else if (images.isEmpty() && audioBytes == null) {
-                        // Quick-task (code-intent-gate): social/identity OR
-                        // code-generation turns skip the pre-search entirely
-                        // — no socket, no credit, no notice, no progress
-                        // state. Identical to grounding-off for this turn.
-                        // This gate touches the heuristic pre-search ONLY:
-                        // the armed loop REMAINS the model's escape hatch —
-                        // it can still web_search mid-turn for versioned or
-                        // fresh API facts the weights don't cover.
-                        if (!NeedsWeb.needsWeb(userMessage.content) ||
-                            CodeIntent.isCodeTurn(userMessage.content)
-                        ) {
-                            Timber.d("Chat: social/code turn — skipping pre-search")
-                        } else {
-                        // Quick-task (DDG-default): DDG-primary search
-                        // branch. Runs ONLY when all hold — doGround (the
-                        // once-per-send GroundingPrecedence.shouldGround read
-                        // above, same precedence as fetch, never re-read
-                        // mid-turn), validated internet (offline yields the
-                        // existing OFFLINE model-only path with no socket
-                        // opened), and — NEW — no key gate at all: the DDG
-                        // repository searches keylessly, so a DDG-OK turn
-                        // is a silent success (no notice) and a DDG-fail
-                        // turn is the FETCH_FAILED notice.
-                        // Success fuses through the IDENTICAL downstream
-                        // path as URL grounding: GroundingPrompt.augment of
-                        // requestUserText, groundedSources/okUrls, the
-                        // details-union persist below, per-source OK/OMITIDA
-                        // progress snapshot, Fuentes/preview/citations
-                        // untouched. Runs on Dispatchers.IO inside the
-                        // repository (same as fetchAll) — never the UI
-                        // thread (T-55-06/T-55-07).
-                        val online = try {
-                            fetcher.hasValidatedInternet()
-                        } catch (e: Exception) {
-                            Timber.w(e, "Chat: connectivity check failed, treating as offline")
-                            false
-                        }
-                        // Always-on pre-search (quick-task always-search): the
-                        // DDG-primary branch runs on EVERY grounded no-URL
-                        // turn INCLUDING armed ones. DDG is free/keyless so
-                        // this adds 0 credits when DDG serves the turn; the
-                        // loop stays armed provider-side (computeArmSnapshot
-                        // / ConversationConfig.tools untouched) for deeper
-                        // model-driven fetch, and loop ToolCompleted rows
-                        // keep merging with pre-search details in the Done
-                        // union below. There is deliberately NO VM-level
-                        // direct keyed call and NO loop-cap change — the
-                        // DDG-only `DuckDuckGoSearchRepository.search`
-                        // serves every turn keylessly; image-intent turns
-                        // fuse zero images (DDG has no image API).
-                        if (!online) {
-                            modelOnlyNotice = ModelOnlyNotice.OFFLINE
-                            requestUserText = GroundingPrompt.augment(
-                                requestUserText,
-                                null,
-                                groundingEnabled = doGround,
-                            )
-                        } else {
-                            // Quick-task (image-grid): intent-gated
-                            // include_images — the DDG leg has no image API
-                            // and fuses zero images. Non-intent turns pass
-                            // false: byte-identical to today, no extra
-                            // payload.
-                            val wantImages = ImageIntent.hasImageIntent(userMessage.content)
-                            val searchCount = DuckDuckGoSearchRepository.DEFAULT_MAX_RESULTS
-                            updateInput {
-                                it.copy(
-                                    isFetchingWeb = true,
-                                    webFetchProgress = WebFetchProgress(
-                                        done = 0,
-                                        total = searchCount,
-                                        perSource = emptyList(),
-                                    ),
-                                )
-                            }
-                            try {
-                                val contextSize = state.generationParameters.contextSize
-                                // Quick-task (always-presearch-anchored):
-                                // anaphoric follow-ups ("Quien es su
-                                // hermanastro?") search the prior turn's
-                                // topic words, not the bare message — anchor
-                                // = most recent prior USER turn (else last
-                                // assistant), capped + deduped inside
-                                // AnaphoraAnchor. No-history turns return the
-                                // raw message (today's behavior,
-                                // byte-identical). Query-text only: DDG stays
-                                // free/keyless (latency, not credits),
-                                // loop cap untouched.
-                                val priorMessages = _transcript.value.messages.dropLast(1)
-                                val anchoredQuery = AnaphoraAnchor.buildQuery(
-                                    userMessage.content,
-                                    priorMessages.filter { it.role == Role.USER }.map { it.content },
-                                    priorMessages.lastOrNull { it.role == Role.ASSISTANT }?.content,
-                                )
-                                when (
-                                    val outcome = ddgSearchRepository.search(
-                                        query = anchoredQuery,
-                                        maxResults = searchCount,
-                                        contextSize = contextSize,
-                                        includeImages = wantImages,
-                                    )
-                                ) {
-                                    is SearchOutcome.Grounded -> {
-                                        val fused = outcome.fused
-                                        requestUserText = GroundingPrompt.augment(
-                                            requestUserText,
-                                            fused.block,
-                                            groundingEnabled = doGround,
-                                        )
-                                        groundedSources = fused.okUrls
-                                        groundedSourceDetails = fused.details
-                                        groundedImages = fused.images
-                                        val total =
-                                            fused.okUrls.size + fused.skippedUrls.size
-                                        updateInput { s ->
-                                            s.copy(
-                                                webFetchProgress = s.webFetchProgress?.copy(
-                                                    done = total,
-                                                    perSource = fused.okUrls.map { url ->
-                                                        SourceFetchState(url, PerSourceStatus.OK)
-                                                    } + fused.skippedUrls.map { url ->
-                                                        SourceFetchState(url, PerSourceStatus.OMITIDA)
-                                                    },
-                                                ),
-                                            )
-                                        }
-                                    }
-                                    is SearchOutcome.ModelOnly -> {
-                                        modelOnlyNotice = when (outcome.failed.reason) {
-                                            GroundingResult.Reason.OFFLINE -> ModelOnlyNotice.OFFLINE
-                                            GroundingResult.Reason.FETCH_FAILED -> ModelOnlyNotice.FETCH_FAILED
-                                        }
-                                        requestUserText = GroundingPrompt.augment(
-                                            requestUserText,
-                                            null,
-                                            groundingEnabled = doGround,
-                                        )
-                                    }
-                                }
-                                // Image-intent turns fuse zero images (DDG
-                                // has no image API) with text grounding
-                                // preserved — no notice attached.
-                            } finally {
-                                updateInput { it.copy(isFetchingWeb = false, webFetchProgress = null) }
-                            }
-                        }
-                        } // needs-web gate: social turns skip the block above
                     }
+                    // User decision 2026-10-03: no heuristic pre-search.
+                    // The app never searches on the model's behalf — only
+                    // user-pasted URLs fetch (branch above) and the armed
+                    // agentic loop (capable models only) searches mid-turn.
+                    // The model decides; the NeedsWeb gate is gone.
                 }
 
                 val selectedProvider = effectiveProvider
