@@ -265,7 +265,14 @@ fun ChatInputBar(
             // untouched: this block only runs on external change.
             var fieldValue by remember { mutableStateOf(TextFieldValue(text, TextRange(text.length))) }
             var inputFocused by remember { mutableStateOf(false) }
-            if (fieldValue.text != text) {
+            // Never overwrite a buffer the IME is actively composing
+            // (autocorrect/predictions): fieldValue.text transiently differs
+            // from the VM text mid-composition, and "syncing" it back
+            // destroys the composition — typed characters get stuck,
+            // duplicated, or undeletable. The IME commits the final text
+            // through onValueChange, which converges both states without
+            // any forced write here.
+            if (fieldValue.composition == null && fieldValue.text != text) {
                 fieldValue = if (inputFocused) {
                     val kept = fieldValue.selection
                     fieldValue.copy(
