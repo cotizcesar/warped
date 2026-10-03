@@ -108,8 +108,8 @@ fun ChatInputBar(
     draftDurationMs: Long = 0L,
     onPlayDraft: () -> Unit = {},
     onPauseDraft: () -> Unit = {},
-    onSendDraft: () -> Unit = {},
     onDeleteDraft: () -> Unit = {},
+    onSeekDraft: (Int) -> Unit = {},
     // Model-loading gate (2026-10-02): while a model loads, the WHOLE
     // input is disabled — text field, image/think buttons, mic, and send.
     isLoadingModel: Boolean = false,
@@ -247,8 +247,8 @@ fun ChatInputBar(
                     durationMs = draftDurationMs,
                     onPlay = onPlayDraft,
                     onPause = onPauseDraft,
-                    onSend = onSendDraft,
                     onDelete = onDeleteDraft,
+                    onSeek = onSeekDraft,
                 )
                 Spacer(Modifier.height(8.dp))
             }
@@ -733,8 +733,8 @@ private fun DraftPreviewCard(
     durationMs: Long,
     onPlay: () -> Unit,
     onPause: () -> Unit,
-    onSend: () -> Unit,
     onDelete: () -> Unit,
+    onSeek: (Int) -> Unit = {},
 ) {
     val totalSec = (durationMs / 1000).toInt().coerceAtLeast(0)
     val stateWord = stringResource(
@@ -746,61 +746,32 @@ private fun DraftPreviewCard(
         totalSec % 60,
         stateWord,
     )
+    // Same player component as the chat history bubbles (VoicePlayerRow:
+    // play/pause + scrubbable progress + total m:ss), only wrapped
+    // rounder (20dp) with a delete affordance instead of send — sending
+    // happens through the input-row send button (hasVoiceClip counts as
+    // content). No send button here by design.
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
-        shape = MaterialTheme.shapes.medium,
+        shape = RoundedCornerShape(20.dp),
         modifier = Modifier
             .fillMaxWidth()
             .semantics { stateDescription = announceText },
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(start = 4.dp, top = 4.dp, end = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(
-                onClick = { if (isPlaying) onPause() else onPlay() },
-                modifier = Modifier.size(48.dp),
-            ) {
-                Icon(
-                    if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    stringResource(
-                        if (isPlaying) R.string.voice_msg_pause_draft
-                        else R.string.voice_msg_play_draft
-                    ),
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp),
-                )
-            }
-            Spacer(Modifier.width(4.dp))
-            LinearProgressIndicator(
-                progress = {
-                    if (durationMs > 0) {
-                        (positionMs.toFloat() / durationMs).coerceIn(0f, 1f)
-                    } else {
-                        0f
-                    }
-                },
+            VoicePlayerRow(
+                durationMs = durationMs,
+                isPlaying = isPlaying,
+                positionMs = positionMs,
+                fileMissing = false,
+                onPlay = onPlay,
+                onPause = onPause,
+                onSeek = onSeek,
                 modifier = Modifier.weight(1f),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                "%d:%02d".format(totalSec / 60, totalSec % 60),
-                style = MaterialTheme.typography.labelLarge.copy(
-                    fontFeatureSettings = "tnum"
-                ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.width(8.dp))
-            IconButton(onClick = onSend, modifier = Modifier.size(48.dp)) {
-                Icon(
-                    Icons.AutoMirrored.Filled.Send,
-                    stringResource(R.string.voice_msg_send_voice),
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp),
-                )
-            }
             IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
                 Icon(
                     Icons.Filled.Delete,

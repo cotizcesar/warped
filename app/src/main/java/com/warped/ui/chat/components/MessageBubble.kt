@@ -755,7 +755,7 @@ private fun MessageImageStack(imageUris: List<String>) {    Column(verticalArran
  * never a silent drop, never a crash.
  */
 @Composable
-private fun VoicePlayerRow(
+fun VoicePlayerRow(
     durationMs: Long,
     isPlaying: Boolean,
     positionMs: Int,
@@ -763,6 +763,7 @@ private fun VoicePlayerRow(
     onPlay: () -> Unit,
     onPause: () -> Unit,
     onSeek: (Int) -> Unit = {},
+    modifier: Modifier = Modifier,
 ) {
     if (fileMissing) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -792,7 +793,7 @@ private fun VoicePlayerRow(
     )
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.semantics { stateDescription = rowState },
+        modifier = modifier.semantics { stateDescription = rowState },
     ) {
         IconButton(
             onClick = { if (isPlaying) onPause() else onPlay() },
