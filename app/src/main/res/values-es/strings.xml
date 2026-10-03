@@ -255,7 +255,6 @@
     <string name="voice_msg_too_short">Grabación muy corta</string>
     <string name="voice_msg_play_draft">Escuchar borrador de voz</string>
     <string name="voice_msg_pause_draft">Pausar borrador de voz</string>
-    <string name="voice_msg_send_voice">Enviar mensaje de voz</string>
     <string name="voice_msg_delete_draft">Eliminar borrador de voz</string>
     <string name="voice_msg_draft_state">Borrador de voz, %1$d:%2$02d, %3$s</string>
     <string name="voice_msg_draft_playing">reproduciendo</string>

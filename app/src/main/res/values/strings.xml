@@ -254,7 +254,6 @@
     <string name="voice_msg_too_short">Recording too short</string>
     <string name="voice_msg_play_draft">Play voice draft</string>
     <string name="voice_msg_pause_draft">Pause voice draft</string>
-    <string name="voice_msg_send_voice">Send voice message</string>
     <string name="voice_msg_delete_draft">Delete voice draft</string>
     <string name="voice_msg_draft_state">Voice draft, %1$d:%2$02d, %3$s</string>
     <string name="voice_msg_draft_playing">playing</string>
