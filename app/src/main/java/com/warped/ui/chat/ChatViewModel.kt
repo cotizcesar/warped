@@ -1176,7 +1176,21 @@ class ChatViewModel @Inject constructor(
                 val rawBuffer = StringBuilder()
                 val reasoningActive = _input.value.reasoningEnabled
                 val modelMayThink = state.localModels.firstOrNull { it.filePath == modelId }?.capabilities?.reasoning == true
-                Timber.d("ChatVM: sendMessage reasoningActive=%b modelMayThink=%b", reasoningActive, modelMayThink)
+                // Verified-only thinker gate (not the hardcoded
+                // LocalModel.capabilities above, true for everything):
+                // drives live think routing — provisional thought goes
+                // to the Thinking panel mid-stream only for models with
+                // observed in-band reasoning. R1 distills always think;
+                // the toggle governs display, never generation.
+                val modelThinks = modelId?.substringAfterLast("/")?.let { fileName ->
+                    try {
+                        modelAllowlistRepository.findByModelFile(fileName)?.capabilities?.supportsThinking == true
+                    } catch (e: Exception) {
+                        Timber.w(e, "ChatVM: allowlist think lookup failed")
+                        false
+                    }
+                } == true
+                Timber.d("ChatVM: sendMessage reasoningActive=%b modelMayThink=%b modelThinks=%b", reasoningActive, modelMayThink, modelThinks)
                 // Quick-task (live-thinking): native thought deltas stream
                 // here DURING generation (Thinking), not just at Done.
                 // liveThought is the streamed authoritative mirror of the
@@ -1249,7 +1263,12 @@ class ChatViewModel @Inject constructor(
                             if (now - lastEmitTime >= 50) {
                                 val chunk = tokenBuffer.joinToString("")
                                 rawBuffer.append(chunk)
-                                val (cleanContent, reasoning) = parseThinkBlocks(rawBuffer.toString(), reasoningActive)
+                                val (cleanContent, reasoning) = parseThinkBlocks(
+                                    rawBuffer.toString(),
+                                    reasoningActive,
+                                    live = true,
+                                    modelThinks = modelThinks,
+                                )
                                 // Quick-task (live-thinking): a text flush
                                 // must not blank an in-flight native thought
                                 // panel — fall back to the streamed thought

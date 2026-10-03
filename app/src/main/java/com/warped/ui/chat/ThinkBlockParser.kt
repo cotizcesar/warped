@@ -29,10 +29,35 @@ private const val CLOSE_TAG = "</think>"
  *   answer clean. Without any close tag the text is a plain answer and is
  *   kept (tags scrubbed).
  *
+ * Live mode ([live]=true, mid-stream flushes): tag-less text cannot be
+ * classified yet — the `</think>` that proves thought may still be coming.
+ * For verified thinkers ([modelThinks]) route provisionally: thinking-on
+ * shows it in the Thinking panel from the first token, thinking-off
+ * suppresses it until the close tag (or the end). Non-thinkers stream
+ * untouched so plain answers never blank mid-stream. At Done ([live]=false)
+ * tag-less text is always the answer (no flicker-back for models that
+ * never emit tags).
+ *
  * Pure — unit-tested. Extracted from ChatViewModel (same logic + orphan
  * handling); the `modelMayThink` reservation is kept at the call sites.
  */
-internal fun parseThinkBlocks(raw: String, enabled: Boolean = true): Pair<String, String> {
+internal fun parseThinkBlocks(
+    raw: String,
+    enabled: Boolean = true,
+    live: Boolean = false,
+    modelThinks: Boolean = false,
+): Pair<String, String> {
+    val lower = raw.lowercase()
+    // Note: "</think>" does NOT contain "<think" ('<' is followed by '/'),
+    // so the orphan close needs its own check.
+    val hasMarker = "<think" in lower || "</think" in lower || "<channel" in lower
+    if (live && modelThinks && !hasMarker) {
+        return if (enabled) {
+            Pair("", raw.trim())
+        } else {
+            Pair("", "")
+        }
+    }
     if (!enabled) {
         val closeIdx = raw.lowercase().indexOf(CLOSE_TAG)
         val dropped = if (closeIdx >= 0) raw.substring(closeIdx + CLOSE_TAG.length) else raw
