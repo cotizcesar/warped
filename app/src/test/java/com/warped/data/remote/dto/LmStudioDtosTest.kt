@@ -45,4 +45,23 @@ class LmStudioDtosTest {
         assertThat(embedding.capabilities).isNull()
         assertThat(embedding.architecture).isNull()
     }
+
+    @Test
+    fun `parses loaded_instances to tell loaded from available`() {
+        // Docs: GET /api/v1/models lists AVAILABLE models — only a
+        // non-empty loaded_instances means loaded. The golden file has
+        // one loaded, one available-but-idle, one embedding.
+        val raw = java.io.File("src/test/resources/lmstudio_models.json").readText()
+        val response = json.decodeFromString<LmStudioModelListResponse>(raw)
+
+        val loaded = response.models.first { it.key == "google/gemma-4-12b-qat" }
+        assertThat(loaded.loadedInstances).hasSize(1)
+        assertThat(loaded.loadedInstances.single().id).isEqualTo("google/gemma-4-12b-qat")
+
+        val idle = response.models.first { it.key == "google/gemma-4-12b" }
+        assertThat(idle.loadedInstances).isEmpty()
+
+        val embedding = response.models.first { it.type == "embedding" }
+        assertThat(embedding.loadedInstances).isEmpty()
+    }
 }

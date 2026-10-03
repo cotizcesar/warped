@@ -59,7 +59,18 @@ data class LmStudioModelData(
     val capabilities: LmStudioCapabilities? = null,
     val description: String? = null,
     val variants: List<String> = emptyList(),
-    @SerialName("selected_variant") val selectedVariant: String? = null
+    @SerialName("selected_variant") val selectedVariant: String? = null,
+    /**
+     * Currently loaded instances of this model (docs: `GET /api/v1/models`
+     * lists AVAILABLE models; a model is loaded iff this is non-empty).
+     * Absent for embedding models and older servers → default empty.
+     */
+    @SerialName("loaded_instances") val loadedInstances: List<LmStudioLoadedInstance> = emptyList()
+)
+
+@Serializable
+data class LmStudioLoadedInstance(
+    val id: String = ""
 )
 
 @Serializable

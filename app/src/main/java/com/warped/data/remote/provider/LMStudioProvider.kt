@@ -514,6 +514,29 @@ class LMStudioProvider(
         return Result.failure(lastError ?: IllegalStateException("No LM Studio endpoint responded with models"))
     }
 
+    /**
+     * Keys (plus selected variants) with at least one loaded instance,
+     * per `GET /api/v1/models` `loaded_instances` (docs: the list shows
+     * AVAILABLE models — presence alone never means loaded). Used by the
+     * load-skip check. Failure/empty → empty set (fail-safe: reload).
+     */
+    suspend fun listLoadedModelKeys(): Result<Set<String>> {
+        return try {
+            val response = api.listModelsByPath("api/v1/models")
+            if (!response.isSuccessful) {
+                return Result.failure(Exception("HTTP ${response.code()}"))
+            }
+            val keys = response.body()?.models.orEmpty()
+                .filter { it.loadedInstances.isNotEmpty() }
+                .flatMap { listOfNotNull(it.key, it.selectedVariant) }
+                .toSet()
+            Result.success(keys)
+        } catch (e: Exception) {
+            Timber.w(e, "LMStudioProvider.listLoadedModelKeys failed")
+            Result.failure(e)
+        }
+    }
+
     suspend fun loadModel(modelKey: String): Result<String> {
         return try {
             val request = com.warped.data.remote.dto.LmStudioLoadRequest(model = modelKey)

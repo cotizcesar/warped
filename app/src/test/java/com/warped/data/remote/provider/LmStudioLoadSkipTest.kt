@@ -49,11 +49,22 @@ class LmStudioLoadSkipTest {
         })
         srv.createContext("/api/v1/models", HttpHandler { exchange ->
             exchange.requestBody.readAllBytes()
-            val models = loadedKeys.joinToString(",") { """{"key":"$it","displayName":"$it"}""" }
-            val body = """{"models":[$models]}""".toByteArray()
+            // Docs-shaped: availability list where ONLY non-empty
+            // loaded_instances means loaded. An available-but-unloaded
+            // model must NOT suppress the reload.
+            val models = loadedKeys.joinToString(",") {
+                """{"key":"$it","display_name":"$it","loaded_instances":[{"id":"$it"}]}"""
+            }
+            val available = """{"key":"other","display_name":"other","loaded_instances":[]}"""
+            val body = if (models.isEmpty()) {
+                """{"models":[$available]}"""
+            } else {
+                """{"models":[$models,$available]}"""
+            }
+            val bytes = body.toByteArray()
             exchange.responseHeaders.add("Content-Type", "application/json")
-            exchange.sendResponseHeaders(200, body.size.toLong())
-            exchange.responseBody.use { it.write(body) }
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
         })
         srv.executor = Executors.newCachedThreadPool { r -> Thread(r).also { it.isDaemon = true } }
         srv.start()
