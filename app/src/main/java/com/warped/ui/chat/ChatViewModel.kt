@@ -1029,6 +1029,20 @@ class ChatViewModel @Inject constructor(
                         false
                     }
                 } == true
+                // Provisional live routing ONLY for dedicated reasoners:
+                // R1 distills always think, so tag-less mid-stream text
+                // is thought. Hybrids (SmolLM3, no name marker) answer
+                // directly when the question is simple — that text must
+                // stream in the bubble, reaching the panel only once
+                // think markers are actually seen.
+                val alwaysThinks = modelId?.substringAfterLast("/")?.let { fileName ->
+                    try {
+                        val entryName = modelAllowlistRepository.findByModelFile(fileName)?.name ?: ""
+                        modelThinks && hasReasoningMarker(entryName)
+                    } catch (e: Exception) {
+                        false
+                    }
+                } == true
                 Timber.d("ChatVM: sendMessage reasoningActive=%b modelMayThink=%b modelThinks=%b", reasoningActive, modelMayThink, modelThinks)
                 // Quick-task (live-thinking): native thought deltas stream
                 // here DURING generation (Thinking), not just at Done.
@@ -1106,7 +1120,7 @@ class ChatViewModel @Inject constructor(
                                     rawBuffer.toString(),
                                     reasoningActive,
                                     live = true,
-                                    modelThinks = modelThinks,
+                                    modelThinks = alwaysThinks,
                                 )
                                 // Quick-task (live-thinking): a text flush
                                 // must not blank an in-flight native thought

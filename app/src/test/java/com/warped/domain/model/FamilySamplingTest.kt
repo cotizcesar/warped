@@ -85,4 +85,15 @@ class FamilySamplingTest {
         assertThat(p.topK).isEqualTo(50)
         assertThat(p.repeatPenalty).isEqualTo(1.05f)
     }
+
+    @Test
+    fun `reasoning markers match dedicated reasoners only`() {
+        assertThat(hasReasoningMarker("deepseek-r1-1.5b")).isTrue()
+        assertThat(hasReasoningMarker("Qwen3 0.6B Thinking (int4)")).isTrue()
+        assertThat(hasReasoningMarker("Ministral 3 3B Reasoning")).isTrue()
+        // Hybrids answer directly when the question is simple.
+        assertThat(hasReasoningMarker("smolllm3-3b")).isFalse()
+        assertThat(hasReasoningMarker("Gemma 4 E2B")).isFalse()
+        assertThat(hasReasoningMarker("qwen3-4b")).isFalse()
+    }
 }

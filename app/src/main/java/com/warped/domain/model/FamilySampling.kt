@@ -27,9 +27,7 @@ data class FamilySampling(
 
 fun familySamplingFor(modelName: String, thinking: Boolean): FamilySampling? {
     val name = modelName.lowercase()
-    val reasoning = thinking ||
-        "thinking" in name || "reasoning" in name ||
-        "r1" in name || "distill" in name
+    val reasoning = thinking || hasReasoningMarker(modelName)
     return when {
         "qwen3" in name -> if (reasoning) {
             FamilySampling(temperature = 0.6f, topK = 20, topP = 0.95f)
@@ -65,4 +63,18 @@ fun familySamplingFor(modelName: String, thinking: Boolean): FamilySampling? {
             FamilySampling(temperature = 0.8f, topK = 40, topP = 0.8f)
         else -> null
     }
+}
+
+/**
+ * Name markers for dedicated reasoning models (R1 distills, thinking /
+ * reasoning variants). These ALWAYS emit a thought trace, so live
+ * think-routing may assume tag-less mid-stream text is thought.
+ * Hybrid thinkers (SmolLM3: answers directly when the question is
+ * simple) carry no marker — their plain answers must stream in the
+ * bubble, routing to the panel only once think markers are seen.
+ */
+internal fun hasReasoningMarker(modelName: String): Boolean {
+    val name = modelName.lowercase()
+    return "thinking" in name || "reasoning" in name ||
+        "r1" in name || "distill" in name
 }
