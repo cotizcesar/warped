@@ -736,15 +736,18 @@ private fun AttachMenuButton(
                 onDismissRequest = { expanded = false },
             ) {
                 Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    tonalElevation = 3.dp,
+                    // Same look as the input bar itself (Color 0xFF2B2B29,
+                    // extraLarge) so the menu reads as its extension.
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = Color(0xFF2B2B29),
+                    tonalElevation = 2.dp,
                     shadowElevation = 8.dp,
                 ) {
                     Column(modifier = Modifier.padding(vertical = 8.dp)) {
                         AttachMenuRow(
                             icon = Icons.Filled.AddPhotoAlternate,
                             label = stringResource(R.string.attach_menu_photos),
+                            description = stringResource(R.string.attach_menu_photos_desc),
                             onClick = {
                                 expanded = false
                                 onPickPhotos()
@@ -753,6 +756,7 @@ private fun AttachMenuButton(
                         AttachMenuRow(
                             icon = Icons.Filled.AttachFile,
                             label = stringResource(R.string.attach_menu_files),
+                            description = stringResource(R.string.attach_menu_files_desc),
                             onClick = {
                                 expanded = false
                                 onPickFiles()
@@ -769,15 +773,23 @@ private fun AttachMenuButton(
 private fun AttachMenuRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
+    description: String,
     onClick: () -> Unit,
 ) {
     DropdownMenuItem(
         text = {
-            Text(
-                label,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            Column {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         },
         leadingIcon = {
             Box(

@@ -284,7 +284,9 @@
     <string name="doc_reader_attached">Document attached: %1$s</string>
     <string name="attach_menu_content_desc">Attach photos or files</string>
     <string name="attach_menu_photos">Photos</string>
+    <string name="attach_menu_photos_desc">Send images with your message</string>
     <string name="attach_menu_files">Files</string>
+    <string name="attach_menu_files_desc">Attach a text file to read</string>
 
     <!-- Capability badges -->
     <string name="badge_vision">Vision</string>

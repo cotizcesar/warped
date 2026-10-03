@@ -285,7 +285,9 @@
     <string name="doc_reader_attached">Documento adjunto: %1$s</string>
     <string name="attach_menu_content_desc">Adjuntar fotos o archivos</string>
     <string name="attach_menu_photos">Fotos</string>
+    <string name="attach_menu_photos_desc">Enviar imágenes con tu mensaje</string>
     <string name="attach_menu_files">Archivos</string>
+    <string name="attach_menu_files_desc">Adjuntar un archivo de texto para leer</string>
 
     <!-- Insignias de capacidad -->
     <string name="badge_vision">Visión</string>
