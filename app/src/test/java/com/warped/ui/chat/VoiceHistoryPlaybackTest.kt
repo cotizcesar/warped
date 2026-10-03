@@ -578,4 +578,52 @@ class VoiceHistoryPlaybackTest {
 
         assertThat(clip.exists()).isFalse()
     }
+
+    @Test
+    fun `seek within active clip moves player and position flow`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
+        val vm = buildViewModel(idleHelper(), modelFile.absolutePath)
+        runCurrent()
+        attachPlayer(vm)
+        val clip = File(tempDir, "h1.m4a").apply { writeText("fake-audio") }
+        val message = voiceMessage(clip.absolutePath)
+
+        vm.playHistoryVoice(message)
+        // playHistoryVoice launches on Dispatchers.IO (a real thread under
+        // runTest) — await the id via turbine like the neighboring tests
+        // instead of asserting synchronously.
+        vm.playingMessageId.test {
+            val initial = awaitItem()
+            var id = initial
+            while (id != message.id) id = awaitItem()
+        }
+        assertThat(vm.isHistoryPlaying.value).isTrue()
+
+        vm.seekHistoryVoice(3_000)
+        // Seek also lands on IO — await the position flow refresh (the
+        // VM sets it right after the player seek, so the bar never snaps
+        // back to the poll value).
+        vm.historyPositionMs.test {
+            var pos = awaitItem()
+            while (pos != 3_000) pos = awaitItem()
+        }
+
+        assertThat(playerHandles.single().position).isEqualTo(3_000)
+    }
+
+    @Test
+    fun `seek with no active bubble is a no-op`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
+        val vm = buildViewModel(idleHelper(), modelFile.absolutePath)
+        runCurrent()
+        attachPlayer(vm)
+
+        vm.seekHistoryVoice(3_000)
+        advanceUntilIdle()
+
+        assertThat(vm.historyPositionMs.value).isEqualTo(0)
+        assertThat(playerHandles).isEmpty()
+    }
 }

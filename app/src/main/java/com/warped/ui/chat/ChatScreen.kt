@@ -738,6 +738,7 @@ fun ChatScreen(
                                 voiceFileMissing = message.audioPath != null && !voiceFileAvailable,
                                 onPlayVoice = { viewModel.toggleHistoryVoice(message) },
                                 onPauseVoice = { viewModel.pauseHistoryVoice() },
+                                onSeekVoice = { viewModel.seekHistoryVoice(it) },
                             )
                         }
                         if (showStreamingBubble) {

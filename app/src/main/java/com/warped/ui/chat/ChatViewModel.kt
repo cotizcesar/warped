@@ -2857,6 +2857,25 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Seek within the active history clip (playing or paused). No-op
+     * without a selected bubble — scrubbing an idle row does nothing.
+     * The position flow refreshes immediately so the bar never snaps
+     * back; the poll loop keeps it live afterwards while playing.
+     */
+    fun seekHistoryVoice(positionMs: Int) {
+        if (_playingMessageId.value == null) return
+        val target = positionMs.coerceAtLeast(0)
+        viewModelScope.launch(Dispatchers.IO + coroutineExceptionHandler) {
+            try {
+                getVoicePlayer().seekTo(target)
+            } catch (e: Exception) {
+                Timber.w(e, "VoiceMsg: history seek failed")
+            }
+            _historyPositionMs.value = target
+        }
+    }
+
     /** Phase 68: bubble-toggle convenience — pause this clip if playing, else play. */
     fun toggleHistoryVoice(message: ChatMessage) {
         if (_playingMessageId.value == message.id && _isHistoryPlaying.value) {

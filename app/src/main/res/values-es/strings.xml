@@ -270,7 +270,6 @@
     <string name="voice_msg_show_less">Mostrar menos</string>
     <string name="voice_msg_transcript_expanded">Transcripción expandida</string>
     <string name="voice_msg_transcript_collapsed">Transcripción contraída</string>
-    <string name="voice_msg_transcript_fallback">%1$d:%2$02d mensaje de voz</string>
     <!-- Coachmark de primer uso (Phase 69) -->
     <string name="voice_msg_coachmark">Mensaje de voz</string>
     <!-- Lector de documentos (Phase 70) -->

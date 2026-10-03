@@ -269,7 +269,6 @@
     <string name="voice_msg_show_less">Show less</string>
     <string name="voice_msg_transcript_expanded">Transcript expanded</string>
     <string name="voice_msg_transcript_collapsed">Transcript collapsed</string>
-    <string name="voice_msg_transcript_fallback">%1$d:%2$02d voice message</string>
     <!-- First-use coachmark (Phase 69) -->
     <string name="voice_msg_coachmark">Voice message</string>
     <!-- Document reader (Phase 70) -->

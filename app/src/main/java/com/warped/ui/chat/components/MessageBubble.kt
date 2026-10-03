@@ -11,6 +11,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.*
@@ -42,7 +44,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -86,6 +90,9 @@ fun MessageBubble(
     voiceFileMissing: Boolean = false,
     onPlayVoice: () -> Unit = {},
     onPauseVoice: () -> Unit = {},
+    // Voice-bubble scrub: caller seeks to an absolute ms position.
+    // Defaults keep previews and non-voice callers compiling unchanged.
+    onSeekVoice: (Int) -> Unit = {},
     // Phase 69 Plan 02 (VMSG-07): transcript caption source override.
     // Defaults to null so previews and non-voice callers compile unchanged;
     // the caption reads this first, then message.transcript hydrated from
@@ -175,7 +182,9 @@ fun MessageBubble(
         }
         Surface(
             color = if (isUser) Color(0xFF121212) else Color.Transparent,
-            shape = RoundedCornerShape(12.dp),
+            // Voice messages render rounder (20dp pill feel); everything
+            // else keeps the 12dp bubble.
+            shape = RoundedCornerShape(if (isUser && message.audioPath != null) 20.dp else 12.dp),
             // Assistant messages use the full chat width (ChatGPT-style
             // plain text, no bubble cap) and grow line-by-line with a
             // smooth size transition while streaming — the container
@@ -275,6 +284,7 @@ fun MessageBubble(
                         fileMissing = voiceFileMissing,
                         onPlay = onPlayVoice,
                         onPause = onPauseVoice,
+                        onSeek = onSeekVoice,
                     )
                     // Phase 69 Plan 02 (VMSG-07): transcript caption
                     // UNDERNEATH the player row (Phase 68 chrome untouched —
@@ -752,6 +762,7 @@ private fun VoicePlayerRow(
     fileMissing: Boolean,
     onPlay: () -> Unit,
     onPause: () -> Unit,
+    onSeek: (Int) -> Unit = {},
 ) {
     if (fileMissing) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -800,18 +811,58 @@ private fun VoicePlayerRow(
             )
         }
         Spacer(Modifier.width(4.dp))
-        LinearProgressIndicator(
-            progress = {
-                if (durationMs > 0) {
-                    (positionMs.toFloat() / durationMs).coerceIn(0f, 1f)
-                } else {
-                    0f
-                }
-            },
-            modifier = Modifier.weight(1f),
-            color = MaterialTheme.colorScheme.primary,
-            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-        )
+        // Scrubbable progress: tap jumps, horizontal drag previews and
+        // seeks on release. The touch target (28dp box) is taller than
+        // the bar visual so a finger lands it easily; the bar itself
+        // keeps the LinearProgressIndicator look. While scrubbing, the
+        // preview fraction wins over the polled position; release hands
+        // the absolute ms to the VM (which also refreshes its flow, so
+        // the bar never snaps back).
+        var barWidthPx by remember { mutableIntStateOf(1) }
+        var scrubFraction by remember { mutableStateOf<Float?>(null) }
+        val baseFraction = if (durationMs > 0) {
+            (positionMs.toFloat() / durationMs).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(28.dp)
+                .onSizeChanged { barWidthPx = it.width.coerceAtLeast(1) },
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            LinearProgressIndicator(
+                progress = { scrubFraction ?: baseFraction },
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            )
+            Spacer(
+                Modifier
+                    .matchParentSize()
+                    .pointerInput(durationMs) {
+                        detectTapGestures { offset ->
+                            val fraction = (offset.x / size.width).coerceIn(0f, 1f)
+                            onSeek((fraction * durationMs).toInt())
+                        }
+                    }
+                    .pointerInput(durationMs) {
+                        var dragX = 0f
+                        detectHorizontalDragGestures(
+                            onDragStart = { offset -> dragX = offset.x },
+                            onDragCancel = { scrubFraction = null },
+                            onDragEnd = {
+                                scrubFraction?.let { onSeek((it * durationMs).toInt()) }
+                                scrubFraction = null
+                            },
+                        ) { _, dragAmount ->
+                            dragX += dragAmount
+                            scrubFraction = (dragX / barWidthPx).coerceIn(0f, 1f)
+                        }
+                    }
+            )
+        }
         Spacer(Modifier.width(8.dp))
         Text(
             "%d:%02d".format(totalSec / 60, totalSec % 60),
@@ -830,8 +881,7 @@ private fun VoicePlayerRow(
  * primary-tinted expand/collapse affordance shown ONLY when the text
  * exceeds 2 lines (latched from onTextLayout overflow — expanded text
  * never overflows, so a plain read would hide the collapse affordance). NULL/blank
- * renders the duration-only fallback in identical styling (informational,
- * never error-red — missing STT is not a user error).
+ * renders nothing (the row's m:ss readout already covers duration).
  *
  * Expansion state is plain remember keyed by message id — rotation resets
  * to collapsed, acceptable per UI-SPEC.
@@ -842,19 +892,11 @@ private fun VoiceTranscriptCaption(
     durationMs: Long,
     messageKey: String,
 ) {
-    if (transcript.isNullOrBlank()) {
-        val totalSec = (durationMs / 1000).toInt().coerceAtLeast(0)
-        Text(
-            text = stringResource(
-                R.string.voice_msg_transcript_fallback,
-                totalSec / 60,
-                totalSec % 60,
-            ),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        return
-    }
+    // No transcript → no caption line. The player row already shows the
+    // total m:ss readout, so the old duration-only fallback
+    // ("0:07 voice message") was redundant — removed per design. Real
+    // transcripts still render below.
+    if (transcript.isNullOrBlank()) return
     var expanded by remember(messageKey) { mutableStateOf(false) }
     var overflowed by remember(messageKey) { mutableStateOf(false) }
     Text(
