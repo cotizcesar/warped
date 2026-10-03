@@ -333,10 +333,11 @@ class ModelAllowlistTest {
             "functiongemma-270m" to false,
 
         )
-        // 3n multimodal + speculative decoding verified; gemma-4
-        // vision/audio docs-verified, thinking docs-verified. E2B
-        // speculative decoding still unverified (stays false); E4B
-        // speculative decoding docs-verified true.
+        // 3n multimodal verified; gemma-4 vision/audio docs-verified,
+        // thinking docs-verified. Speculative decoding aligned to the
+        // engine report 2026-10-03 (litert-lm describe per file):
+        // gemma-4 pair true, everything else false (3n docs claim
+        // reverted — engine says NO).
         // Qwen wave (2026-10-03): vision and audio split into separate
         // maps — VLMs carry vision WITHOUT audio (the old shared map
         // forced vision==audio per model, which no VLM satisfies).
@@ -517,9 +518,9 @@ class ModelAllowlistTest {
 
         )
         val expectedSpeculativeDecoding = mapOf(
-            "gemma-3n-E2B-it-int4" to true,
-            "gemma-3n-E4B-it-int4" to true,
-            "gemma-4-E2B-it" to false,
+            "gemma-3n-E2B-it-int4" to false,
+            "gemma-3n-E4B-it-int4" to false,
+            "gemma-4-E2B-it" to true,
             "gemma-4-E4B-it" to true,
             "gemma-3-1b-it" to false,
             "gemma-3-270m-it" to false
@@ -730,10 +731,11 @@ class ModelAllowlistTest {
         assertThat(repo.supportsFunctionCalling("gemma-4-E4B-it")).isTrue()
         assertThat(repo.supportsFunctionCalling("gemma-4-E2B-it")).isTrue()
         assertThat(repo.supportsSpeculativeDecoding("gemma-4-E4B-it")).isTrue()
+        assertThat(repo.supportsSpeculativeDecoding("gemma-4-E2B-it")).isTrue()
         assertThat(repo.supportsThinking("gemma-3n-E2B-it-int4")).isFalse()
         assertThat(repo.supportsFunctionCalling("gemma-3n-E2B-it-int4")).isFalse()
         assertThat(repo.supportsFunctionCalling("gemma-3n-E4B-it-int4")).isFalse()
-        assertThat(repo.supportsSpeculativeDecoding("gemma-3n-E2B-it-int4")).isTrue()
+        assertThat(repo.supportsSpeculativeDecoding("gemma-3n-E2B-it-int4")).isFalse()
         assertThat(repo.supportsExtendedContext("gemma-3n-E2B-it-int4")).isFalse()
         assertThat(repo.supportsMtp("gemma-3n-E2B-it-int4")).isFalse()
         assertThat(repo.supportsModality("gemma-3n-E2B-it-int4", "vision")).isTrue()

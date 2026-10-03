@@ -2,8 +2,8 @@
   "meta": {
     "engine": "litertlm-android",
     "engineVersion": "0.17.1",
-    "verifiedOn": "2026-10-01",
-    "note": "Capability flags reflect ONLY features verified against 0.17.x on Android (45-02 LRT-09, D-allowlist). Unverified 0.17.0 features (MTP, extended context) stay false until device-verified. gemma-4-E2B-it and gemma-4-E4B-it vision/audio/thinking are docs-verified from Google official Gemma 4 docs (2026-09-28); device confirmation pending — user validates on hardware. supportsFunctionCalling is true for the gemma-4 pair ONLY (56-01 FLAG DECISION, docs basis: Gemma 4 model card documents built-in function calling, the E4B chat_template.jinja ships <|tool|> blocks, LiteRT-LM docs list Gemma 4 under models with tool support; device confirmation pending — if a Gemma 4 model never emits ToolCalls on-device, its flag reverts). 3n pair stays false — no evidence either way, verified-only defaults closed. E4B file size verified via Hugging Face CDN HEAD on 2026-09-28. Mobile footprint basis: E2B 1.1GB / E4B 2.5GB Google-published mobile numbers; 3n numbers are conservative approximations (no published mobile footprint) — marked (aprox.). gemma-3-1b-it (584417280 bytes) and gemma-3-270m-it (304005120 bytes) mirrored 2026-10-01 from litert-community Gemma3-1B-IT (gemma3-1b-it-int4.litertlm) and gemma-3-270m-it (gemma3-270m-it-q8.litertlm) into warped-community; text-only, all unverified flags false."
+    "verifiedOn": "2026-10-03",
+    "note": "Capability flags reflect ONLY features verified against 0.17.x on Android (45-02 LRT-09, D-allowlist). Unverified 0.17.0 features (MTP, extended context) stay false until device-verified. gemma-4-E2B-it and gemma-4-E4B-it vision/audio/thinking are docs-verified from Google official Gemma 4 docs (2026-09-28); device confirmation pending — user validates on hardware. supportsFunctionCalling is true for the gemma-4 pair ONLY (56-01 FLAG DECISION, docs basis: Gemma 4 model card documents built-in function calling, the E4B chat_template.jinja ships <|tool|> blocks, LiteRT-LM docs list Gemma 4 under models with tool support; device confirmation pending — if a Gemma 4 model never emits ToolCalls on-device, its flag reverts). 3n pair stays false — no evidence either way, verified-only defaults closed. E4B file size verified via Hugging Face CDN HEAD on 2026-09-28. Mobile footprint basis: E2B 1.1GB / E4B 2.5GB Google-published mobile numbers; 3n numbers are conservative approximations (no published mobile footprint) — marked (aprox.). gemma-3-1b-it (584417280 bytes) and gemma-3-270m-it (304005120 bytes) mirrored 2026-10-01 from litert-community Gemma3-1B-IT (gemma3-1b-it-int4.litertlm) and gemma-3-270m-it (gemma3-270m-it-q8.litertlm) into warped-community; text-only, all unverified flags false. Device-verified 2026-10-03 via litert-lm describe/run per file: modalities confirmed for all .litertlm entries; gemma-4 pair emits real native ToolCalls (supportsFunctionCalling confirmed beyond docs); ThinkingConfig safely ignored where undeclared (reasoning renders in-band); speculativeDecoding aligned to engine report (gemma-4 pair true, 3n false); all .task containers fail to load on the LiteRT-LM path (TinyLlama run: prefill work-group error) and are comingSoon pending .task container support."
   },
   "models": [
     {
@@ -18,7 +18,7 @@
         "audio": true,
         "supportsThinking": true,
         "supportsFunctionCalling": true,
-        "speculativeDecoding": false,
+        "speculativeDecoding": true,
         "extendedContext": false,
         "mtpSupport": false
       },
@@ -60,7 +60,7 @@
         "audio": true,
         "supportsThinking": false,
         "supportsFunctionCalling": false,
-        "speculativeDecoding": true,
+        "speculativeDecoding": false,
         "extendedContext": false,
         "mtpSupport": false
       },
@@ -81,7 +81,7 @@
         "audio": true,
         "supportsThinking": false,
         "supportsFunctionCalling": false,
-        "speculativeDecoding": true,
+        "speculativeDecoding": false,
         "extendedContext": false,
         "mtpSupport": false
       },
@@ -361,7 +361,10 @@
       "llmPromptTemplates": {},
       "taskTypes": ["chat"],
       "ramNote": "From ~4 GB RAM",
-      "blurb": "Chat with vision (Gemma 3)."
+      "blurb": "Chat with vision (Gemma 3).",
+      "comingSoon": true,
+      "comingSoonNote": "Needs .task container support.",
+      "comingSoonNoteEs": "Necesita soporte del contenedor .task."
     },
     {
       "name": "gemma3-12b-it",
@@ -382,7 +385,10 @@
       "llmPromptTemplates": {},
       "taskTypes": ["chat"],
       "ramNote": "12 GB or more recommended",
-      "blurb": "Flagship chat with vision."
+      "blurb": "Flagship chat with vision.",
+      "comingSoon": true,
+      "comingSoonNote": "Needs .task container support.",
+      "comingSoonNoteEs": "Necesita soporte del contenedor .task."
     },
     {
       "name": "gemma-3n-E2B-official",
@@ -592,7 +598,10 @@
       "llmPromptTemplates": {},
       "taskTypes": ["chat"],
       "ramNote": "From ~2 GB RAM",
-      "blurb": "Classic tiny chat."
+      "blurb": "Classic tiny chat.",
+      "comingSoon": true,
+      "comingSoonNote": "Needs .task container support.",
+      "comingSoonNoteEs": "Necesita soporte del contenedor .task."
     },
     {
       "name": "olmo-2-1b",
@@ -697,7 +706,10 @@
       "llmPromptTemplates": {},
       "taskTypes": ["chat"],
       "ramNote": "From ~2 GB RAM",
-      "blurb": "Smallest Qwen chat."
+      "blurb": "Smallest Qwen chat.",
+      "comingSoon": true,
+      "comingSoonNote": "Needs .task container support.",
+      "comingSoonNoteEs": "Necesita soporte del contenedor .task."
     },
     {
       "name": "smolllm2-135m",
