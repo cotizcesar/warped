@@ -1249,7 +1249,7 @@ class ChatViewModel @Inject constructor(
                             if (now - lastEmitTime >= 50) {
                                 val chunk = tokenBuffer.joinToString("")
                                 rawBuffer.append(chunk)
-                                val (cleanContent, reasoning) = parseThinkBlocks(rawBuffer.toString(), reasoningActive, modelMayThink)
+                                val (cleanContent, reasoning) = parseThinkBlocks(rawBuffer.toString(), reasoningActive)
                                 // Quick-task (live-thinking): a text flush
                                 // must not blank an in-flight native thought
                                 // panel — fall back to the streamed thought
@@ -1286,7 +1286,7 @@ class ChatViewModel @Inject constructor(
                         }
                         is StreamToken.Done -> {
                             rawBuffer.append(tokenBuffer.joinToString(""))
-                            val (finalClean, finalReasoning) = parseThinkBlocks(rawBuffer.toString(), reasoningActive, modelMayThink)
+                            val (finalClean, finalReasoning) = parseThinkBlocks(rawBuffer.toString(), reasoningActive)
                             val content = if (finalClean.isBlank()) finalClean else finalClean.trimStart()
                             // Phase 49 (DEL-01): single-turn only — the turn
                             // persists exactly one assistant message. Legacy
@@ -3507,42 +3507,6 @@ class ChatViewModel @Inject constructor(
 
     private fun LocalModel.isLiteRtLm(): Boolean =
         modelFormat.equals("LITERTLM", ignoreCase = true) || filePath.endsWith(".litertlm", ignoreCase = true)
-
-    private fun parseThinkBlocks(raw: String, enabled: Boolean = true, @Suppress("UNUSED_PARAMETER") modelMayThink: Boolean = false): Pair<String, String> {
-        if (!enabled) {
-            val clean = Regex("<[/]?think>|<[/]?channel\\|?>", setOf(RegexOption.IGNORE_CASE))
-                .replace(raw, "").trim()
-            return Pair(clean, "")
-        }
-        val reasoning = StringBuilder()
-        var clean = raw
-
-        val channelRegex = Regex("<channel\\|>([\\s\\S]*?)<\\|channel>",
-            setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE))
-        channelRegex.findAll(clean).forEach { m -> reasoning.append(m.groupValues[1].trim()).append("\n") }
-        clean = channelRegex.replace(clean, "")
-
-        val thinkRegex = Regex("<think>([\\s\\S]*?)</think>",
-            setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE))
-        thinkRegex.findAll(clean).forEach { m -> reasoning.append(m.groupValues[1].trim()).append("\n") }
-        clean = thinkRegex.replace(clean, "")
-
-        val openIdx = clean.lowercase().lastIndexOf("<think>")
-        if (openIdx >= 0) {
-            reasoning.append(clean.substring(openIdx + "<think>".length).trim())
-            clean = clean.substring(0, openIdx)
-        }
-
-        // Untagged output is the answer, not reasoning: without explicit
-        // <think>/<channel|> markers there is no evidence the model was thinking,
-        // and routing plain replies into the collapsed Thinking panel produces
-        // empty assistant bubbles (local-empty-response, 2026-09-28). Genuine
-        // 0.17.x thought-channel streaming stays a later-phase wire-up
-        // (LiteRTLmProvider.extractThoughtContent) — never inferred from absence.
-
-        Timber.d("ChatVM: parseThinkBlocks result — clean=%d reasoning=%d", clean.length, reasoning.length)
-        return Pair(clean.trim(), reasoning.toString().trim())
-    }
 
     /**
      * Phase 53 (SRC-02): union of all N fetched sources in fetch-block order
