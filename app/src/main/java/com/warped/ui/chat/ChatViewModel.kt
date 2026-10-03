@@ -1558,23 +1558,9 @@ class ChatViewModel @Inject constructor(
                     }
                     // Lazy load: no preload on open — the traffic light
                     // shows selected-not-loaded until the first send
-                    // mounts the engine.
-                    //
-                    // Auto-mount the chat's LOCAL model in the background
-                    // (loading indicator on, input briefly locked): opening
-                    // a chat means continuing it, so no manual first send
-                    // is needed. Already-mounted same model is skipped;
-                    // remote conversations mount nothing (helpers resolve
-                    // per send). The memory guard inside preload reports
-                    // via banner instead of loading when RAM is short.
-                    if (conversation.providerType == ProviderType.LITE_RT_LM &&
-                        engineManager.getActiveEngine()?.modelPath != conversation.modelId) {
-                        val mountPath = conversation.modelId
-                        activeModelSelection.markLocalLoading(mountPath)
-                        viewModelScope.launch(coroutineExceptionHandler) {
-                            preloadLocalModel(mountPath)
-                        }
-                    }
+                    // mounts the engine. User decision 2026-10-03: the
+                    // chat never orders a load; "Use in Chat" navigates
+                    // and the first send mounts.
                 }
                 activeModelSelection.saveLastConversation(conversation.id)
                 refreshActiveBackend()
