@@ -20,7 +20,8 @@
     <string name="download_model_first">Download this model before using it for local chat.</string>
     <string name="thinking">Thinking</string>
     <string name="use_in_chat">Use in chat</string>
-    <string name="catalog_coming_soon">Próximamente</string>
+    <string name="catalog_coming_soon">Coming soon</string>
+    <string name="preset_apply">Apply</string>
     <string name="hf_section_downloaded">Downloaded</string>
     <string name="hf_section_available">Available models</string>
     <string name="active_downloads">Active Downloads</string>

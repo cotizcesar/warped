@@ -783,7 +783,8 @@
       "ramNote": "From ~2 GB RAM",
       "blurb": "Speech recognition (upcoming).",
       "comingSoon": true,
-      "comingSoonNote": "Necesita reconocimiento de voz en el dispositivo."
+      "comingSoonNote": "Needs on-device speech recognition.",
+      "comingSoonNoteEs": "Necesita reconocimiento de voz en el dispositivo."
     },
     {
       "name": "qwen3-asr-0.6b",
@@ -806,7 +807,8 @@
       "ramNote": "From ~2 GB RAM",
       "blurb": "Speech recognition (upcoming).",
       "comingSoon": true,
-      "comingSoonNote": "Necesita reconocimiento de voz en el dispositivo."
+      "comingSoonNote": "Needs on-device speech recognition.",
+      "comingSoonNoteEs": "Necesita reconocimiento de voz en el dispositivo."
     },
     {
       "name": "moonshine-tiny",
@@ -829,7 +831,8 @@
       "ramNote": "From ~1 GB RAM",
       "blurb": "Tiny speech recognition (upcoming).",
       "comingSoon": true,
-      "comingSoonNote": "Necesita reconocimiento de voz en el dispositivo."
+      "comingSoonNote": "Needs on-device speech recognition.",
+      "comingSoonNoteEs": "Necesita reconocimiento de voz en el dispositivo."
     },
     {
       "name": "whisper-tiny",
@@ -852,7 +855,8 @@
       "ramNote": "From ~1 GB RAM",
       "blurb": "Baseline speech recognition (upcoming).",
       "comingSoon": true,
-      "comingSoonNote": "Necesita reconocimiento de voz en el dispositivo."
+      "comingSoonNote": "Needs on-device speech recognition.",
+      "comingSoonNoteEs": "Necesita reconocimiento de voz en el dispositivo."
     },
     {
       "name": "kokoro-82m",
@@ -875,7 +879,8 @@
       "ramNote": "From ~2 GB RAM",
       "blurb": "Spoken responses (upcoming).",
       "comingSoon": true,
-      "comingSoonNote": "Necesita lectura de respuestas en voz alta."
+      "comingSoonNote": "Needs spoken responses.",
+      "comingSoonNoteEs": "Necesita lectura de respuestas en voz alta."
     },
     {
       "name": "matcha-tts",
@@ -898,7 +903,8 @@
       "ramNote": "From ~1 GB RAM",
       "blurb": "Spoken responses (upcoming).",
       "comingSoon": true,
-      "comingSoonNote": "Necesita lectura de respuestas en voz alta."
+      "comingSoonNote": "Needs spoken responses.",
+      "comingSoonNoteEs": "Necesita lectura de respuestas en voz alta."
     },
     {
       "name": "qwen3-emb-0.6b",
@@ -921,7 +927,8 @@
       "ramNote": "From ~2 GB RAM",
       "blurb": "Semantic search (upcoming).",
       "comingSoon": true,
-      "comingSoonNote": "Necesita búsqueda semántica."
+      "comingSoonNote": "Needs semantic search.",
+      "comingSoonNoteEs": "Necesita búsqueda semántica."
     },
     {
       "name": "qwen3-rerank-0.6b",
@@ -944,7 +951,8 @@
       "ramNote": "From ~2 GB RAM",
       "blurb": "Semantic search (upcoming).",
       "comingSoon": true,
-      "comingSoonNote": "Necesita búsqueda semántica."
+      "comingSoonNote": "Needs semantic search.",
+      "comingSoonNoteEs": "Necesita búsqueda semántica."
     },
     {
       "name": "paddleocr-vl",
@@ -967,7 +975,8 @@
       "ramNote": "From ~3 GB RAM",
       "blurb": "Read text in images (upcoming).",
       "comingSoon": true,
-      "comingSoonNote": "Necesita lectura de texto en imágenes."
+      "comingSoonNote": "Needs reading text in images.",
+      "comingSoonNoteEs": "Necesita lectura de texto en imágenes."
     },
     {
       "name": "flux-klein-4b",
@@ -990,7 +999,8 @@
       "ramNote": "From ~2 GB RAM",
       "blurb": "Image generation (upcoming).",
       "comingSoon": true,
-      "comingSoonNote": "Necesita generación de imágenes."
+      "comingSoonNote": "Needs image generation.",
+      "comingSoonNoteEs": "Necesita generación de imágenes."
     },
     {
       "name": "z-image-turbo",
@@ -1013,7 +1023,8 @@
       "ramNote": "6 GB or more recommended",
       "blurb": "Image generation (upcoming).",
       "comingSoon": true,
-      "comingSoonNote": "Necesita generación de imágenes."
+      "comingSoonNote": "Needs image generation.",
+      "comingSoonNoteEs": "Necesita generación de imágenes."
     }
   ]
 }

@@ -96,8 +96,30 @@ data class AllowlistedModel(
      * Back-compat: absent → false (existing entries behave unchanged).
      */
     val comingSoon: Boolean = false,
-    val comingSoonNote: String? = null
+    val comingSoonNote: String? = null,
+    /**
+     * Spanish twin of [comingSoonNote]. The app is fully EN+ES: UI copy
+     * always resolves through resources or locale-paired fields, never a
+     * hardcoded language. See [localizedComingSoonNote].
+     */
+    val comingSoonNoteEs: String? = null
 ) {
+    /**
+     * Locale-aware coming-soon reason: Spanish note on es locales,
+     * English otherwise (falling back across when one side is absent).
+     */
+    fun localizedComingSoonNote(): String? {
+        val spanish = try {
+            java.util.Locale.getDefault().language.startsWith("es")
+        } catch (_: Exception) {
+            false
+        }
+        return if (spanish) {
+            comingSoonNoteEs ?: comingSoonNote
+        } else {
+            comingSoonNote ?: comingSoonNoteEs
+        }
+    }
     /**
      * Effective repo slug for download URL construction.
      * Explicit [repo] wins; legacy `warped-community/$name` applies ONLY

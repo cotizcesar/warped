@@ -451,10 +451,11 @@ private fun CatalogModelCard(
                 )
             }
             // Coming-soon reason line (only on coming-soon entries).
-            if (entry.comingSoon && !entry.comingSoonNote.isNullOrBlank()) {
+            val soonNote = entry.localizedComingSoonNote()
+            if (entry.comingSoon && !soonNote.isNullOrBlank()) {
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = entry.comingSoonNote ?: "",
+                    text = soonNote,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                     maxLines = 2,

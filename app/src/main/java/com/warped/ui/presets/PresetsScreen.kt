@@ -490,7 +490,7 @@ private fun SmartPresetCard(
             }
             if (!isActive) {
                 TextButton(onClick = onApply) {
-                    Text("Apply", color = tierColor)
+                    Text(stringResource(R.string.preset_apply), color = tierColor)
                 }
             }
         }

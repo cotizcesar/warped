@@ -172,7 +172,21 @@ class ModelAllowlistTest {
         val parakeet = models.getValue("parakeet-tdt-0.6b")
         assertThat(parakeet.comingSoon).isTrue()
         assertThat(parakeet.comingSoonNote)
+            .isEqualTo("Needs on-device speech recognition.")
+        assertThat(parakeet.comingSoonNoteEs)
             .isEqualTo("Necesita reconocimiento de voz en el dispositivo.")
+        // Locale-aware resolution (both directions, global state restored).
+        val previousLocale = java.util.Locale.getDefault()
+        try {
+            java.util.Locale.setDefault(java.util.Locale("es"))
+            assertThat(parakeet.localizedComingSoonNote())
+                .isEqualTo("Necesita reconocimiento de voz en el dispositivo.")
+            java.util.Locale.setDefault(java.util.Locale.ENGLISH)
+            assertThat(parakeet.localizedComingSoonNote())
+                .isEqualTo("Needs on-device speech recognition.")
+        } finally {
+            java.util.Locale.setDefault(previousLocale)
+        }
         // Old assets lacking the keys entirely still parse.
         val legacy = parseModelAllowlist(
             """{"models": [{"name": "x", "displayName": "X", "modelFile": "x.task",
