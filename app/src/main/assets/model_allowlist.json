@@ -1155,6 +1155,258 @@
       "comingSoon": true,
       "comingSoonNote": "Needs function calling.",
       "comingSoonNoteEs": "Necesita llamadas a funciones."
+    }    ,
+    {
+      "name": "gemma-4-12B-it",
+      "displayName": "Gemma 4 12B IT",
+      "repo": "warped-community/gemma-4-12B-it-litert-lm",
+      "modelFile": "gemma-4-12B-it.litertlm",
+      "sizeInBytes": 6883278368,
+      "capabilities": {
+        "text": true,
+        "vision": true,
+        "audio": true,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": true,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "8 GB or more recommended",
+      "blurb": "Smartest Gemma (huge)."
+    },
+    {
+      "name": "lfm2.5-1.2b-instruct",
+      "displayName": "LFM2.5 1.2B Instruct",
+      "repo": "warped-community/LFM2.5-1.2B-Instruct-litert-lm",
+      "modelFile": "LFM2.5-1.2B-Instruct_int8.litertlm",
+      "sizeInBytes": 1247091440,
+      "capabilities": {
+        "text": true,
+        "vision": false,
+        "audio": false,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "From ~3 GB RAM",
+      "blurb": "Mobile-first architecture chat."
+    },
+    {
+      "name": "lfm2.5-1.2b-thinking",
+      "displayName": "LFM2.5 1.2B Thinking",
+      "repo": "warped-community/LFM2.5-1.2B-Thinking-litert-lm",
+      "modelFile": "LFM2.5-1.2B-Thinking_int8.litertlm",
+      "sizeInBytes": 1244594224,
+      "capabilities": {
+        "text": true,
+        "vision": false,
+        "audio": false,
+        "supportsThinking": true,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "From ~3 GB RAM",
+      "blurb": "Tiny mobile reasoner (thinks)."
+    },
+    {
+      "name": "lfm2.5-230m",
+      "displayName": "LFM2.5 230M",
+      "repo": "warped-community/LFM2.5-230M-litert-lm",
+      "modelFile": "LFM2.5-230M_int8.litertlm",
+      "sizeInBytes": 266053344,
+      "capabilities": {
+        "text": true,
+        "vision": false,
+        "audio": false,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "From ~1 GB RAM",
+      "blurb": "Ultralight mobile chat."
+    },
+    {
+      "name": "qwen3.5-0.8b",
+      "displayName": "Qwen3.5 0.8B",
+      "repo": "warped-community/Qwen3.5-0.8B-litert-lm",
+      "modelFile": "Qwen3.5-0.8B_int8.litertlm",
+      "sizeInBytes": 963184864,
+      "capabilities": {
+        "text": true,
+        "vision": false,
+        "audio": false,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "From ~2 GB RAM",
+      "blurb": "Newest tiny Qwen."
+    },
+    {
+      "name": "qwen3-0.6b-int4-thinking",
+      "displayName": "Qwen3 0.6B Thinking (int4)",
+      "repo": "warped-community/Qwen3-0.6B-int4-litert-lm",
+      "modelFile": "qwen3_0.6b_q4_block32_ekv1280.litertlm",
+      "sizeInBytes": 347251840,
+      "capabilities": {
+        "text": true,
+        "vision": false,
+        "audio": false,
+        "supportsThinking": true,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "From ~1 GB RAM",
+      "blurb": "Smallest thinker available."
+    },
+    {
+      "name": "qwen2.5-coder-1.5b",
+      "displayName": "Qwen2.5 Coder 1.5B",
+      "repo": "warped-community/Qwen2.5-Coder-1.5B-litert-lm",
+      "modelFile": "Qwen2.5-Coder-1.5B-Instruct_int4.litertlm",
+      "sizeInBytes": 1117385648,
+      "capabilities": {
+        "text": true,
+        "vision": false,
+        "audio": false,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "From ~3 GB RAM",
+      "blurb": "Small coder, code help."
+    },
+    {
+      "name": "ministral-3-3b-reasoning",
+      "displayName": "Ministral 3 3B Reasoning",
+      "repo": "warped-community/Ministral-3-3B-Reasoning-litert-lm",
+      "modelFile": "Ministral-3-3B-Reasoning-2512.litertlm",
+      "sizeInBytes": 2340982768,
+      "capabilities": {
+        "text": true,
+        "vision": false,
+        "audio": false,
+        "supportsThinking": true,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "From ~4 GB RAM",
+      "blurb": "Mistral reasoner (thinks)."
+    },
+    {
+      "name": "phi-4-mini-reasoning",
+      "displayName": "Phi 4 Mini Reasoning",
+      "repo": "warped-community/Phi-4-mini-reasoning-litert-lm",
+      "modelFile": "Phi-4-mini-reasoning.litertlm",
+      "sizeInBytes": 2783974384,
+      "capabilities": {
+        "text": true,
+        "vision": false,
+        "audio": false,
+        "supportsThinking": true,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "From ~4 GB RAM",
+      "blurb": "Microsoft reasoner (thinks)."
+    },
+    {
+      "name": "fastvlm-0.5b",
+      "displayName": "FastVLM 0.5B",
+      "repo": "warped-community/FastVLM-0.5B-litert-lm",
+      "modelFile": "FastVLM-0.5B.litertlm",
+      "sizeInBytes": 1156342768,
+      "capabilities": {
+        "text": true,
+        "vision": true,
+        "audio": false,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "From ~3 GB RAM",
+      "blurb": "Apple tiny vision chat."
+    },
+    {
+      "name": "lfm2.5-vl-450m",
+      "displayName": "LFM2.5 VL 450M",
+      "repo": "warped-community/LFM2.5-VL-450M-litert-lm",
+      "modelFile": "LFM2.5-VL-450M_int8.litertlm",
+      "sizeInBytes": 563549568,
+      "capabilities": {
+        "text": true,
+        "vision": true,
+        "audio": false,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "From ~2 GB RAM",
+      "blurb": "Ultralight vision chat."
+    },
+    {
+      "name": "granite-4.0-350m",
+      "displayName": "Granite 4.0 350M",
+      "repo": "warped-community/granite-4.0-350m-litert-lm",
+      "modelFile": "granite-4.0-350m_q8_ekv1280.litertlm",
+      "sizeInBytes": 468209584,
+      "capabilities": {
+        "text": true,
+        "vision": false,
+        "audio": false,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "From ~1 GB RAM",
+      "blurb": "IBM tiny chat."
     }
   ]
 }

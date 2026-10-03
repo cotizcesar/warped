@@ -37,7 +37,7 @@ class ModelAllowlistTest {
     fun `shipped asset parses with expected entries`() {
         val models = parseModelAllowlist(shippedAssetText())
 
-        assertThat(models).hasSize(52)
+        assertThat(models).hasSize(64)
         val e2b = models.first { it.name == "gemma-3n-E2B-it-int4" }
         assertThat(e2b.displayName).isEqualTo("Gemma 3n E2B IT (int4)")
         assertThat(e2b.modelFile).isEqualTo("gemma-3n-E2B-it-int4.litertlm")
@@ -164,6 +164,18 @@ class ModelAllowlistTest {
             "medgemma-1.5-4b",
             "embeddinggemma-300m",
             "functiongemma-270m",
+            "gemma-4-12B-it",
+            "lfm2.5-1.2b-instruct",
+            "lfm2.5-1.2b-thinking",
+            "lfm2.5-230m",
+            "qwen3.5-0.8b",
+            "qwen3-0.6b-int4-thinking",
+            "qwen2.5-coder-1.5b",
+            "ministral-3-3b-reasoning",
+            "phi-4-mini-reasoning",
+            "fastvlm-0.5b",
+            "lfm2.5-vl-450m",
+            "granite-4.0-350m",
         ).inOrder()
     }
 
@@ -331,6 +343,29 @@ class ModelAllowlistTest {
             "embeddinggemma-300m" to false,
 
             "functiongemma-270m" to false,
+            "gemma-4-12B-it" to true,
+
+            "lfm2.5-1.2b-instruct" to true,
+
+            "lfm2.5-1.2b-thinking" to true,
+
+            "lfm2.5-230m" to true,
+
+            "qwen3.5-0.8b" to true,
+
+            "qwen3-0.6b-int4-thinking" to true,
+
+            "qwen2.5-coder-1.5b" to true,
+
+            "ministral-3-3b-reasoning" to true,
+
+            "phi-4-mini-reasoning" to true,
+
+            "fastvlm-0.5b" to true,
+
+            "lfm2.5-vl-450m" to true,
+
+            "granite-4.0-350m" to true,
 
         )
         // 3n multimodal verified; gemma-4 vision/audio docs-verified,
@@ -428,6 +463,29 @@ class ModelAllowlistTest {
             "embeddinggemma-300m" to false,
 
             "functiongemma-270m" to false,
+            "gemma-4-12B-it" to true,
+
+            "lfm2.5-1.2b-instruct" to false,
+
+            "lfm2.5-1.2b-thinking" to false,
+
+            "lfm2.5-230m" to false,
+
+            "qwen3.5-0.8b" to false,
+
+            "qwen3-0.6b-int4-thinking" to false,
+
+            "qwen2.5-coder-1.5b" to false,
+
+            "ministral-3-3b-reasoning" to false,
+
+            "phi-4-mini-reasoning" to false,
+
+            "fastvlm-0.5b" to true,
+
+            "lfm2.5-vl-450m" to true,
+
+            "granite-4.0-350m" to false,
 
         )
         val expectedAudio = mapOf(
@@ -515,6 +573,29 @@ class ModelAllowlistTest {
             "embeddinggemma-300m" to false,
 
             "functiongemma-270m" to false,
+            "gemma-4-12B-it" to true,
+
+            "lfm2.5-1.2b-instruct" to false,
+
+            "lfm2.5-1.2b-thinking" to false,
+
+            "lfm2.5-230m" to false,
+
+            "qwen3.5-0.8b" to false,
+
+            "qwen3-0.6b-int4-thinking" to false,
+
+            "qwen2.5-coder-1.5b" to false,
+
+            "ministral-3-3b-reasoning" to false,
+
+            "phi-4-mini-reasoning" to false,
+
+            "fastvlm-0.5b" to false,
+
+            "lfm2.5-vl-450m" to false,
+
+            "granite-4.0-350m" to false,
 
         )
         val expectedSpeculativeDecoding = mapOf(
@@ -523,7 +604,8 @@ class ModelAllowlistTest {
             "gemma-4-E2B-it" to true,
             "gemma-4-E4B-it" to true,
             "gemma-3-1b-it" to false,
-            "gemma-3-270m-it" to false
+            "gemma-3-270m-it" to false,
+            "gemma-4-12B-it" to true
         )
         val expectedThinking = mapOf(
             "gemma-3n-E2B-it-int4" to false,
@@ -610,6 +692,29 @@ class ModelAllowlistTest {
             "embeddinggemma-300m" to false,
 
             "functiongemma-270m" to false,
+            "gemma-4-12B-it" to false,
+
+            "lfm2.5-1.2b-instruct" to false,
+
+            "lfm2.5-1.2b-thinking" to true,
+
+            "lfm2.5-230m" to false,
+
+            "qwen3.5-0.8b" to false,
+
+            "qwen3-0.6b-int4-thinking" to true,
+
+            "qwen2.5-coder-1.5b" to false,
+
+            "ministral-3-3b-reasoning" to true,
+
+            "phi-4-mini-reasoning" to true,
+
+            "fastvlm-0.5b" to false,
+
+            "lfm2.5-vl-450m" to false,
+
+            "granite-4.0-350m" to false,
 
         )
         // 56-01 FLAG DECISION: supportsFunctionCalling true for the gemma-4
@@ -703,6 +808,29 @@ class ModelAllowlistTest {
             "embeddinggemma-300m" to false,
 
             "functiongemma-270m" to false,
+            "gemma-4-12B-it" to false,
+
+            "lfm2.5-1.2b-instruct" to false,
+
+            "lfm2.5-1.2b-thinking" to false,
+
+            "lfm2.5-230m" to false,
+
+            "qwen3.5-0.8b" to false,
+
+            "qwen3-0.6b-int4-thinking" to false,
+
+            "qwen2.5-coder-1.5b" to false,
+
+            "ministral-3-3b-reasoning" to false,
+
+            "phi-4-mini-reasoning" to false,
+
+            "fastvlm-0.5b" to false,
+
+            "lfm2.5-vl-450m" to false,
+
+            "granite-4.0-350m" to false,
 
         )
         for (model in models) {
@@ -722,7 +850,7 @@ class ModelAllowlistTest {
     fun `repository exposes capability queries`() {
         val repo = repositoryBackedBy(shippedAssetText())
 
-        assertThat(repo.models).hasSize(52)
+        assertThat(repo.models).hasSize(64)
         assertThat(repo.findByModelFile("gemma-3n-E4B-it-int4.litertlm")?.name)
             .isEqualTo("gemma-3n-E4B-it-int4")
         assertThat(repo.findByModelFile("gemma-4-E4B-it.litertlm")?.name)
@@ -835,6 +963,21 @@ class ModelAllowlistTest {
         assertThat(n3e2b.vision).isTrue()
         assertThat(n3e2b.audio).isTrue()
         assertThat(n3e2b.supportsThinking).isFalse()
+        // Wave 5 (CLI describe + smoke 2026-10-03, /tmp/opencode/wave5.log):
+        // thinking = in-band trace observed ([thought]/<think>); vision =
+        // describe Input Modalities; gemma-12B spec = describe YES.
+        val g12 = byName.getValue("gemma-4-12B-it").capabilities
+        assertThat(g12.vision).isTrue()
+        assertThat(g12.audio).isTrue()
+        assertThat(g12.speculativeDecoding).isTrue()
+        assertThat(g12.supportsThinking).isFalse()
+        assertThat(byName.getValue("lfm2.5-1.2b-thinking").capabilities.supportsThinking).isTrue()
+        assertThat(byName.getValue("qwen3-0.6b-int4-thinking").capabilities.supportsThinking).isTrue()
+        assertThat(byName.getValue("ministral-3-3b-reasoning").capabilities.supportsThinking).isTrue()
+        assertThat(byName.getValue("phi-4-mini-reasoning").capabilities.supportsThinking).isTrue()
+        assertThat(byName.getValue("fastvlm-0.5b").capabilities.vision).isTrue()
+        assertThat(byName.getValue("lfm2.5-vl-450m").capabilities.vision).isTrue()
+        assertThat(byName.getValue("granite-4.0-350m").capabilities.supportsThinking).isFalse()
     }
 
     @Test
