@@ -1,6 +1,7 @@
 package com.warped.ui.chat.components
 
 import android.net.Uri
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -132,12 +133,18 @@ fun ChatInputBar(
     Surface(
         color = Color(0xFF2B2B29),
         shape = MaterialTheme.shapes.extraLarge,
+        shadowElevation = 8.dp,
+        tonalElevation = 2.dp,
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(start = 10.dp, end = 10.dp, top = 5.dp, bottom = 0.dp)
+            .padding(start = 10.dp, end = 10.dp, top = 5.dp, bottom = 10.dp)
     ) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 12.dp, vertical = 4.dp)
+                .animateContentSize()
+        ) {
             // Image previews
             if (attachedImages.isNotEmpty()) {
                 LazyRow(
@@ -270,142 +277,108 @@ fun ChatInputBar(
                 }
                 onCursorChange(fieldValue.selection.start)
             }
-            // Phase 67 (VMSG-01 full): recording replaces the input row
-            // inline — mm:ss timer + amplitude bar + explicit cancel (X).
-            // The voice-send button in Row 2 doubles as the stop toggle.
-            // Timer + bar render onSurfaceVariant, switching to error red
-            // in the last 10 s (>= 50 s). No other recolor, no pulse.
-            if (isVoiceRecording) {
-                val capWarning = voiceElapsedSec >= 50
-                val recColor = if (capWarning) MaterialTheme.colorScheme.error
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                // TalkBack throttle (Phase 65 pattern): the live-region
-                // description only changes every 5 s so announcements
-                // never spam, while the visual timer ticks each second.
-                val announceBucket = voiceElapsedSec / 5
-                val announceText = stringResource(
-                    R.string.voice_msg_recording_state,
-                    announceBucket * 5 / 60,
-                    announceBucket * 5 % 60,
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth().semantics {
-                        stateDescription = announceText
-                    },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onCancelRecording, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.Filled.Close, stringResource(R.string.voice_msg_cancel),
-                            tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(24.dp))
-                    }
-                    Text(
-                        "%d:%02d".format(voiceElapsedSec / 60, voiceElapsedSec % 60),
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontFeatureSettings = "tnum"
-                        ),
-                        color = recColor
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    LinearProgressIndicator(
-                        progress = { (voiceAmplitude / 32767f).coerceIn(0f, 1f) },
-                        modifier = Modifier.weight(1f),
-                        color = recColor,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    IconButton(onClick = onVoiceClick, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.Filled.Stop, stringResource(R.string.voice_msg_stop),
-                            tint = recColor, modifier = Modifier.size(24.dp))
-                    }
-                }
-            } else {
-                // Single input row: [+] [input........] [mic] [voice]
-                // [send↑]. The attach menu opens upward; the Think toggle
-                // moved to the header bar (brain icon by the traffic
-                // light); mic/voice/send keep their visibility rules and
-                // send renders only with content.
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Unified attach menu (Photos on vision-capable
-                    // models, Files always); Files-only attaches directly
-                    // instead of opening a one-item menu.
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val showPhotosItem = modelHasVision
-                        if (showPhotosItem) {
-                            AttachMenuButton(
-                                enabled = !inputLocked,
-                                onPickPhotos = onAddImage,
-                                onPickFiles = onAttachDocument,
+            var inputLines by remember { mutableIntStateOf(0) }
+            // Expanded (ChatGPT-style) once the text wraps past one line:
+            // text field full-width on top, button row below. Single line
+            // keeps the compact [+] [input] [mic] [voice] [send] row.
+            // Line count comes from an invisible full-width mirror (the
+            // TextFieldValue overload has no onTextLayout): measuring at
+            // constant full width keeps the trigger monotonic in text, so
+            // the narrow/wide switch can never oscillate.
+            val expandedInput = inputLines > 1
+            Text(
+                text = text.ifEmpty { " " },
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = Int.MAX_VALUE,
+                onTextLayout = { if (it.lineCount != inputLines) inputLines = it.lineCount },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .height(0.dp),
+            )
+
+            // Input-row pieces as local composables so the compact row and
+            // the expanded layout share one implementation (no duplication).
+            @Composable
+            fun AttachGroup() {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val showPhotosItem = modelHasVision
+                    if (showPhotosItem) {
+                        AttachMenuButton(
+                            enabled = !inputLocked,
+                            onPickPhotos = onAddImage,
+                            onPickFiles = onAttachDocument,
+                        )
+                    } else {
+                        // Files-only: direct attach, no menu detour.
+                        // description swaps to replace when attached (a new
+                        // pick replaces); the attached filename rides
+                        // stateDescription (Phase 65 pattern).
+                        // Hoisted out of semantics{}: stringResource is
+                        // @Composable and cannot run inside the semantics lambda.
+                        val attachedStateDesc = attachedDocName?.let {
+                            stringResource(R.string.doc_reader_attached, it)
+                        }
+                        IconButton(
+                            onClick = onAttachDocument,
+                            enabled = !inputLocked,
+                            modifier = Modifier.size(40.dp).semantics {
+                                attachedStateDesc?.let { stateDescription = it }
+                            },
+                        ) {
+                            Icon(
+                                Icons.Filled.AttachFile,
+                                stringResource(
+                                    if (attachedDocName != null) R.string.doc_reader_replace
+                                    else R.string.doc_reader_attach
+                                ),
+                                tint = Color.White.copy(alpha = 0.6f),
+                                modifier = Modifier.size(24.dp),
                             )
-                        } else {
-                            // Files-only: direct attach, no menu detour.
-                            // description swaps to replace when attached (a new
-                            // pick replaces); the attached filename rides
-                            // stateDescription (Phase 65 pattern).
-                            // Hoisted out of semantics{}: stringResource is
-                            // @Composable and cannot run inside the semantics lambda.
-                            val attachedStateDesc = attachedDocName?.let {
-                                stringResource(R.string.doc_reader_attached, it)
-                            }
-                            IconButton(
-                                onClick = onAttachDocument,
-                                enabled = !inputLocked,
-                                modifier = Modifier.size(40.dp).semantics {
-                                    attachedStateDesc?.let { stateDescription = it }
-                                },
-                            ) {
-                                Icon(
-                                    Icons.Filled.AttachFile,
-                                    stringResource(
-                                        if (attachedDocName != null) R.string.doc_reader_replace
-                                        else R.string.doc_reader_attach
-                                    ),
-                                    tint = Color.White.copy(alpha = 0.6f),
-                                    modifier = Modifier.size(24.dp),
-                                )
-                            }
                         }
                     }
-                    OutlinedTextField(
-                    value = fieldValue,
-                    onValueChange = { next ->
-                        fieldValue = next
-                        if (next.text != text) onTextChange(next.text)
-                        onCursorChange(next.selection.start)
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 44.dp)
-                        .onFocusChanged { inputFocused = it.isFocused }
-                        .onKeyEvent { event ->
-                            val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip
-                            if (event.key == Key.Enter && canSend && !isGenerating && !isLoadingModel && hasContent) {
-                                onSend()
-                                true
-                            } else false
-                        },
-                    placeholder = { Text(stringResource(R.string.type_message)) },
-                    enabled = !inputLocked,
-                    maxLines = 4,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = {
-                        val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip
-                        if (canSend && !isGenerating && !isLoadingModel && hasContent) onSend()
-                    }),
-                    shape = MaterialTheme.shapes.medium,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                        disabledBorderColor = Color.Transparent,
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent
-                    )
-                    )
-                    // (Attach menu + input field live above, in the single
-                    // input row — this slot now holds mic/voice/send only.)
+                }
+            }
 
+            @Composable
+            fun InputField(mod: Modifier) {
+                OutlinedTextField(
+                value = fieldValue,
+                onValueChange = { next ->
+                    fieldValue = next
+                    if (next.text != text) onTextChange(next.text)
+                    onCursorChange(next.selection.start)
+                },
+                modifier = mod
+                    .onFocusChanged { inputFocused = it.isFocused }
+                    .onKeyEvent { event ->
+                        val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip
+                        if (event.key == Key.Enter && canSend && !isGenerating && !isLoadingModel && hasContent) {
+                            onSend()
+                            true
+                        } else false
+                    },
+                placeholder = { Text(stringResource(R.string.type_message)) },
+                enabled = !inputLocked,
+                maxLines = 4,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = {
+                    val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip
+                    if (canSend && !isGenerating && !isLoadingModel && hasContent) onSend()
+                }),
+                shape = MaterialTheme.shapes.medium,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent,
+                    disabledBorderColor = Color.Transparent,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent
+                )
+                )
+            }
+
+            @Composable
+            fun MicButton() {
                 // Phase 65 (VOICE-01/03): dictation mic, immediately left of
                 // the send/stop slot. Hidden without a recognizer
                 // (speechAvailable), while generating, and while a model
@@ -442,14 +415,17 @@ fun ChatInputBar(
                     }
                     Spacer(Modifier.width(8.dp))
                 }
+            }
 
-                // Phase 67 (VMSG-01 tracer): voice-send button beside the
-                // dictation mic, same visibility conditions. Waveform
-                // glyph (GraphicEq family), never a mic. Hidden while
-                // recording — the Row-1 recording row owns stop/cancel.
-                // Gated configs (text-only model, remote endpoint) render
-                // NOTHING — no button, no hint. The send-path VM guards
-                // still block gated sends (draft kept + explainer).
+            @Composable
+            fun VoiceButton() {
+                // Phase 67 voice-send button beside the dictation mic, same
+                // visibility conditions. Waveform glyph (GraphicEq family),
+                // never a mic. Hidden while recording — the recording row
+                // owns stop/cancel. Gated configs (text-only model, remote
+                // endpoint) render NOTHING — no button, no hint. The
+                // send-path VM guards still block gated sends (draft kept +
+                // explainer).
                 if (speechAvailable && !isGenerating && !isLoadingModel && !isVoiceRecording) {
                     // Adopt the pre-existing dead onAudioRecordingChanged
                     // channel: it now fires with the live recording flag so
@@ -499,7 +475,10 @@ fun ChatInputBar(
                     }
                     Spacer(Modifier.width(8.dp))
                 }
+            }
 
+            @Composable
+            fun SendSlot() {
                 // Send/stop slot: stop while generating; up-arrow send
                 // ONLY with content (text, images, document, or voice
                 // draft) — empty input shows no send affordance at all.
@@ -523,6 +502,84 @@ fun ChatInputBar(
                     }
                 }
             }
+
+            // Phase 67 (VMSG-01 full): recording replaces the input row
+            // inline — mm:ss timer + amplitude bar + explicit cancel (X).
+            // Timer + bar render onSurfaceVariant, switching to error red
+            // in the last 10 s (>= 50 s). No other recolor, no pulse.
+            if (isVoiceRecording) {
+                val capWarning = voiceElapsedSec >= 50
+                val recColor = if (capWarning) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                // TalkBack throttle (Phase 65 pattern): the live-region
+                // description only changes every 5 s so announcements
+                // never spam, while the visual timer ticks each second.
+                val announceBucket = voiceElapsedSec / 5
+                val announceText = stringResource(
+                    R.string.voice_msg_recording_state,
+                    announceBucket * 5 / 60,
+                    announceBucket * 5 % 60,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().semantics {
+                        stateDescription = announceText
+                    },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onCancelRecording, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Filled.Close, stringResource(R.string.voice_msg_cancel),
+                            tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(24.dp))
+                    }
+                    Text(
+                        "%d:%02d".format(voiceElapsedSec / 60, voiceElapsedSec % 60),
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontFeatureSettings = "tnum"
+                        ),
+                        color = recColor
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    LinearProgressIndicator(
+                        progress = { (voiceAmplitude / 32767f).coerceIn(0f, 1f) },
+                        modifier = Modifier.weight(1f),
+                        color = recColor,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    IconButton(onClick = onVoiceClick, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Filled.Stop, stringResource(R.string.voice_msg_stop),
+                            tint = recColor, modifier = Modifier.size(24.dp))
+                    }
+                }
+            } else {
+                // Compact single row vs expanded ChatGPT-style layout
+                // (text on top, buttons below) once the text wraps.
+                if (expandedInput) {
+                    Column {
+                        InputField(Modifier.fillMaxWidth())
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AttachGroup()
+                            Spacer(Modifier.weight(1f))
+                            MicButton()
+                            VoiceButton()
+                            SendSlot()
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AttachGroup()
+                        InputField(Modifier.weight(1f))
+                        MicButton()
+                        VoiceButton()
+                        SendSlot()
+                    }
+                }
         }
     }
 }}
