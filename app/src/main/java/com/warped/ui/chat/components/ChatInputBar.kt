@@ -503,6 +503,15 @@ fun ChatInputBar(
                 }
             }
 
+            // The text field MOVES between the compact row and the
+            // expanded column — movableContentOf keeps the SAME composition
+            // (text, selection, and FOCUS) across the move, so the keyboard
+            // never drops when the input grows/shrinks. Declared once here
+            // (after the local pieces it calls) and invoked in both layouts.
+            val movableInputField = remember {
+                movableContentOf { mod: Modifier -> InputField(mod) }
+            }
+
             // Phase 67 (VMSG-01 full): recording replaces the input row
             // inline — mm:ss timer + amplitude bar + explicit cancel (X).
             // Timer + bar render onSurfaceVariant, switching to error red
@@ -555,7 +564,7 @@ fun ChatInputBar(
                 // (text on top, buttons below) once the text wraps.
                 if (expandedInput) {
                     Column {
-                        InputField(Modifier.fillMaxWidth())
+                        movableInputField(Modifier.fillMaxWidth())
                         Spacer(Modifier.height(4.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -574,7 +583,7 @@ fun ChatInputBar(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         AttachGroup()
-                        InputField(Modifier.weight(1f))
+                        movableInputField(Modifier.weight(1f))
                         MicButton()
                         VoiceButton()
                         SendSlot()
