@@ -37,7 +37,7 @@ class ModelAllowlistTest {
     fun `shipped asset parses with expected entries`() {
         val models = parseModelAllowlist(shippedAssetText())
 
-        assertThat(models).hasSize(6)
+        assertThat(models).hasSize(19)
         val e2b = models.first { it.name == "gemma-3n-E2B-it-int4" }
         assertThat(e2b.displayName).isEqualTo("Gemma 3n E2B IT (int4)")
         assertThat(e2b.modelFile).isEqualTo("gemma-3n-E2B-it-int4.litertlm")
@@ -117,7 +117,20 @@ class ModelAllowlistTest {
             "gemma-3n-E2B-it-int4",
             "gemma-3n-E4B-it-int4",
             "gemma-3-1b-it",
-            "gemma-3-270m-it"
+            "gemma-3-270m-it",
+            "qwen3-1.7b",
+            "qwen3-4b",
+            "qwen2-vl-2b",
+            "qwen3-4b-thinking",
+            "qwen2.5-coder-3b",
+            "qwen3-0.6b",
+            "qwen2.5-1.5b",
+            "qwen3-8b",
+            "qwen3.5-2b-vl",
+            "qwen3.5-4b",
+            "gemma3-4b-it",
+            "gemma3-12b-it",
+            "gemma-3n-E2B-official"
         ).inOrder()
     }
 
@@ -172,19 +185,71 @@ class ModelAllowlistTest {
             "gemma-4-E2B-it" to true,
             "gemma-4-E4B-it" to true,
             "gemma-3-1b-it" to true,
-            "gemma-3-270m-it" to true
+            "gemma-3-270m-it" to true,
+            "qwen3-1.7b" to true,
+            "qwen3-4b" to true,
+            "qwen2-vl-2b" to true,
+            "qwen3-4b-thinking" to true,
+            "qwen2.5-coder-3b" to true,
+            "qwen3-0.6b" to true,
+            "qwen2.5-1.5b" to true,
+            "qwen3-8b" to true,
+            "qwen3.5-2b-vl" to true,
+            "qwen3.5-4b" to true,
+            "gemma3-4b-it" to true,
+            "gemma3-12b-it" to true,
+            "gemma-3n-E2B-official" to true
         )
         // 3n multimodal + speculative decoding verified; gemma-4
         // vision/audio docs-verified, thinking docs-verified. E2B
         // speculative decoding still unverified (stays false); E4B
         // speculative decoding docs-verified true.
-        val expectedVisionAudio = mapOf(
+        // Qwen wave (2026-10-03): vision and audio split into separate
+        // maps — VLMs carry vision WITHOUT audio (the old shared map
+        // forced vision==audio per model, which no VLM satisfies).
+        // Vision docs-verified via image-text-to-text pipeline_tag + vlm
+        // tags; thinking docs-verified via reasoning/thinking tags.
+        val expectedVision = mapOf(
             "gemma-3n-E2B-it-int4" to true,
             "gemma-3n-E4B-it-int4" to true,
             "gemma-4-E2B-it" to true,
             "gemma-4-E4B-it" to true,
             "gemma-3-1b-it" to false,
-            "gemma-3-270m-it" to false
+            "gemma-3-270m-it" to false,
+            "qwen3-1.7b" to false,
+            "qwen3-4b" to false,
+            "qwen2-vl-2b" to true,
+            "qwen3-4b-thinking" to false,
+            "qwen2.5-coder-3b" to false,
+            "qwen3-0.6b" to false,
+            "qwen2.5-1.5b" to false,
+            "qwen3-8b" to false,
+            "qwen3.5-2b-vl" to true,
+            "qwen3.5-4b" to false,
+            "gemma3-4b-it" to true,
+            "gemma3-12b-it" to true,
+            "gemma-3n-E2B-official" to true
+        )
+        val expectedAudio = mapOf(
+            "gemma-3n-E2B-it-int4" to true,
+            "gemma-3n-E4B-it-int4" to true,
+            "gemma-4-E2B-it" to true,
+            "gemma-4-E4B-it" to true,
+            "gemma-3-1b-it" to false,
+            "gemma-3-270m-it" to false,
+            "qwen3-1.7b" to false,
+            "qwen3-4b" to false,
+            "qwen2-vl-2b" to false,
+            "qwen3-4b-thinking" to false,
+            "qwen2.5-coder-3b" to false,
+            "qwen3-0.6b" to false,
+            "qwen2.5-1.5b" to false,
+            "qwen3-8b" to false,
+            "qwen3.5-2b-vl" to false,
+            "qwen3.5-4b" to false,
+            "gemma3-4b-it" to false,
+            "gemma3-12b-it" to false,
+            "gemma-3n-E2B-official" to true
         )
         val expectedSpeculativeDecoding = mapOf(
             "gemma-3n-E2B-it-int4" to true,
@@ -200,7 +265,20 @@ class ModelAllowlistTest {
             "gemma-4-E2B-it" to true,
             "gemma-4-E4B-it" to true,
             "gemma-3-1b-it" to false,
-            "gemma-3-270m-it" to false
+            "gemma-3-270m-it" to false,
+            "qwen3-1.7b" to false,
+            "qwen3-4b" to false,
+            "qwen2-vl-2b" to false,
+            "qwen3-4b-thinking" to true,
+            "qwen2.5-coder-3b" to false,
+            "qwen3-0.6b" to false,
+            "qwen2.5-1.5b" to false,
+            "qwen3-8b" to false,
+            "qwen3.5-2b-vl" to false,
+            "qwen3.5-4b" to false,
+            "gemma3-4b-it" to false,
+            "gemma3-12b-it" to false,
+            "gemma-3n-E2B-official" to false
         )
         // 56-01 FLAG DECISION: supportsFunctionCalling true for the gemma-4
         // pair ONLY (docs basis: Gemma 4 model card built-in function
@@ -214,13 +292,26 @@ class ModelAllowlistTest {
             "gemma-4-E2B-it" to true,
             "gemma-4-E4B-it" to true,
             "gemma-3-1b-it" to false,
-            "gemma-3-270m-it" to false
+            "gemma-3-270m-it" to false,
+            "qwen3-1.7b" to false,
+            "qwen3-4b" to false,
+            "qwen2-vl-2b" to false,
+            "qwen3-4b-thinking" to false,
+            "qwen2.5-coder-3b" to false,
+            "qwen3-0.6b" to false,
+            "qwen2.5-1.5b" to false,
+            "qwen3-8b" to false,
+            "qwen3.5-2b-vl" to false,
+            "qwen3.5-4b" to false,
+            "gemma3-4b-it" to false,
+            "gemma3-12b-it" to false,
+            "gemma-3n-E2B-official" to false
         )
         for (model in models) {
             val caps = model.capabilities
             assertThat(caps.text).isEqualTo(expectedTextModality[model.name] == true)
-            assertThat(caps.vision).isEqualTo(expectedVisionAudio[model.name] == true)
-            assertThat(caps.audio).isEqualTo(expectedVisionAudio[model.name] == true)
+            assertThat(caps.vision).isEqualTo(expectedVision[model.name] == true)
+            assertThat(caps.audio).isEqualTo(expectedAudio[model.name] == true)
             assertThat(caps.speculativeDecoding).isEqualTo(expectedSpeculativeDecoding[model.name] == true)
             assertThat(caps.supportsThinking).isEqualTo(expectedThinking[model.name] == true)
             assertThat(caps.supportsFunctionCalling).isEqualTo(expectedFunctionCalling[model.name] == true)
@@ -233,7 +324,7 @@ class ModelAllowlistTest {
     fun `repository exposes capability queries`() {
         val repo = repositoryBackedBy(shippedAssetText())
 
-        assertThat(repo.models).hasSize(6)
+        assertThat(repo.models).hasSize(19)
         assertThat(repo.findByModelFile("gemma-3n-E4B-it-int4.litertlm")?.name)
             .isEqualTo("gemma-3n-E4B-it-int4")
         assertThat(repo.findByModelFile("gemma-4-E4B-it.litertlm")?.name)

@@ -131,6 +131,279 @@
       "taskTypes": ["chat"],
       "ramNote": "From ~1 GB RAM",
       "blurb": "Tiny model for any device."
+    },
+    {
+      "name": "qwen3-1.7b",
+      "displayName": "Qwen3 1.7B",
+      "repo": "warped-community/Qwen3-1.7B-litert-lm",
+      "modelFile": "Qwen3-1.7B_dynamic_wi4b32_afp32.litertlm",
+      "sizeInBytes": 977184032,
+      "capabilities": {
+        "text": true,
+        "vision": false,
+        "audio": false,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "From ~2 GB RAM",
+      "blurb": "Fast everyday chat, tiny download."
+    },
+    {
+      "name": "qwen3-4b",
+      "displayName": "Qwen3 4B",
+      "repo": "warped-community/Qwen3-4B-litert-lm",
+      "modelFile": "qwen3_4b_mixed_int4.litertlm",
+      "sizeInBytes": 2659057664,
+      "capabilities": {
+        "text": true,
+        "vision": false,
+        "audio": false,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "From ~4 GB RAM",
+      "blurb": "Strong mid-size chat."
+    },
+    {
+      "name": "qwen2-vl-2b",
+      "displayName": "Qwen2 VL 2B",
+      "repo": "warped-community/Qwen2-VL-2B-litert-lm",
+      "modelFile": "Qwen2-VL-2B.litertlm",
+      "sizeInBytes": 1783424544,
+      "capabilities": {
+        "text": true,
+        "vision": true,
+        "audio": false,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "From ~3 GB RAM",
+      "blurb": "Chat that sees images."
+    },
+    {
+      "name": "qwen3-4b-thinking",
+      "displayName": "Qwen3 4B Thinking",
+      "repo": "warped-community/Qwen3-4B-Thinking-litert-lm",
+      "modelFile": "Qwen3_4b_thinking_dynamic_wi4b32_afp32.litertlm",
+      "sizeInBytes": 2274193168,
+      "capabilities": {
+        "text": true,
+        "vision": false,
+        "audio": false,
+        "supportsThinking": true,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "From ~4 GB RAM",
+      "blurb": "Reasons step by step (thinking)."
+    },
+    {
+      "name": "qwen2.5-coder-3b",
+      "displayName": "Qwen2.5 Coder 3B",
+      "repo": "warped-community/Qwen2.5-Coder-3B-litert-lm",
+      "modelFile": "Qwen2.5_Coder_3B_It.litertlm",
+      "sizeInBytes": 3433083824,
+      "capabilities": {
+        "text": true,
+        "vision": false,
+        "audio": false,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "6 GB or more recommended",
+      "blurb": "Code help and debugging."
+    },
+    {
+      "name": "qwen3-0.6b",
+      "displayName": "Qwen3 0.6B",
+      "repo": "warped-community/Qwen3-0.6B-litert-lm",
+      "modelFile": "qwen3_0_6b_mixed_int4.litertlm",
+      "sizeInBytes": 497516544,
+      "capabilities": {
+        "text": true,
+        "vision": false,
+        "audio": false,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "From ~2 GB RAM",
+      "blurb": "Ultralight for low-end phones."
+    },
+    {
+      "name": "qwen2.5-1.5b",
+      "displayName": "Qwen2.5 1.5B",
+      "repo": "warped-community/Qwen2.5-1.5B-litert-lm",
+      "modelFile": "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
+      "sizeInBytes": 1597931520,
+      "capabilities": {
+        "text": true,
+        "vision": false,
+        "audio": false,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "From ~3 GB RAM",
+      "blurb": "Balanced small chat."
+    },
+    {
+      "name": "qwen3-8b",
+      "displayName": "Qwen3 8B",
+      "repo": "warped-community/Qwen3-8B-litert-lm",
+      "modelFile": "qwen3_8b_mixed_int4.litertlm",
+      "sizeInBytes": 4887412736,
+      "capabilities": {
+        "text": true,
+        "vision": false,
+        "audio": false,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "8 GB or more recommended",
+      "blurb": "High-quality chat for big phones."
+    },
+    {
+      "name": "qwen3.5-2b-vl",
+      "displayName": "Qwen3.5 2B VL",
+      "repo": "warped-community/Qwen3.5-2B-litert-lm",
+      "modelFile": "Qwen3.5-2B-VL_int8.litertlm",
+      "sizeInBytes": 3148905040,
+      "capabilities": {
+        "text": true,
+        "vision": true,
+        "audio": false,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "From ~6 GB RAM",
+      "blurb": "New-gen small chat with vision."
+    },
+    {
+      "name": "qwen3.5-4b",
+      "displayName": "Qwen3.5 4B",
+      "repo": "warped-community/Qwen3.5-4B-litert-lm",
+      "modelFile": "Qwen3.5-4B_mixed_int4.litertlm",
+      "sizeInBytes": 2754365536,
+      "capabilities": {
+        "text": true,
+        "vision": false,
+        "audio": false,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "From ~4 GB RAM",
+      "blurb": "New-gen mid-size chat."
+    },
+    {
+      "name": "gemma3-4b-it",
+      "displayName": "Gemma3 4B IT",
+      "repo": "warped-community/Gemma3-4B-litert-lm",
+      "modelFile": "gemma3-4b-it-int4-web.task",
+      "sizeInBytes": 2559442944,
+      "capabilities": {
+        "text": true,
+        "vision": true,
+        "audio": false,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "From ~4 GB RAM",
+      "blurb": "Chat with vision (Gemma 3)."
+    },
+    {
+      "name": "gemma3-12b-it",
+      "displayName": "Gemma3 12B IT",
+      "repo": "warped-community/Gemma3-12B-litert-lm",
+      "modelFile": "gemma3-12b-it-int4-web.task",
+      "sizeInBytes": 7546535936,
+      "capabilities": {
+        "text": true,
+        "vision": true,
+        "audio": false,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "12 GB or more recommended",
+      "blurb": "Flagship chat with vision."
+    },
+    {
+      "name": "gemma-3n-E2B-official",
+      "displayName": "Gemma 3n E2B IT (Official)",
+      "repo": "warped-community/gemma-3n-E2B-official-litert-lm",
+      "modelFile": "gemma-3n-E2B-it-int4.litertlm",
+      "sizeInBytes": 3655827456,
+      "capabilities": {
+        "text": true,
+        "vision": true,
+        "audio": true,
+        "supportsThinking": false,
+        "supportsFunctionCalling": false,
+        "speculativeDecoding": false,
+        "extendedContext": false,
+        "mtpSupport": false
+      },
+      "llmPromptTemplates": {},
+      "taskTypes": ["chat"],
+      "ramNote": "From ~6 GB RAM",
+      "blurb": "Official Google audio+vision build."
     }
   ]
 }
