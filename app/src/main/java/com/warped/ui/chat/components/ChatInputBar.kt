@@ -463,7 +463,7 @@ fun ChatInputBar(
                                     if (showVoiceCoachmark) onCoachmarkDismiss()
                                     onVoiceClick()
                                 },
-                            modifier = Modifier.size(48.dp),
+                            modifier = Modifier.size(40.dp),
                             colors = IconButtonDefaults.iconButtonColors(
                                 containerColor = if (isVoiceRecording) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent
                             )
