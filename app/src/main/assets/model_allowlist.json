@@ -1161,6 +1161,7 @@
       "displayName": "Gemma 4 12B IT",
       "repo": "warped-community/gemma-4-12B-it-litert-lm",
       "modelFile": "gemma-4-12B-it.litertlm",
+      "recommended": true,
       "sizeInBytes": 6883278368,
       "capabilities": {
         "text": true,
