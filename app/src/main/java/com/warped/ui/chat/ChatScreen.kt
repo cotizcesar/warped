@@ -873,10 +873,10 @@ fun ChatScreen(
             }
 
             if (connection.modelLoadError != null) {
-                Snackbar(
-                    modifier = Modifier.padding(16.dp),
-                    action = { TextButton(onClick = { viewModel.clearModelLoadError() }) { Text(stringResource(R.string.dismiss)) } }
-                ) { Text(connection.modelLoadError ?: "") }
+                AutoDismissErrorBanner(
+                    text = connection.modelLoadError ?: "",
+                    onDismiss = { viewModel.clearModelLoadError() },
+                )
             }
 
             if (transcript.error != null) {
@@ -1239,6 +1239,63 @@ private fun InlineModelSelectorBar(
  * reading_page copy, search uses the indeterminate searching copy (no
  * counts), the gap reuses the old in-list thinking-row copy (thinking_ellipsis).
  */
+/**
+ * Model-load error banner: rounded error card (icon + message + close)
+ * that dismisses itself after [AUTO_DISMISS_MS]. Replaces the stuck
+ * inline Snackbar — load errors (notably low-memory) must not linger
+ * over the conversation.
+ */
+private const val ERROR_BANNER_AUTO_DISMISS_MS = 5_000L
+
+@Composable
+private fun AutoDismissErrorBanner(
+    text: String,
+    onDismiss: () -> Unit,
+) {
+    LaunchedEffect(text) {
+        kotlinx.coroutines.delay(ERROR_BANNER_AUTO_DISMISS_MS)
+        onDismiss()
+    }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        ),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Filled.Warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier.size(32.dp),
+            ) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = stringResource(R.string.cd_close),
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun TurnStatusRow(status: TurnStatus?) {
     if (status == null) return
