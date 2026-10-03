@@ -37,7 +37,7 @@ class ModelAllowlistTest {
     fun `shipped asset parses with expected entries`() {
         val models = parseModelAllowlist(shippedAssetText())
 
-        assertThat(models).hasSize(19)
+        assertThat(models).hasSize(47)
         val e2b = models.first { it.name == "gemma-3n-E2B-it-int4" }
         assertThat(e2b.displayName).isEqualTo("Gemma 3n E2B IT (int4)")
         assertThat(e2b.modelFile).isEqualTo("gemma-3n-E2B-it-int4.litertlm")
@@ -130,8 +130,56 @@ class ModelAllowlistTest {
             "qwen3.5-4b",
             "gemma3-4b-it",
             "gemma3-12b-it",
-            "gemma-3n-E2B-official"
+            "gemma-3n-E2B-official",
+            "smolvlm2-500m",
+            "llava-ov-0.5b",
+            "qwen3-4b-instruct",
+            "deepseek-r1-1.5b",
+            "ministral-3-3b",
+            "phi-4-mini",
+            "smolllm2-360m",
+            "smolllm3-3b",
+            "tinyllama-1.1b",
+            "olmo-2-1b",
+            "internvl3_5-1b",
+            "ovis2.5-2b",
+            "smolvlm2-2.2b",
+            "qwen2.5-0.5b",
+            "smolllm2-135m",
+            "qwen3-14b",
+            "qwen2-0.5b",
+            "parakeet-tdt-0.6b",
+            "qwen3-asr-0.6b",
+            "moonshine-tiny",
+            "whisper-tiny",
+            "kokoro-82m",
+            "matcha-tts",
+            "qwen3-emb-0.6b",
+            "qwen3-rerank-0.6b",
+            "paddleocr-vl",
+            "flux-klein-4b",
+            "z-image-turbo",
         ).inOrder()
+    }
+
+    @Test
+    fun `comingSoon flags parse with back-compat defaults`() {
+        val models = parseModelAllowlist(shippedAssetText()).associateBy { it.name }
+        // Regular entries default to downloadable.
+        assertThat(models.getValue("qwen3-4b").comingSoon).isFalse()
+        assertThat(models.getValue("qwen3-4b").comingSoonNote).isNull()
+        // Coming-soon entries carry the flag + reason, no actions.
+        val parakeet = models.getValue("parakeet-tdt-0.6b")
+        assertThat(parakeet.comingSoon).isTrue()
+        assertThat(parakeet.comingSoonNote)
+            .isEqualTo("Necesita reconocimiento de voz en el dispositivo.")
+        // Old assets lacking the keys entirely still parse.
+        val legacy = parseModelAllowlist(
+            """{"models": [{"name": "x", "displayName": "X", "modelFile": "x.task",
+            "sizeInBytes": 1, "capabilities": {}}]}"""
+        )
+        assertThat(legacy.single().comingSoon).isFalse()
+        assertThat(legacy.single().comingSoonNote).isNull()
     }
 
     @Test
@@ -198,7 +246,63 @@ class ModelAllowlistTest {
             "qwen3.5-4b" to true,
             "gemma3-4b-it" to true,
             "gemma3-12b-it" to true,
-            "gemma-3n-E2B-official" to true
+            "gemma-3n-E2B-official" to true,
+            "smolvlm2-500m" to true,
+
+            "llava-ov-0.5b" to true,
+
+            "qwen3-4b-instruct" to true,
+
+            "deepseek-r1-1.5b" to true,
+
+            "ministral-3-3b" to true,
+
+            "phi-4-mini" to true,
+
+            "smolllm2-360m" to true,
+
+            "smolllm3-3b" to true,
+
+            "tinyllama-1.1b" to true,
+
+            "olmo-2-1b" to true,
+
+            "internvl3_5-1b" to true,
+
+            "ovis2.5-2b" to true,
+
+            "smolvlm2-2.2b" to true,
+
+            "qwen2.5-0.5b" to true,
+
+            "smolllm2-135m" to true,
+
+            "qwen3-14b" to true,
+
+            "qwen2-0.5b" to true,
+
+            "parakeet-tdt-0.6b" to false,
+
+            "qwen3-asr-0.6b" to false,
+
+            "moonshine-tiny" to false,
+
+            "whisper-tiny" to false,
+
+            "kokoro-82m" to false,
+
+            "matcha-tts" to false,
+
+            "qwen3-emb-0.6b" to false,
+
+            "qwen3-rerank-0.6b" to false,
+
+            "paddleocr-vl" to false,
+
+            "flux-klein-4b" to false,
+
+            "z-image-turbo" to false,
+
         )
         // 3n multimodal + speculative decoding verified; gemma-4
         // vision/audio docs-verified, thinking docs-verified. E2B
@@ -228,7 +332,63 @@ class ModelAllowlistTest {
             "qwen3.5-4b" to false,
             "gemma3-4b-it" to true,
             "gemma3-12b-it" to true,
-            "gemma-3n-E2B-official" to true
+            "gemma-3n-E2B-official" to true,
+            "smolvlm2-500m" to true,
+
+            "llava-ov-0.5b" to true,
+
+            "qwen3-4b-instruct" to false,
+
+            "deepseek-r1-1.5b" to false,
+
+            "ministral-3-3b" to false,
+
+            "phi-4-mini" to false,
+
+            "smolllm2-360m" to false,
+
+            "smolllm3-3b" to false,
+
+            "tinyllama-1.1b" to false,
+
+            "olmo-2-1b" to false,
+
+            "internvl3_5-1b" to true,
+
+            "ovis2.5-2b" to true,
+
+            "smolvlm2-2.2b" to true,
+
+            "qwen2.5-0.5b" to false,
+
+            "smolllm2-135m" to false,
+
+            "qwen3-14b" to false,
+
+            "qwen2-0.5b" to false,
+
+            "parakeet-tdt-0.6b" to false,
+
+            "qwen3-asr-0.6b" to false,
+
+            "moonshine-tiny" to false,
+
+            "whisper-tiny" to false,
+
+            "kokoro-82m" to false,
+
+            "matcha-tts" to false,
+
+            "qwen3-emb-0.6b" to false,
+
+            "qwen3-rerank-0.6b" to false,
+
+            "paddleocr-vl" to false,
+
+            "flux-klein-4b" to false,
+
+            "z-image-turbo" to false,
+
         )
         val expectedAudio = mapOf(
             "gemma-3n-E2B-it-int4" to true,
@@ -249,7 +409,63 @@ class ModelAllowlistTest {
             "qwen3.5-4b" to false,
             "gemma3-4b-it" to false,
             "gemma3-12b-it" to false,
-            "gemma-3n-E2B-official" to true
+            "gemma-3n-E2B-official" to true,
+            "smolvlm2-500m" to false,
+
+            "llava-ov-0.5b" to false,
+
+            "qwen3-4b-instruct" to false,
+
+            "deepseek-r1-1.5b" to false,
+
+            "ministral-3-3b" to false,
+
+            "phi-4-mini" to false,
+
+            "smolllm2-360m" to false,
+
+            "smolllm3-3b" to false,
+
+            "tinyllama-1.1b" to false,
+
+            "olmo-2-1b" to false,
+
+            "internvl3_5-1b" to false,
+
+            "ovis2.5-2b" to false,
+
+            "smolvlm2-2.2b" to false,
+
+            "qwen2.5-0.5b" to false,
+
+            "smolllm2-135m" to false,
+
+            "qwen3-14b" to false,
+
+            "qwen2-0.5b" to false,
+
+            "parakeet-tdt-0.6b" to false,
+
+            "qwen3-asr-0.6b" to false,
+
+            "moonshine-tiny" to false,
+
+            "whisper-tiny" to false,
+
+            "kokoro-82m" to false,
+
+            "matcha-tts" to false,
+
+            "qwen3-emb-0.6b" to false,
+
+            "qwen3-rerank-0.6b" to false,
+
+            "paddleocr-vl" to false,
+
+            "flux-klein-4b" to false,
+
+            "z-image-turbo" to false,
+
         )
         val expectedSpeculativeDecoding = mapOf(
             "gemma-3n-E2B-it-int4" to true,
@@ -278,7 +494,63 @@ class ModelAllowlistTest {
             "qwen3.5-4b" to false,
             "gemma3-4b-it" to false,
             "gemma3-12b-it" to false,
-            "gemma-3n-E2B-official" to false
+            "gemma-3n-E2B-official" to false,
+            "smolvlm2-500m" to false,
+
+            "llava-ov-0.5b" to false,
+
+            "qwen3-4b-instruct" to false,
+
+            "deepseek-r1-1.5b" to true,
+
+            "ministral-3-3b" to false,
+
+            "phi-4-mini" to false,
+
+            "smolllm2-360m" to false,
+
+            "smolllm3-3b" to false,
+
+            "tinyllama-1.1b" to false,
+
+            "olmo-2-1b" to false,
+
+            "internvl3_5-1b" to false,
+
+            "ovis2.5-2b" to false,
+
+            "smolvlm2-2.2b" to false,
+
+            "qwen2.5-0.5b" to false,
+
+            "smolllm2-135m" to false,
+
+            "qwen3-14b" to false,
+
+            "qwen2-0.5b" to false,
+
+            "parakeet-tdt-0.6b" to false,
+
+            "qwen3-asr-0.6b" to false,
+
+            "moonshine-tiny" to false,
+
+            "whisper-tiny" to false,
+
+            "kokoro-82m" to false,
+
+            "matcha-tts" to false,
+
+            "qwen3-emb-0.6b" to false,
+
+            "qwen3-rerank-0.6b" to false,
+
+            "paddleocr-vl" to false,
+
+            "flux-klein-4b" to false,
+
+            "z-image-turbo" to false,
+
         )
         // 56-01 FLAG DECISION: supportsFunctionCalling true for the gemma-4
         // pair ONLY (docs basis: Gemma 4 model card built-in function
@@ -305,7 +577,63 @@ class ModelAllowlistTest {
             "qwen3.5-4b" to false,
             "gemma3-4b-it" to false,
             "gemma3-12b-it" to false,
-            "gemma-3n-E2B-official" to false
+            "gemma-3n-E2B-official" to false,
+            "smolvlm2-500m" to false,
+
+            "llava-ov-0.5b" to false,
+
+            "qwen3-4b-instruct" to false,
+
+            "deepseek-r1-1.5b" to false,
+
+            "ministral-3-3b" to false,
+
+            "phi-4-mini" to false,
+
+            "smolllm2-360m" to false,
+
+            "smolllm3-3b" to false,
+
+            "tinyllama-1.1b" to false,
+
+            "olmo-2-1b" to false,
+
+            "internvl3_5-1b" to false,
+
+            "ovis2.5-2b" to false,
+
+            "smolvlm2-2.2b" to false,
+
+            "qwen2.5-0.5b" to false,
+
+            "smolllm2-135m" to false,
+
+            "qwen3-14b" to false,
+
+            "qwen2-0.5b" to false,
+
+            "parakeet-tdt-0.6b" to false,
+
+            "qwen3-asr-0.6b" to false,
+
+            "moonshine-tiny" to false,
+
+            "whisper-tiny" to false,
+
+            "kokoro-82m" to false,
+
+            "matcha-tts" to false,
+
+            "qwen3-emb-0.6b" to false,
+
+            "qwen3-rerank-0.6b" to false,
+
+            "paddleocr-vl" to false,
+
+            "flux-klein-4b" to false,
+
+            "z-image-turbo" to false,
+
         )
         for (model in models) {
             val caps = model.capabilities
@@ -324,7 +652,7 @@ class ModelAllowlistTest {
     fun `repository exposes capability queries`() {
         val repo = repositoryBackedBy(shippedAssetText())
 
-        assertThat(repo.models).hasSize(19)
+        assertThat(repo.models).hasSize(47)
         assertThat(repo.findByModelFile("gemma-3n-E4B-it-int4.litertlm")?.name)
             .isEqualTo("gemma-3n-E4B-it-int4")
         assertThat(repo.findByModelFile("gemma-4-E4B-it.litertlm")?.name)

@@ -86,7 +86,17 @@ data class AllowlistedModel(
      * lacking these fields.
      */
     val ramNote: String? = null,
-    val blurb: String? = null
+    val blurb: String? = null,
+    /**
+     * Coming-soon flag: the entry is listed for discovery but cannot be
+     * downloaded or used yet — its pipeline doesn't exist in the app
+     * (on-device STT/TTS, semantic search, image generation, OCR tooling).
+     * [comingSoonNote] names the missing piece (shown under the badge).
+     *
+     * Back-compat: absent → false (existing entries behave unchanged).
+     */
+    val comingSoon: Boolean = false,
+    val comingSoonNote: String? = null
 ) {
     /**
      * Effective repo slug for download URL construction.

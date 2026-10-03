@@ -77,6 +77,7 @@ fun ModelCard(
     sizeText: String,
     ramText: String? = null,
     metaChips: List<String> = emptyList(),
+    textBadge: Boolean = true,
     vision: Boolean = false,
     audio: Boolean = false,
     reasoning: Boolean = false,
@@ -128,14 +129,18 @@ fun ModelCard(
                             )
                         }
                     }
-                    // Text badge always: every model chats (explicit per UX).
+                    // Text badge only when the model actually chats —
+                    // coming-soon non-chat entries (ASR/TTS/...) show no
+                    // badges at all, just the Próximamente pill.
                     Spacer(Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        CapabilityIconBadge(
-                            icon = Icons.Filled.TextFields,
-                            contentDescription = stringResource(R.string.cap_text),
-                            color = Color(0xFF9CA3AF)
-                        )
+                        if (textBadge) {
+                            CapabilityIconBadge(
+                                icon = Icons.Filled.TextFields,
+                                contentDescription = stringResource(R.string.cap_text),
+                                color = Color(0xFF9CA3AF)
+                            )
+                        }
                         if (vision) CapabilityIconBadge(
                             icon = Icons.Filled.Visibility,
                             contentDescription = stringResource(R.string.badge_vision),

@@ -34,6 +34,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -354,6 +355,7 @@ private fun CatalogModelCard(
         sizeText = formatFileSize(entry.sizeInBytes),
         ramText = entry.ramNote,
         metaChips = if (downloaded && isInUse) listOf(inUseLabel) else emptyList(),
+        textBadge = entry.capabilities.text,
         vision = entry.capabilities.vision,
         audio = entry.capabilities.audio,
         reasoning = entry.capabilities.supportsThinking,
@@ -361,7 +363,23 @@ private fun CatalogModelCard(
         dotConnected = downloaded,
         expandable = expandable,
         trailingActions = {
-            if (downloaded) {
+            if (entry.comingSoon) {
+                // Coming-soon entries list for discovery but expose no
+                // actions — their pipeline doesn't exist in the app yet.
+                // Never downloadable, never deletable, never usable.
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                ) {
+                    Text(
+                        text = stringResource(R.string.catalog_coming_soon),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+            } else if (downloaded) {
                 IconButton(onClick = { showDeleteConfirm = true }) {
                     Icon(
                         imageVector = Icons.Filled.Delete,
@@ -380,6 +398,8 @@ private fun CatalogModelCard(
             }
         },
         downloadContent = {
+            // Coming-soon: no download CTA ever (nothing to download into).
+            if (!entry.comingSoon) {
             // Active download: shared linear-bar + status-line + Cancel look.
             // Cancel goes through the cancel-confirm dialog — cancelling
             // deletes the partial file (see dialog copy).
@@ -410,6 +430,7 @@ private fun CatalogModelCard(
                     )
                 }
             }
+            } // end if (!entry.comingSoon)
         },
         // Retained error text (icon form keeps the message for a11y;
         // retry = download icon tap).
@@ -425,6 +446,17 @@ private fun CatalogModelCard(
                     text = entry.blurb,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            // Coming-soon reason line (only on coming-soon entries).
+            if (entry.comingSoon && !entry.comingSoonNote.isNullOrBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = entry.comingSoonNote ?: "",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
