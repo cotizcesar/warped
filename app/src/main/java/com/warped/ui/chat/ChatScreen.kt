@@ -194,6 +194,27 @@ fun ChatScreen(
             viewModel.selectConversation(conversationId)
         }
     }
+    // Per-conversation composer drafts: leaving a chat stashes the unsent
+    // composer (text, images, send-bytes, document, settled voice draft)
+    // under it; arriving restores the target's stash (or clears to fresh).
+    // The dispose closure holds the leaving chat's values — never the
+    // arriving chat's — so nothing is lost or leaked across chats.
+    DisposableEffect(conversationId) {
+        onDispose {
+            viewModel.stashComposerDraft(
+                transcript.conversationId,
+                input.inputText,
+                attachedImages,
+                audioBytes,
+            )
+        }
+    }
+    LaunchedEffect(transcript.conversationId) {
+        val draft = viewModel.popComposerDraft(transcript.conversationId)
+        attachedImages = draft?.images.orEmpty()
+        audioBytes = draft?.audioBytes
+        viewModel.restoreComposerDraft(draft)
+    }
     LaunchedEffect(Unit) {
         if (conversationId == 0L) {
             snapToBottomOnNextContent = true
@@ -586,10 +607,15 @@ fun ChatScreen(
             Box(modifier = Modifier.weight(1f)) {
                 if (isEmpty) {
                     // Empty state
+                    // Optical centering: the floating input overlay covers
+                    // the bottom of this Box, so center within the area
+                    // above it (overlay height as bottom padding) — logo +
+                    // text sit truly centered in the visible space.
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .fillMaxWidth(),
+                            .fillMaxWidth()
+                            .padding(bottom = with(density) { overlayHeightPx.toDp() }),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -810,7 +836,7 @@ fun ChatScreen(
                     draftDurationMs = draftDurationMs,
                     onPlayDraft = { viewModel.playVoiceDraft() },
                     onPauseDraft = { viewModel.pauseVoiceDraft() },
-                    onSendDraft = onSendMessage,
+                    onSeekDraft = { viewModel.seekDraftVoice(it) },
                     onDeleteDraft = { viewModel.deleteVoiceDraft() },
                     // WR-03: report the caret so dictation inserts at cursor.
                     onCursorChange = { viewModel.updateInputCursor(it) },

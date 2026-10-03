@@ -443,4 +443,113 @@ class VoiceDraftGuardTest {
         assertThat(vm.isDraftPlaying.value).isFalse()
         assertThat(playerHandles).isEmpty()
     }
+
+    @Test
+    fun `seekDraftVoice moves player and position flow`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
+        val vm = buildViewModel(idleHelper(), modelFile.absolutePath)
+        runCurrent()
+        vm.voiceDurationReader = { 3_000L }
+        val handle = attachRecorder(vm, File(tempDir, "voice"))
+        attachPlayer(vm)
+        recordClip(vm, handle) { stopVoiceRecording() }
+        vm.hasVoiceClip.test {
+            var kept = awaitItem()
+            while (!kept) kept = awaitItem()
+        }
+
+        // Play first (creates the player handle), then pause so the poll
+        // can't overwrite the seek target mid-assert.
+        vm.playVoiceDraft()
+        vm.isDraftPlaying.test {
+            var playing = awaitItem()
+            while (!playing) playing = awaitItem()
+        }
+        vm.pauseVoiceDraft()
+        vm.isDraftPlaying.test {
+            var playing = awaitItem()
+            while (playing) playing = awaitItem()
+        }
+
+        vm.seekDraftVoice(500)
+        // Seek lands on IO (a real thread under runTest) — await the
+        // refreshed position flow like the neighboring tests.
+        vm.draftPositionMs.test {
+            var pos = awaitItem()
+            while (pos != 500) pos = awaitItem()
+        }
+        assertThat(playerHandles.single().position).isEqualTo(500)
+    }
+
+    @Test
+    fun `seekDraftVoice without a clip is a no-op`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
+        val vm = buildViewModel(idleHelper(), modelFile.absolutePath)
+        runCurrent()
+        attachPlayer(vm)
+        advanceUntilIdle()
+
+        vm.seekDraftVoice(1_500)
+        advanceUntilIdle()
+
+        assertThat(vm.draftPositionMs.value).isEqualTo(0)
+        assertThat(playerHandles).isEmpty()
+    }
+
+    @Test
+    fun `composer draft round-trips text, images, audio and voice`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
+        val vm = buildViewModel(idleHelper(), modelFile.absolutePath)
+        runCurrent()
+        vm.voiceDurationReader = { 3_000L }
+        val handle = attachRecorder(vm, File(tempDir, "voice"))
+        recordClip(vm, handle) { stopVoiceRecording() }
+        vm.hasVoiceClip.test {
+            var kept = awaitItem()
+            while (!kept) kept = awaitItem()
+        }
+
+        val images = listOf(mockk<android.net.Uri>())
+        val audio = byteArrayOf(1, 2, 3)
+        vm.stashComposerDraft(7L, "hello draft", images, audio)
+
+        val popped = vm.popComposerDraft(7L)
+        assertThat(popped).isNotNull()
+        assertThat(popped!!.text).isEqualTo("hello draft")
+        assertThat(popped.images).isEqualTo(images)
+        assertThat(popped.audioBytes).isEqualTo(audio)
+        assertThat(popped.voice?.durationMs).isEqualTo(3_000L)
+        assertThat(popped.voice?.path).isNotNull()
+        // Pop consumes:
+        assertThat(vm.popComposerDraft(7L)).isNull()
+
+        // Restore applies text + voice card state:
+        vm.restoreComposerDraft(popped)
+        assertThat(vm.inputState.value.inputText).isEqualTo("hello draft")
+        assertThat(vm.hasVoiceClip.value).isTrue()
+        assertThat(vm.draftDurationMs.value).isEqualTo(3_000L)
+
+        // Restore of null clears to a fresh composer:
+        vm.restoreComposerDraft(null)
+        assertThat(vm.inputState.value.inputText).isEmpty()
+        assertThat(vm.hasVoiceClip.value).isFalse()
+        assertThat(vm.draftDurationMs.value).isEqualTo(0L)
+    }
+
+    @Test
+    fun `empty composer evicts the stash`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
+        val vm = buildViewModel(idleHelper(), modelFile.absolutePath)
+        runCurrent()
+        advanceUntilIdle()
+
+        vm.stashComposerDraft(9L, "", emptyList(), null)
+        assertThat(vm.popComposerDraft(9L)).isNull()
+        vm.stashComposerDraft(9L, "   ", emptyList(), null)
+        assertThat(vm.popComposerDraft(9L)).isNull()
+    }
 }

@@ -1746,6 +1746,106 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
+     * Per-conversation composer drafts: switching chats stashes the
+     * unsent composer (text, images, send-bytes, document, settled voice
+     * draft) under the conversation being left (null = fresh new chat)
+     * and restores the target's stash — nothing typed is ever lost or
+     * leaked into another chat. Session-scoped (in-memory map, never
+     * Room): a restart starts every composer empty.
+     *
+     * Voice policy: only a SETTLED kept clip is stashed (path + duration
+     * + frozen transcript holder); an in-flight recording keep landing
+     * after the switch behaves as before (global draft, same as today —
+     * nothing lost). Playback and dictation stop at the switch so audio
+     * and trailing partials never bleed into the new chat.
+     */
+    data class VoiceDraftSnapshot(
+        val path: String,
+        val durationMs: Long,
+        val transcript: String?,
+        val unavailable: Boolean,
+    )
+
+    data class ChatDraft(
+        val text: String = "",
+        val images: List<Uri> = emptyList(),
+        val audioBytes: ByteArray? = null,
+        val document: AttachedDocument? = null,
+        val voice: VoiceDraftSnapshot? = null,
+    )
+
+    private val conversationDrafts = mutableMapOf<Long?, ChatDraft>()
+
+    /** Snapshot the current composer under [conversationId]; empty composers evict. */
+    fun stashComposerDraft(
+        conversationId: Long?,
+        text: String,
+        images: List<Uri>,
+        audioBytes: ByteArray?,
+    ) {
+        stopPlaybackInternal()
+        try {
+            stopDictation()
+        } catch (e: Exception) {
+            Timber.w(e, "Chat: stop dictation on chat switch failed")
+        }
+        val voice = if (_hasVoiceClip.value && !_isVoiceRecording.value) {
+            voiceClipFile?.takeIf { it.exists() }?.let { file ->
+                VoiceDraftSnapshot(
+                    path = file.absolutePath,
+                    durationMs = _draftDurationMs.value,
+                    transcript = lastSentVoiceTranscript,
+                    unavailable = transcriptUnavailable,
+                )
+            }
+        } else {
+            null
+        }
+        val document = _attachedDocument.value
+        if (text.isBlank() && images.isEmpty() && audioBytes == null && document == null && voice == null) {
+            conversationDrafts.remove(conversationId)
+        } else {
+            conversationDrafts[conversationId] = ChatDraft(text, images, audioBytes, document, voice)
+        }
+    }
+
+    /** Pop (consume) the stashed draft for [conversationId], if any. */
+    fun popComposerDraft(conversationId: Long?): ChatDraft? =
+        conversationDrafts.remove(conversationId)
+
+    /**
+     * Apply a popped draft to the composer; null clears it to a fresh
+     * state. Voice restore never deletes files (clips belong to stashed
+     * drafts, not to this chat) — it only repoints VM state at an
+     * existing clip, or clears the card when there is none.
+     */
+    fun restoreComposerDraft(draft: ChatDraft?) {
+        stopPlaybackInternal()
+        updateInput { it.copy(inputText = draft?.text.orEmpty()) }
+        _attachedDocument.value = draft?.document
+        val voice = draft?.voice
+        val clip = voice?.let { java.io.File(it.path).takeIf { f -> f.exists() } }
+        if (clip != null && voice != null) {
+            voiceClipFile = clip
+            _draftDurationMs.value = voice.durationMs
+            lastSentVoiceTranscript = voice.transcript
+            transcriptUnavailable = voice.unavailable
+            _voiceTranscriptLive.value = voice.transcript.orEmpty()
+            transcriptFinalized = voice.transcript.orEmpty()
+            _hasVoiceClip.value = true
+            _draftPositionMs.value = 0
+            _isDraftPlaying.value = false
+        } else {
+            voiceClipFile = null
+            _hasVoiceClip.value = false
+            _draftDurationMs.value = 0L
+            _isDraftPlaying.value = false
+            _draftPositionMs.value = 0
+            clearTranscriptState()
+        }
+    }
+
+    /**
      * Phase 65 fix (CR-01): provisional partial handler. Platform partials
      * are cumulative hypotheses ("hel" → "hello" → "hello world"), not
      * deltas — each call REPLACES the previous hypothesis ([lastPartial]
@@ -2884,6 +2984,23 @@ class ChatViewModel @Inject constructor(
                 Timber.w(e, "VoiceMsg: history seek failed")
             }
             _historyPositionMs.value = target
+        }
+    }
+
+    /**
+     * Seek within the kept draft clip (playing or paused). No-op without
+     * a draft — scrubbing with no clip does nothing.
+     */
+    fun seekDraftVoice(positionMs: Int) {
+        if (!_hasVoiceClip.value) return
+        val target = positionMs.coerceAtLeast(0)
+        viewModelScope.launch(Dispatchers.IO + coroutineExceptionHandler) {
+            try {
+                getVoicePlayer().seekTo(target)
+            } catch (e: Exception) {
+                Timber.w(e, "VoiceMsg: draft seek failed")
+            }
+            _draftPositionMs.value = target
         }
     }
 
