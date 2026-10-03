@@ -56,11 +56,12 @@ class CatalogViewModel @Inject constructor(
 
     /**
      * Synchronous asset parse — first paint shows the populated list, no skeleton.
-     * Display order is smallest-first by file size (user decision 2026-10-01);
-     * the bundled asset keeps its locked sequence for non-display uses.
+     * Display order is smallest-first by file size (user decision 2026-10-01),
+     * with coming-soon entries always last (user decision 2026-10-03) so
+     * installable models are never buried under placeholders; the bundled
+     * asset keeps its locked sequence for non-display uses.
      */
-    val models: List<AllowlistedModel> =
-        allowlistRepository.models.sortedBy { it.sizeInBytes }
+    val models: List<AllowlistedModel> = sortCatalogModels(allowlistRepository.models)
 
     val downloadStates: StateFlow<Map<String, DownloadState>> =
         downloadManager.downloadStates.stateIn(
@@ -167,6 +168,7 @@ class CatalogViewModel @Inject constructor(
                     activeModelSelection.disconnectLocal()
                 }
                 modelImportManager.deleteModel(model)
+                downloadManager.forgetDownloadsForFile(entry.modelFile)
             } catch (e: Exception) {
                 Timber.e(e, "CatalogVM: deleteDownloaded failed")
             }
@@ -276,3 +278,13 @@ internal fun findLocalModelForEntry(
     }
     return matches.firstOrNull()
 }
+
+/**
+ * Catalog display order: downloadable models smallest-first, coming-soon
+ * entries always trailing (user decision 2026-10-03 — installable models
+ * must never be buried under placeholders). Pure — unit-tested.
+ */
+fun sortCatalogModels(models: List<AllowlistedModel>): List<AllowlistedModel> =
+    models.sortedWith(
+        compareBy<AllowlistedModel> { it.comingSoon }.thenBy { it.sizeInBytes }
+    )
