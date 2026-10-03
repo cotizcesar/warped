@@ -568,7 +568,7 @@ fun ChatInputBar(
                         Spacer(Modifier.height(4.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.Bottom
                         ) {
                             AttachGroup()
                             Spacer(Modifier.weight(1f))
@@ -580,7 +580,7 @@ fun ChatInputBar(
                 } else {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.Bottom
                     ) {
                         AttachGroup()
                         movableInputField(Modifier.weight(1f))
