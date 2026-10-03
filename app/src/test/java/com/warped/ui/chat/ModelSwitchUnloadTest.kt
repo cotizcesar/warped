@@ -304,10 +304,11 @@ class ModelSwitchUnloadTest {
         fixture.vm.sendMessage("hello")
         advanceUntilIdle()
 
-        // Error surfaced, spinner cleared, selection kept for retry, draft
-        // kept, nothing persisted.
+        // Error surfaced ONCE via the modelLoadError banner (no stacked
+        // transcript-error duplicate), spinner cleared, selection kept
+        // for retry, draft kept, nothing persisted.
         assertThat(fixture.vm.connectionState.value.modelLoadError).isNotNull()
-        assertThat(fixture.vm.transcriptState.value.error).isNotNull()
+        assertThat(fixture.vm.transcriptState.value.error).isNull()
         assertThat(fixture.vm.connectionState.value.isLoadingModel).isFalse()
         assertThat(fixture.vm.connectionState.value.selectedLocalModelId).isEqualTo(path)
         assertThat(fixture.vm.inputState.value.inputText).isEqualTo("hello")
@@ -335,15 +336,14 @@ class ModelSwitchUnloadTest {
         advanceUntilIdle()
         // The throw hops off Dispatchers.Default — yield, then assert.
         var attempts = 0
-        while (fixture.vm.transcriptState.value.error == null && attempts++ < 100) {
+        while (fixture.vm.connectionState.value.modelLoadError == null && attempts++ < 100) {
             kotlinx.coroutines.delay(10)
         }
         advanceUntilIdle()
 
-        assertThat(fixture.vm.transcriptState.value.error)
-            .isInstanceOf(ChatError.Unknown::class.java)
-        assertThat((fixture.vm.transcriptState.value.error as ChatError.Unknown).message)
-            .isEqualTo("boom")
+        // Single report via the banner (no transcript-error duplicate).
+        assertThat(fixture.vm.connectionState.value.modelLoadError).isEqualTo("boom")
+        assertThat(fixture.vm.transcriptState.value.error).isNull()
         assertThat(fixture.vm.connectionState.value.isLoadingModel).isFalse()
         // Selection kept (pending) for retry, draft kept, nothing persisted.
         assertThat(fixture.vm.connectionState.value.selectedLocalModelId).isEqualTo(path)
@@ -411,5 +411,36 @@ class ModelSwitchUnloadTest {
         // runTest), so verify with a timeout instead of bare advanceUntilIdle.
         verify(timeout = 5000, exactly = 1) { fixture.engineManager.unloadCurrent() }
         assertThat(fixture.selection.localSelection.value.modelId).isNull()
+    }
+
+    @Test
+    fun `local to local switch keeps conversation without dialog`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val pathA = File(tempDir, "a.litertlm").apply { writeText("fake") }.absolutePath
+        val pathB = File(tempDir, "b.litertlm").apply { writeText("fake") }.absolutePath
+        val models = listOf(
+            model(pathA, Instant.EPOCH),
+            model(pathB, Instant.EPOCH.plusSeconds(10))
+        )
+        val fixture = buildFixture(models, helper = idleHelper())
+        runCurrent()
+        advanceUntilIdle()
+
+        // Mount A via a first send so the conversation exists.
+        fixture.vm.launchModelSelection(pathA, ProviderType.LITE_RT_LM)
+        advanceUntilIdle()
+        fixture.vm.sendMessage("hi")
+        awaitMount(fixture)
+        assertThat(fixture.vm.transcriptState.value.messages).isNotEmpty()
+
+        // Same-conversation switch: no dialog parks, history survives,
+        // selection + conversation retarget to B.
+        fixture.vm.launchModelSelection(pathB, ProviderType.LITE_RT_LM)
+        advanceUntilIdle()
+
+        assertThat(fixture.vm.connectionState.value.pendingModelSwitch).isNull()
+        assertThat(fixture.vm.connectionState.value.selectedLocalModelId).isEqualTo(pathB)
+        assertThat(fixture.vm.connectionState.value.conversationModelId).isEqualTo(pathB)
+        assertThat(fixture.vm.transcriptState.value.messages).isNotEmpty()
     }
 }

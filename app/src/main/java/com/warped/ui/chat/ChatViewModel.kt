@@ -2929,12 +2929,26 @@ class ChatViewModel @Inject constructor(
     fun launchModelSelection(modelId: String, providerType: ProviderType, endpointId: Long? = null) {
         val state = snapshot()
 
-        // If we're in a conversation and the model is different, block and show dialog
+        // Mid-conversation model change: local<->remote (or remote<->local)
+        // switches park behind the new-chat confirm dialog (incompatible
+        // contexts). Local->local stays in the SAME conversation — no
+        // dialog: history is model-agnostic text and the engine remounts
+        // lazily on the next send (switchToLiteRT unloads atomically).
         val conversationModelId = state.conversationModelId
         if (conversationModelId != null && state.messages.isNotEmpty() &&
             (modelId != conversationModelId || providerType != state.conversationProviderType)) {
-            updateConnection { it.copy(pendingModelSwitch = ModelSwitchRequest(modelId, providerType, endpointId)) }
-            return
+            val localToLocal = providerType == ProviderType.LITE_RT_LM &&
+                state.conversationProviderType == ProviderType.LITE_RT_LM
+            if (!localToLocal) {
+                updateConnection { it.copy(pendingModelSwitch = ModelSwitchRequest(modelId, providerType, endpointId)) }
+                return
+            }
+            // Same-conversation switch: keep history, retarget the
+            // conversation so later comparisons (and the next send) use
+            // the new model.
+            updateConnection {
+                it.copy(conversationModelId = modelId, conversationProviderType = providerType)
+            }
         }
 
         // Check memory for local models

@@ -48,6 +48,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -162,6 +163,7 @@ fun ChatScreen(
     // the current viewport.
     var snapToBottomOnNextContent by remember { mutableStateOf(false) }
     var attachedImages by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var overlayHeightPx by remember { mutableIntStateOf(0) }
     var audioBytes by remember { mutableStateOf<ByteArray?>(null) }
     var isRecording by remember { mutableStateOf(false) }
     var showModelPicker by remember { mutableStateOf(false) }
@@ -544,113 +546,11 @@ fun ChatScreen(
 
     Scaffold(
         modifier = Modifier.imePadding(),
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState, modifier = Modifier.padding(bottom = with(density) { overlayHeightPx.toDp() } + 16.dp)) },
         topBar = { /* CHAT-02: removed TopAppBar — model picker is now inline above messages */
             // Drawer remains reachable via swipe (ModalNavigationDrawer around the Scaffold)
             // and the parent NavHost provides the drawer gesture.
         },
-        bottomBar = {
-            Column {
-                // Unified turn status (quick-turn-status): ONE transient row
-                // above the input bar — priority model loading > tool >
-                // fetch/search > streaming gap. Never a transcript message, never
-                // persisted; unmounts on completion/failure/Stop. Null
-                // status renders nothing (and no spacer).
-                val turnStatus = resolveTurnStatus(
-                    toolCallActive = input.toolCallActive,
-                    isFetchingWeb = input.isFetchingWeb,
-                    progress = input.webFetchProgress,
-                    isStreamingGap = isStreamingGap,
-                    isLoadingModel = connection.isLoadingModel,
-                    loadingModelName = connection.loadingModelName,
-                    loadingFirstTime = connection.loadingFirstTime,
-                )
-                TurnStatusRow(status = turnStatus)
-                // Phase 68 (VMSG-02): the draft card sends voice + caption
-                // through the same route as the input-row send (a kept clip
-                // always takes the transcode-and-send path).
-                val onSendMessage = {
-                    // CR-03: never leave the mic live without its indicator
-                    // — the mic hides while generating, so stop first.
-                    if (isListening) viewModel.stopDictation()
-                    snapToBottomOnNextContent = true
-                    hasNewContentBelow = false
-                    // Phase 67 (VMSG-05 tracer): a kept voice clip routes
-                    // through the transcode-and-send path with the caption.
-                    // Phase 69 Plan 01 (VMSG-04/08): a gated config with a
-                    // kept draft routes to the explainer instead — the
-                    // draft is kept, the send never attempted.
-                    if (hasVoiceClip) {
-                        if (voiceGate != GateState.Allowed) showVoiceGateExplainer(voiceGate)
-                        else viewModel.sendVoiceMessage(input.inputText)
-                    } else {
-                        viewModel.sendMessage(input.inputText, attachedImages, audioBytes)
-                    }
-                    attachedImages = emptyList()
-                    audioBytes = null
-                }
-                ChatInputBar(
-                text = input.inputText,
-                isGenerating = input.isGenerating,
-                canSend = (connection.selectedLocalModelId ?: connection.selectedRemoteModelId) != null,
-                onTextChange = { viewModel.updateInput(it) },
-                onSend = onSendMessage,
-                onStop = { viewModel.stopGeneration() },
-                // Verified-only capabilities: image/audio buttons hide when
-                // the selected local model lacks the modality. Remote or
-                // unselected → fail open (null → true).
-                modelHasVision = viewModel.verifiedLocalCapabilities(connection.selectedLocalModelId)?.vision
-                    ?: true,
-                onAddImage = { imagePickerLauncher.launch("image/*") },
-                attachedImages = attachedImages,
-                onRemoveImage = { i -> attachedImages = attachedImages.filterIndexed { idx, _ -> idx != i } },
-                // Phase 69 Plan 01 (VMSG-04/08): the collected VM gate
-                // drives button visibility (hidden when gated — no
-                // screen-local capability read). Gated sends still
-                // route to the explainer via the VM send-path guards.
-                voiceGate = voiceGate,
-                // Phase 69 Plan 03 (VMSG-03): one-shot coachmark on the
-                // enabled voice button; any tap dismisses (VM persists).
-                showVoiceCoachmark = showVoiceCoachmark,
-                onCoachmarkDismiss = { viewModel.dismissVoiceCoachmark() },
-                onAudioRecorded = { bytes -> audioBytes = bytes },
-                onAudioRecordingChanged = { isRecording = it },
-                speechAvailable = speechAvailable,
-                isListening = isListening,
-                onMicClick = onMicClick,
-                // Phase 67 (VMSG-01 tracer): minimal voice-send toggle.
-                isVoiceRecording = isVoiceRecording,
-                onVoiceClick = onVoiceClick,
-                // Phase 67 (VMSG-01 full): recording row + cancel path.
-                voiceElapsedSec = voiceElapsedSec,
-                voiceAmplitude = voiceAmplitude,
-                onCancelRecording = { viewModel.cancelVoiceRecording() },
-                // Phase 68 (VMSG-02): draft preview card state + callbacks.
-                hasVoiceClip = hasVoiceClip,
-                isDraftPlaying = isDraftPlaying,
-                draftPositionMs = draftPositionMs,
-                draftDurationMs = draftDurationMs,
-                onPlayDraft = { viewModel.playVoiceDraft() },
-                onPauseDraft = { viewModel.pauseVoiceDraft() },
-                onSendDraft = onSendMessage,
-                onDeleteDraft = { viewModel.deleteVoiceDraft() },
-                // WR-03: report the caret so dictation inserts at cursor.
-                onCursorChange = { viewModel.updateInputCursor(it) },
-                // Model-loading gate: the whole bar locks while loading.
-                isLoadingModel = connection.isLoadingModel,
-                // Phase 70 (70-02): document attach affordance + chip. The
-                // existing SnackbarHost (Short) serves the VM
-                // unsupported/failed/truncation notices — no new channel.
-                onAttachDocument = {
-                    documentPickerLauncher.launch(arrayOf("text/plain", "text/markdown", "text/*"))
-                },
-                attachedDocName = readyDoc?.filename,
-                attachedDocSize = readyDoc?.let { formatDocumentSize(it.sizeBytes) },
-                attachedDocTruncatedAt = readyDoc?.truncatedAt,
-                onRemoveDocument = { viewModel.clearDocument() },
-            )
-            }
-        }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -683,100 +583,142 @@ fun ChatScreen(
                 onToggleThinking = { viewModel.toggleThinking() },
             )
 
-            if (isEmpty) {
-                // Empty state
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Image(
-                            painter = painterResource(id = com.warped.R.drawable.logo),
-                            contentDescription = stringResource(R.string.cd_logo),
-                            modifier = Modifier.size(128.dp)
-                        )
-                        Spacer(Modifier.height(24.dp))
-                        Text(
-                            stringResource(R.string.empty_state_message),
-                            color = Color(0xFF9CA3AF),
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-                }
-            } else {
-                Box(modifier = Modifier.weight(1f)) {
-                    // 48-01 (PERF-15): keyed LazyColumn. Role.TOOL transcript rows
-                    // are persisted ChatMessages with stable ids — keyed inline,
-                    // zero extra work. Transient trailing rows use the constant
-                    // ChatListKeys (never content hashes — T-48-01/T-48-02).
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        items(transcript.messages, key = { it.id }) { message ->
-                            // Phase 68 Plan 03: voice-bubble playback state.
-                            // The file-exists check is remembered per
-                            // message (VM helper, no streams) so composition
-                            // never performs IO directly (T-68-08).
-                            val voiceFileAvailable = remember(message.audioPath) {
-                                viewModel.hasVoiceFile(message.audioPath)
-                            }
-                            MessageBubble(
-                                message = message,
-                                codeTheme = connection.codeTheme,
-                                codeFontScale = connection.codeFontScale,
-                                isValidatedOnline = input.isValidatedOnline,
-                                isFetchingWeb = input.isFetchingWeb,
-                                isGenerating = input.isGenerating,
-                                onRetry = { viewModel.retryGrounding(it) },
-                                isVoicePlaying = playingMessageId == message.id && isHistoryPlaying,
-                                voicePositionMs = if (playingMessageId == message.id) historyPositionMs else 0,
-                                voiceFileMissing = message.audioPath != null && !voiceFileAvailable,
-                                onPlayVoice = { viewModel.toggleHistoryVoice(message) },
-                                onPauseVoice = { viewModel.pauseHistoryVoice() },
-                                onSeekVoice = { viewModel.seekHistoryVoice(it) },
-                            )
-                        }
-                        if (showStreamingBubble) {
-                            item(key = ChatListKeys.STREAMING) {
-                                MessageBubble(
-                                    message = com.warped.domain.model.ChatMessage(
-                                        role = Role.ASSISTANT,
-                                        content = transcript.streamingContent,
-                                        reasoning = transcript.streamingReasoning.ifEmpty { null }
-                                    ),
-                                    isStreaming = true,
-                                    codeTheme = connection.codeTheme,
-                                    codeFontScale = connection.codeFontScale
-                                )
-                            }
-                        }
-                    }
-                    // Top fade gradient overlay
+            Box(modifier = Modifier.weight(1f)) {
+                if (isEmpty) {
+                    // Empty state
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(24.dp)
-                            .align(Alignment.TopCenter)
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color(0xFF1F1F1E),
-                                        Color.Transparent
+                            .fillMaxSize()
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Image(
+                                painter = painterResource(id = com.warped.R.drawable.logo),
+                                contentDescription = stringResource(R.string.cd_logo),
+                                modifier = Modifier.size(128.dp)
+                            )
+                            Spacer(Modifier.height(24.dp))
+                            Text(
+                                stringResource(R.string.empty_state_message),
+                                color = Color(0xFF9CA3AF),
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
+                    }
+                } else {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        // 48-01 (PERF-15): keyed LazyColumn. Role.TOOL transcript rows
+                        // are persisted ChatMessages with stable ids — keyed inline,
+                        // zero extra work. Transient trailing rows use the constant
+                        // ChatListKeys (never content hashes — T-48-01/T-48-02).
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = 8.dp,
+                                bottom = with(density) { overlayHeightPx.toDp() } + 12.dp
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            items(transcript.messages, key = { it.id }) { message ->
+                                // Phase 68 Plan 03: voice-bubble playback state.
+                                // The file-exists check is remembered per
+                                // message (VM helper, no streams) so composition
+                                // never performs IO directly (T-68-08).
+                                val voiceFileAvailable = remember(message.audioPath) {
+                                    viewModel.hasVoiceFile(message.audioPath)
+                                }
+                                MessageBubble(
+                                    message = message,
+                                    codeTheme = connection.codeTheme,
+                                    codeFontScale = connection.codeFontScale,
+                                    isValidatedOnline = input.isValidatedOnline,
+                                    isFetchingWeb = input.isFetchingWeb,
+                                    isGenerating = input.isGenerating,
+                                    onRetry = { viewModel.retryGrounding(it) },
+                                    isVoicePlaying = playingMessageId == message.id && isHistoryPlaying,
+                                    voicePositionMs = if (playingMessageId == message.id) historyPositionMs else 0,
+                                    voiceFileMissing = message.audioPath != null && !voiceFileAvailable,
+                                    onPlayVoice = { viewModel.toggleHistoryVoice(message) },
+                                    onPauseVoice = { viewModel.pauseHistoryVoice() },
+                                    onSeekVoice = { viewModel.seekHistoryVoice(it) },
+                                )
+                            }
+                            if (showStreamingBubble) {
+                                item(key = ChatListKeys.STREAMING) {
+                                    MessageBubble(
+                                        message = com.warped.domain.model.ChatMessage(
+                                            role = Role.ASSISTANT,
+                                            content = transcript.streamingContent,
+                                            reasoning = transcript.streamingReasoning.ifEmpty { null }
+                                        ),
+                                        isStreaming = true,
+                                        codeTheme = connection.codeTheme,
+                                        codeFontScale = connection.codeFontScale
+                                    )
+                                }
+                            }
+                        }
+                        // Top fade gradient overlay
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(24.dp)
+                                .align(Alignment.TopCenter)
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color(0xFF1F1F1E),
+                                            Color.Transparent
+                                        )
                                     )
                                 )
-                            )
-                    )
-                    // Bottom fade gradient overlay
+                        )
+                        // 48-01 (48-UI-SPEC §2): Jump-to-latest pill — the only new
+                        // composable. Renders above the fades, never dimmed.
+                        JumpToLatestPillOverlay(
+                            visible = showPill,
+                            onClick = {
+                                snapToBottomOnNextContent = false
+                                hasNewContentBelow = false
+                                scope.launch {
+                                    if (totalItems > 0) {
+                                        listState.animateScrollToItem(totalItems - 1)
+                                        val info = listState.layoutInfo
+                                        val item = info.visibleItemsInfo
+                                            .firstOrNull { it.index == totalItems - 1 }
+                                        if (item != null) {
+                                            val overflow = item.offset + item.size -
+                                                info.viewportEndOffset
+                                            if (overflow > 0) {
+                                                listState.animateScrollBy(overflow.toFloat())
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(end = 16.dp, bottom = with(density) { overlayHeightPx.toDp() } + 20.dp)
+                        )
+                    }
+                // Floating input overlay (shared by empty + history states):
+                // the list scrolls UNDER a fade + the pill (transparent
+                // surround), so text visibly travels behind instead of
+                // clipping hard at an in-flow bar. Height is measured for
+                // the list's bottom padding + the jump-pill offset.
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .onSizeChanged { overlayHeightPx = it.height }
+                ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(24.dp)
-                            .align(Alignment.BottomCenter)
+                            .height(64.dp)
                             .background(
                                 Brush.verticalGradient(
                                     colors = listOf(
@@ -786,34 +728,106 @@ fun ChatScreen(
                                 )
                             )
                     )
-                    // 48-01 (48-UI-SPEC §2): Jump-to-latest pill — the only new
-                    // composable. Renders above the fades, never dimmed.
-                    JumpToLatestPillOverlay(
-                        visible = showPill,
-                        onClick = {
-                            snapToBottomOnNextContent = false
-                            hasNewContentBelow = false
-                            scope.launch {
-                                if (totalItems > 0) {
-                                    listState.animateScrollToItem(totalItems - 1)
-                                    val info = listState.layoutInfo
-                                    val item = info.visibleItemsInfo
-                                        .firstOrNull { it.index == totalItems - 1 }
-                                    if (item != null) {
-                                        val overflow = item.offset + item.size -
-                                            info.viewportEndOffset
-                                        if (overflow > 0) {
-                                            listState.animateScrollBy(overflow.toFloat())
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(end = 16.dp, bottom = 8.dp)
+                    // Unified turn status (quick-turn-status): ONE transient row
+                    // above the input bar — priority model loading > tool >
+                    // fetch/search > streaming gap. Never a transcript message, never
+                    // persisted; unmounts on completion/failure/Stop. Null
+                    // status renders nothing (and no spacer).
+                    val turnStatus = resolveTurnStatus(
+                        toolCallActive = input.toolCallActive,
+                        isFetchingWeb = input.isFetchingWeb,
+                        progress = input.webFetchProgress,
+                        isStreamingGap = isStreamingGap,
+                        isLoadingModel = connection.isLoadingModel,
+                        loadingModelName = connection.loadingModelName,
+                        loadingFirstTime = connection.loadingFirstTime,
                     )
+                    TurnStatusRow(status = turnStatus)
+                    // Phase 68 (VMSG-02): the draft card sends voice + caption
+                    // through the same route as the input-row send (a kept clip
+                    // always takes the transcode-and-send path).
+                    val onSendMessage = {
+                        // CR-03: never leave the mic live without its indicator
+                        // — the mic hides while generating, so stop first.
+                        if (isListening) viewModel.stopDictation()
+                        snapToBottomOnNextContent = true
+                        hasNewContentBelow = false
+                        // Phase 67 (VMSG-05 tracer): a kept voice clip routes
+                        // through the transcode-and-send path with the caption.
+                        // Phase 69 Plan 01 (VMSG-04/08): a gated config with a
+                        // kept draft routes to the explainer instead — the
+                        // draft is kept, the send never attempted.
+                        if (hasVoiceClip) {
+                            if (voiceGate != GateState.Allowed) showVoiceGateExplainer(voiceGate)
+                            else viewModel.sendVoiceMessage(input.inputText)
+                        } else {
+                            viewModel.sendMessage(input.inputText, attachedImages, audioBytes)
+                        }
+                        attachedImages = emptyList()
+                        audioBytes = null
+                    }
+                    ChatInputBar(
+                    text = input.inputText,
+                    isGenerating = input.isGenerating,
+                    canSend = (connection.selectedLocalModelId ?: connection.selectedRemoteModelId) != null,
+                    onTextChange = { viewModel.updateInput(it) },
+                    onSend = onSendMessage,
+                    onStop = { viewModel.stopGeneration() },
+                    // Verified-only capabilities: image/audio buttons hide when
+                    // the selected local model lacks the modality. Remote or
+                    // unselected → fail open (null → true).
+                    modelHasVision = viewModel.verifiedLocalCapabilities(connection.selectedLocalModelId)?.vision
+                        ?: true,
+                    onAddImage = { imagePickerLauncher.launch("image/*") },
+                    attachedImages = attachedImages,
+                    onRemoveImage = { i -> attachedImages = attachedImages.filterIndexed { idx, _ -> idx != i } },
+                    // Phase 69 Plan 01 (VMSG-04/08): the collected VM gate
+                    // drives button visibility (hidden when gated — no
+                    // screen-local capability read). Gated sends still
+                    // route to the explainer via the VM send-path guards.
+                    voiceGate = voiceGate,
+                    // Phase 69 Plan 03 (VMSG-03): one-shot coachmark on the
+                    // enabled voice button; any tap dismisses (VM persists).
+                    showVoiceCoachmark = showVoiceCoachmark,
+                    onCoachmarkDismiss = { viewModel.dismissVoiceCoachmark() },
+                    onAudioRecorded = { bytes -> audioBytes = bytes },
+                    onAudioRecordingChanged = { isRecording = it },
+                    speechAvailable = speechAvailable,
+                    isListening = isListening,
+                    onMicClick = onMicClick,
+                    // Phase 67 (VMSG-01 tracer): minimal voice-send toggle.
+                    isVoiceRecording = isVoiceRecording,
+                    onVoiceClick = onVoiceClick,
+                    // Phase 67 (VMSG-01 full): recording row + cancel path.
+                    voiceElapsedSec = voiceElapsedSec,
+                    voiceAmplitude = voiceAmplitude,
+                    onCancelRecording = { viewModel.cancelVoiceRecording() },
+                    // Phase 68 (VMSG-02): draft preview card state + callbacks.
+                    hasVoiceClip = hasVoiceClip,
+                    isDraftPlaying = isDraftPlaying,
+                    draftPositionMs = draftPositionMs,
+                    draftDurationMs = draftDurationMs,
+                    onPlayDraft = { viewModel.playVoiceDraft() },
+                    onPauseDraft = { viewModel.pauseVoiceDraft() },
+                    onSendDraft = onSendMessage,
+                    onDeleteDraft = { viewModel.deleteVoiceDraft() },
+                    // WR-03: report the caret so dictation inserts at cursor.
+                    onCursorChange = { viewModel.updateInputCursor(it) },
+                    // Model-loading gate: the whole bar locks while loading.
+                    isLoadingModel = connection.isLoadingModel,
+                    // Phase 70 (70-02): document attach affordance + chip. The
+                    // existing SnackbarHost (Short) serves the VM
+                    // unsupported/failed/truncation notices — no new channel.
+                    onAttachDocument = {
+                        documentPickerLauncher.launch(arrayOf("text/plain", "text/markdown", "text/*"))
+                    },
+                    attachedDocName = readyDoc?.filename,
+                    attachedDocSize = readyDoc?.let { formatDocumentSize(it.sizeBytes) },
+                    attachedDocTruncatedAt = readyDoc?.truncatedAt,
+                    onRemoveDocument = { viewModel.clearDocument() },
+                )
                 }
+            }
             }
 
             if (connection.modelLoadError != null) {
