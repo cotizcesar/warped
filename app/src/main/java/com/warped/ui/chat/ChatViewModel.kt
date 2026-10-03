@@ -455,6 +455,21 @@ class ChatViewModel @Inject constructor(
                 updateInput {
                     it.copy(supportsThinking = supportsThinkingFor(_connection.value.selectedLocalModelId, remote.modelId))
                 }
+                // Remote parity with the cold-start mount: probe once per
+                // endpoint so the light turns green by itself. Failures
+                // stay red with a snackbar; the next send surfaces the
+                // real error. Retry happens on reselection (or send).
+                val remoteEid = remote.endpointId
+                if (remote.modelId != null && remoteEid != null && remoteEid != lastProbedEndpointId) {
+                    lastProbedEndpointId = remoteEid
+                    updateConnection { it.copy(connectionStatus = ConnectionStatus.Connecting) }
+                    viewModelScope.launch(coroutineExceptionHandler) {
+                        probeRemoteEndpoint(remoteEid, remote.modelId)
+                    }
+                }
+                if (remote.modelId == null) {
+                    lastProbedEndpointId = null
+                }
             }
         }
         viewModelScope.launch(coroutineExceptionHandler) {
@@ -3513,6 +3528,45 @@ class ChatViewModel @Inject constructor(
      * selection emission; retry comes from the banner or the next send).
      */
     private var startupMountAttemptedFor: String? = null
+
+    /**
+     * Endpoint id the remote probe already attempted (same once-per-
+     * session contract as the cold-start mount). Null clears on
+     * deselection so reselecting probes again.
+     */
+    private var lastProbedEndpointId: Long? = null
+
+    /**
+     * One-shot reachability probe for a remote endpoint. TestConnection
+     * never throws (providers map failures to Disconnected); the
+     * timeout + stale-selection guards are ours. Main-thread confined
+     * state writes only.
+     */
+    private suspend fun probeRemoteEndpoint(endpointId: Long, modelId: String) {
+        val status = try {
+            val endpoint = endpointRepository.getById(endpointId) ?: return
+            // No IO hop: Room + Retrofit suspend fns are main-safe; the
+            // timeout bounds the whole probe (also keeps the flow
+            // deterministic under test dispatchers).
+            val result = kotlinx.coroutines.withTimeoutOrNull(15_000L) {
+                providerRouter.resolve(endpoint, modelId).testConnection()
+            }
+            result?.getOrNull() ?: ConnectionStatus.Disconnected
+        } catch (e: Exception) {
+            Timber.w(e, "ChatVM: remote probe failed")
+            ConnectionStatus.Disconnected
+        }
+        // Stale guard: only apply if the selection hasn't moved on.
+        if (activeModelSelection.remoteSelection.value.endpointId == endpointId) {
+            updateConnection { it.copy(connectionStatus = status) }
+            if (status != ConnectionStatus.Connected) {
+                val name = activeModelSelection.remoteSelection.value.modelId ?: modelId
+                _events.tryEmit(
+                    ChatEvent.Snackbar(context.getString(R.string.remote_probe_failed_fmt, name))
+                )
+            }
+        }
+    }
 
     /**
      * Last model auto-selected by the observeModels hook (loop guard — the

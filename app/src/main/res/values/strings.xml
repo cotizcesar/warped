@@ -13,6 +13,7 @@
     <string name="connected">Connected</string>
     <string name="disconnected">Disconnected</string>
     <string name="connection_lost">Connection lost. Tap to retry.</string>
+    <string name="remote_probe_failed_fmt">Couldn\'t reach %1$s</string>
     <string name="new_chat">New Chat</string>
     <string name="type_message">Type a message…</string>
     <string name="select_model">Select a model</string>
