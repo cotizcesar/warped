@@ -29,8 +29,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -304,7 +306,14 @@ fun ChatInputBar(
             // TextFieldValue overload has no onTextLayout — hence a
             // mirror instead of measuring the field itself.)
             var inputLines by remember { mutableIntStateOf(0) }
-            val expandedInput = inputLines > 1
+            // Slots relocate ONLY while unfocused: moving the field
+            // between slots mid-typing drops IME focus on real devices
+            // (keyboard closes, the refocus net below reopens it —
+            // the close/reopen flicker at line 2). While focused the
+            // compact overlay layout persists (rightCluster padding
+            // already reserves the buttons); the move happens on blur
+            // or clear, where no focus can be lost.
+            val expandedInput = inputLines > 1 && !inputFocused
             Text(
                 text = text.ifEmpty { " " },
                 style = MaterialTheme.typography.bodyLarge,
@@ -369,17 +378,35 @@ fun ChatInputBar(
                 BasicTextField(
                 value = fieldValue,
                 onValueChange = { next ->
-                    fieldValue = next
-                    if (next.text != text) onTextChange(next.text)
-                    onCursorChange(next.selection.start)
+                    // Soft-keyboard Enter committed as text (keyboards
+                    // that ignore imeAction on multiline fields): a lone
+                    // trailing newline appended to the buffer sends
+                    // instead of growing the field. Pasted/multi-char
+                    // edits and IME compositions take the normal path.
+                    if (shouldSendOnNewline(fieldValue.text, next.text, next.composition != null)) {
+                        val stripped = next.text.dropLast(1)
+                        fieldValue = next.copy(text = stripped)
+                        if (stripped != text) onTextChange(stripped)
+                        val hasContent = stripped.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip
+                        if (canSend && !isGenerating && !isLoadingModel && hasContent) {
+                            onSend()
+                        }
+                    } else {
+                        fieldValue = next
+                        if (next.text != text) onTextChange(next.text)
+                        onCursorChange(next.selection.start)
+                    }
                 },
                 modifier = mod
                     .focusRequester(focusRequester)
                     .padding(vertical = 10.dp)
                     .onFocusChanged { inputFocused = it.isFocused }
                     .onKeyEvent { event ->
+                        // KeyDown only: without the type check both press
+                        // and release would send (the release no-ops on
+                        // cleared text, but say what you mean).
                         val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip
-                        if (event.key == Key.Enter && canSend && !isGenerating && !isLoadingModel && hasContent) {
+                        if (event.type == KeyEventType.KeyDown && event.key == Key.Enter && canSend && !isGenerating && !isLoadingModel && hasContent) {
                             onSend()
                             true
                         } else false
@@ -558,7 +585,10 @@ fun ChatInputBar(
             LaunchedEffect(expandedInput) {
                 if (!expandEffectArmed) {
                     expandEffectArmed = true
-                } else {
+                } else if (inputFocused) {
+                    // Refocus ONLY when still focused (send-clear while
+                    // typing): never yank the keyboard back after the
+                    // user dismissed it (blur flips expandedInput too).
                     withFrameNanos { }
                     try {
                         focusRequester.requestFocus()
@@ -861,4 +891,18 @@ private fun DraftPreviewCard(
             }
         }
     }
+}
+
+/**
+ * Soft-keyboard Enter committed as a text newline (keyboards that ignore
+ * imeAction=Send on multiline fields): true only when the edit appends
+ * exactly one trailing "\n" outside an IME composition. Pasted blocks,
+ * mid-text newlines and composing buffers take the normal path.
+ * Pure — unit-tested.
+ */
+internal fun shouldSendOnNewline(prevText: String, nextText: String, composing: Boolean): Boolean {
+    if (composing) return false
+    if (nextText.length != prevText.length + 1) return false
+    if (!nextText.endsWith("\n")) return false
+    return nextText.dropLast(1) == prevText
 }
