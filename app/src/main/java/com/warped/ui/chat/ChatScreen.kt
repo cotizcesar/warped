@@ -705,6 +705,7 @@ fun ChatScreen(
                                 .padding(end = 16.dp, bottom = with(density) { overlayHeightPx.toDp() } + 20.dp)
                         )
                     }
+            }
                 // Floating input overlay (shared by empty + history states):
                 // the list scrolls UNDER a fade + the pill (transparent
                 // surround), so text visibly travels behind instead of
@@ -827,7 +828,6 @@ fun ChatScreen(
                     onRemoveDocument = { viewModel.clearDocument() },
                 )
                 }
-            }
             }
 
             if (connection.modelLoadError != null) {
