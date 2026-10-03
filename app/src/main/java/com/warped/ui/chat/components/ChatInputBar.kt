@@ -620,7 +620,7 @@ fun ChatInputBar(
                         movableInputField(
                             Modifier
                                 .fillMaxWidth()
-                                .padding(end = 8.dp)
+                                .padding(start = 12.dp, end = 12.dp)
                         )
                         Spacer(Modifier.height(4.dp))
                         Row(
