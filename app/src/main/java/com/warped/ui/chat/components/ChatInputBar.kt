@@ -26,6 +26,7 @@ import androidx.compose.material3.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
@@ -342,7 +343,12 @@ fun ChatInputBar(
 
             @Composable
             fun InputField(mod: Modifier) {
-                OutlinedTextField(
+                // BasicTextField (not OutlinedTextField): M3's outlined
+                // field enforces a 56dp intrinsic min height that no
+                // heightIn can shrink — Basic has no min, so the row wraps
+                // the 16sp content exactly (~44dp single-line). Same
+                // transparent look, same TextFieldValue cursor contract.
+                BasicTextField(
                 value = fieldValue,
                 onValueChange = { next ->
                     fieldValue = next
@@ -350,6 +356,7 @@ fun ChatInputBar(
                     onCursorChange(next.selection.start)
                 },
                 modifier = mod
+                    .padding(vertical = 10.dp)
                     .onFocusChanged { inputFocused = it.isFocused }
                     .onKeyEvent { event ->
                         val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip
@@ -358,22 +365,28 @@ fun ChatInputBar(
                             true
                         } else false
                     },
-                placeholder = { Text(stringResource(R.string.type_message)) },
                 enabled = !inputLocked,
                 maxLines = 4,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    color = MaterialTheme.colorScheme.onSurface
+                ),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = {
                     val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip
                     if (canSend && !isGenerating && !isLoadingModel && hasContent) onSend()
                 }),
-                shape = MaterialTheme.shapes.medium,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent,
-                    disabledBorderColor = Color.Transparent,
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent
-                )
+                decorationBox = { innerTextField ->
+                    Box {
+                        if (text.isEmpty()) {
+                            Text(
+                                stringResource(R.string.type_message),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        innerTextField()
+                    }
+                },
                 )
             }
 
