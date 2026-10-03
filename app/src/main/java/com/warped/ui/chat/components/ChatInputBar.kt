@@ -36,6 +36,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -282,11 +285,18 @@ fun ChatInputBar(
             // Expanded (ChatGPT-style) once the text wraps past one line:
             // text field full-width on top, button row below. Single line
             // keeps the compact [+] [input] [mic] [voice] [send] row.
-            // Line count comes from an invisible full-width mirror (the
-            // TextFieldValue overload has no onTextLayout): measuring at
-            // constant full width keeps the trigger monotonic in text, so
-            // the narrow/wide switch can never oscillate.
             val expandedInput = inputLines > 1
+            val focusRequester = remember { FocusRequester() }
+            // Mirror width = compact-field width: full width minus the
+            // button cluster sharing the row (attach + visible mic /
+            // voice / send + gaps). Dynamic but loop-free — button
+            // visibility never depends on expandedInput, so the trigger
+            // stays monotonic in text and can never oscillate.
+            val buttonsEndWidth = (40 +
+                (if (speechAvailable && !isGenerating && !isLoadingModel) 40 else 0) +
+                (if (speechAvailable && !isGenerating && !isLoadingModel && !isVoiceRecording && voiceGate == GateState.Allowed) 40 else 0) +
+                (if ((text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip) && canSend && !isLoadingModel) 40 else 0) +
+                16).dp
             Text(
                 text = text.ifEmpty { " " },
                 style = MaterialTheme.typography.bodyLarge,
@@ -294,7 +304,7 @@ fun ChatInputBar(
                 onTextLayout = { if (it.lineCount != inputLines) inputLines = it.lineCount },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(start = 40.dp, end = buttonsEndWidth)
                     .height(0.dp),
             )
 
@@ -356,6 +366,7 @@ fun ChatInputBar(
                     onCursorChange(next.selection.start)
                 },
                 modifier = mod
+                    .focusRequester(focusRequester)
                     .padding(vertical = 10.dp)
                     .onFocusChanged { inputFocused = it.isFocused }
                     .onKeyEvent { event ->
@@ -370,6 +381,7 @@ fun ChatInputBar(
                 textStyle = MaterialTheme.typography.bodyLarge.copy(
                     color = MaterialTheme.colorScheme.onSurface
                 ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = {
                     val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip
@@ -377,7 +389,10 @@ fun ChatInputBar(
                 }),
                 decorationBox = { innerTextField ->
                     Box {
-                        if (text.isEmpty()) {
+                        // Rendered text (fieldValue), not the VM prop: the
+                        // prop lags a frame behind while typing and the
+                        // placeholder would bleed through over live text.
+                        if (fieldValue.text.isEmpty()) {
                             Text(
                                 stringResource(R.string.type_message),
                                 style = MaterialTheme.typography.bodyLarge,
@@ -523,6 +538,24 @@ fun ChatInputBar(
             // (after the local pieces it calls) and invoked in both layouts.
             val movableInputField = remember {
                 movableContentOf { mod: Modifier -> InputField(mod) }
+            }
+
+            // Refocus after grow/shrink moves the field: the move itself
+            // can drop IME focus even though the composition is preserved.
+            // If the field was focused going in, hand focus back to the
+            // moved node (one frame later, once attached). No-op when the
+            // user dismissed the keyboard (flag already false) or when the
+            // layout didn't switch (effect doesn't restart).
+            var focusBeforeSwitch by remember { mutableStateOf(false) }
+            focusBeforeSwitch = inputFocused
+            LaunchedEffect(expandedInput) {
+                if (focusBeforeSwitch) {
+                    withFrameNanos { }
+                    try {
+                        focusRequester.requestFocus()
+                    } catch (_: Exception) {
+                    }
+                }
             }
 
             // Phase 67 (VMSG-01 full): recording replaces the input row
