@@ -11,10 +11,10 @@ android {
     namespace = "com.warped"
     compileSdk = 36
 
-    val versionMajor = 2
-    val versionMinor = 5
-    val versionPatch = 2
-    val baseVersionCode = versionMajor * 10000 + versionMinor * 100 + versionPatch // 20501
+    val versionMajor = 3
+    val versionMinor = 1
+    val versionPatch = 0
+    val baseVersionCode = versionMajor * 10000 + versionMinor * 100 + versionPatch // 30100
 
     // CI build number from GitHub Actions (always increments per workflow run)
     val ciBuildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0
