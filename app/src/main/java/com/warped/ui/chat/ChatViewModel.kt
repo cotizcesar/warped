@@ -1570,11 +1570,22 @@ class ChatViewModel @Inject constructor(
                             activeModelSelection.selectRemote(conversation.modelId, conversation.providerType, endpoint.id)
                         }
                     }
-                    // Lazy load: no preload on open — the traffic light
-                    // shows selected-not-loaded until the first send
-                    // mounts the engine. User decision 2026-10-03: the
-                    // chat never orders a load; "Use in Chat" navigates
-                    // and the first send mounts.
+                    // User decision: opening a chat ALWAYS loads its local
+                    // model in the background (loading indicator on, input
+                    // locked until mounted). The first send never waits
+                    // on a cold mount. Already-mounted same model is
+                    // skipped; remote conversations mount nothing (helpers
+                    // resolve per send). The memory guard inside preload
+                    // reports via banner instead of loading when RAM is
+                    // short.
+                    if (conversation.providerType == ProviderType.LITE_RT_LM &&
+                        engineManager.getActiveEngine()?.modelPath != conversation.modelId) {
+                        val mountPath = conversation.modelId
+                        activeModelSelection.markLocalLoading(mountPath)
+                        viewModelScope.launch(coroutineExceptionHandler) {
+                            preloadLocalModel(mountPath)
+                        }
+                    }
                 }
                 activeModelSelection.saveLastConversation(conversation.id)
                 refreshActiveBackend()
@@ -3320,13 +3331,14 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Lazy-load driver (quick-task lazy-model-load): mounts [filePath] into
-     * the engine. Called ONLY from the send path (after `markLocalLoading`)
-     * — never from selection sites. State flows ONLY through
+     * Mount driver: mounts [filePath] into the engine. Called from the
+     * send path (after `markLocalLoading`) and from chat open (user
+     * decision: opening a chat always loads its local model) — never
+     * from selection sites. State flows ONLY through
      * [ActiveModelSelection] (`connectLocal` / `markLocalDisconnected`);
-     * the selection collector owns `isLoadingModel`/`loadingModelName`.
-     * This function writes `modelLoadError` only. Failures keep the
-     * selection (pending) so retrying just works.
+     * the selection collector owns `isLoadingModel`/`loadingModelName`
+     * (input locked while loading). This function writes `modelLoadError`
+     * only. Failures keep the selection (pending) so retrying just works.
      */
     private suspend fun preloadLocalModel(filePath: String) {
         val model = _connection.value.localModels.firstOrNull { it.filePath == filePath }
