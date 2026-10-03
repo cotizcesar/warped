@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -278,13 +279,21 @@ fun ChatScreen(
         }
     }
 
-    // Memory warning dialog
+    // Memory warning dialog (app-styled card + warning icon).
     if (connection.memoryWarningModel != null) {
         val model = connection.memoryWarningModel!!
         val context = androidx.compose.ui.platform.LocalContext.current
         val info = com.warped.data.local.inference.MemoryChecker(context).getMemoryInfo()
-        AlertDialog(
+        WarpedAlertDialog(
             onDismissRequest = { viewModel.dismissMemoryWarning() },
+            icon = {
+                Icon(
+                    Icons.Filled.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(32.dp),
+                )
+            },
             title = { Text(stringResource(R.string.memory_warning_title)) },
             text = {
                 Text(stringResource(R.string.memory_warning_message,
