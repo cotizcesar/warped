@@ -37,7 +37,7 @@ class ModelAllowlistTest {
     fun `shipped asset parses with expected entries`() {
         val models = parseModelAllowlist(shippedAssetText())
 
-        assertThat(models).hasSize(47)
+        assertThat(models).hasSize(52)
         val e2b = models.first { it.name == "gemma-3n-E2B-it-int4" }
         assertThat(e2b.displayName).isEqualTo("Gemma 3n E2B IT (int4)")
         assertThat(e2b.modelFile).isEqualTo("gemma-3n-E2B-it-int4.litertlm")
@@ -159,6 +159,11 @@ class ModelAllowlistTest {
             "paddleocr-vl",
             "flux-klein-4b",
             "z-image-turbo",
+            "llama-3.2-1b",
+            "llama-3.2-3b",
+            "medgemma-1.5-4b",
+            "embeddinggemma-300m",
+            "functiongemma-270m",
         ).inOrder()
     }
 
@@ -317,6 +322,16 @@ class ModelAllowlistTest {
 
             "z-image-turbo" to false,
 
+            "llama-3.2-1b" to true,
+
+            "llama-3.2-3b" to true,
+
+            "medgemma-1.5-4b" to true,
+
+            "embeddinggemma-300m" to false,
+
+            "functiongemma-270m" to false,
+
         )
         // 3n multimodal + speculative decoding verified; gemma-4
         // vision/audio docs-verified, thinking docs-verified. E2B
@@ -403,6 +418,16 @@ class ModelAllowlistTest {
 
             "z-image-turbo" to false,
 
+            "llama-3.2-1b" to false,
+
+            "llama-3.2-3b" to false,
+
+            "medgemma-1.5-4b" to true,
+
+            "embeddinggemma-300m" to false,
+
+            "functiongemma-270m" to false,
+
         )
         val expectedAudio = mapOf(
             "gemma-3n-E2B-it-int4" to true,
@@ -480,6 +505,16 @@ class ModelAllowlistTest {
 
             "z-image-turbo" to false,
 
+            "llama-3.2-1b" to false,
+
+            "llama-3.2-3b" to false,
+
+            "medgemma-1.5-4b" to false,
+
+            "embeddinggemma-300m" to false,
+
+            "functiongemma-270m" to false,
+
         )
         val expectedSpeculativeDecoding = mapOf(
             "gemma-3n-E2B-it-int4" to true,
@@ -523,7 +558,7 @@ class ModelAllowlistTest {
 
             "smolllm2-360m" to false,
 
-            "smolllm3-3b" to false,
+            "smolllm3-3b" to true,
 
             "tinyllama-1.1b" to false,
 
@@ -564,6 +599,16 @@ class ModelAllowlistTest {
             "flux-klein-4b" to false,
 
             "z-image-turbo" to false,
+
+            "llama-3.2-1b" to false,
+
+            "llama-3.2-3b" to false,
+
+            "medgemma-1.5-4b" to false,
+
+            "embeddinggemma-300m" to false,
+
+            "functiongemma-270m" to false,
 
         )
         // 56-01 FLAG DECISION: supportsFunctionCalling true for the gemma-4
@@ -648,6 +693,16 @@ class ModelAllowlistTest {
 
             "z-image-turbo" to false,
 
+            "llama-3.2-1b" to false,
+
+            "llama-3.2-3b" to false,
+
+            "medgemma-1.5-4b" to false,
+
+            "embeddinggemma-300m" to false,
+
+            "functiongemma-270m" to false,
+
         )
         for (model in models) {
             val caps = model.capabilities
@@ -666,7 +721,7 @@ class ModelAllowlistTest {
     fun `repository exposes capability queries`() {
         val repo = repositoryBackedBy(shippedAssetText())
 
-        assertThat(repo.models).hasSize(47)
+        assertThat(repo.models).hasSize(52)
         assertThat(repo.findByModelFile("gemma-3n-E4B-it-int4.litertlm")?.name)
             .isEqualTo("gemma-3n-E4B-it-int4")
         assertThat(repo.findByModelFile("gemma-4-E4B-it.litertlm")?.name)
