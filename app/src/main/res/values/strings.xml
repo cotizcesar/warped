@@ -344,7 +344,6 @@
     <string name="hf_download_model">Download model</string>
     <string name="hf_load_failed">Couldn\'t load the model catalog. Restart the app and try again.</string>
     <string name="catalog_activation_failed">Couldn\'t open that model in chat. Try again.</string>
-    <string name="catalog_in_use">In use</string>
     <string name="hf_expand">Expand details</string>
     <string name="hf_collapse">Collapse details</string>
 

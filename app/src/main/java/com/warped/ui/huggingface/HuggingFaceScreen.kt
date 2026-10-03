@@ -80,7 +80,6 @@ fun HuggingFaceScreen(
 ) {
     val downloadStates by viewModel.downloadStates.collectAsStateWithLifecycle()
     val downloadedFileNames by viewModel.downloadedFileNames.collectAsStateWithLifecycle()
-    val activeLocalModelId by viewModel.activeLocalModelId.collectAsStateWithLifecycle()
 
     // FUN-01: activation creates the bound conversation asynchronously —
     // navigate once its id lands, then consume so a later recomposition
@@ -176,7 +175,6 @@ fun HuggingFaceScreen(
                             viewModel = viewModel,
                             downloadStates = downloadStates,
                             isOnDevice = onDevice,
-                            isInUse = isEntryInUse(activeLocalModelId, entry),
                             onDeleteDownloaded = { viewModel.deleteDownloaded(entry) },
                             onUseInChat = { viewModel.useDownloadedModel(entry) }
                         )
@@ -195,7 +193,6 @@ fun HuggingFaceScreen(
                             viewModel = viewModel,
                             downloadStates = downloadStates,
                             isOnDevice = true,
-                            isInUse = isEntryInUse(activeLocalModelId, entry),
                             onDeleteDownloaded = { viewModel.deleteDownloaded(entry) },
                             onUseInChat = { viewModel.useDownloadedModel(entry) }
                         )
@@ -250,7 +247,6 @@ private fun CatalogCardItem(
     viewModel: CatalogViewModel,
     downloadStates: Map<String, DownloadState>,
     isOnDevice: Boolean,
-    isInUse: Boolean = false,
     onDeleteDownloaded: () -> Unit = {},
     onUseInChat: () -> Unit = {}
 ) {
@@ -259,7 +255,6 @@ private fun CatalogCardItem(
         entry = entry,
         downloadState = downloadStates[downloadId],
         isOnDevice = isOnDevice,
-        isInUse = isInUse,
         onDownload = { viewModel.startDownload(entry) },
         onCancel = { viewModel.cancelDownload(downloadId) },
         onPause = { viewModel.pauseDownload(downloadId) },
@@ -312,7 +307,6 @@ private fun CatalogModelCard(
     entry: AllowlistedModel,
     downloadState: DownloadState?,
     isOnDevice: Boolean = false,
-    isInUse: Boolean = false,
     onDownload: () -> Unit,
     onCancel: () -> Unit,
     onPause: () -> Unit,
@@ -377,13 +371,11 @@ private fun CatalogModelCard(
     // trailing slot and the Use-in-chat CTA renders full-width at the
     // BOTTOM of the card (downloadContent slot below), so every card is
     // distinguishable by name and the action sits where the thumb expects
-    // it. The active model additionally carries an "In use" pill.
-    val inUseLabel = stringResource(R.string.catalog_in_use)
+    // it.
     com.warped.ui.components.ModelCard(
         title = entry.displayName,
         sizeText = formatFileSize(entry.sizeInBytes),
         ramText = entry.ramNote,
-        metaChips = if (downloaded && isInUse) listOf(inUseLabel) else emptyList(),
         textBadge = entry.capabilities.text,
         vision = entry.capabilities.vision,
         audio = entry.capabilities.audio,
@@ -454,7 +446,7 @@ private fun CatalogModelCard(
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = if (isInUse) inUseLabel else stringResource(R.string.use_in_chat),
+                        text = stringResource(R.string.use_in_chat),
                         color = Color.White
                     )
                 }

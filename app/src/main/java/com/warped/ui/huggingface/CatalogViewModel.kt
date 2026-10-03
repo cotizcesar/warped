@@ -235,15 +235,6 @@ class CatalogViewModel @Inject constructor(
 }
 
 /**
- * Pure "In use" rule: true when the active local model id resolves to the
- * same on-device file as the catalog entry (basename match — the DB row
- * stores the absolute path, the entry only the basename). JVM-testable.
- */
-fun isEntryInUse(activeLocalModelId: String?, entry: AllowlistedModel): Boolean =
-    activeLocalModelId != null &&
-        activeLocalModelId.substringAfterLast("/") == entry.modelFile
-
-/**
  * Shared catalog-to-library resolver (WR-03). The allowlist entry carries
  * only the bare [AllowlistedModel.modelFile] basename while the DB row
  * stores the absolute path, so both the delete and activation paths funnel
