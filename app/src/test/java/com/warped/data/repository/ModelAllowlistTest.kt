@@ -985,11 +985,16 @@ class ModelAllowlistTest {
         val models = parseModelAllowlist(shippedAssetText())
         val recommended = models.filter { it.recommended }
 
-        // User curation 2026-10-03: Recommended is the Gemma 4 trio only.
+        // User curation 2026-10-03: Recommended is the Gemma 4 trio plus
+        // Gemma 3 1B and all Gemma 3n entries.
         assertThat(recommended.map { it.name }).containsExactly(
             "gemma-4-E2B-it",
             "gemma-4-E4B-it",
             "gemma-4-12B-it",
+            "gemma-3-1b-it",
+            "gemma-3n-E2B-it-int4",
+            "gemma-3n-E4B-it-int4",
+            "gemma-3n-E2B-official",
         )
         // Every pick must be installable — a coming-soon entry can never
         // back the Recommended section (display-only by design).
