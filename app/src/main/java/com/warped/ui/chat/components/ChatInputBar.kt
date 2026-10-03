@@ -139,12 +139,11 @@ fun ChatInputBar(
         tonalElevation = 2.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(start = 10.dp, end = 10.dp, top = 5.dp, bottom = 10.dp)
+            .padding(start = 10.dp, end = 10.dp, top = 5.dp, bottom = 6.dp)
     ) {
         Column(
             modifier = Modifier
-                .padding(horizontal = 12.dp, vertical = 4.dp)
+                .padding(horizontal = 4.dp, vertical = 4.dp)
                 .animateContentSize()
         ) {
             // Image previews
@@ -279,6 +278,14 @@ fun ChatInputBar(
                 }
                 onCursorChange(fieldValue.selection.start)
             }
+            // End padding reserving the overlaid right cluster (mic /
+            // voice / send widths + breathing room). Function of model,
+            // loading, and content state only — never of layout — so no
+            // feedback loop is possible.
+            val micVisible = speechAvailable && !isGenerating && !isLoadingModel
+            val voiceVisible = micVisible && !isVoiceRecording && voiceGate == GateState.Allowed
+            val sendVisible = (text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip) && canSend && !isLoadingModel
+            val rightClusterDp = ((if (micVisible) 40 else 0) + (if (voiceVisible) 40 else 0) + (if (sendVisible) 40 else 0) + 4).dp
 
             // Input-row pieces as local composables (single static row —
             // the row stretches in place as the text wraps, nothing moves).
@@ -551,22 +558,32 @@ fun ChatInputBar(
                     }
                 }
             } else {
-                // Compact single row vs expanded ChatGPT-style layout
-                // (text on top, buttons below) once the text wraps.
-                // Single input row — it STRETCHES in place as the text
-                // wraps (animateContentSize on the pill smooths the growth).
-                // No layout swap: swapping compact/expanded trees destroyed
-                // the field and dropped the keyboard, so the row is static
-                // and only its height changes.
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.Bottom
-                ) {
-                    AttachGroup()
-                    InputField(Modifier.weight(1f))
-                    MicButton()
-                    VoiceButton()
-                    SendSlot()
+                // Overlay layout in ONE static tree (nothing is created or
+                // destroyed as the text grows, so focus and the keyboard
+                // survive): the field spans the full width with padding
+                // for the overlaid buttons; + anchors bottom-start,
+                // mic/voice/send bottom-end. The pill stretches in place
+                // via animateContentSize as the field wraps to more lines.
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    InputField(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(start = 48.dp, end = rightClusterDp)
+                    )
+                    Row(
+                        modifier = Modifier.align(Alignment.BottomStart),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AttachGroup()
+                    }
+                    Row(
+                        modifier = Modifier.align(Alignment.BottomEnd),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        MicButton()
+                        VoiceButton()
+                        SendSlot()
+                    }
                 }
         }
     }
