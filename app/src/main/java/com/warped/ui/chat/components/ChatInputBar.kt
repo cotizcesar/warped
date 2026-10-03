@@ -37,8 +37,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -281,35 +279,9 @@ fun ChatInputBar(
                 }
                 onCursorChange(fieldValue.selection.start)
             }
-            var inputLines by remember { mutableIntStateOf(0) }
-            // Expanded (ChatGPT-style) once the text wraps past one line:
-            // text field full-width on top, button row below. Single line
-            // keeps the compact [+] [input] [mic] [voice] [send] row.
-            val expandedInput = inputLines > 1
-            val focusRequester = remember { FocusRequester() }
-            // Mirror width = compact-field width: full width minus the
-            // button cluster sharing the row (attach + visible mic /
-            // voice / send + gaps). Dynamic but loop-free — button
-            // visibility never depends on expandedInput, so the trigger
-            // stays monotonic in text and can never oscillate.
-            val buttonsEndWidth = (40 +
-                (if (speechAvailable && !isGenerating && !isLoadingModel) 40 else 0) +
-                (if (speechAvailable && !isGenerating && !isLoadingModel && !isVoiceRecording && voiceGate == GateState.Allowed) 40 else 0) +
-                (if ((text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip) && canSend && !isLoadingModel) 40 else 0) +
-                16).dp
-            Text(
-                text = text.ifEmpty { " " },
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = Int.MAX_VALUE,
-                onTextLayout = { if (it.lineCount != inputLines) inputLines = it.lineCount },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 40.dp, end = buttonsEndWidth)
-                    .height(0.dp),
-            )
 
-            // Input-row pieces as local composables so the compact row and
-            // the expanded layout share one implementation (no duplication).
+            // Input-row pieces as local composables (single static row —
+            // the row stretches in place as the text wraps, nothing moves).
             @Composable
             fun AttachGroup() {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -366,7 +338,6 @@ fun ChatInputBar(
                     onCursorChange(next.selection.start)
                 },
                 modifier = mod
-                    .focusRequester(focusRequester)
                     .padding(vertical = 10.dp)
                     .onFocusChanged { inputFocused = it.isFocused }
                     .onKeyEvent { event ->
@@ -531,33 +502,6 @@ fun ChatInputBar(
                 }
             }
 
-            // The text field MOVES between the compact row and the
-            // expanded column — movableContentOf keeps the SAME composition
-            // (text, selection, and FOCUS) across the move, so the keyboard
-            // never drops when the input grows/shrinks. Declared once here
-            // (after the local pieces it calls) and invoked in both layouts.
-            val movableInputField = remember {
-                movableContentOf { mod: Modifier -> InputField(mod) }
-            }
-
-            // Refocus after grow/shrink moves the field: the move itself
-            // can drop IME focus even though the composition is preserved.
-            // If the field was focused going in, hand focus back to the
-            // moved node (one frame later, once attached). No-op when the
-            // user dismissed the keyboard (flag already false) or when the
-            // layout didn't switch (effect doesn't restart).
-            var focusBeforeSwitch by remember { mutableStateOf(false) }
-            focusBeforeSwitch = inputFocused
-            LaunchedEffect(expandedInput) {
-                if (focusBeforeSwitch) {
-                    withFrameNanos { }
-                    try {
-                        focusRequester.requestFocus()
-                    } catch (_: Exception) {
-                    }
-                }
-            }
-
             // Phase 67 (VMSG-01 full): recording replaces the input row
             // inline — mm:ss timer + amplitude bar + explicit cancel (X).
             // Timer + bar render onSurfaceVariant, switching to error red
@@ -609,32 +553,20 @@ fun ChatInputBar(
             } else {
                 // Compact single row vs expanded ChatGPT-style layout
                 // (text on top, buttons below) once the text wraps.
-                if (expandedInput) {
-                    Column {
-                        movableInputField(Modifier.fillMaxWidth())
-                        Spacer(Modifier.height(4.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.Bottom
-                        ) {
-                            AttachGroup()
-                            Spacer(Modifier.weight(1f))
-                            MicButton()
-                            VoiceButton()
-                            SendSlot()
-                        }
-                    }
-                } else {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.Bottom
-                    ) {
-                        AttachGroup()
-                        movableInputField(Modifier.weight(1f))
-                        MicButton()
-                        VoiceButton()
-                        SendSlot()
-                    }
+                // Single input row — it STRETCHES in place as the text
+                // wraps (animateContentSize on the pill smooths the growth).
+                // No layout swap: swapping compact/expanded trees destroyed
+                // the field and dropped the keyboard, so the row is static
+                // and only its height changes.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    AttachGroup()
+                    InputField(Modifier.weight(1f))
+                    MicButton()
+                    VoiceButton()
+                    SendSlot()
                 }
         }
     }

@@ -665,12 +665,23 @@ class ChatViewModel @Inject constructor(
                         preloadLocalModel(effectiveModelId)
                     }
                     if (engineManager.getActiveEngine()?.modelPath != effectiveModelId) {
-                        val loadError = _connection.value.modelLoadError
-                            ?: context.getString(R.string.error_unknown_short)
+                        // Load failed: preloadLocalModel already reported it
+                        // via the modelLoadError banner (memory guard
+                        // included) — setting a transcript error too stacked
+                        // a second identical Snackbar on top (device report:
+                        // double "Not enough memory"). The transcript error
+                        // stays only as a backstop for the impossible case
+                        // where preload failed silently. The traffic light
+                        // stays RED via selected-not-loaded either way.
+                        val backstop = if (_connection.value.modelLoadError == null) {
+                            ChatError.Unknown(context.getString(R.string.error_unknown_short))
+                        } else {
+                            null
+                        }
                         updateTranscript {
                             it.copy(
                                 messages = it.messages.filterNot { m -> m.id == userMessage.id },
-                                error = ChatError.Unknown(loadError),
+                                error = backstop,
                                 isStreaming = false
                             )
                         }
