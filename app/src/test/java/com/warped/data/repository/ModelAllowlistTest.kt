@@ -985,9 +985,12 @@ class ModelAllowlistTest {
         val models = parseModelAllowlist(shippedAssetText())
         val recommended = models.filter { it.recommended }
 
-        // Curated set: big enough to offer choice, small enough to choose.
-        assertThat(recommended.size).isAtLeast(5)
-        assertThat(recommended.size).isAtMost(10)
+        // User curation 2026-10-03: Recommended is the Gemma 4 trio only.
+        assertThat(recommended.map { it.name }).containsExactly(
+            "gemma-4-E2B-it",
+            "gemma-4-E4B-it",
+            "gemma-4-12B-it",
+        )
         // Every pick must be installable — a coming-soon entry can never
         // back the Recommended section (display-only by design).
         assertThat(recommended.none { it.comingSoon }).isTrue()
