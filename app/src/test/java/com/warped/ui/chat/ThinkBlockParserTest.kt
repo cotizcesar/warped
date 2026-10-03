@@ -124,4 +124,34 @@ class ThinkBlockParserTest {
         assertThat(clean).isEqualTo("Answer starts.")
         assertThat(reasoning).isEqualTo("Thought so far.")
     }
+
+    @Test
+    fun `bracket thought markers normalize like angle tags`() {
+        val raw = "[thought]Checking the request.[/thought]¡Hola!"
+
+        val (clean, reasoning) = parseThinkBlocks(raw, enabled = true)
+
+        assertThat(clean).isEqualTo("¡Hola!")
+        assertThat(reasoning).isEqualTo("Checking the request.")
+    }
+
+    @Test
+    fun `bracket open without close treats tail as thought`() {
+        val raw = "Answer so far.[thought]Still thinking..."
+
+        val (clean, reasoning) = parseThinkBlocks(raw, enabled = true)
+
+        assertThat(clean).isEqualTo("Answer so far.")
+        assertThat(reasoning).isEqualTo("Still thinking...")
+    }
+
+    @Test
+    fun `bracket markers dropped with thought when thinking off`() {
+        val raw = "[thought]Checking.[/thought]¡Hola!"
+
+        val (clean, reasoning) = parseThinkBlocks(raw, enabled = false)
+
+        assertThat(clean).isEqualTo("¡Hola!")
+        assertThat(reasoning).isEmpty()
+    }
 }

@@ -14,6 +14,8 @@ private val THINK_PAIR_REGEX = Regex(
 )
 private const val OPEN_TAG = "<think>"
 private const val CLOSE_TAG = "</think>"
+private val BRACKET_OPEN_REGEX = Regex("\\[thought\\]", RegexOption.IGNORE_CASE)
+private val BRACKET_CLOSE_REGEX = Regex("\\[/thought\\]", RegexOption.IGNORE_CASE)
 
 /**
  * Split raw model output into (answer, reasoning).
@@ -50,7 +52,8 @@ internal fun parseThinkBlocks(
     val lower = raw.lowercase()
     // Note: "</think>" does NOT contain "<think" ('<' is followed by '/'),
     // so the orphan close needs its own check.
-    val hasMarker = "<think" in lower || "</think" in lower || "<channel" in lower
+    val hasMarker = "<think" in lower || "</think" in lower || "<channel" in lower ||
+        "[thought" in lower
     if (live && modelThinks && !hasMarker) {
         return if (enabled) {
             Pair("", raw.trim())
@@ -58,13 +61,19 @@ internal fun parseThinkBlocks(
             Pair("", "")
         }
     }
+    // SmolLM3 emits `[thought]`/`[/thought]` instead of angle tags
+    // (proven in-band in the CLI smoke). Normalize first so the pair,
+    // orphan and strip logic below applies unchanged.
+    var normalized = BRACKET_OPEN_REGEX.replace(raw, OPEN_TAG)
+    normalized = BRACKET_CLOSE_REGEX.replace(normalized, CLOSE_TAG)
+    val input = normalized
     if (!enabled) {
-        val closeIdx = raw.lowercase().indexOf(CLOSE_TAG)
-        val dropped = if (closeIdx >= 0) raw.substring(closeIdx + CLOSE_TAG.length) else raw
+        val closeIdx = input.lowercase().indexOf(CLOSE_TAG)
+        val dropped = if (closeIdx >= 0) input.substring(closeIdx + CLOSE_TAG.length) else input
         return Pair(TAG_STRIP_REGEX.replace(dropped, "").trim(), "")
     }
     val reasoning = StringBuilder()
-    var clean = raw
+    var clean = input
 
     CHANNEL_REGEX.findAll(clean).forEach { m -> reasoning.append(m.groupValues[1].trim()).append("\n") }
     clean = CHANNEL_REGEX.replace(clean, "")
