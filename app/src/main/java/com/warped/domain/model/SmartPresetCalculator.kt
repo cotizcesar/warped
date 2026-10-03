@@ -27,7 +27,9 @@ object SmartPresetCalculator {
 
     fun calculate(
         memoryInfo: MemoryInfo,
-        modelSizeBytes: Long
+        modelSizeBytes: Long,
+        modelName: String = "",
+        thinking: Boolean = false,
     ): SmartPresetResult {
         val freeMb = memoryInfo.availableBytes / (1024 * 1024)
         val totalMb = memoryInfo.totalBytes / (1024 * 1024)
@@ -66,18 +68,24 @@ object SmartPresetCalculator {
         // them down; big models stay expressive with an anti-slop floor).
         // Memory tiers above own efficiency (context/threads/tokens);
         // these own quality. Thresholds in MiB of the model file.
-        val (temperature, topK, topP, repeatPenalty) = when {
+        val (tierTemp, tierTopK, tierTopP, tierRep) = when {
             modelMb < 1024 -> Sampling(0.3f, 15, 0.85f, 1.15f) // tiny: max precision
             modelMb < 3072 -> Sampling(0.5f, 25, 0.9f, 1.12f) // small: focused
             modelMb < 6144 -> Sampling(0.7f, 40, 0.95f, 1.08f) // mid: balanced
             else -> Sampling(0.8f, 40, 0.95f, 1.05f) // large: expressive
         }
 
+        // Vendor family guidance (upstream model cards) overrides the size
+        // tiers field-by-field; null family fields fall back to the tier.
+        // E.g. Gemma runs hot (1.0/64/0.95) despite its mid size, Qwen3
+        // wants topK 20, Ministral-instruct wants 0.1.
+        val family = if (modelName.isNotBlank()) familySamplingFor(modelName, thinking) else null
+
         val parameters = GenerationParameters(
-            temperature = temperature,
-            topP = topP,
-            topK = topK,
-            repeatPenalty = repeatPenalty,
+            temperature = family?.temperature ?: tierTemp,
+            topP = family?.topP ?: tierTopP,
+            topK = family?.topK ?: tierTopK,
+            repeatPenalty = family?.repeatPenalty ?: tierRep,
             maxTokens = adjustedMaxTokens,
             contextSize = adjustedContext,
             seed = -1,

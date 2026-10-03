@@ -397,6 +397,7 @@
     <string name="param_seed">Semilla</string>
     <string name="param_seed_hint">Semilla (-1 para aleatorio)</string>
     <string name="param_threads">Hilos</string>
+    <string name="param_thinking">Razonamiento</string>
     <string name="param_desc_temperature">Controla la aleatoriedad. Más bajo = más determinista.</string>
     <string name="param_desc_top_p">Muestreo nucleus. Más bajo = más enfocado.</string>
     <string name="param_desc_top_k">Limita la selección de tokens a los K mejores.</string>
@@ -404,6 +405,8 @@
     <string name="param_desc_maxtokens">Máximo de tokens de salida por respuesta.</string>
     <string name="param_desc_context">Tamaño máximo de la ventana de contexto.</string>
     <string name="param_desc_seed">Semilla aleatoria. -1 = aleatorio cada vez.</string>
+    <string name="param_desc_threads">Hilos de CPU para inferencia. Más es más rápido hasta saturar la memoria.</string>
+    <string name="param_desc_thinking">Permite a los modelos capaces razonar paso a paso antes de responder. Sin efecto en modelos sin soporte.</string>
     <string name="param_random">Aleatorio</string>
     <string name="preset_unsupported_litertlm">No compatible con LiteRT-LM</string>
     <string name="preset_reset">Restablecer</string>

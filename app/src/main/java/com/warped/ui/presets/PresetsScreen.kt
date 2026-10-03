@@ -30,6 +30,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -208,6 +209,13 @@ fun PresetsScreen(
                     onValueChange = { viewModel.updateThreads(it) }
                 )
             }
+
+            item {
+                ThinkingToggle(
+                    checked = params.reasoningEnabled,
+                    onCheckedChange = { viewModel.updateReasoning(it) }
+                )
+            }
         }
     }
 
@@ -326,6 +334,28 @@ fun ParameterIntSlider(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+@Composable
+fun ThinkingToggle(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(stringResource(R.string.param_thinking), style = MaterialTheme.typography.bodyMedium)
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
+        }
+        Text(
+            stringResource(R.string.param_desc_thinking),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

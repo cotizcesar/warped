@@ -394,6 +394,7 @@
     <string name="param_seed">Seed</string>
     <string name="param_seed_hint">Seed (-1 for random)</string>
     <string name="param_threads">Threads</string>
+    <string name="param_thinking">Thinking</string>
     <string name="param_desc_temperature">Controls randomness. Lower = more deterministic.</string>
     <string name="param_desc_top_p">Nucleus sampling. Lower = more focused.</string>
     <string name="param_desc_top_k">Limits token selection to top K.</string>
@@ -401,6 +402,8 @@
     <string name="param_desc_maxtokens">Maximum output tokens per response.</string>
     <string name="param_desc_context">Maximum context window size.</string>
     <string name="param_desc_seed">Random seed. -1 = random each time.</string>
+    <string name="param_desc_threads">CPU threads for inference. More is faster until memory bandwidth saturates.</string>
+    <string name="param_desc_thinking">Lets capable models reason step by step before answering. No effect on models without thinking support.</string>
     <string name="param_random">Random</string>
     <string name="preset_unsupported_litertlm">Unsupported for LiteRT-LM</string>
     <string name="preset_reset">Reset</string>

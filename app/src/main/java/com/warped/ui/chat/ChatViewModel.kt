@@ -3668,7 +3668,14 @@ class ChatViewModel @Inject constructor(
                 val models = localModelRepository.observeModels().first()
                 val model = models.firstOrNull { it.filePath == modelId } ?: return@launch
                 val memInfo = memoryChecker.getMemoryInfo()
-                val result = SmartPresetCalculator.calculate(memInfo, model.sizeBytes)
+                val result = SmartPresetCalculator.calculate(
+                    memInfo,
+                    model.sizeBytes,
+                    modelName = model.name,
+                    // Verified-only thinking flag: selects the thinking row
+                    // of the vendor family table (e.g. Qwen3 0.6 vs 0.7).
+                    thinking = modelAllowlistRepository.supportsThinking(model.name),
+                )
                 parameterStore.update(result.parameters)
                 Timber.d("ChatVM: auto-applied smart preset — tier=${result.tier} context=${result.parameters.contextSize} threads=${result.parameters.threads}")
             } catch (e: Exception) {

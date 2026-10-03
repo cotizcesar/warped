@@ -102,6 +102,10 @@ class PresetsViewModel @Inject constructor(
         update { it.copy(threads = value) }
     }
 
+    fun updateReasoning(enabled: Boolean) {
+        update { it.copy(reasoningEnabled = enabled) }
+    }
+
     private inline fun update(crossinline transform: (GenerationParameters) -> GenerationParameters) {
         _uiState.update { state ->
             val newParams = transform(state.parameters)
@@ -132,7 +136,7 @@ class PresetsViewModel @Inject constructor(
     private fun recalculateSmartPreset(modelId: String) {
         val model = cachedModels.firstOrNull { it.filePath == modelId } ?: return
         val memInfo = memoryChecker.getMemoryInfo()
-        val result = SmartPresetCalculator.calculate(memInfo, model.sizeBytes)
+        val result = SmartPresetCalculator.calculate(memInfo, model.sizeBytes, modelName = model.name)
         smartPresetParams = result.parameters
         val label = context.getString(R.string.preset_smart_fmt, "%.1f".format(result.availableGb))
         _uiState.update {
