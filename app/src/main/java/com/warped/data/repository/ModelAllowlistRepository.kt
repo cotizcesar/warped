@@ -178,6 +178,15 @@ class ModelAllowlistRepository @Inject constructor(
     fun findByModelFile(fileName: String): AllowlistedModel? =
         models.firstOrNull { it.modelFile.equals(fileName, ignoreCase = true) }
 
+    /**
+     * Reverse download-id lookup (`repoSlug/modelFile`, see
+     * [CatalogViewModel.downloadId]) — resolves the worker's display name
+     * so saved rows carry "SmolLM3 3B" instead of the quant-suffixed file
+     * stem. Null for imports (no catalog entry).
+     */
+    fun findByDownloadId(downloadId: String): AllowlistedModel? =
+        models.firstOrNull { "${it.repoSlug}/${it.modelFile}".equals(downloadId, ignoreCase = true) }
+
     /** True only if thinking was verified for this model on 0.17.x Android. */
     fun supportsThinking(name: String): Boolean =
         findByName(name)?.capabilities?.supportsThinking == true

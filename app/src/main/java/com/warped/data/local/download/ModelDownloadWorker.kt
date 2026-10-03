@@ -17,7 +17,9 @@ import com.warped.R
 import com.warped.WarpedApplication
 import com.warped.data.local.db.dao.DownloadCheckpointDao
 import com.warped.data.local.db.entity.DownloadCheckpointEntity
+import com.warped.data.repository.ModelAllowlistRepository
 import com.warped.domain.model.LocalModel
+import com.warped.domain.model.prettyModelName
 import com.warped.domain.repository.LocalModelRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -35,6 +37,7 @@ class ModelDownloadWorker @AssistedInject constructor(
     private val okHttpClient: OkHttpClient,
     private val localModelRepository: LocalModelRepository,
     private val checkpointDao: DownloadCheckpointDao,
+    private val allowlistRepository: ModelAllowlistRepository,
 ) : CoroutineWorker(context, workerParams) {
 
     companion object {
@@ -261,7 +264,11 @@ class ModelDownloadWorker @AssistedInject constructor(
             )
 
             val localModel = LocalModel(
-                name = localFileName.removeSuffix(".litertlm"),
+                // Display name from the catalog entry (matched by
+                // download id), prettified stem otherwise — never the
+                // raw quant-suffixed file name.
+                name = allowlistRepository.findByDownloadId(modelId)?.displayName
+                    ?: prettyModelName(localFileName),
                 filePath = destFile.absolutePath,
                 sizeBytes = destFile.length().takeIf { it > 0 } ?: fileSizeBytes,
                 quantization = "N/A",

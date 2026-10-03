@@ -5,15 +5,18 @@ import com.warped.data.local.db.entity.toDomain
 import com.warped.data.local.db.entity.toEntity
 import com.warped.domain.model.GenerationParameters
 import com.warped.domain.model.LocalModel
+import com.warped.domain.model.prettyModelName
 import com.warped.domain.repository.LocalModelRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class LocalModelRepositoryImpl @Inject constructor(
-    private val localModelDao: LocalModelDao
+    private val localModelDao: LocalModelDao,
+    private val allowlistRepository: ModelAllowlistRepository,
 ) : LocalModelRepository {
 
     override fun observeModels(): Flow<List<LocalModel>> =
@@ -50,4 +53,21 @@ class LocalModelRepositoryImpl @Inject constructor(
 
     override suspend fun deleteByFilePath(filePath: String): Int =
         localModelDao.deleteByFilePath(filePath)
+
+    override suspend fun healModelNames(): Int {
+        var renamed = 0
+        for (entity in localModelDao.observeAll().first()) {
+            val stem = entity.filePath.substringAfterLast("/").substringBeforeLast(".")
+            if (entity.name != stem) continue
+            val pretty = allowlistRepository
+                .findByModelFile(entity.filePath.substringAfterLast("/"))
+                ?.displayName
+                ?: prettyModelName(entity.filePath.substringAfterLast("/"))
+            if (pretty != stem) {
+                localModelDao.updateName(entity.id, pretty)
+                renamed++
+            }
+        }
+        return renamed
+    }
 }
