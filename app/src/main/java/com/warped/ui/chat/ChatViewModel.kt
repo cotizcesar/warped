@@ -405,6 +405,24 @@ class ChatViewModel @Inject constructor(
                 if (modelId == null) {
                     lastAutoAppliedModelId = null
                 }
+                // Cold-start mount (user decision: red on open must turn
+                // green by itself): a pending selection with no chat open
+                // and nothing mounted mounts in the background, once per
+                // model per session (failures stay pending, never retried
+                // here — the banner + next send drive retry). Open
+                // conversations mount via selectConversation instead.
+                if (modelId != null && !connected && !loading &&
+                    _transcript.value.conversationId == null &&
+                    startupMountAttemptedFor != modelId &&
+                    java.io.File(modelId).exists() &&
+                    isEngineEmpty()
+                ) {
+                    startupMountAttemptedFor = modelId
+                    activeModelSelection.markLocalLoading(modelId)
+                    viewModelScope.launch(coroutineExceptionHandler) {
+                        preloadLocalModel(modelId)
+                    }
+                }
 
                 updateConnection {
                     it.copy(
@@ -3476,6 +3494,25 @@ class ChatViewModel @Inject constructor(
     }
 
     private var lastAutoAppliedModelId: String? = null
+
+    /**
+     * Engine-emptiness probe for the cold-start mount trigger. Fail-closed:
+     * a lookup failure skips the mount (the collector must never die —
+     * it owns input-flag recomputation downstream).
+     */
+    private fun isEngineEmpty(): Boolean = try {
+        engineManager.getActiveEngine() == null
+    } catch (e: Exception) {
+        Timber.w(e, "ChatVM: engine lookup failed, skipping cold-start mount")
+        false
+    }
+
+    /**
+     * Model id the cold-start mount already attempted this session (loop
+     * guard — failures stay pending and must not remount on every
+     * selection emission; retry comes from the banner or the next send).
+     */
+    private var startupMountAttemptedFor: String? = null
 
     /**
      * Last model auto-selected by the observeModels hook (loop guard — the

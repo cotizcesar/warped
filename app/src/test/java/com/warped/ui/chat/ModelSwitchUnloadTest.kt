@@ -198,7 +198,7 @@ class ModelSwitchUnloadTest {
     }
 
     @Test
-    fun `selecting a model never touches the engine`() = runTest {
+    fun `selecting a model mounts it in background`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val pathA = File(tempDir, "a.litertlm").apply { writeText("fake") }.absolutePath
         val pathB = File(tempDir, "b.litertlm").apply { writeText("fake") }.absolutePath
@@ -215,12 +215,13 @@ class ModelSwitchUnloadTest {
         fixture.vm.launchModelSelection(pathB, ProviderType.LITE_RT_LM)
         advanceUntilIdle()
 
-        // Selection only marks pending — no mount, no unload, no spinner.
-        verify(exactly = 0) { fixture.engineManager.switchToLiteRT(any()) }
+        // User decision: red turns green by itself — selection mounts in
+        // background, no send needed. No explicit unload call (switch
+        // unloads atomically inside the engine).
+        verify { fixture.engineManager.switchToLiteRT(pathB) }
         verify(exactly = 0) { fixture.engineManager.unloadCurrent() }
         assertThat(fixture.vm.connectionState.value.selectedLocalModelId).isEqualTo(pathB)
         assertThat(fixture.vm.connectionState.value.isLoadingModel).isFalse()
-        assertThat(fixture.vm.connectionState.value.isLocalModelLoaded).isFalse()
         assertThat(fixture.selection.localSelection.value.isLoading).isFalse()
     }
 
@@ -250,12 +251,12 @@ class ModelSwitchUnloadTest {
 
         fixture.vm.launchModelSelection(path, ProviderType.LITE_RT_LM)
         advanceUntilIdle()
-        assertThat(fixture.engineManager.getActiveEngine()).isNull()
 
         fixture.vm.sendMessage("hello")
         awaitMount(fixture)
 
-        // Mounted on first send, then generated.
+        // Mounted on selection (background), send reuses it — exactly one
+        // mount total, then generated.
         verify(exactly = 1) { fixture.engineManager.switchToLiteRT(path) }
         assertThat(fixture.selection.localSelection.value.isConnected).isTrue()
         val messages = fixture.vm.transcriptState.value.messages
