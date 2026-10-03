@@ -138,12 +138,21 @@ fun HuggingFaceScreen(
             }
         } else {
             // Smallest-first display order comes from the ViewModel; sections
-            // split downloaded from available within that order.
-            val downloaded = remember(viewModel.models, downloadedFileNames) {
-                viewModel.models.filter { it.modelFile in downloadedFileNames }
+            // split downloaded from available within that order. Recommended
+            // entries (curated in the allowlist) get their own top section
+            // with the same cards/actions — excluded below so each model
+            // renders exactly once.
+            val recommended = remember(viewModel.models) {
+                viewModel.models.filter { it.recommended && !it.comingSoon }
             }
-            val available = remember(viewModel.models, downloadedFileNames) {
-                viewModel.models.filter { it.modelFile !in downloadedFileNames }
+            val rest = remember(viewModel.models, recommended) {
+                viewModel.models.filter { it !in recommended }
+            }
+            val downloaded = remember(rest, downloadedFileNames) {
+                rest.filter { it.modelFile in downloadedFileNames }
+            }
+            val available = remember(rest, downloadedFileNames) {
+                rest.filter { it.modelFile !in downloadedFileNames }
             }
             LazyColumn(
                 modifier = Modifier
@@ -153,6 +162,26 @@ fun HuggingFaceScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp)
             ) {
+                if (recommended.isNotEmpty()) {
+                    item(key = "section-recommended") {
+                        CatalogSectionHeader(
+                            title = stringResource(R.string.hf_section_recommended),
+                            count = recommended.size
+                        )
+                    }
+                    items(recommended, key = { "rec-${it.name}" }) { entry ->
+                        val onDevice = entry.modelFile in downloadedFileNames
+                        CatalogCardItem(
+                            entry = entry,
+                            viewModel = viewModel,
+                            downloadStates = downloadStates,
+                            isOnDevice = onDevice,
+                            isInUse = isEntryInUse(activeLocalModelId, entry),
+                            onDeleteDownloaded = { viewModel.deleteDownloaded(entry) },
+                            onUseInChat = { viewModel.useDownloadedModel(entry) }
+                        )
+                    }
+                }
                 if (downloaded.isNotEmpty()) {
                     item(key = "section-downloaded") {
                         CatalogSectionHeader(

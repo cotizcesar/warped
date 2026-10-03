@@ -311,7 +311,7 @@ class LmStudioCancelTest {
         every { engineManager.getActiveEngine() } returns
             ActiveEngine(EngineType.LITE_RT_LM, "model-x")
         every { engineManager.getLiteRTLmEngine() } returns engine
-        every { engineManager.createLiteRTConversation(any(), any()) } returns conversation
+        every { engineManager.createLiteRTConversation(any(), any(), any()) } returns conversation
         every { engineManager.switchToLiteRT(any()) } just Runs
         val activeSelection = mockk<ActiveModelSelection>(relaxed = true)
         every { activeSelection.activeModel } returns MutableStateFlow(null)

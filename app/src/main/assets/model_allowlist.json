@@ -11,6 +11,7 @@
       "displayName": "Gemma 4 E2B IT",
       "repo": "warped-community/gemma-4-E2B-it-litert-lm",
       "modelFile": "gemma-4-E2B-it.litertlm",
+      "recommended": true,
       "sizeInBytes": 2588147712,
       "capabilities": {
         "text": true,
@@ -32,6 +33,7 @@
       "displayName": "Gemma 4 E4B IT",
       "repo": "warped-community/gemma-4-E4B-it-litert-lm",
       "modelFile": "gemma-4-E4B-it.litertlm",
+      "recommended": true,
       "sizeInBytes": 3659530240,
       "capabilities": {
         "text": true,
@@ -200,6 +202,7 @@
       "displayName": "Qwen3 4B Thinking",
       "repo": "warped-community/Qwen3-4B-Thinking-litert-lm",
       "modelFile": "Qwen3_4b_thinking_dynamic_wi4b32_afp32.litertlm",
+      "recommended": true,
       "sizeInBytes": 2274193168,
       "capabilities": {
         "text": true,
@@ -221,6 +224,7 @@
       "displayName": "Qwen2.5 Coder 3B",
       "repo": "warped-community/Qwen2.5-Coder-3B-litert-lm",
       "modelFile": "Qwen2.5_Coder_3B_It.litertlm",
+      "recommended": true,
       "sizeInBytes": 3433083824,
       "capabilities": {
         "text": true,
@@ -458,6 +462,7 @@
       "displayName": "Qwen3 4B Instruct",
       "repo": "warped-community/Qwen3-4B-Instruct-2507-litert-lm",
       "modelFile": "qwen3_4b_instruct_2507_mixed_int4.litertlm",
+      "recommended": true,
       "sizeInBytes": 2659057664,
       "capabilities": {
         "text": true,
@@ -479,6 +484,7 @@
       "displayName": "DeepSeek R1 1.5B",
       "repo": "warped-community/DeepSeek-R1-Distill-Qwen-1.5B-litert-lm",
       "modelFile": "DeepSeek-R1-Distill-Qwen-1.5B_multi-prefill-seq_q8_ekv4096.litertlm",
+      "recommended": true,
       "sizeInBytes": 1833451520,
       "capabilities": {
         "text": true,
@@ -563,6 +569,7 @@
       "displayName": "SmolLM3 3B",
       "repo": "warped-community/SmolLM3-3B-litert-lm",
       "modelFile": "SmolLM3-3B_q4_block32_ekv4096.litertlm",
+      "recommended": true,
       "sizeInBytes": 2002257840,
       "capabilities": {
         "text": true,

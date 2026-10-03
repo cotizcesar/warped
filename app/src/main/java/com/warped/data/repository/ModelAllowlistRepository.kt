@@ -102,7 +102,15 @@ data class AllowlistedModel(
      * always resolves through resources or locale-paired fields, never a
      * hardcoded language. See [localizedComingSoonNote].
      */
-    val comingSoonNoteEs: String? = null
+    val comingSoonNoteEs: String? = null,
+    /**
+     * Curated pick: the most capable + usable models for the catalog's
+     * Recommended section (verified flags + family track record — see
+     * model_allowlist.json). Display-only curation, no behavior change.
+     *
+     * Back-compat: absent → false.
+     */
+    val recommended: Boolean = false
 ) {
     /**
      * Locale-aware coming-soon reason: Spanish note on es locales,

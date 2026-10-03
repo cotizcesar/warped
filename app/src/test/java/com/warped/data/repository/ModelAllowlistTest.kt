@@ -836,4 +836,34 @@ class ModelAllowlistTest {
         assertThat(n3e2b.audio).isTrue()
         assertThat(n3e2b.supportsThinking).isFalse()
     }
+
+    @Test
+    fun `recommended curation is usable and downloadable`() {
+        val models = parseModelAllowlist(shippedAssetText())
+        val recommended = models.filter { it.recommended }
+
+        // Curated set: big enough to offer choice, small enough to choose.
+        assertThat(recommended.size).isAtLeast(5)
+        assertThat(recommended.size).isAtMost(10)
+        // Every pick must be installable — a coming-soon entry can never
+        // back the Recommended section (display-only by design).
+        assertThat(recommended.none { it.comingSoon }).isTrue()
+        // Every pick resolves to a real download (explicit repo slug).
+        for (entry in recommended) {
+            assertThat(entry.repo).isNotNull()
+            assertThat(entry.repoSlug).isNotEmpty()
+        }
+    }
+
+    @Test
+    fun `recommended defaults to false for hand-built entries`() {
+        val entry = AllowlistedModel(
+            name = "x",
+            displayName = "X",
+            modelFile = "x.litertlm",
+            sizeInBytes = 1L,
+        )
+
+        assertThat(entry.recommended).isFalse()
+    }
 }

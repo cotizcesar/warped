@@ -293,7 +293,8 @@ class EngineManager @Inject constructor(
     fun createLiteRTConversation(
         config: ConversationConfig = ConversationConfig(),
         thinkingConfig: ThinkingConfig? = null,
-    ) = liteRTLmEngine.createConversation(config, thinkingConfig)
+        maxOutputToken: Int? = null,
+    ) = liteRTLmEngine.createConversation(config, thinkingConfig, maxOutputToken)
 
     /** Returns the LiteRT-LM engine directly for advanced usage. */
     fun getLiteRTLmEngine(): LiteRTLmEngine = liteRTLmEngine

@@ -12,6 +12,14 @@ data class SmartPresetResult(
 
 enum class MemoryTier { LOW, MID, HIGH }
 
+/** Sampling quadruple: temperature, topK, topP, repeatPenalty. */
+private data class Sampling(
+    val temperature: Float,
+    val topK: Int,
+    val topP: Float,
+    val repeatPenalty: Float
+)
+
 object SmartPresetCalculator {
 
     private const val LOW_THRESHOLD_MB = 4 * 1024L
@@ -53,11 +61,23 @@ object SmartPresetCalculator {
             (maxTokens * 0.5f).toInt().coerceAtLeast(256)
         } else maxTokens
 
+        // Sampling precision tiers by MODEL file size (small models ramble,
+        // loop greetings, and hallucinate at default sampling — tighten
+        // them down; big models stay expressive with an anti-slop floor).
+        // Memory tiers above own efficiency (context/threads/tokens);
+        // these own quality. Thresholds in MiB of the model file.
+        val (temperature, topK, topP, repeatPenalty) = when {
+            modelMb < 1024 -> Sampling(0.3f, 15, 0.85f, 1.15f) // tiny: max precision
+            modelMb < 3072 -> Sampling(0.5f, 25, 0.9f, 1.12f) // small: focused
+            modelMb < 6144 -> Sampling(0.7f, 40, 0.95f, 1.08f) // mid: balanced
+            else -> Sampling(0.8f, 40, 0.95f, 1.05f) // large: expressive
+        }
+
         val parameters = GenerationParameters(
-            temperature = 0.7f,
-            topP = 0.9f,
-            topK = 40,
-            repeatPenalty = 1.1f,
+            temperature = temperature,
+            topP = topP,
+            topK = topK,
+            repeatPenalty = repeatPenalty,
             maxTokens = adjustedMaxTokens,
             contextSize = adjustedContext,
             seed = -1,
@@ -77,5 +97,25 @@ object SmartPresetCalculator {
         MemoryTier.LOW -> "Conservative"
         MemoryTier.MID -> "Balanced"
         MemoryTier.HIGH -> "Optimal"
+    }
+
+    /**
+     * Precision guidance appended to the system instruction for small
+     * models (the canned-greeting loops and rambling of sub-3GB models
+     * respond strongly to explicit direction; big models need none).
+     * Null when the model is large enough to behave without coaching.
+     * Pure — unit-tested.
+     */
+    fun precisionHintFor(modelSizeBytes: Long): String? {
+        val modelMb = modelSizeBytes / (1024 * 1024)
+        return when {
+            modelMb < 1024 ->
+                "Answer briefly and directly in the user's language. " +
+                    "Never repeat greetings, the question, or your own sentences. " +
+                    "If unsure, say so in one line."
+            modelMb < 3072 ->
+                "Be concise and do not repeat yourself."
+            else -> null
+        }
     }
 }

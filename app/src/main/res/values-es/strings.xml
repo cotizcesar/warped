@@ -24,6 +24,7 @@
     <string name="preset_apply">Aplicar</string>
     <string name="hf_section_downloaded">Descargados</string>
     <string name="hf_section_available">Modelos disponibles</string>
+    <string name="hf_section_recommended">Recomendados</string>
     <string name="active_downloads">Descargas activas</string>
     <string name="local_models">Modelos locales</string>
     <string name="network_endpoints">Endpoints de red</string>
