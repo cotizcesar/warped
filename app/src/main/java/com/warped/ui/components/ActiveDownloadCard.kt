@@ -51,6 +51,14 @@ fun ActiveDownloadContent(
     onPause: () -> Unit = {},
     onResume: () -> Unit = {},
     /**
+     * Human model label (display name / repo) rendered as the card title.
+     * The raw file name is never shown — it duplicates the title and
+     * wraps badly on narrow cards. Null when the call site already shows
+     * the model name above (catalog card header) — then only the bar,
+     * status and actions render.
+     */
+    title: String? = null,
+    /**
      * Phase 60-02 (API-04): retry after a platform stop (resumes from the
      * persisted checkpoint). Rendered only when [DownloadState.stopReasonCopy]
      * is present, so call sites without retry wiring never show a dead button.
@@ -58,13 +66,16 @@ fun ActiveDownloadContent(
     onRetry: () -> Unit = {}
 ) {
     Column {
-        Text(
-            download.fileName.substringAfterLast("/"),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
-        )
-        Spacer(Modifier.height(4.dp))
+        if (title != null) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(4.dp))
+        }
         if (download.isDownloading) {
+            Spacer(Modifier.height(4.dp))
             LinearProgressIndicator(
                 progress = { download.progress },
                 modifier = Modifier.fillMaxWidth()

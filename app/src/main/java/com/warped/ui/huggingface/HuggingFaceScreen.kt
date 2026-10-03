@@ -433,7 +433,7 @@ private fun CatalogModelCard(
             // Cancel goes through the cancel-confirm dialog — cancelling
             // deletes the partial file (see dialog copy).
             if (active && downloadState != null) {
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(12.dp))
                 ActiveDownloadContent(
                     download = downloadState,
                     onCancel = { showCancelConfirm = true },
