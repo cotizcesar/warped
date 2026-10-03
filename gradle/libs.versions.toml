@@ -26,7 +26,6 @@ datastore = "1.2.1"
 play-review = "2.0.2"
 workmanager = "2.12.0"
 security-crypto = "1.1.0"  # latest stable
-core-splashscreen = "1.2.0"  # RUNTIME-08 / PERF-11: SplashScreen API integration
 profileinstaller = "1.4.1"  # PERF-16: Maven-confirmed latest stable 2026-09-28 (androidx.profileinstaller)
 baselineprofile = "1.5.0"  # PERF-16: tracks benchmark 1.5.0 (androidx.benchmark:benchmark-baseline-profile-gradle-plugin; Maven-confirmed latest stable 2026-09-28; 1.3.3 plugin cannot apply under AGP 9 — legacy AppExtension API removed)
 kotlinx-collections-immutable = "0.5.2"
@@ -120,9 +119,6 @@ coil3-test = { group = "io.coil-kt.coil3", name = "coil-test", version.ref = "co
 
 # WorkManager
 work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workmanager" }
-
-# SplashScreen
-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "core-splashscreen" }
 
 # Baseline Profiles (PERF-16): installs the checked-in baseline-prof.txt on Android 7+ without Play
 profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }

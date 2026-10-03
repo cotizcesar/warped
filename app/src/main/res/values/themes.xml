@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Warped.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/window_background</item>
-        <item name="postSplashScreenTheme">@style/Theme.Warped</item>
+    <style name="Theme.Warped.Splash" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <!-- windowSplashScreenBackground lives in values-v31/themes.xml
+             (platform attr, API 31+ only — lint NewApi would fail here on
+             minSdk 28). -->
     </style>
 
     <style name="Theme.Warped" parent="android:Theme.Material.Light.NoActionBar">

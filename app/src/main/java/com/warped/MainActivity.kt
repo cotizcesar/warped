@@ -1,16 +1,12 @@
 package com.warped
 
 import android.Manifest
-import android.animation.ObjectAnimator
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.view.animation.AccelerateInterpolator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.core.splashscreen.SplashScreenViewProvider
 import com.warped.ui.navigation.WarpedNavGraph
 import com.warped.ui.theme.WarpedTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -18,24 +14,15 @@ import dagger.hilt.android.AndroidEntryPoint
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        val splashScreen = installSplashScreen()
+        // No splashscreen-compat (removed 3.1.1): core-splashscreen calls
+        // the API-35-deprecated Window.setStatusBarColor /
+        // setNavigationBarColor internally (Play flags it) with no upgrade
+        // path (1.2.0 is latest). API 31+ still shows the platform splash
+        // from windowSplashScreenBackground in themes.xml; older devices
+        // launch straight into content over windowBackground.
         super.onCreate(savedInstanceState)
         requestNotificationPermissionIfNeeded()
         enableEdgeToEdge()
-        splashScreen.setKeepOnScreenCondition { false }
-        // PERF-11: cross-fade the splash view out as the activity content takes over.
-        splashScreen.setOnExitAnimationListener { splashProvider: SplashScreenViewProvider ->
-            val fade = ObjectAnimator.ofFloat(splashProvider.view, "alpha", 1f, 0f).apply {
-                interpolator = AccelerateInterpolator()
-                duration = 200L
-            }
-            fade.addListener(object : android.animation.AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: android.animation.Animator) {
-                    splashProvider.remove()
-                }
-            })
-            fade.start()
-        }
         setContent {
             WarpedTheme {
                 WarpedNavGraph()

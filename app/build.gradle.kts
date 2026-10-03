@@ -240,9 +240,6 @@ dependencies {
     // WorkManager
     implementation(libs.work.runtime.ktx)
 
-    // SplashScreen
-    implementation(libs.core.splashscreen)
-
     // Baseline Profiles (PERF-16): installs the release baseline profile on first run
     implementation(libs.profileinstaller)
 
