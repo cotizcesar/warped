@@ -86,10 +86,36 @@ class LmStudioHelper @Inject constructor(
     /** Returns the model instance id returned by `/api/v1/models/load`, or null. */
     fun getInstanceId(): String? = activeInstanceId.get()
 
+    /**
+     * True when the server's loaded-model list contains [modelPath]
+     * (exact id match). False (reload) on any error or empty list —
+     * a needless reload is today's behavior, a wrong skip would chat
+     * against a different model.
+     */
+    private suspend fun isModelLoaded(
+        provider: LMStudioProvider,
+        modelPath: String,
+    ): Boolean = try {
+        provider.listModels().getOrNull()?.any { it.id == modelPath } == true
+    } catch (e: Exception) {
+        Timber.w(e, "LmStudioHelper: loaded-list check failed, reloading")
+        false
+    }
+
     override suspend fun initialize(modelPath: String) {
         val endpoint = activeEndpoint.get()
             ?: error("LmStudioHelper: setEndpoint() must be called before initialize()")
         val provider = createProvider(endpoint, modelPath)
+        // Idempotency (user report 2026-10-03): every send calls
+        // initialize(), which used to POST /models/load unconditionally —
+        // the server reloaded (and OOM-killed) the model on every
+        // question. If this same model is already loaded server-side,
+        // skip the reload. Fail-safe direction: any doubt reloads
+        // (today's behavior), a skip needs a positive exact id match.
+        if (initializedModelId == modelPath && isModelLoaded(provider, modelPath)) {
+            Timber.d("LmStudioHelper: $modelPath already loaded server-side — skipping reload")
+            return
+        }
         Timber.d("LmStudioHelper: initialize(modelPath=$modelPath) — calling loadModel")
         val result = provider.loadModel(modelPath)
         result.fold(
