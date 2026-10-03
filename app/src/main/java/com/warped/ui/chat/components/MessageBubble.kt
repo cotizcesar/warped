@@ -298,6 +298,7 @@ fun MessageBubble(
                             MarkdownText(
                                 text = message.content + if (isStreaming) "▌" else "",
                                 baseColor = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 16f,
                                 modifier = Modifier.fillMaxWidth(),
                                 codeTheme = codeTheme,
                                 codeFontScale = codeFontScale,
@@ -309,7 +310,7 @@ fun MessageBubble(
                         SelectionContainer {
                             Text(
                                 text = message.content + if (isStreaming) "▌" else "",
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.bodyLarge,
                                 color = Color.White
                             )
                         }

@@ -137,7 +137,7 @@ fun ChatInputBar(
             .navigationBarsPadding()
             .padding(start = 10.dp, end = 10.dp, top = 5.dp, bottom = 0.dp)
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
             // Image previews
             if (attachedImages.isNotEmpty()) {
                 LazyRow(
@@ -352,7 +352,7 @@ fun ChatInputBar(
                             IconButton(
                                 onClick = onAttachDocument,
                                 enabled = !inputLocked,
-                                modifier = Modifier.size(48.dp).semantics {
+                                modifier = Modifier.size(40.dp).semantics {
                                     attachedStateDesc?.let { stateDescription = it }
                                 },
                             ) {
@@ -377,6 +377,7 @@ fun ChatInputBar(
                     },
                     modifier = Modifier
                         .weight(1f)
+                        .heightIn(min = 44.dp)
                         .onFocusChanged { inputFocused = it.isFocused }
                         .onKeyEvent { event ->
                             val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip
@@ -549,7 +550,7 @@ private fun AttachMenuButton(
         IconButton(
             onClick = { expanded = !expanded },
             enabled = enabled,
-            modifier = Modifier.size(48.dp),
+            modifier = Modifier.size(40.dp),
         ) {
             Icon(
                 Icons.Filled.Add,
