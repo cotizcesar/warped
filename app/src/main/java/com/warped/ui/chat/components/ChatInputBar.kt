@@ -539,6 +539,7 @@ fun ChatInputBar(
                         Icon(Icons.Filled.Close, stringResource(R.string.voice_msg_cancel),
                             tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(24.dp))
                     }
+                    Spacer(Modifier.width(12.dp))
                     Text(
                         "%d:%02d".format(voiceElapsedSec / 60, voiceElapsedSec % 60),
                         style = MaterialTheme.typography.labelLarge.copy(
@@ -546,7 +547,7 @@ fun ChatInputBar(
                         ),
                         color = recColor
                     )
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(12.dp))
                     LinearProgressIndicator(
                         progress = { (voiceAmplitude / 32767f).coerceIn(0f, 1f) },
                         modifier = Modifier.weight(1f),
