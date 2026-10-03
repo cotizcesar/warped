@@ -13,7 +13,7 @@ android {
 
     val versionMajor = 3
     val versionMinor = 1
-    val versionPatch = 0
+    val versionPatch = 1
     val baseVersionCode = versionMajor * 10000 + versionMinor * 100 + versionPatch // 30100
 
     // CI build number from GitHub Actions (always increments per workflow run)
