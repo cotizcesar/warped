@@ -450,21 +450,28 @@ fun ChatScreen(
     // Phase 69 Plan 01 (VMSG-04/08): gate-driven voice explainer. Gated
     // taps never dead-end: text-only links to the model catalog, remote
     // links to the Help voice section (Plan 03 wiring below).
+    // Lint-safe: strings resolved via stringResource in composition —
+    // context.getString() inside the launched coroutine trips
+    // LocalContextGetResourceValueCall.
+    val gateAudioMsg = stringResource(R.string.voice_msg_gate_audio)
+    val gateViewModelsMsg = stringResource(R.string.voice_msg_view_models)
+    val gateRemoteMsg = stringResource(R.string.voice_msg_gate_remote)
+    val gateLearnMoreMsg = stringResource(R.string.voice_msg_learn_more)
     val showVoiceGateExplainer: (GateState) -> Unit = { gate ->
         scope.launch {
             when (gate) {
                 GateState.GatedTextOnly -> {
                     val result = snackbarHostState.showSnackbar(
-                        message = context.getString(R.string.voice_msg_gate_audio),
-                        actionLabel = context.getString(R.string.voice_msg_view_models),
+                        message = gateAudioMsg,
+                        actionLabel = gateViewModelsMsg,
                         duration = SnackbarDuration.Long,
                     )
                     if (result == SnackbarResult.ActionPerformed) onNavigateToCatalog()
                 }
                 GateState.GatedRemote -> {
                     val result = snackbarHostState.showSnackbar(
-                        message = context.getString(R.string.voice_msg_gate_remote),
-                        actionLabel = context.getString(R.string.voice_msg_learn_more),
+                        message = gateRemoteMsg,
+                        actionLabel = gateLearnMoreMsg,
                         duration = SnackbarDuration.Long,
                     )
                     // Phase 69 Plan 03 (VMSG-03): the secondary explainer
