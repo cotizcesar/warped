@@ -53,6 +53,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import com.warped.R
 import timber.log.Timber
 import java.io.ByteArrayOutputStream
@@ -3613,6 +3614,43 @@ class ChatViewModel @Inject constructor(
      * only. Failures keep the selection (pending) so retrying just works.
      */
     private suspend fun preloadLocalModel(filePath: String) {
+        // 2026-10-04 mount dedup: pick+immediate-send (and open+send)
+        // otherwise stack two concurrent native inits for the same file.
+        // The second caller JOINS the in-flight one (bounded wait) and
+        // returns — the send's post-check below verifies the engine, so
+        // a still-missing engine surfaces the normal load-failed path
+        // instead of hanging. Never blocks the UI thread (all callers
+        // are off-main) and never waits forever (timeout).
+        if (!mountsInFlight.add(filePath)) {
+            withTimeoutOrNull(MOUNT_JOIN_TIMEOUT_MS) {
+                while (mountsInFlight.contains(filePath)) {
+                    kotlinx.coroutines.delay(100)
+                }
+            }
+            return
+        }
+        try {
+            mountBody(filePath)
+        } finally {
+            mountsInFlight.remove(filePath)
+        }
+    }
+
+    /**
+     * Paths with a mount currently running. Send/pick/open/retry all
+     * funnel through [preloadLocalModel], which joins instead of
+     * stacking duplicates. Main-confined in practice (all launches are
+     * viewModelScope); synchronized set for the cross-thread reads.
+     */
+    private val mountsInFlight =
+        java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+    /** Bounded join window for a duplicate mount (slow mounts keep their lane). */
+    private companion object {
+        const val MOUNT_JOIN_TIMEOUT_MS = 30_000L
+    }
+
+    private suspend fun mountBody(filePath: String) {
         val model = _connection.value.localModels.firstOrNull { it.filePath == filePath }
         if (model != null && !memoryChecker.canLoadModel(model.sizeBytes)) {
             val memInfo = memoryChecker.getMemoryInfo()

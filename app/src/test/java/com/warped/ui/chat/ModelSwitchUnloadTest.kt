@@ -342,12 +342,12 @@ class ModelSwitchUnloadTest {
         fixture.vm.launchModelSelection(path, ProviderType.LITE_RT_LM)
         advanceUntilIdle()
         fixture.vm.sendMessage("hello")
-        // The throw hops off Dispatchers.Default (a real thread under
-        // runTest) — interleave scheduler pumping with real waits until
-        // the failure lands (virtual-only delays starve real threads
-        // under parallel load).
-        val deadline = System.currentTimeMillis() + 5000
-        while (fixture.vm.connectionState.value.modelLoadError == null &&
+        // Mount dedup (pick+send share one init): wait until no mount
+        // is running AND the failure is reported — the send-triggered
+        // duplicate used to interleave here and flake the flags.
+        var deadline = System.currentTimeMillis() + 5000
+        while ((fixture.vm.connectionState.value.isLoadingModel ||
+            fixture.vm.connectionState.value.modelLoadError == null) &&
             System.currentTimeMillis() < deadline
         ) {
             advanceUntilIdle()
