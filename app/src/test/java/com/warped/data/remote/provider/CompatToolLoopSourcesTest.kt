@@ -198,4 +198,93 @@ class CompatToolLoopSourcesTest {
         assertThat(LocalToolLoop.searchImages(outcome))
             .containsExactly("https://r.example/grid1.png")
     }
+
+    /**
+     * Transient-rejection tolerance (device evidence 2026-10-03): a lone
+     * 400 naming tools is retried armed once before concluding
+     * incapability — the server accepts the identical body right after.
+     */
+    private fun startFlakyServer(firstCode: Int, firstBody: String, restBody: String) {
+        startFlakyServer(listOf(firstCode to firstBody), restBody)
+    }
+
+    /**
+     * Scripted rounds: each hit consumes the next (code, body); hits past
+     * the script replay the last entry. Lets the double-400 test fail the
+     * armed attempt AND the armed retry, then answer the model-only
+     * fallback cleanly.
+     */
+    private fun startFlakyServer(script: List<Pair<Int, String>>, restBody: String) {
+        val hits = java.util.concurrent.atomic.AtomicInteger(0)
+        server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/chat") { exchange ->
+            val n = hits.incrementAndGet()
+            val (code, body) = script.getOrElse(n - 1) { 200 to restBody }
+            val bytes = body.toByteArray()
+            exchange.sendResponseHeaders(code, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+        }
+        server.start()
+        postUrl = "http://127.0.0.1:${server.address.port}/chat"
+    }
+
+    private suspend fun runTurnTokens(): List<StreamToken> {
+        val request = ChatRequest(
+            messages = listOf(ChatMessage(role = Role.USER, content = "q")),
+        )
+        return kotlinx.coroutines.flow.flow<StreamToken> {
+            with(CompatToolLoop) {
+                runTurn(
+                    client = client,
+                    json = json,
+                    postUrl = postUrl,
+                    modelId = "test-model",
+                    baseMessages = listOf(OpenAiMessage(role = "user", content = "q")),
+                    request = request,
+                    ddg = ddg,
+                    multiUrlFetcher = multiUrlFetcher,
+                    webPageFetcher = webPageFetcher,
+                    logTag = "Test",
+                    onCallCreated = {},
+                    onCallCleared = {},
+                )
+            }
+        }.toList()
+    }
+
+    @Test
+    fun `transient tools four hundred retries armed without notice`() = runTest {
+        startFlakyServer(
+            firstCode = 400,
+            firstBody = """{"error":{"message":"tool call failed transiently","type":"invalid_request_error"}}""",
+            restBody = """{"choices":[{"message":{"content":"recovered answer"}}]}""",
+        )
+
+        val tokens = runTurnTokens()
+
+        assertThat(tokens.filterIsInstance<StreamToken.ToolsUnsupported>()).isEmpty()
+        assertThat(tokens.filterIsInstance<StreamToken.Delta>().map { it.content })
+            .contains("recovered answer")
+        assertThat(tokens.last()).isInstanceOf(StreamToken.Done::class.java)
+    }
+
+    @Test
+    fun `double tools four hundred falls back with exactly one notice`() = runTest {
+        val rejection = """{"error":{"message":"model does not support tool use","type":"invalid_request_error"}}"""
+        startFlakyServer(
+            script = listOf(
+                400 to rejection,
+                400 to rejection,
+            ),
+            restBody = """{"choices":[{"message":{"content":"model-only answer"}}]}""",
+        )
+
+        val tokens = runTurnTokens()
+
+        // Armed retry + model-only fallback both run to completion.
+        assertThat(tokens.filterIsInstance<StreamToken.ToolsUnsupported>()).hasSize(1)
+        assertThat(tokens.filterIsInstance<StreamToken.Delta>().map { it.content })
+            .contains("model-only answer")
+        assertThat(tokens.last()).isInstanceOf(StreamToken.Done::class.java)
+    }
 }

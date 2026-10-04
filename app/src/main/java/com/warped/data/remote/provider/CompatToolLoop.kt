@@ -95,6 +95,7 @@ internal object CompatToolLoop {
         var callsUsed = 0
         var capFed = false
         var fallbackDone = false
+        var armedRetried = false
         val contextSize = request.parameters.contextSize
         while (true) {
             coroutineContext.ensureActive()
@@ -108,6 +109,19 @@ internal object CompatToolLoop {
                 return
             }
             if (round.toolsRejected && attachedTools != null && !fallbackDone) {
+                // Transient tolerance (device evidence 2026-10-03: LM
+                // Studio 400s a tools round intermittently, then accepts
+                // the identical body): ONE identical armed retry while no
+                // tool call has executed yet (stateless + store=false, so
+                // side-effect free). A second rejection concludes
+                // incapability → the locked fallback below. Mid-loop
+                // rejections (callsUsed > 0) skip straight to fallback —
+                // those are echo-format issues, not transients.
+                if (callsUsed == 0 && !armedRetried) {
+                    armedRetried = true
+                    Timber.d("$logTag: tools round rejected once — one identical armed retry")
+                    continue
+                }
                 // Locked: exactly one retry of the same turn with tools
                 // null and a clean plain-message replay (partial echoes
                 // dropped — strict servers reject unpaired role:tool),
