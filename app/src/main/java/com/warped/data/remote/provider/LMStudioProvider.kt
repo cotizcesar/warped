@@ -544,6 +544,24 @@ class LMStudioProvider(
         }
     }
 
+    companion object {
+        /**
+         * Slug-aware loaded match: the endpoint id is often the short
+         * name (`gemma-4-12b-qat`) while the server keys the full slug
+         * (`google/gemma-4-12b-qat`). Exact match first, then slug-suffix
+         * on `/` boundaries (never substring: `other/bonsai-27b` must not
+         * match `prism-ml/bonsai-27b`). `@variant` suffixes are stripped
+         * on both sides. Pure — unit-tested.
+         */
+        fun isLoadedKeyMatch(loadedKey: String, modelPath: String): Boolean {
+            val base = loadedKey.substringBefore("@")
+            val want = modelPath.substringBefore("@")
+            if (base.equals(want, ignoreCase = true)) return true
+            return base.endsWith("/$want", ignoreCase = true) ||
+                want.endsWith("/$base", ignoreCase = true)
+        }
+    }
+
     suspend fun loadModel(modelKey: String): Result<String> {
         return try {
             val request = com.warped.data.remote.dto.LmStudioLoadRequest(model = modelKey)

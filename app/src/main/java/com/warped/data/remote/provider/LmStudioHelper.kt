@@ -87,8 +87,9 @@ class LmStudioHelper @Inject constructor(
     fun getInstanceId(): String? = activeInstanceId.get()
 
     /**
-     * True when the server reports [modelPath] loaded (exact key or
-     * selected-variant match against non-empty `loaded_instances`).
+     * True when the server reports [modelPath] loaded (exact key,
+     * selected-variant or slug-suffix match against non-empty
+     * `loaded_instances` — endpoint ids are often short names).
      * False (reload) on any error or empty set — a needless reload is
      * today's behavior, a wrong skip would chat against another model.
      */
@@ -96,7 +97,9 @@ class LmStudioHelper @Inject constructor(
         provider: LMStudioProvider,
         modelPath: String,
     ): Boolean = try {
-        provider.listLoadedModelKeys().getOrNull()?.contains(modelPath) == true
+        provider.listLoadedModelKeys().getOrNull()?.any { key ->
+            LMStudioProvider.isLoadedKeyMatch(key, modelPath)
+        } == true
     } catch (e: Exception) {
         Timber.w(e, "LmStudioHelper: loaded-list check failed, reloading")
         false

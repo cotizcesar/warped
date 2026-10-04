@@ -133,4 +133,35 @@ class LmStudioLoadSkipTest {
             srv.stop(0)
         }
     }
+
+    @Test
+    fun `second initialize with short id skips when full slug loaded`() = runBlocking {
+        val h = helper(startServer())
+
+        h.initialize("m1")
+        loadedKeys = listOf("org/m1")
+        h.initialize("m1")
+
+        assertThat(loadCount.get()).isEqualTo(1)
+    }
+
+    @Test
+    fun `short endpoint id matches full server slug`() {
+        // User report 2026-10-03: endpoint id "gemma-4-12b-qat" vs server
+        // key "google/gemma-4-12b-qat" — exact match missed and every
+        // chat reloaded (and OOM-killed) the model.
+        assertThat(LMStudioProvider.isLoadedKeyMatch("google/gemma-4-12b-qat", "gemma-4-12b-qat")).isTrue()
+        assertThat(LMStudioProvider.isLoadedKeyMatch("google/gemma-4-12b-qat", "google/gemma-4-12b-qat")).isTrue()
+        assertThat(
+            LMStudioProvider.isLoadedKeyMatch(
+                "google/gemma-4-12b-qat@q4_0",
+                "gemma-4-12b-qat"
+            )
+        ).isTrue()
+        // Slug-boundary safety: same tail, different org must not match.
+        assertThat(
+            LMStudioProvider.isLoadedKeyMatch("other-org/bonsai-27b", "prism-ml/bonsai-27b")
+        ).isFalse()
+        assertThat(LMStudioProvider.isLoadedKeyMatch("google/gemma-4-12b-qat", "qwen3-4b")).isFalse()
+    }
 }
