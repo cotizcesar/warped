@@ -118,6 +118,7 @@ class LMStudioProvider(
                 request.messages,
                 includeSystem = false,
                 sanitizeUser = inputSanitizer::sanitize,
+                currentImages = request.images,
             )
             val ddgRepo = ddg
             val fetchAll = multiUrlFetcher

@@ -71,8 +71,18 @@ internal fun mapOpenAiHistory(
     messages: List<ChatMessage>,
     includeSystem: Boolean,
     sanitizeUser: (String) -> String,
+    /**
+     * Current-turn image data URLs. History carry ([selectKeptUrls])
+     * deliberately excludes the last message, and no caller fuses the
+     * live turn — so without this, every compat image turn silently
+     * dropped the attached photo (user report 2026-10-03: "no has
+     * adjuntado ninguna imagen"). Fused onto the last USER row,
+     * distinct with history URLs.
+     */
+    currentImages: List<String> = emptyList(),
 ): List<OpenAiMessage> {
     val kept = HistoryImageCarry.selectKeptUrls(messages)
+    val lastIndex = messages.lastIndex
     return messages.mapIndexedNotNull { index, msg ->
         if ((!includeSystem && msg.role == Role.SYSTEM) || msg.content.isBlank()) {
             return@mapIndexedNotNull null
@@ -82,10 +92,13 @@ internal fun mapOpenAiHistory(
             OpenAiMessage(role = role, content = text)
         } else {
             val content = if (msg.role == Role.USER) sanitizeUser(msg.content) else msg.content
+            val extra = if (index == lastIndex && msg.role == Role.USER) {
+                currentImages.filter { it.isNotBlank() }
+            } else emptyList()
             OpenAiMessage(
                 role = msg.role.name.lowercase(),
                 content = content,
-                imageUrls = kept[index],
+                imageUrls = (kept[index].orEmpty() + extra).distinct().takeIf { it.isNotEmpty() },
             )
         }
     }

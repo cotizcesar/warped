@@ -502,7 +502,7 @@ class ChatViewModel @Inject constructor(
         }
         viewModelScope.launch(coroutineExceptionHandler) {
             advancedPreferences.thinkingEnabled.collect { enabled ->
-                updateInput { it.copy(enableThinking = enabled) }
+                updateInput { it.copy(enableThinking = enabled, reasoningEnabled = enabled) }
             }
         }
         viewModelScope.launch(coroutineExceptionHandler) {
@@ -3170,8 +3170,10 @@ class ChatViewModel @Inject constructor(
         updateConnection { it.copy(generationParameters = params) }
     }
 
+    /** @deprecated Use [toggleThinking]: the header toggle is the single thinking switch. */
+    @Deprecated("Use toggleThinking", ReplaceWith("toggleThinking()"))
     fun toggleReasoning() {
-        updateInput { it.copy(reasoningEnabled = !it.reasoningEnabled) }
+        toggleThinking()
     }
 
     /**
@@ -3212,7 +3214,13 @@ class ChatViewModel @Inject constructor(
      * state value is updated by the AdvancedPreferences collector in init().
      */
     fun toggleThinking() {
+        // Single source of truth: the header toggle drives BOTH the
+        // persisted enableThinking (local helper init) and the live
+        // reasoningEnabled that travels in every ChatRequest (providers
+        // + think-panel parsing). A split-brain here sent thinking
+        // params with the toggle off (user report 2026-10-03).
         val next = !_input.value.enableThinking
+        updateInput { it.copy(enableThinking = next, reasoningEnabled = next) }
         viewModelScope.launch(coroutineExceptionHandler) {
             advancedPreferences.setThinkingEnabled(next)
         }

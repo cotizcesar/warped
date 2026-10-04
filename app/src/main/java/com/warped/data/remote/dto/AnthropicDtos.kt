@@ -134,6 +134,41 @@ data class AnthropicMessage(
             AnthropicMessage(role, JsonPrimitive(text))
 
         /**
+         * User turn carrying current-turn images as native `image` blocks
+         * (`{type:image, source:{type:base64, media_type, data}}` per the
+         * Anthropic-compat docs). Media type comes from the data-URL
+         * prefix (default `image/jpeg`); blanks and prefix-less payloads
+         * are dropped so the turn keeps its exact text shape.
+         */
+        fun userWithImages(text: String, dataUrls: List<String>): AnthropicMessage {
+            val blocks = buildJsonArray {
+                if (text.isNotEmpty()) {
+                    add(buildJsonObject {
+                        put("type", "text")
+                        put("text", text)
+                    })
+                }
+                dataUrls.forEach { url ->
+                    val mediaType = url.substringAfter("data:", "")
+                        .substringBefore(";").takeIf { it.contains("/") }
+                        ?: "image/jpeg"
+                    val data = url.substringAfter(",", "")
+                    if (data.isNotBlank()) {
+                        add(buildJsonObject {
+                            put("type", "image")
+                            putJsonObject("source") {
+                                put("type", "base64")
+                                put("media_type", mediaType)
+                                put("data", data)
+                            }
+                        })
+                    }
+                }
+            }
+            return AnthropicMessage("user", blocks)
+        }
+
+        /**
          * Assistant echo carrying the completed `tool_use` blocks for one
          * round ([PendingToolCall.id]/name plus the complete reassembled
          * input object). In-memory loop echo only — never persisted.

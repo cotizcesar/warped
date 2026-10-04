@@ -25,6 +25,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
@@ -319,5 +320,69 @@ class CompatToolLoopSourcesTest {
         // could pin.
         val seed = parsed["seed"]
         assertThat(seed == null || seed is kotlinx.serialization.json.JsonNull).isTrue()
+    }
+
+    @Test
+    fun `compat rounds carry the current-turn image as image_url`() = runTest {
+        var capturedBody = ""
+        server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/chat") { exchange ->
+            capturedBody = exchange.requestBody.readAllBytes().toString(Charsets.UTF_8)
+            val body = """{"choices":[{"message":{"content":"veo una foto"}}]}""".toByteArray()
+            exchange.sendResponseHeaders(200, body.size.toLong())
+            exchange.responseBody.use { it.write(body) }
+        }
+        server.start()
+        postUrl = "http://127.0.0.1:${server.address.port}/chat"
+
+        // History carry (last message excluded) + live turn images, like
+        // the LM Studio armed branch builds them.
+        val history = com.warped.domain.model.ChatMessage(
+            role = com.warped.domain.model.Role.USER,
+            content = "old",
+        )
+        val live = com.warped.domain.model.ChatMessage(
+            role = com.warped.domain.model.Role.USER,
+            content = "describe esta imagen.",
+        )
+        val base = mapOpenAiHistory(
+            listOf(history, live),
+            includeSystem = false,
+            sanitizeUser = { it },
+            currentImages = listOf("data:image/png;base64,QUJD"),
+        )
+        val request = ChatRequest(
+            messages = listOf(history, live),
+        )
+        kotlinx.coroutines.flow.flow<StreamToken> {
+            with(CompatToolLoop) {
+                runTurn(
+                    client = client,
+                    json = json,
+                    postUrl = postUrl,
+                    modelId = "test-model",
+                    baseMessages = base,
+                    request = request,
+                    ddg = ddg,
+                    multiUrlFetcher = multiUrlFetcher,
+                    webPageFetcher = webPageFetcher,
+                    logTag = "Test",
+                    onCallCreated = {},
+                    onCallCleared = {},
+                )
+            }
+        }.toList()
+
+        val parsed = kotlinx.serialization.json.Json.parseToJsonElement(capturedBody).jsonObject
+        val messages = parsed["messages"]!!.jsonArray
+        val last = messages.last().jsonObject
+        val parts = last["content"]!!.jsonArray
+        val images = parts.filter {
+            it.jsonObject["type"]?.jsonPrimitive?.content == "image_url"
+        }
+        assertThat(images).hasSize(1)
+        assertThat(
+            images.single().jsonObject["image_url"]!!.jsonObject["url"]?.jsonPrimitive?.content
+        ).isEqualTo("data:image/png;base64,QUJD")
     }
 }
