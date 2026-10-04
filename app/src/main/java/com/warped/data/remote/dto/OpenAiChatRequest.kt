@@ -40,6 +40,8 @@ data class OpenAiChatRequest(
     @EncodeDefault(EncodeDefault.Mode.ALWAYS) val stream: Boolean = true,
     val temperature: Float? = null,
     @SerialName("top_p") val topP: Float? = null,
+    @SerialName("top_k") val topK: Int? = null,
+    @SerialName("repeat_penalty") val repeatPenalty: Float? = null,
     @SerialName("max_tokens") val maxTokens: Int? = null,
     val stop: List<String>? = null,
     val seed: Int? = null,

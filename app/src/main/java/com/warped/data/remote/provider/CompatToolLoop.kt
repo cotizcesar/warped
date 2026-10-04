@@ -356,13 +356,21 @@ internal object CompatToolLoop {
         onCallCleared: () -> Unit,
     ): CompatRoundResult {
         coroutineContext.ensureActive()
+        // Docs-supported sampling params ride every round (top_k,
+        // repeat_penalty and seed were silently dropped here while the
+        // native path sent them — inconsistent sampling across paths).
+        // Seed -1 (random) encodes as absent; maxTokens<=0 is omitted
+        // rather than risking a server 400.
         val body = OpenAiChatRequest(
             model = modelId,
             messages = messages,
             stream = true,
             temperature = request.parameters.temperature,
             topP = request.parameters.topP,
-            maxTokens = request.parameters.maxTokens,
+            topK = request.parameters.topK,
+            repeatPenalty = request.parameters.repeatPenalty,
+            maxTokens = request.parameters.maxTokens.takeIf { it > 0 },
+            seed = request.parameters.seed.takeIf { it != -1 },
             tools = tools,
         )
         val call: Call

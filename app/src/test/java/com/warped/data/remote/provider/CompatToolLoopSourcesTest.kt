@@ -23,6 +23,10 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.double
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -286,5 +290,34 @@ class CompatToolLoopSourcesTest {
         assertThat(tokens.filterIsInstance<StreamToken.Delta>().map { it.content })
             .contains("model-only answer")
         assertThat(tokens.last()).isInstanceOf(StreamToken.Done::class.java)
+    }
+
+    @Test
+    fun `compat rounds carry full sampling params`() = runTest {
+        var capturedBody = ""
+        server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/chat") { exchange ->
+            capturedBody = exchange.requestBody.readAllBytes().toString(Charsets.UTF_8)
+            val body = """{"choices":[{"message":{"content":"ok"}}]}""".toByteArray()
+            exchange.sendResponseHeaders(200, body.size.toLong())
+            exchange.responseBody.use { it.write(body) }
+        }
+        server.start()
+        postUrl = "http://127.0.0.1:${server.address.port}/chat"
+
+        runTurnTokens()
+
+        // Docs-supported sampling (top_k, repeat_penalty, seed) must ride
+        // the compat rounds like the native path — silent drops here
+        // meant inconsistent sampling across paths.
+        val parsed = kotlinx.serialization.json.Json.parseToJsonElement(capturedBody).jsonObject
+        assertThat(parsed["top_k"]?.jsonPrimitive?.int).isEqualTo(40)
+        assertThat(parsed["repeat_penalty"]?.jsonPrimitive?.double ?: -1.0)
+            .isWithin(0.001).of(1.1)
+        assertThat(parsed["max_tokens"]?.jsonPrimitive?.int).isEqualTo(2048)
+        // Seed -1 (random) encodes null, never a literal -1 the server
+        // could pin.
+        val seed = parsed["seed"]
+        assertThat(seed == null || seed is kotlinx.serialization.json.JsonNull).isTrue()
     }
 }
