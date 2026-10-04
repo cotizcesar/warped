@@ -139,8 +139,11 @@ fun ChatInputBar(
     Surface(
         color = Color(0xFF2B2B29),
         shape = MaterialTheme.shapes.extraLarge,
-        shadowElevation = 8.dp,
-        tonalElevation = 2.dp,
+        // Halo shadow hugging the rounded bar (user decision 2026-10-03):
+        // small elevation so the blur reads around the pill, never as a
+        // slab floating above it.
+        shadowElevation = 2.dp,
+        tonalElevation = 0.dp,
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 10.dp, end = 10.dp, top = 5.dp, bottom = 6.dp)
