@@ -2496,6 +2496,14 @@ class ChatViewModel @Inject constructor(
         // WR-02: invalidate any trailing callbacks from the previous
         // session alongside the reset.
         transcriptSession.incrementAndGet()
+        // 2026-10-04 race fix: the new live session must invalidate
+        // in-flight duration validations SYNCHRONOUSLY here on the
+        // caller thread — the transcript STT start inside the IO block
+        // below is slow, and a stop racing it used to capture the old
+        // session, then get stood down by the late bump landing
+        // mid-validation (kept clip never materialized, Turbine timeout
+        // in tests, lost draft for users).
+        voiceClipSession++
         transcriptFinalized = ""
         _voiceTranscriptLive.value = ""
         transcriptUnavailable = false
@@ -2578,9 +2586,8 @@ class ChatViewModel @Inject constructor(
                     Timber.w(e, "VoiceMsg: transcript STT start failed")
                     transcriptUnavailable = true
                 }
-                // WR-03: a new live session invalidates any in-flight
-                // duration validation from the previous stop.
-                voiceClipSession++
+                // (Session invalidation already happened synchronously
+                // at startVoiceRecording entry — see above.)
                 voiceSessionJob?.cancel()
                 voiceSessionJob = viewModelScope.launch(coroutineExceptionHandler) {
                     // WR-03: the 100 ms amplitude sampler is binder IPC —
