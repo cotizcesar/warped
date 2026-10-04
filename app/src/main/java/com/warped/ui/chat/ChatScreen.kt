@@ -661,7 +661,7 @@ fun ChatScreen(
                                 start = 16.dp,
                                 end = 16.dp,
                                 top = 8.dp,
-                                bottom = with(density) { overlayHeightPx.toDp() } + 12.dp
+                                bottom = with(density) { overlayHeightPx.toDp() } + 4.dp
                             ),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
@@ -761,7 +761,7 @@ fun ChatScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(64.dp)
+                            .height(40.dp)
                             .background(
                                 Brush.verticalGradient(
                                     colors = listOf(
