@@ -36,6 +36,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaType
@@ -549,7 +550,19 @@ class LMStudioProvider(
             if (response.isSuccessful) {
                 Result.success(response.body()?.instanceId ?: modelKey)
             } else {
-                Result.failure(Exception("Load failed: HTTP ${response.code()}"))
+                // Surface the server's reason (e.g. CUDA OOM,
+                // model_load_failed) — a bare HTTP code leaves the user
+                // guessing why the load died.
+                val detail = try {
+                    val raw = response.errorBody()?.string().orEmpty()
+                    val msg = json.parseToJsonElement(raw).jsonObject["error"]
+                        ?.jsonObject?.get("message")?.jsonPrimitive?.content
+                    msg?.takeIf { it.isNotBlank() } ?: raw.take(200).ifBlank { null }
+                } catch (_: Exception) {
+                    null
+                }
+                val suffix = detail?.let { ": $it" } ?: ""
+                Result.failure(Exception("Load failed: HTTP ${response.code()}$suffix"))
             }
         } catch (e: Exception) {
             Result.failure(e)

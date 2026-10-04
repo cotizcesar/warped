@@ -105,4 +105,32 @@ class LmStudioLoadSkipTest {
 
         assertThat(loadCount.get()).isEqualTo(2)
     }
+
+    @Test
+    fun `failed load surfaces the server reason not just the code`() = runBlocking {
+        val srv = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        srv.createContext("/api/v1/models/load", HttpHandler { exchange ->
+            exchange.requestBody.readAllBytes()
+            val body = """{"error":{"type":"model_load_failed","message":"error loading model: unable to allocate CUDA0 buffer"}}""".toByteArray()
+            exchange.sendResponseHeaders(500, body.size.toLong())
+            exchange.responseBody.use { it.write(body) }
+        })
+        srv.executor = Executors.newCachedThreadPool { r -> Thread(r).also { it.isDaemon = true } }
+        srv.start()
+        try {
+            val provider = LMStudioProvider(
+                baseUrl = "http://127.0.0.1:${srv.address.port}",
+                modelId = "m1",
+                apiKey = null,
+                inputSanitizer = com.warped.data.local.inference.InputSanitizer(),
+            )
+
+            val result = provider.loadModel("m1")
+
+            assertThat(result.isFailure).isTrue()
+            assertThat(result.exceptionOrNull()?.message).contains("unable to allocate CUDA0 buffer")
+        } finally {
+            srv.stop(0)
+        }
+    }
 }
