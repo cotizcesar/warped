@@ -67,7 +67,12 @@ data class OpenAiChatRequest(
  */
 @Serializable
 data class OpenAiTool(
-    val type: String = "function",
+    /**
+     * ALWAYS-encoded: kotlinx omits defaulted values, and LM Studio
+     * validates the literal (`invalid_literal, expected "function"` on
+     * absence → every armed turn 400d, device-proven 2026-10-03).
+     */
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val type: String = "function",
     val function: OpenAiFunctionDef,
 )
 
