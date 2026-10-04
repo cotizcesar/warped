@@ -69,7 +69,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.R
-import com.warped.ui.components.BrainIcon
 import com.warped.data.local.inference.BackendType
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.Role
@@ -1182,7 +1181,7 @@ private fun InlineModelSelectorBar(
                             modifier = Modifier.size(40.dp),
                         ) {
                             Icon(
-                                BrainIcon,
+                                painterResource(id = R.drawable.neurology_24),
                                 contentDescription = stringResource(R.string.cd_toggle_thinking),
                                 tint = if (thinkingEnabled) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),

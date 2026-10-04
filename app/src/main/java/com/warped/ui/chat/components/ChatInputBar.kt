@@ -10,15 +10,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
@@ -49,6 +44,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.IntOffset
@@ -358,7 +354,7 @@ fun ChatInputBar(
                             },
                         ) {
                             Icon(
-                                Icons.Filled.AttachFile,
+                                painterResource(id = R.drawable.post_add_24),
                                 stringResource(
                                     if (attachedDocName != null) R.string.doc_reader_replace
                                     else R.string.doc_reader_attach
@@ -475,7 +471,7 @@ fun ChatInputBar(
                             Icon(Icons.Filled.Stop, stringResource(R.string.cd_stop_listening),
                                 tint = Color.White, modifier = Modifier.size(24.dp))
                         } else {
-                            Icon(Icons.Filled.Mic, stringResource(R.string.cd_dictate),
+                            Icon(painterResource(id = R.drawable.speech_to_text_24), stringResource(R.string.cd_dictate),
                                 tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
                         }
                     }
@@ -534,7 +530,7 @@ fun ChatInputBar(
                                 containerColor = if (isVoiceRecording) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent
                             )
                         ) {
-                            Icon(Icons.Filled.GraphicEq, stringResource(R.string.voice_msg_record),
+                            Icon(painterResource(id = R.drawable.mic_24), stringResource(R.string.voice_msg_record),
                                 tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
                         }
                         }
@@ -727,7 +723,7 @@ private fun AttachMenuButton(
             modifier = Modifier.size(40.dp),
         ) {
             Icon(
-                Icons.Filled.Add,
+                painterResource(id = R.drawable.add_24),
                 stringResource(R.string.attach_menu_content_desc),
                 tint = Color.White.copy(alpha = 0.6f),
                 modifier = Modifier.size(24.dp),
@@ -748,7 +744,7 @@ private fun AttachMenuButton(
                 ) {
                     Column(modifier = Modifier.padding(vertical = 8.dp)) {
                         AttachMenuRow(
-                            icon = Icons.Filled.AddPhotoAlternate,
+                            icon = painterResource(id = R.drawable.add_photo_alternate_24),
                             label = stringResource(R.string.attach_menu_photos),
                             description = stringResource(R.string.attach_menu_photos_desc),
                             onClick = {
@@ -757,7 +753,7 @@ private fun AttachMenuButton(
                             },
                         )
                         AttachMenuRow(
-                            icon = Icons.Filled.AttachFile,
+                            icon = painterResource(id = R.drawable.post_add_24),
                             label = stringResource(R.string.attach_menu_files),
                             description = stringResource(R.string.attach_menu_files_desc),
                             onClick = {
@@ -774,7 +770,7 @@ private fun AttachMenuButton(
 
 @Composable
 private fun AttachMenuRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: androidx.compose.ui.graphics.painter.Painter,
     label: String,
     description: String,
     onClick: () -> Unit,
