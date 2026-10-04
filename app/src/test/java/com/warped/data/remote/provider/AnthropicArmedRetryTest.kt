@@ -15,6 +15,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.jsonObject
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicInteger
 import com.sun.net.httpserver.HttpServer
@@ -126,5 +127,37 @@ class AnthropicArmedRetryTest {
         assertThat(tokens.filterIsInstance<StreamToken.Delta>().map { it.content })
             .contains("model-only")
         assertThat(tokens.last()).isInstanceOf(StreamToken.Done::class.java)
+    }
+
+    @Test
+    fun `reasoning off sends no thinking block`() = runTest {
+        var capturedBody = ""
+        server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server!!.createContext("/v1/messages") { exchange ->
+            capturedBody = exchange.requestBody.readAllBytes().toString(Charsets.UTF_8)
+            val body = answerEvents("ok").toByteArray()
+            exchange.sendResponseHeaders(200, body.size.toLong())
+            exchange.responseBody.use { it.write(body) }
+        }
+        server!!.start()
+        postUrl = "http://127.0.0.1:${server!!.address.port}"
+        val prefs = mockk<AdvancedPreferences>()
+        every { prefs.webGroundingEnabled } returns flowOf(false)
+        val provider = AnthropicProvider(
+            baseUrl = postUrl,
+            modelId = "test-model",
+            apiKey = null,
+            inputSanitizer = InputSanitizer(),
+            advancedPreferences = prefs,
+        )
+
+        val request = ChatRequest(
+            messages = listOf(ChatMessage(role = Role.USER, content = "q")),
+            parameters = com.warped.domain.model.GenerationParameters(reasoningEnabled = false),
+        )
+        provider.chat(request).toList()
+
+        val parsed = kotlinx.serialization.json.Json.parseToJsonElement(capturedBody).jsonObject
+        assertThat(parsed.containsKey("thinking")).isFalse()
     }
 }
