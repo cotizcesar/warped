@@ -298,13 +298,17 @@ private fun CatalogModelCard(
     onDeleteDownloaded: () -> Unit = {},
 ) {
     // A "Cancelled" error is terminal-idle: the partial file is deleted and a
-    // fresh Download restarts cleanly.
-    val active = downloadState != null &&
-        (downloadState.isDownloading || downloadState.isPaused) &&
-        downloadState.error != "Cancelled"
+    // fresh Download restarts cleanly. Non-null takeIfs below (instead of
+    // `active && downloadState != null` chains) so nullability is proven
+    // once at the source — no redundant checks downstream.
+    val activeDownload: DownloadState? = downloadState?.takeIf {
+        (it.isDownloading || it.isPaused) && it.error != "Cancelled"
+    }
+    val active = activeDownload != null
     val downloaded = isEffectivelyDownloaded(downloadState, isOnDevice)
     val failed = !active && !downloaded &&
         downloadState?.error != null && downloadState.error != "Cancelled"
+    val failureError: String? = downloadState?.error?.takeIf { failed && it != "Cancelled" }
     var showCancelConfirm by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     val details = remember(entry) { expandedText(entry) }
@@ -405,10 +409,10 @@ private fun CatalogModelCard(
             // Active download: shared linear-bar + status-line + Cancel look.
             // Cancel goes through the cancel-confirm dialog — cancelling
             // deletes the partial file (see dialog copy).
-            if (active && downloadState != null) {
+            if (activeDownload != null) {
                 Spacer(Modifier.height(12.dp))
                 ActiveDownloadContent(
-                    download = downloadState,
+                    download = activeDownload,
                     onCancel = { showCancelConfirm = true },
                     onDeleteIncomplete = { showCancelConfirm = true },
                     onPause = onPause,
@@ -420,7 +424,7 @@ private fun CatalogModelCard(
         },
         // Retained error text (icon form keeps the message for a11y;
         // retry = download icon tap).
-        errorText = if (failed) downloadState?.error else null,
+        errorText = failureError,
         detailsContent = {
             // Blurb constrained to two lines, separated above and below so
             // it never blends into the header or the table. RAM guidance

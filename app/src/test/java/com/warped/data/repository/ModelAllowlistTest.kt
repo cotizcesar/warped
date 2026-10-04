@@ -195,7 +195,9 @@ class ModelAllowlistTest {
         // Locale-aware resolution (both directions, global state restored).
         val previousLocale = java.util.Locale.getDefault()
         try {
-            java.util.Locale.setDefault(java.util.Locale("es"))
+            java.util.Locale.setDefault(
+                java.util.Locale.Builder().setLanguage("es").build()
+            )
             assertThat(parakeet.localizedComingSoonNote())
                 .isEqualTo("Necesita reconocimiento de voz en el dispositivo.")
             java.util.Locale.setDefault(java.util.Locale.ENGLISH)

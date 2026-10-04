@@ -1,5 +1,10 @@
 name: CI
 
+# Cancel stale runs: only the latest push/PR state matters.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [main, beta]
@@ -8,7 +13,7 @@ on:
 
 jobs:
   build:
-    runs-on: [self-hosted, android]
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -43,23 +48,27 @@ jobs:
       - name: Assemble Debug
         run: ./gradlew assembleDebug
 
-      - name: Build Release APK (16KB gate artifact)
-        run: |
-          # Self-hosted runner persists /tmp across runs — stale keystore
-          # would fail genkeypair with "alias <ci> already exists".
-          rm -f /tmp/ci-release.jks
-          keytool -genkeypair -keystore /tmp/ci-release.jks -alias ci -keyalg RSA -keysize 2048 -validity 30 -storepass ci-release-pass -keypass ci-release-pass -dname "CN=CI, OU=CI, O=CI, C=US"
-          echo "RELEASE_STORE_FILE=/tmp/ci-release.jks" >> local.properties
-          echo "RELEASE_STORE_PASSWORD=ci-release-pass" >> local.properties
-          echo "RELEASE_KEY_ALIAS=ci" >> local.properties
-          echo "RELEASE_KEY_PASSWORD=ci-release-pass" >> local.properties
-          ./gradlew assembleRelease
+      # Heavy release-shape verification (R8 fullMode + 16KB gate)
+        # runs on pushes only — PRs get lint/tests/debug, which is what
+        # reviewers need in minutes. Pushes to beta/main still verify
+        # the exact shippable artifact before any release can trigger.
+        - name: Build Release APK (16KB gate artifact)
+          if: github.event_name == 'push'
+          run: |
+            rm -f /tmp/ci-release.jks
+            keytool -genkeypair -keystore /tmp/ci-release.jks -alias ci -keyalg RSA -keysize 2048 -validity 30 -storepass ci-release-pass -keypass ci-release-pass -dname "CN=CI, OU=CI, O=CI, C=US"
+            echo "RELEASE_STORE_FILE=/tmp/ci-release.jks" >> local.properties
+            echo "RELEASE_STORE_PASSWORD=ci-release-pass" >> local.properties
+            echo "RELEASE_KEY_ALIAS=ci" >> local.properties
+            echo "RELEASE_KEY_PASSWORD=ci-release-pass" >> local.properties
+            ./gradlew assembleRelease
 
       - name: Verify 16KB native alignment
+        if: github.event_name == 'push'
         run: ./scripts/check_elf_alignment.sh app/build/outputs/apk/release/app-release.apk
 
   security:
-    runs-on: [self-hosted, android]
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

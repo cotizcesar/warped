@@ -250,8 +250,9 @@ class VoiceMessageGuardTest {
 
             // Simulate the platform having written the clip file.
             clip = File(requireNotNull(handle.outputPath))
-            clip!!.parentFile?.mkdirs()
-            clip!!.writeText("fake-audio")
+            val clipFile = requireNotNull(clip)
+            clipFile.parentFile?.mkdirs()
+            clipFile.writeText("fake-audio")
 
             vm.stopVoiceRecording()
             assertThat(awaitItem()).isFalse()

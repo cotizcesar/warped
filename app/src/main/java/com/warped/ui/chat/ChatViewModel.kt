@@ -1011,8 +1011,8 @@ class ChatViewModel @Inject constructor(
                     )
                 }
                 val sentDocBlock: String? = sendableDocument?.block
-                if (sentDocBlock != null && sendableDocument != null) {
-                    requestUserText = DocumentPrompt.augmentWithDocument(requestUserText, sentDocBlock)
+                if (sendableDocument != null) {
+                    requestUserText = DocumentPrompt.augmentWithDocument(requestUserText, sendableDocument.block)
                     groundedSourceDetails = groundedSourceDetails + GroundedSource(
                         url = DOCUMENT_SOURCE_PREFIX + sendableDocument.filename,
                         extractedText = sendableDocument.text,
@@ -1069,7 +1069,7 @@ class ChatViewModel @Inject constructor(
                 // to the Thinking panel mid-stream only for models with
                 // observed in-band reasoning. R1 distills always think;
                 // the toggle governs display, never generation.
-                val modelThinks = modelId?.substringAfterLast("/")?.let { fileName ->
+                val modelThinks = modelId.substringAfterLast("/").let { fileName ->
                     try {
                         modelAllowlistRepository.findByModelFile(fileName)?.capabilities?.supportsThinking == true
                     } catch (e: Exception) {
@@ -1083,7 +1083,7 @@ class ChatViewModel @Inject constructor(
                 // directly when the question is simple — that text must
                 // stream in the bubble, reaching the panel only once
                 // think markers are actually seen.
-                val alwaysThinks = modelId?.substringAfterLast("/")?.let { fileName ->
+                val alwaysThinks = modelId.substringAfterLast("/").let { fileName ->
                     try {
                         val entryName = modelAllowlistRepository.findByModelFile(fileName)?.name ?: ""
                         modelThinks && hasReasoningMarker(entryName)
@@ -1906,7 +1906,7 @@ class ChatViewModel @Inject constructor(
         _attachedDocument.value = draft?.document
         val voice = draft?.voice
         val clip = voice?.let { java.io.File(it.path).takeIf { f -> f.exists() } }
-        if (clip != null && voice != null) {
+        if (voice != null && clip != null) {
             voiceClipFile = clip
             _draftDurationMs.value = voice.durationMs
             lastSentVoiceTranscript = voice.transcript

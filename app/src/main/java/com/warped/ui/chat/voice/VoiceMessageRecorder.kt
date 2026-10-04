@@ -2,6 +2,7 @@ package com.warped.ui.chat.voice
 
 import android.content.Context
 import android.media.MediaRecorder
+import android.os.Build
 import java.io.File
 import timber.log.Timber
 
@@ -41,8 +42,17 @@ interface RecorderHandle {
     fun release()
 }
 
-internal class RealRecorderFactory : RecorderFactory {
-    override fun create(): RecorderHandle = RealRecorderHandle(MediaRecorder())
+internal class RealRecorderFactory(private val context: Context) : RecorderFactory {
+    // 2026-10-04 warning fix: the no-arg MediaRecorder constructor is
+    // deprecated since API 31 — use the Context version there (minSdk 28
+    // keeps the legacy path below it).
+    override fun create(): RecorderHandle = RealRecorderHandle(
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) MediaRecorder(context)
+        else {
+            @Suppress("DEPRECATION")
+            MediaRecorder()
+        },
+    )
 }
 
 private class RealRecorderHandle(private val recorder: MediaRecorder) : RecorderHandle {
@@ -68,7 +78,7 @@ private class RealRecorderHandle(private val recorder: MediaRecorder) : Recorder
 class VoiceMessageRecorder(
     context: Context,
     private val outputDir: File,
-    private val factory: RecorderFactory = RealRecorderFactory(),
+    private val factory: RecorderFactory = RealRecorderFactory(context),
 ) {
     @Volatile
     var isRecording: Boolean = false

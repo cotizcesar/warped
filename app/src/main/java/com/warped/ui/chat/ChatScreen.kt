@@ -234,7 +234,8 @@ fun ChatScreen(
         val isLeftover = hasLeftChat &&
             input.inputText == (lastLeftText ?: "") &&
             attachedImages == lastLeftImages &&
-            audioBytes == lastLeftAudio
+            // Same array instance = untouched (referential on purpose).
+            audioBytes === lastLeftAudio
         if (draft == null && !isLeftover) {
             return@LaunchedEffect
         }

@@ -1,11 +1,11 @@
 package com.warped.ui.chat.voice
 
 import android.content.Context
+import android.media.AudioFocusRequest
 import android.media.AudioManager
 import com.google.common.truth.Truth.assertThat
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.slot
 import io.mockk.verify
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -76,17 +76,17 @@ class VoiceMessagePlayerTest {
         handles = mutableListOf()
         audioManager = mockk(relaxed = true)
         every {
-            audioManager.requestAudioFocus(
-                any(),
-                AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT,
-            )
+            audioManager.requestAudioFocus(any<AudioFocusRequest>())
         } returns AudioManager.AUDIOFOCUS_REQUEST_GRANTED
         context = mockk()
         every { context.getSystemService(Context.AUDIO_SERVICE) } returns audioManager
     }
 
-    private fun player() = VoiceMessagePlayer(context, factory)
+    private fun player() = VoiceMessagePlayer(context, factory).also {
+        // JVM unit tests cannot construct the framework AudioFocusRequest
+        // (android.jar stubs throw) — inject a mock like production DI would.
+        it.focusRequestOverride = mockk(relaxed = true)
+    }
 
     @Test
     fun `play starts the clip and reports playing`() {
@@ -175,7 +175,7 @@ class VoiceMessagePlayerTest {
         assertThat(handle.releases).isEqualTo(1)
         assertThat(player.isPlaying).isFalse()
         assertThat(player.hasClip).isFalse()
-        verify { audioManager.abandonAudioFocus(any()) }
+        verify { audioManager.abandonAudioFocusRequest(any()) }
     }
 
     @Test
@@ -203,7 +203,7 @@ class VoiceMessagePlayerTest {
         assertThat(player.hasClip).isFalse()
         // One handle released exactly once despite the double destroy.
         assertThat(handles.single().releases).isEqualTo(1)
-        verify(atLeast = 1) { audioManager.abandonAudioFocus(any()) }
+        verify(atLeast = 1) { audioManager.abandonAudioFocusRequest(any()) }
     }
 
     @Test
@@ -221,18 +221,10 @@ class VoiceMessagePlayerTest {
 
     @Test
     fun `audio-focus loss pauses playback`() {
-        val listenerSlot = slot<AudioManager.OnAudioFocusChangeListener>()
-        every {
-            audioManager.requestAudioFocus(
-                capture(listenerSlot),
-                AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT,
-            )
-        } returns AudioManager.AUDIOFOCUS_REQUEST_GRANTED
         val player = player()
         assertThat(player.play("/voice/a.m4a")).isTrue()
 
-        listenerSlot.captured.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS)
+        player.simulateAudioFocusLoss()
 
         assertThat(player.isPlaying).isFalse()
         assertThat(handles.single().pauses).isEqualTo(1)

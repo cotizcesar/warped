@@ -34,8 +34,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Warped.Splash"
         android:dataExtractionRules="@xml/data_extraction_rules"
-        tools:targetApi="31"
-        android:extractNativeLibs="false">
+        tools:targetApi="31">
 
         <!-- LiteRT-LM GPU backend support (LITE-08) -->
         <uses-native-library android:name="libvndksupport.so" android:required="false" />
