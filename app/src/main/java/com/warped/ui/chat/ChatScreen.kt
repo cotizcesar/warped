@@ -562,7 +562,10 @@ fun ChatScreen(
         transcript.streamingReasoning.length,
     ) {
         if (totalItems == 0) return@LaunchedEffect
-        if (snapToBottomOnNextContent || isAtBottom) {
+        // User decision 2026-10-03: while generating, the list always
+        // follows live (thinking and answer alike). At rest, the
+        // at-bottom rule + pill apply as before.
+        if (transcript.isStreaming || snapToBottomOnNextContent || isAtBottom) {
             snapToBottomOnNextContent = false
             hasNewContentBelow = false
             listState.pinLastItemEnd(totalItems - 1)
@@ -739,7 +742,7 @@ fun ChatScreen(
                             },
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
-                                .padding(end = 16.dp, bottom = with(density) { inputBarHeightPx.toDp() } + 20.dp)
+                                .padding(end = 16.dp, bottom = 12.dp)
                         )
                     }
             }
