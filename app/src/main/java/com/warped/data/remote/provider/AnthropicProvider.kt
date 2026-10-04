@@ -243,6 +243,7 @@ class AnthropicProvider(
         var callsUsed = 0
         var capFed = false
         var fallbackDone = false
+        var armedRetried = false
         val contextSize = request.parameters.contextSize
         while (true) {
             coroutineContext.ensureActive()
@@ -253,6 +254,16 @@ class AnthropicProvider(
                 return
             }
             if (round.toolsRejected && attachedTools != null && !fallbackDone) {
+                // Transient tolerance (CompatToolLoop parity, device
+                // evidence 2026-10-03): one identical armed retry while no
+                // tool call has executed yet. Mid-loop rejections go
+                // straight to fallback (echo-format issues, not
+                // transients).
+                if (callsUsed == 0 && !armedRetried) {
+                    armedRetried = true
+                    Timber.d("Anthropic: tools round rejected once — one identical armed retry")
+                    continue
+                }
                 // Locked: exactly one retry of the same turn without tools
                 // and a clean plain-message replay (partial echoes
                 // dropped), plus the visible notice through the
