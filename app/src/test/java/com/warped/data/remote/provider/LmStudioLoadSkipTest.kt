@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import com.google.common.truth.Truth.assertThat
 import com.sun.net.httpserver.HttpHandler
 import com.sun.net.httpserver.HttpServer
+import org.junit.jupiter.api.Tag
 
 /**
  * User report 2026-10-03: every question POSTed `/api/v1/models/load`,
@@ -25,6 +26,7 @@ import com.sun.net.httpserver.HttpServer
  * Loopback HttpServer fixtures (no new dependencies); runBlocking
  * (real socket IO is incompatible with runTest virtual time).
  */
+@Tag("slow")
 class LmStudioLoadSkipTest {
 
     private var server: HttpServer? = null

@@ -50,6 +50,7 @@ import java.util.Collections
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
+import org.junit.jupiter.api.Tag
 
 /**
  * 46-01 RUNTIME-14 tracer: true transport cancellation regression tests.
@@ -71,6 +72,7 @@ private fun testHelper(apiKeyStore: ApiKeyStore): LmStudioHelper =
         InputSanitizer(),
         apiKeyStore,
     )
+@Tag("slow")
 class LmStudioCancelTest {
 
     private var server: HttpServer? = null

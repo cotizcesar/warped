@@ -8,12 +8,14 @@ import org.junit.jupiter.api.Test
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicReference
 import com.sun.net.httpserver.HttpServer
+import org.junit.jupiter.api.Tag
 
 /**
  * Auth docs: LM Studio accepts `x-api-key` and `Authorization: Bearer`
  * (examples use Bearer on the native REST API). The provider sends both
  * when a key is configured so every endpoint authenticates.
  */
+@Tag("slow")
 class LmStudioAuthHeadersTest {
 
     private var server: HttpServer? = null

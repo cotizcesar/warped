@@ -33,6 +33,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.net.InetSocketAddress
+import org.junit.jupiter.api.Tag
 
 /**
  * Quick-task (agentic-rows): the shared compat loop surfaces per-call
@@ -44,6 +45,7 @@ import java.net.InetSocketAddress
  * final answer. The `web_search` executor is a mocked DDG repository with
  * known details.
  */
+@Tag("slow")
 class CompatToolLoopSourcesTest {
 
     private val ddg = mockk<DuckDuckGoSearchRepository>()

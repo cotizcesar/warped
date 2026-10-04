@@ -1,2 +1,3 @@
-# Sole owner approves everything — no other collaborators exist by design.
+# 2026-10-04: every pull request requires the owner's approval —
+# no merge without review, on any branch.
 * @cotizcesar

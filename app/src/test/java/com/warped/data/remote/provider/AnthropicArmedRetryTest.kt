@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import com.sun.net.httpserver.HttpServer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Tag
 
 /**
  * CompatToolLoop parity (device evidence 2026-10-03): a lone tools
@@ -29,6 +30,7 @@ import org.junit.jupiter.api.Test
  * OkHttp inside runTest uses its own threads, matching the existing
  * loopback suites).
  */
+@Tag("slow")
 class AnthropicArmedRetryTest {
 
     private var server: HttpServer? = null
