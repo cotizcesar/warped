@@ -1,5 +1,6 @@
 package com.warped.ui.chat.components
 
+import androidx.compose.ui.text.TextRange
 import com.google.common.truth.Truth.assertThat
 import org.junit.jupiter.api.Test
 
@@ -39,5 +40,14 @@ class InputEnterSendTest {
     fun `plain typing does not send`() {
         assertThat(shouldSendOnNewline("hola", "holas", composing = false)).isFalse()
         assertThat(shouldSendOnNewline("hola", "hola", composing = false)).isFalse()
+    }
+
+    @Test
+    fun `cleared value is empty composition-free at zero`() {
+        val cleared = clearedFieldValue()
+
+        assertThat(cleared.text).isEmpty()
+        assertThat(cleared.composition).isNull()
+        assertThat(cleared.selection).isEqualTo(TextRange.Zero)
     }
 }

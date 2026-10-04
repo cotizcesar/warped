@@ -390,6 +390,16 @@ fun ChatInputBar(
                         if (canSend && !isGenerating && !isLoadingModel && hasContent) {
                             onSend()
                         }
+                    } else if (next.text.isEmpty()) {
+                        // Clearing the field drops any lingering IME
+                        // composition outright (user report 2026-10-03:
+                        // deleting down to empty kept resurrecting the
+                        // last character and the placeholder never came
+                        // back). A composition-free value leaves the IME
+                        // session nothing stale to restore.
+                        fieldValue = clearedFieldValue()
+                        if (text.isNotEmpty()) onTextChange("")
+                        onCursorChange(0)
                     } else {
                         fieldValue = next
                         if (next.text != text) onTextChange(next.text)
@@ -917,3 +927,10 @@ internal fun shouldSendOnNewline(prevText: String, nextText: String, composing: 
     if (!nextText.endsWith("\n")) return false
     return nextText.dropLast(1) == prevText
 }
+
+/**
+ * Composition-free empty field for the clear path above: text empty,
+ * cursor at zero, no IME region to resurrect. Pure — unit-tested.
+ */
+internal fun clearedFieldValue(): TextFieldValue =
+    TextFieldValue("", TextRange.Zero, null)
