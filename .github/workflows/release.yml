@@ -67,11 +67,6 @@ jobs:
           packageName: com.warped.app
           releaseFiles: app/build/outputs/bundle/release/app-release.aab
           tracks: ${{ steps.track.outputs.track }}
-          # Play rejects auto-review while the console holds an
-          # in-progress edit/review (Oct 2026: beta track state). Commit
-          # as draft instead — send for review / roll out with one click
-          # in Play Console. Revert to auto-review once the track is clean.
-          changesNotSentForReview: true
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
