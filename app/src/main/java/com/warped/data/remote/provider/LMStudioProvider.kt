@@ -433,6 +433,13 @@ class LMStudioProvider(
             currentCall = null
             teardown.cancel()
         }
+        // 2026-10-04 terminal-close fix: the terminal Done/Error above is
+        // the end of the turn — close so collectors terminate (shareIn
+        // jobs complete, turn finally-blocks run). Without this the flow
+        // stayed open forever: production leaked one suspended
+        // collection per turn and `toList()`-style collectors hung.
+        // Cancellation rethrows above, so this runs only on completion.
+        close()
         awaitClose { currentCall = null }
     }.flowOn(Dispatchers.IO)
 

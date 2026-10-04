@@ -3695,8 +3695,14 @@ class ChatViewModel @Inject constructor(
             // 2026-10-04 title-heal: a row still carrying the default title
             // while holding text (ghost-turn spill, legacy rows) is
             // retitled too — "New Chat" shows only for textless chats.
-            val needsTitle = state.messages.isEmpty() ||
-                isDefaultTitle(chatRepository.getConversationTitle(state.conversationId))
+            // Fail-open: a title lookup must never kill the turn.
+            val needsTitle = state.messages.isEmpty() || isDefaultTitle(
+                try {
+                    chatRepository.getConversationTitle(state.conversationId)
+                } catch (e: Exception) {
+                    null
+                },
+            )
             if (needsTitle) {
                 try {
                     chatRepository.updateConversationTitle(
