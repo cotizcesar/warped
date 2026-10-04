@@ -27,6 +27,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
@@ -112,6 +115,18 @@ fun PresetsScreen(
                         onApply = { viewModel.applySmartPreset() }
                     )
                 }
+            }
+
+            // 2026-10-04 params-mode select: Preset (vendor/family tuning,
+            // managed) vs Custom (hand-editable). Tuned models default to
+            // Preset; the rest default to Custom prefilled with these same
+            // smart values. Any slider edit flips to Custom by itself.
+            item(key = "params-mode-select") {
+                ParamsModeSelect(
+                    mode = uiState.paramsMode,
+                    enabled = uiState.smartPresetName != null,
+                    onSelect = { viewModel.selectParamsMode(it) }
+                )
             }
 
             if (uiState.presets.isNotEmpty()) {
@@ -437,6 +452,42 @@ private fun FormatBadge(format: String) {
             style = MaterialTheme.typography.labelSmall,
             maxLines = 1
         )
+    }
+}
+
+@Composable
+private fun ParamsModeSelect(
+    mode: ParamsMode,
+    enabled: Boolean,
+    onSelect: (ParamsMode) -> Unit,
+) {
+    // 2026-10-04 select: two-option segmented control. Preset =
+    // vendor/family tuning applied by the app (managed); Custom =
+    // hand-editable (untuned models start here with the smart values
+    // prefilled). Labels reuse the existing preset strings (localized).
+    val options = listOf(ParamsMode.PRESET, ParamsMode.CUSTOM)
+    SingleChoiceSegmentedButtonRow(
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        options.forEachIndexed { index, option ->
+            SegmentedButton(
+                selected = mode == option,
+                enabled = enabled,
+                onClick = { onSelect(option) },
+                shape = SegmentedButtonDefaults.itemShape(
+                    index = index,
+                    count = options.size,
+                ),
+                label = {
+                    Text(
+                        stringResource(
+                            if (option == ParamsMode.PRESET) R.string.preset_smart_name
+                            else R.string.preset_custom_name,
+                        ),
+                    )
+                },
+            )
+        }
     }
 }
 

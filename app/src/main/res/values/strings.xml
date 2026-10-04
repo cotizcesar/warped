@@ -13,6 +13,7 @@
     <string name="connected">Connected</string>
     <string name="disconnected">Disconnected</string>
     <string name="connection_lost">Connection lost. Tap to retry.</string>
+    <string name="empty_answer_notice">The model didn\'t produce an answer. Try again.</string>
     <string name="remote_probe_failed_fmt">Couldn\'t reach %1$s</string>
     <string name="new_chat">New Chat</string>
     <string name="type_message">Type a message…</string>
@@ -135,6 +136,9 @@
     <string name="wizard_step_8_desc_no">Create your first generation preset. Define temperature, max tokens, seed, and more to reuse your favorite settings.</string>
     <string name="wizard_step_9_desc_has">You already have %1$d %2$s in your history. Pick up any of them from the conversation panel.</string>
     <string name="wizard_step_9_desc_no">Your conversation history will appear here. Each chat is automatically saved so you can return to it anytime.</string>
+    <!-- 2026-10-04 wizard privacy step -->
+    <string name="wizard_privacy_title">Private by Design</string>
+    <string name="wizard_privacy_desc">Local chats never leave your device — no account, no cloud, no tracking. Network chats go only to the provider you configure, with your API keys encrypted on-device.</string>
 
     <!-- Wizard context badges -->
     <string name="wizard_badge_has_litertlm">You have %1$d LiteRT-LM %2$s imported</string>
@@ -359,6 +363,7 @@
     <string name="models_memory_msg_fmt">This model needs ~%1$d MB, your device has %2$d MB available. Loading may cause instability.</string>
     <string name="selector_no_models">No models available. Download one to get started.</string>
     <string name="drawer_empty_download_cta">Download a model</string>
+    <string name="selector_add_endpoint">Add an Endpoint</string>
     <string name="models_empty_download_cta">Download a local model</string>
     <string name="models_empty_add_endpoint_cta">Add a new Endpoint</string>
     <string name="selector_no_local">No local models downloaded</string>

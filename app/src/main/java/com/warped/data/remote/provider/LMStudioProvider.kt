@@ -288,7 +288,12 @@ class LMStudioProvider(
         val body = LmStudioChatRequest(
             model = modelId,
             input = allInput,
-            systemPrompt = systemMessage,
+            // Default remote persona (user report 2026-10-03): remote
+            // turns carried no system prompt, so weak models narrated
+            // their reasoning as answer text with nothing to route on.
+            // Short identity + language + directness; explicit history
+            // system messages still win.
+            systemPrompt = systemMessage ?: REMOTE_PERSONA,
             stream = true,
             temperature = request.parameters.temperature,
             topP = request.parameters.topP,
@@ -545,6 +550,16 @@ class LMStudioProvider(
     }
 
     companion object {
+        /**
+         * Default system prompt for remote turns without one. Mirrors the
+         * local identity line minus the on-device claim, plus a directness
+         * rule: narration-as-answer has no markers to route on, so it is
+         * prevented at the source instead.
+         */
+        internal const val REMOTE_PERSONA =
+            "You are Warped, a helpful AI assistant. " +
+                "Always reply in the same language the user writes in. " +
+                "Answer directly without narrating your internal reasoning."
         /**
          * Slug-aware loaded match: the endpoint id is often the short
          * name (`gemma-4-12b-qat`) while the server keys the full slug

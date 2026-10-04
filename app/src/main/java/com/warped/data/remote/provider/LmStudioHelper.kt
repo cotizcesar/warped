@@ -168,22 +168,32 @@ class LmStudioHelper @Inject constructor(
             .onCompletion { activeCall.set(null) } // no stale handle: follow-up turns are safe (pitfall 2)
             .let { upstream ->
                 if (enableThinking) upstream
-                else upstream.mapNotNull { token ->
-                    when (token) {
-                        is StreamToken.Delta -> StreamToken.Delta(stripThinkTags(token.content))
-                        is StreamToken.Done -> StreamToken.Done(stats = token.stats, reasoning = null)
-                        is StreamToken.Error -> token
-                        // Quick-task (live-thinking): hidden when the toggle
-                        // is off — dropped, never surfaced as text.
-                        is StreamToken.Thinking -> null
-                        // Legacy StreamToken variants: no producer remains
-                        // post-DEL-01; passed through untouched.
-                        is StreamToken.ToolStatus -> token
-                        is StreamToken.ToolCompleted -> token
-                        // Phase 57 UI-review: typed tools-unsupported
-                        // notice passes through untouched (never
-                        // think-stripped, never filtered).
-                        is StreamToken.ToolsUnsupported -> token
+                else {
+                    // Thinking off: drop thought spans with a cross-token
+                    // state machine. The provider fans reasoning out as
+                    // SPLIT markers ("<think>" … thought … "</think>" in
+                    // separate Deltas), so the old single-token pair strip
+                    // let the orphan markers through — and the ViewModel
+                    // then truncated the whole turn at the first "<think>"
+                    // (empty bubble, 2026-10-04).
+                    val thinkFilter = ThinkStripFilter()
+                    upstream.mapNotNull { token ->
+                        when (token) {
+                            is StreamToken.Delta -> StreamToken.Delta(thinkFilter.filterDelta(token.content))
+                            is StreamToken.Done -> StreamToken.Done(stats = token.stats, reasoning = null)
+                            is StreamToken.Error -> token
+                            // Quick-task (live-thinking): hidden when the toggle
+                            // is off — dropped, never surfaced as text.
+                            is StreamToken.Thinking -> null
+                            // Legacy StreamToken variants: no producer remains
+                            // post-DEL-01; passed through untouched.
+                            is StreamToken.ToolStatus -> token
+                            is StreamToken.ToolCompleted -> token
+                            // Phase 57 UI-review: typed tools-unsupported
+                            // notice passes through untouched (never
+                            // think-stripped, never filtered).
+                            is StreamToken.ToolsUnsupported -> token
+                        }
                     }
                 }
             }
@@ -242,5 +252,60 @@ class LmStudioHelper @Inject constructor(
         fun stripThinkTags(s: String): String =
             if (!s.contains("<think>", ignoreCase = true)) s
             else THINK_TAG_REGEX.replace(s, "").trimStart()
+    }
+}
+
+/**
+ * Cross-token thought-span filter for the thinking-off path (2026-10-04).
+ *
+ * The provider fans reasoning out as SPLIT markers — `"<think>"`,
+ * thought text and `"</think>"` arrive in separate [StreamToken.Delta]s
+ * (native `reasoning.*` events and compat `reasoning_content` alike) —
+ * so a single-token pair strip can never remove them. This state machine
+ * drops thought spans across token boundaries and keeps the answer text
+ * around them. Complete pairs inside one token are removed first (same
+ * regex as [LmStudioHelper.stripThinkTags]); a lone orphan `</think>`
+ * with no open span is marker noise (the answer follows it, R1-style).
+ *
+ * Sequential use only: one instance per turn (the thinking-off
+ * `mapNotNull` owns it). Pure — unit-tested.
+ */
+internal class ThinkStripFilter {
+    private var inThought = false
+
+    fun filterDelta(s: String): String {
+        var rest = LmStripPairRegex.replace(s, "")
+        if (!rest.contains('<', ignoreCase = false) && !inThought) return rest
+        val out = StringBuilder()
+        while (true) {
+            val lower = rest.lowercase()
+            if (inThought) {
+                val close = lower.indexOf(CLOSE_TAG)
+                if (close < 0) return out.toString()
+                rest = rest.substring(close + CLOSE_TAG.length)
+                inThought = false
+            } else {
+                val open = lower.indexOf(OPEN_TAG)
+                val close = lower.indexOf(CLOSE_TAG)
+                if (close >= 0 && (open < 0 || close < open)) {
+                    rest = rest.substring(close + CLOSE_TAG.length)
+                    continue
+                }
+                if (open < 0) {
+                    out.append(rest)
+                    return out.toString()
+                }
+                out.append(rest.substring(0, open))
+                rest = rest.substring(open + OPEN_TAG.length)
+                inThought = true
+            }
+        }
+    }
+
+    companion object {
+        private const val OPEN_TAG = "<think>"
+        private const val CLOSE_TAG = "</think>"
+        private val LmStripPairRegex =
+            Regex("<think>.*?</think>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
     }
 }

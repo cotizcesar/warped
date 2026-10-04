@@ -68,9 +68,26 @@ internal fun parseThinkBlocks(
     normalized = BRACKET_CLOSE_REGEX.replace(normalized, CLOSE_TAG)
     val input = normalized
     if (!enabled) {
-        val closeIdx = input.lowercase().indexOf(CLOSE_TAG)
-        val dropped = if (closeIdx >= 0) input.substring(closeIdx + CLOSE_TAG.length) else input
-        return Pair(TAG_STRIP_REGEX.replace(dropped, "").trim(), "")
+        // Toggle off: thought never surfaces. Closed thought spans are
+        // dropped but the answer around them is KEPT — LM Studio serves
+        // reasoning as <think>…</think> channel Deltas (native
+        // reasoning.delta and compat reasoning_content alike), so
+        // truncating at the first open tag wiped the answer too and the
+        // turn rendered as an empty bubble (2026-10-04). An UNCLOSED
+        // open tag still drops everything from it onward (thought in
+        // flight); a lone orphan close drops everything before it. No
+        // markers at all: plain answer, kept.
+        var dropped = THINK_PAIR_REGEX.replace(input, "")
+        dropped = CHANNEL_REGEX.replace(dropped, "")
+        val lower = dropped.lowercase()
+        val openIdx = lower.indexOf(OPEN_TAG)
+        val clean = if (openIdx >= 0) {
+            dropped.substring(0, openIdx)
+        } else {
+            val closeIdx = lower.indexOf(CLOSE_TAG)
+            if (closeIdx >= 0) dropped.substring(closeIdx + CLOSE_TAG.length) else dropped
+        }
+        return Pair(TAG_STRIP_REGEX.replace(clean, "").trim(), "")
     }
     val reasoning = StringBuilder()
     var clean = input

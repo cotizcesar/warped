@@ -112,17 +112,22 @@ object SmartPresetCalculator {
      * models (the canned-greeting loops and rambling of sub-3GB models
      * respond strongly to explicit direction; big models need none).
      * Null when the model is large enough to behave without coaching.
-     * Pure — unit-tested.
+     * Tiny models get the constraint repeated in full sentences: a bare
+     * "briefly" elicits one-word answers ("Bien") and the language rule
+     * bears repeating next to the task (language mixing on 1B models,
+     * 2026-10-04). Pure — unit-tested.
      */
     fun precisionHintFor(modelSizeBytes: Long): String? {
         val modelMb = modelSizeBytes / (1024 * 1024)
         return when {
             modelMb < 1024 ->
-                "Answer briefly and directly in the user's language. " +
+                "Answer briefly in complete sentences with correct grammar, " +
+                    "in the user's language only. " +
                     "Never repeat greetings, the question, or your own sentences. " +
                     "If unsure, say so in one line."
             modelMb < 3072 ->
-                "Be concise and do not repeat yourself."
+                "Be concise and do not repeat yourself. " +
+                    "Reply only in the user's language."
             else -> null
         }
     }

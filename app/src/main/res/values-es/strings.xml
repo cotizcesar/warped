@@ -13,6 +13,7 @@
     <string name="connected">Conectado</string>
     <string name="disconnected">Desconectado</string>
     <string name="connection_lost">Conexión perdida. Toca para reintentar.</string>
+    <string name="empty_answer_notice">El modelo no respondió. Intentá de nuevo.</string>
     <string name="remote_probe_failed_fmt">No se pudo conectar a %1$s</string>
     <string name="new_chat">Nuevo Chat</string>
     <string name="type_message">Escribe un mensaje…</string>
@@ -135,6 +136,9 @@
     <string name="wizard_step_8_desc_no">Crea tu primer preset de generación. Define temperatura, tokens máximos, semilla y más para reutilizar tus configuraciones favoritas.</string>
     <string name="wizard_step_9_desc_has">Ya tienes %1$d %2$s en tu historial. Retoma cualquiera de ellas desde el panel de conversaciones.</string>
     <string name="wizard_step_9_desc_no">Tu historial de conversaciones aparecerá aquí. Cada chat se guarda automáticamente para que puedas retomarlo cuando quieras.</string>
+    <!-- 2026-10-04 wizard privacy step -->
+    <string name="wizard_privacy_title">Privacidad por diseño</string>
+    <string name="wizard_privacy_desc">Los chats locales nunca salen de tu dispositivo: sin cuenta, sin nube, sin rastreo. Los chats en red solo van al proveedor que configures, con tus API keys cifradas en el dispositivo.</string>
 
     <!-- Wizard context badges -->
     <string name="wizard_badge_has_litertlm">Tienes %1$d %2$s LiteRT-LM importados</string>
@@ -361,6 +365,7 @@
     <string name="models_memory_msg_fmt">Este modelo necesita ~%1$d MB, tu dispositivo tiene %2$d MB disponibles. Cargarlo puede causar inestabilidad.</string>
     <string name="selector_no_models">No hay modelos disponibles. Descargá uno para empezar.</string>
     <string name="drawer_empty_download_cta">Descargar un modelo</string>
+    <string name="selector_add_endpoint">Agregar endpoint</string>
     <string name="models_empty_download_cta">Descargar un modelo local</string>
     <string name="models_empty_add_endpoint_cta">Agregar un Endpoint</string>
     <string name="selector_no_local">No se descargaron modelos locales</string>

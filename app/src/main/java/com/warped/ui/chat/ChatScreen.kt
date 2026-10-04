@@ -70,6 +70,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.R
 import com.warped.data.local.inference.BackendType
+import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.Role
 import kotlinx.coroutines.CancellationException
@@ -98,6 +99,7 @@ fun ChatScreen(
     onOpenDrawer: () -> Unit = {},
     onNavigateToSelector: () -> Unit = {},
     onNavigateToCatalog: () -> Unit = {},
+    onNavigateToEndpoints: () -> Unit = {},
     onNavigateToHelp: () -> Unit = {},
     conversationId: Long = 0L,
     newChat: Boolean = false
@@ -165,6 +167,15 @@ fun ChatScreen(
     var attachedImages by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var inputBarHeightPx by remember { mutableIntStateOf(0) }
     var audioBytes by remember { mutableStateOf<ByteArray?>(null) }
+    // 2026-10-04 leftover snapshots: what the composer held when the
+    // screen last left a chat. Lets the arrival effect below tell a
+    // genuine switch (previous chat's leftover → clear/apply stash)
+    // from a fresh-row transition (null → created id, same session —
+    // freshly typed/attached content must never be wiped).
+    var lastLeftText by remember { mutableStateOf<String?>(null) }
+    var lastLeftImages by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var lastLeftAudio by remember { mutableStateOf<ByteArray?>(null) }
+    var hasLeftChat by remember { mutableStateOf(false) }
     var isRecording by remember { mutableStateOf(false) }
     var showModelPicker by remember { mutableStateOf(false) }
     // Phase 65 (VOICE-02): first-tap rationale visibility. Shown only when
@@ -201,6 +212,10 @@ fun ChatScreen(
     // arriving chat's — so nothing is lost or leaked across chats.
     DisposableEffect(conversationId) {
         onDispose {
+            lastLeftText = input.inputText
+            lastLeftImages = attachedImages
+            lastLeftAudio = audioBytes
+            hasLeftChat = true
             viewModel.stashComposerDraft(
                 transcript.conversationId,
                 input.inputText,
@@ -211,6 +226,18 @@ fun ChatScreen(
     }
     LaunchedEffect(transcript.conversationId) {
         val draft = viewModel.popComposerDraft(transcript.conversationId)
+        // Fresh-row transition (null → newly created id, same composer
+        // session): the user may have typed/attached already — never
+        // wipe it when there is no stash to apply. Genuine switches
+        // always arrive carrying the leftover snapshotted above, which
+        // we clear/apply below.
+        val isLeftover = hasLeftChat &&
+            input.inputText == (lastLeftText ?: "") &&
+            attachedImages == lastLeftImages &&
+            audioBytes == lastLeftAudio
+        if (draft == null && !isLeftover) {
+            return@LaunchedEffect
+        }
         attachedImages = draft?.images.orEmpty()
         audioBytes = draft?.audioBytes
         viewModel.restoreComposerDraft(draft)
@@ -220,6 +247,11 @@ fun ChatScreen(
             snapToBottomOnNextContent = true
             if (newChat) {
                 viewModel.newConversation()
+                // 2026-10-04: a fresh chat starts model-less — open the
+                // existing picker right away so the pick is one tap.
+                // Dismissing without picking leaves the input locked
+                // (No model selected) until the user picks from the bar.
+                showModelPicker = true
             } else {
                 viewModel.loadLastConversation()
             }
@@ -769,6 +801,11 @@ fun ChatScreen(
                         isLoadingModel = connection.isLoadingModel,
                         loadingModelName = connection.loadingModelName,
                         loadingFirstTime = connection.loadingFirstTime,
+                        // 2026-10-04 Caso 3: remote ping in flight — shows
+                        // the loading row without locking the input.
+                        isProbingRemote = connection.selectedRemoteModelId != null &&
+                            connection.connectionStatus == ConnectionStatus.Connecting,
+                        probingModelName = connection.selectedRemoteModelId.orEmpty(),
                     )
                     TurnStatusRow(status = turnStatus)
                     // Phase 68 (VMSG-02): the draft card sends voice + caption
@@ -796,6 +833,7 @@ fun ChatScreen(
                     }
                     ChatInputBar(
                     text = input.inputText,
+                    textGeneration = input.inputTextGeneration,
                     isGenerating = input.isGenerating,
                     canSend = (connection.selectedLocalModelId ?: connection.selectedRemoteModelId) != null,
                     onTextChange = { viewModel.updateInput(it) },
@@ -856,11 +894,24 @@ fun ChatScreen(
                 )
             }
 
+            // 2026-10-04 silent-RED fix: load failures are durable states
+            // (missing file, short RAM — retrying blindly fails the same
+            // way), so this banner STICKS with an explicit Retry instead
+            // of auto-dismissing into an unexplained red light.
             if (connection.modelLoadError != null) {
-                AutoDismissErrorBanner(
-                    text = connection.modelLoadError ?: "",
-                    onDismiss = { viewModel.clearModelLoadError() },
-                )
+                Snackbar(
+                    modifier = Modifier.padding(16.dp),
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    action = {
+                        Row {
+                            TextButton(onClick = { viewModel.retryLocalMount() }) { Text(stringResource(R.string.bubble_retry)) }
+                            TextButton(onClick = { viewModel.clearModelLoadError() }) { Text(stringResource(R.string.dismiss)) }
+                        }
+                    }
+                ) {
+                    Text(connection.modelLoadError ?: "")
+                }
             }
 
             if (transcript.error != null) {
@@ -982,7 +1033,8 @@ fun ChatScreen(
             onModelSelected = { modelId, providerType, endpointId ->
                 viewModel.launchModelSelection(modelId, providerType, endpointId)
             },
-            onNavigateToCatalog = { showModelPicker = false; onNavigateToCatalog() }
+            onNavigateToCatalog = { showModelPicker = false; onNavigateToCatalog() },
+            onNavigateToEndpoints = { showModelPicker = false; onNavigateToEndpoints() }
         )
     }
 }
@@ -1223,63 +1275,6 @@ private fun InlineModelSelectorBar(
  * reading_page copy, search uses the indeterminate searching copy (no
  * counts), the gap reuses the old in-list thinking-row copy (thinking_ellipsis).
  */
-/**
- * Model-load error banner: rounded error card (icon + message + close)
- * that dismisses itself after [AUTO_DISMISS_MS]. Replaces the stuck
- * inline Snackbar — load errors (notably low-memory) must not linger
- * over the conversation.
- */
-private const val ERROR_BANNER_AUTO_DISMISS_MS = 5_000L
-
-@Composable
-private fun AutoDismissErrorBanner(
-    text: String,
-    onDismiss: () -> Unit,
-) {
-    LaunchedEffect(text) {
-        kotlinx.coroutines.delay(ERROR_BANNER_AUTO_DISMISS_MS)
-        onDismiss()
-    }
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer,
-            contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        ),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                Icons.Filled.Warning,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f),
-            )
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier.size(32.dp),
-            ) {
-                Icon(
-                    Icons.Filled.Close,
-                    contentDescription = stringResource(R.string.cd_close),
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-        }
-    }
-}
-
 @Composable
 private fun TurnStatusRow(status: TurnStatus?) {
     if (status == null) return
@@ -1294,6 +1289,10 @@ private fun TurnStatusRow(status: TurnStatus?) {
         } else {
             stringResource(R.string.loading_model, status.modelName.substringAfterLast("/"))
         }
+        // 2026-10-04 Caso 3: remote ping in flight — same "loading"
+        // copy the user asked for, non-blocking.
+        is TurnStatus.Connecting ->
+            stringResource(R.string.loading_model, status.modelName.substringAfterLast("/"))
     }
     val statusCd = when (status) {
         is TurnStatus.Tool -> stringResource(R.string.cd_running_tool, status.text)
@@ -1304,7 +1303,7 @@ private fun TurnStatusRow(status: TurnStatus?) {
         is TurnStatus.LoadingModel -> stringResource(
             if (status.firstTime) R.string.loading_model_first_cd else R.string.loading_model_cd
         )
-        is TurnStatus.LoadingModel -> stringResource(R.string.loading_model_cd)
+        is TurnStatus.Connecting -> stringResource(R.string.loading_model_cd)
     }
     Row(
         modifier = Modifier

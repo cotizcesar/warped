@@ -73,8 +73,17 @@ class SmartPresetSamplingTest {
     fun `precision hint only for small models`() {
         assertThat(SmartPresetCalculator.precisionHintFor(300L * 1024L * 1024L))
             .contains("briefly")
+        // 2026-10-04: bare "briefly" elicited one-word answers ("Bien")
+        // on 1B models — the tiny hint now demands complete sentences
+        // with correct grammar in the user's language only.
+        assertThat(SmartPresetCalculator.precisionHintFor(300L * 1024L * 1024L))
+            .contains("complete sentences")
+        assertThat(SmartPresetCalculator.precisionHintFor(300L * 1024L * 1024L))
+            .contains("user's language only")
         assertThat(SmartPresetCalculator.precisionHintFor(1500L * 1024L * 1024L))
             .contains("concise")
+        assertThat(SmartPresetCalculator.precisionHintFor(1500L * 1024L * 1024L))
+            .contains("user's language")
         assertThat(SmartPresetCalculator.precisionHintFor(4L * 1024L * 1024L * 1024L))
             .isNull()
         assertThat(SmartPresetCalculator.precisionHintFor(9L * 1024L * 1024L * 1024L))

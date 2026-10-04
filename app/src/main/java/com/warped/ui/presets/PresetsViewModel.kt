@@ -40,6 +40,8 @@ class PresetsViewModel @Inject constructor(
 
     private var smartPresetParams: GenerationParameters? = null
     private var cachedModels: List<LocalModel> = emptyList()
+    /** Model the params-mode default was last applied for (recalc guard). */
+    private var lastModeModelId: String? = null
 
     init {
         viewModelScope.launch(coroutineExceptionHandler) {
@@ -111,8 +113,28 @@ class PresetsViewModel @Inject constructor(
             val newParams = transform(state.parameters)
             parameterStore.update(newParams)
             val isCustom = smartPresetParams == null || newParams != smartPresetParams
-            state.copy(parameters = newParams, isCustomOverride = isCustom, selectedPresetName = if (isCustom) context.getString(R.string.preset_custom_name) else state.selectedPresetName)
+            state.copy(
+                parameters = newParams,
+                isCustomOverride = isCustom,
+                selectedPresetName = if (isCustom) context.getString(R.string.preset_custom_name) else state.selectedPresetName,
+                // Any hand edit leaves managed mode (2026-10-04 select).
+                paramsMode = ParamsMode.CUSTOM,
+            )
         }
+    }
+
+    /**
+     * 2026-10-04 select: PRESET (re)applies the smart values as managed;
+     * CUSTOM keeps the current values as the editable baseline (for
+     * untuned models these already ARE the smart values — "custom con
+     * el smart-preset").
+     */
+    fun selectParamsMode(mode: ParamsMode) {
+        if (mode == ParamsMode.PRESET) {
+            applySmartPreset()
+            return
+        }
+        _uiState.update { it.copy(paramsMode = ParamsMode.CUSTOM) }
     }
 
     fun applySmartPreset() {
@@ -123,7 +145,8 @@ class PresetsViewModel @Inject constructor(
                 parameters = smart,
                 isCustomOverride = false,
                 selectedPresetId = null,
-                selectedPresetName = it.smartPresetName ?: context.getString(R.string.preset_smart_name)
+                selectedPresetName = it.smartPresetName ?: context.getString(R.string.preset_smart_name),
+                paramsMode = ParamsMode.PRESET,
             )
         }
     }
@@ -139,15 +162,30 @@ class PresetsViewModel @Inject constructor(
         val result = SmartPresetCalculator.calculate(memInfo, model.sizeBytes, modelName = model.name)
         smartPresetParams = result.parameters
         val label = context.getString(R.string.preset_smart_fmt, "%.1f".format(result.availableGb))
+        // 2026-10-04 select default: vendor-tuned families open managed
+        // (PRESET), everything else opens CUSTOM prefilled with these
+        // same smart values. Applied on MODEL CHANGE only — emissions
+        // for the current model must never clobber hand edits.
+        val tuned = familySamplingFor(model.name, thinking = false) != null
+        val modelChanged = lastModeModelId != modelId
+        if (modelChanged) lastModeModelId = modelId
         _uiState.update {
             it.copy(
                 smartPresetName = label,
                 smartPresetTier = result.tier,
                 availableGb = result.availableGb,
                 totalGb = result.totalGb,
-                isCustomOverride = it.isCustomOverride || (it.parameters != result.parameters)
+                isCustomOverride = it.isCustomOverride || (it.parameters != result.parameters),
+                hasVendorTuning = tuned,
+                paramsMode = if (modelChanged) {
+                    if (tuned) ParamsMode.PRESET else ParamsMode.CUSTOM
+                } else {
+                    it.paramsMode
+                },
+                parameters = if (modelChanged) result.parameters else it.parameters,
             )
         }
+        if (modelChanged) parameterStore.update(result.parameters)
     }
 
     fun loadPreset(preset: Preset) {
@@ -187,7 +225,10 @@ class PresetsViewModel @Inject constructor(
             it.copy(
                 parameters = params,
                 selectedPresetId = preset.id,
-                selectedPresetName = preset.name
+                selectedPresetName = preset.name,
+                // A saved preset is user-chosen values, not the managed
+                // vendor preset (2026-10-04 select).
+                paramsMode = ParamsMode.CUSTOM,
             )
         }
     }
@@ -259,7 +300,8 @@ class PresetsViewModel @Inject constructor(
             it.copy(
                 parameters = defaults,
                 selectedPresetId = null,
-                selectedPresetName = ""
+                selectedPresetName = "",
+                paramsMode = ParamsMode.CUSTOM,
             )
         }
     }

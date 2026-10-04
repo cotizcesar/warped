@@ -61,6 +61,13 @@ import com.warped.ui.chat.voice.GateState
 @Composable
 fun ChatInputBar(
     text: String,
+    /**
+     * External-write stamp from [com.warped.ui.chat.ChatInputState]
+     * .inputTextGeneration, bumped on every non-typing write
+     * (send-clear, draft restore, dictation commit). Typing never
+     * bumps it — see the adoption rule below.
+     */
+    textGeneration: Long = 0,
     isGenerating: Boolean,
     canSend: Boolean,
     onTextChange: (String) -> Unit,
@@ -258,22 +265,33 @@ fun ChatInputBar(
 
             // Row 1: Input only. WR-03: TextFieldValue (not raw String) so
             // dictation inserts at the selection via onCursorChange.
-            // External text changes (dictation commits) snap the caret to
-            // the END only when the field is NOT focused (user decision
-            // 2026-10-02: never steal the caret mid-edit); when focused,
-            // the caret is preserved. Either way the position is reported
-            // so the ViewModel's lastKnownCursor stays in sync. Typing is
-            // untouched: this block only runs on external change.
+            // Single adoption rule (2026-10-04 input unification): the VM
+            // text is adopted EXACTLY ONCE per external-write stamp — the
+            // typing path never bumps the stamp, so mid-edit keystrokes
+            // (including IME compositions) can never be overwritten by a
+            // stale prop, the "undeletable last letter" class. Focus only
+            // decides caret placement (preserve when focused, snap to end
+            // when not), never whether to adopt. Deferred while the IME
+            // holds an active composition: the stamp still differs, so
+            // adoption runs on the commit that ends it — never lost (the
+            // old text-compare rule could never tell "stale prop" from
+            // "fresh external write"). Either way the position is
+            // reported so the ViewModel's lastKnownCursor stays in sync.
+            // Typing is untouched: onValueChange converges both states.
             var fieldValue by remember { mutableStateOf(TextFieldValue(text, TextRange(text.length))) }
+            var lastAdoptedGeneration by remember { mutableLongStateOf(textGeneration) }
             var inputFocused by remember { mutableStateOf(false) }
-            // Never overwrite a buffer the IME is actively composing
-            // (autocorrect/predictions): fieldValue.text transiently differs
-            // from the VM text mid-composition, and "syncing" it back
-            // destroys the composition — typed characters get stuck,
-            // duplicated, or undeletable. The IME commits the final text
-            // through onValueChange, which converges both states without
-            // any forced write here.
-            if (fieldValue.composition == null && fieldValue.text != text) {
+            if (textGeneration != lastAdoptedGeneration && fieldValue.composition == null) {
+                // Never overwrite a buffer the IME is actively composing
+                // (autocorrect/predictions): fieldValue.text transiently
+                // differs from the VM text mid-composition, and forcing
+                // the prop in destroys the session — typed characters get
+                // stuck, duplicated, or undeletable, and yanking it provokes
+                // a repair-resend of the last char (stuck-letter). The IME
+                // commits the final text through onValueChange, which
+                // converges both states without any forced write here. The
+                // pending stamp survives until the commit, then adopts.
+                lastAdoptedGeneration = textGeneration
                 fieldValue = if (inputFocused) {
                     val kept = fieldValue.selection
                     fieldValue.copy(
@@ -391,13 +409,16 @@ fun ChatInputBar(
                             onSend()
                         }
                     } else if (next.text.isEmpty()) {
-                        // Clearing the field drops any lingering IME
-                        // composition outright (user report 2026-10-03:
-                        // deleting down to empty kept resurrecting the
-                        // last character and the placeholder never came
-                        // back). A composition-free value leaves the IME
-                        // session nothing stale to restore.
-                        fieldValue = clearedFieldValue()
+                        // Clearing the field honors the IME session: when
+                        // the IME still owns an active composition the
+                        // empty state is accepted as-is — nuking the
+                        // session provokes a repair-resend of the last
+                        // char (stuck-letter, 2026-10-04). A
+                        // composition-free empty takes the clean reset
+                        // (user report 2026-10-03: deleting down to empty
+                        // kept resurrecting the last character and the
+                        // placeholder never came back).
+                        fieldValue = if (next.composition == null) clearedFieldValue() else next
                         if (text.isNotEmpty()) onTextChange("")
                         onCursorChange(0)
                     } else {

@@ -13,6 +13,7 @@ import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.concurrent.withLock
 
 /** Identifies which local inference engine type. */
 enum class EngineType { LITE_RT_LM }
@@ -38,9 +39,23 @@ class EngineManager @Inject constructor(
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var activeEngine: ActiveEngine? = null
 
+    /**
+     * 2026-10-04 async-load fix: the old method-level `@Synchronized`
+     * held ONE monitor across the whole multi-second native init/close,
+     * so every Main-thread [getActiveEngine] parked until the mount
+     * finished — the full UI freeze on model load. Now split:
+     * - [fieldLock] guards ONLY the [activeEngine] field (nanoseconds —
+     *   Main-safe, this is all Main ever takes).
+     * - [switchLock] serializes full unload→init sequences among
+     *   BACKGROUND threads only (today's atomicity preserved: a switch
+     *   can never interleave with another switch/close). Main never
+     *   touches it.
+     */
+    private val fieldLock = Any()
+    private val switchLock = java.util.concurrent.locks.ReentrantLock()
+
     /** Returns the currently active engine info, or null if nothing is loaded. */
-    @Synchronized
-    fun getActiveEngine(): ActiveEngine? = activeEngine
+    fun getActiveEngine(): ActiveEngine? = synchronized(fieldLock) { activeEngine }
 
     /**
      * Switch to the LiteRT-LM engine with the given model.
@@ -50,17 +65,27 @@ class EngineManager @Inject constructor(
      * version and capped via [LiteRtLmCacheManager].
      *
      * @param modelPath Absolute path to the .litertlm or .task model file
+     *
+     * Background-only contract (every call site is already off-main):
+     * the full unload→init sequence runs under [switchLock]; Main
+     * threads only ever take [fieldLock], so mounts never freeze the UI.
      */
-    @Synchronized
     fun switchToLiteRT(modelPath: String) {
+        switchLock.withLock {
+            switchToLiteRTLocked(modelPath)
+        }
+    }
+
+    /** [switchLock] held. Synchronous close + init; background only. */
+    private fun switchToLiteRTLocked(modelPath: String) {
         cacheManager.cacheRoot
         val sourceFile = File(modelPath)
         val target = ActiveEngine(EngineType.LITE_RT_LM, modelPath, backendDetector.probeBackend())
-        if (activeEngine == target) {
+        if (getActiveEngine() == target) {
             Timber.d("EngineManager: $target already loaded, skipping switch")
             return
         }
-        unloadCurrent()
+        closeNowLocked()
 
         if (!sourceFile.exists()) {
             error("EngineManager: model file does not exist at $modelPath")
@@ -69,7 +94,7 @@ class EngineManager @Inject constructor(
         Timber.d("EngineManager: initializing LiteRT-LM with backend=${target.backend} model=${modelPath.substringAfterLast("/")} (mmap, no copy)")
         try {
             initWith(target)
-            activeEngine = target
+            synchronized(fieldLock) { activeEngine = target }
         } catch (e: Exception) {
             // GPU-constrained models (e.g. gemma-4-12B-it: "requires one of [gpu]")
             // fail on the probed CPU backend. The device probe can false-negative
@@ -97,15 +122,15 @@ class EngineManager @Inject constructor(
                             BackendSlot.MAIN -> {
                                 val retryTarget = target.copy(backend = required)
                                 initWith(retryTarget)
-                                activeEngine = retryTarget
+                                synchronized(fieldLock) { activeEngine = retryTarget }
                             }
                             BackendSlot.VISION -> {
                                 initWith(target, visionOverride = required)
-                                activeEngine = target
+                                synchronized(fieldLock) { activeEngine = target }
                             }
                             BackendSlot.AUDIO -> {
                                 initWith(target, audioOverride = required)
-                                activeEngine = target
+                                synchronized(fieldLock) { activeEngine = target }
                             }
                         }
                         return
@@ -127,33 +152,72 @@ class EngineManager @Inject constructor(
 
     /**
      * Unload the current engine (if any). Releases all native resources.
-     * Safe to call even if nothing is loaded.
+     * Safe to call even if nothing is loaded — and now safe from ANY
+     * thread: the field flips synchronously (callers observe the unload
+     * immediately) while the native close runs serialized with switches
+     * on IO, so Main callers (memory trim, catalog/selector, chat exit)
+     * never block on it.
      */
-    @Synchronized
     fun unloadCurrent() {
-        val current = activeEngine ?: return
-        Timber.d("EngineManager: unloading current engine: $current")
-
-        try {
-            liteRTLmEngine.close()
-        } catch (e: Exception) {
-            Timber.w(e, "EngineManager: error during unload of $current")
-        } finally {
-            activeEngine = null
-        }
+        requestUnload()
     }
 
     /**
      * Schedule unload of the current engine. If the engine is generating text,
      * waits for generation to finish, then unloads. If not generating, unloads immediately.
-     * Safe to call from any thread.
+     * Safe to call from any thread (same async-close contract as [unloadCurrent]).
      */
     fun scheduleUnload() {
-        val current = activeEngine ?: return
+        requestUnload()
+    }
+
+    /**
+     * Grab-and-null under [fieldLock] (fast — Main-safe), then close the
+     * grabbed engine on IO under [switchLock]. A pending close is DROPPED
+     * when the field no longer holds what we grabbed: a concurrent switch
+     * already closed it synchronously and owns the engine now, so closing
+     * again would kill the fresh engine (or double-close the old one).
+     */
+    private fun requestUnload() {
+        val grabbed: ActiveEngine? = synchronized(fieldLock) {
+            val current = activeEngine
+            activeEngine = null
+            current
+        } ?: return
+        ioScope.launch {
+            switchLock.withLock {
+                val current = synchronized(fieldLock) { activeEngine }
+                if (current == null) {
+                    try {
+                        liteRTLmEngine.close()
+                    } catch (e: Exception) {
+                        Timber.w(e, "EngineManager: error during unload of $grabbed")
+                    }
+                } else {
+                    Timber.d("EngineManager: unload of $grabbed superseded by ${current.modelPath}, skipping close")
+                }
+            }
+        }
+    }
+
+    /**
+     * Synchronous close for use INSIDE [switchLock] only (the switch
+     * sequence owns the old engine and must release it before init —
+     * delegating to the async path would leak it: the pending close
+     * would observe the fresh engine and stand down).
+     */
+    private fun closeNowLocked() {
+        val current = synchronized(fieldLock) {
+            val cur = activeEngine
+            activeEngine = null
+            cur
+        } ?: return
+        Timber.d("EngineManager: unloading current engine: $current")
         try {
             liteRTLmEngine.close()
-        } catch (e: Exception) { Timber.e(e, "EngineManager: scheduleUnload failed") }
-        synchronized(this) { activeEngine = null }
+        } catch (e: Exception) {
+            Timber.w(e, "EngineManager: error during unload of $current")
+        }
     }
 
     /** Single init attempt for a resolved target (no retry). */
@@ -250,7 +314,8 @@ class EngineManager @Inject constructor(
 
     /** Returns true if any engine is currently loaded. */
     @Synchronized
-    fun isEngineLoaded(): Boolean = activeEngine != null
+    /** True while an engine is mounted. Field-locked read — Main-safe (2026-10-04). */
+    fun isEngineLoaded(): Boolean = getActiveEngine() != null
 
     /**
      * Handle system memory pressure. Called from Application.onTrimMemory.

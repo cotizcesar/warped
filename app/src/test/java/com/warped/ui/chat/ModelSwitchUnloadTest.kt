@@ -213,6 +213,14 @@ class ModelSwitchUnloadTest {
         fixture.vm.launchModelSelection(pathA, ProviderType.LITE_RT_LM)
         advanceUntilIdle()
         fixture.vm.launchModelSelection(pathB, ProviderType.LITE_RT_LM)
+        // Mounts hop to Dispatchers.Default (a real thread under runTest)
+        // — yield until B is served and flags settle before asserting.
+        var attempts = 0
+        while ((fixture.vm.connectionState.value.isLoadingModel ||
+            fixture.engineManager.getActiveEngine()?.modelPath != pathB) && attempts++ < 200
+        ) {
+            kotlinx.coroutines.delay(10)
+        }
         advanceUntilIdle()
 
         // User decision: red turns green by itself — selection mounts in
@@ -334,11 +342,16 @@ class ModelSwitchUnloadTest {
         fixture.vm.launchModelSelection(path, ProviderType.LITE_RT_LM)
         advanceUntilIdle()
         fixture.vm.sendMessage("hello")
-        advanceUntilIdle()
-        // The throw hops off Dispatchers.Default — yield, then assert.
-        var attempts = 0
-        while (fixture.vm.connectionState.value.modelLoadError == null && attempts++ < 100) {
-            kotlinx.coroutines.delay(10)
+        // The throw hops off Dispatchers.Default (a real thread under
+        // runTest) — interleave scheduler pumping with real waits until
+        // the failure lands (virtual-only delays starve real threads
+        // under parallel load).
+        val deadline = System.currentTimeMillis() + 5000
+        while (fixture.vm.connectionState.value.modelLoadError == null &&
+            System.currentTimeMillis() < deadline
+        ) {
+            advanceUntilIdle()
+            Thread.sleep(25)
         }
         advanceUntilIdle()
 

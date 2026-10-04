@@ -3,6 +3,8 @@ package com.warped.ui.endpoints
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -18,6 +20,9 @@ import com.warped.ui.endpoints.components.EndpointForm
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EndpointsScreen(
+    // 2026-10-04: reached from the chat model picker — shows a back
+    // arrow in that case; standalone uses (drawer tabs) omit it.
+    onBack: (() -> Unit)? = null,
     viewModel: EndpointsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -25,7 +30,17 @@ fun EndpointsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.endpoints_title)) }
+                title = { Text(stringResource(R.string.endpoints_title)) },
+                navigationIcon = {
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.back),
+                            )
+                        }
+                    }
+                },
             )
         },
         floatingActionButton = {

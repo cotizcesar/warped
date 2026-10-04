@@ -154,4 +154,50 @@ class ThinkBlockParserTest {
         assertThat(clean).isEqualTo("¡Hola!")
         assertThat(reasoning).isEmpty()
     }
+
+    @Test
+    fun `unclosed thought never leaks inline when thinking off`() {
+        // Live leak (user report 2026-10-03): with the toggle off, the
+        // trace rendered as answer text until the close tag arrived, then
+        // vanished. An open tag drops everything from it onward.
+        val raw = "<think>The user asked \"como te va?\". This is casual."
+
+        val (clean, reasoning) = parseThinkBlocks(raw, enabled = false)
+
+        assertThat(clean).isEmpty()
+        assertThat(reasoning).isEmpty()
+    }
+
+    @Test
+    fun `answer before open tag survives when thinking off`() {
+        val raw = "¡Hola!<think>reasoning..."
+
+        val (clean, reasoning) = parseThinkBlocks(raw, enabled = false)
+
+        assertThat(clean).isEqualTo("¡Hola!")
+        assertThat(reasoning).isEmpty()
+    }
+
+    @Test
+    fun `paired think tags keep answer when thinking off`() {
+        // 2026-10-04: thinking-off truncated at the first open tag and
+        // wiped the answer too (empty LM Studio bubble on thinking
+        // models) — closed spans drop, surrounding answer survives.
+        val raw = "<think>Let me think.</think>Final answer."
+
+        val (clean, reasoning) = parseThinkBlocks(raw, enabled = false)
+
+        assertThat(clean).isEqualTo("Final answer.")
+        assertThat(reasoning).isEmpty()
+    }
+
+    @Test
+    fun `multiple paired spans keep surrounding answer when thinking off`() {
+        val raw = "Primero <think>uno</think>en medio<think>dos</think> final."
+
+        val (clean, reasoning) = parseThinkBlocks(raw, enabled = false)
+
+        assertThat(clean).isEqualTo("Primero en medio final.")
+        assertThat(reasoning).isEmpty()
+    }
 }

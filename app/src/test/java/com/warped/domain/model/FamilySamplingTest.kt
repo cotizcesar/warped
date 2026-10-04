@@ -96,4 +96,14 @@ class FamilySamplingTest {
         assertThat(hasReasoningMarker("Gemma 4 E2B")).isFalse()
         assertThat(hasReasoningMarker("qwen3-4b")).isFalse()
     }
+
+    @Test
+    fun `params-mode default set — tuned families vs unknown models`() {
+        // 2026-10-04 select: the default (PRESET for tuned families,
+        // CUSTOM-with-smart-values otherwise) keys on this predicate.
+        assertThat(familySamplingFor("gemma-3-1b-it", thinking = false)).isNotNull()
+        assertThat(familySamplingFor("Qwen3 4B", thinking = false)).isNotNull()
+        assertThat(familySamplingFor("TinyLlama 1.1B Chat", thinking = false)).isNotNull()
+        assertThat(familySamplingFor("SomeRandom 1B", thinking = false)).isNull()
+    }
 }

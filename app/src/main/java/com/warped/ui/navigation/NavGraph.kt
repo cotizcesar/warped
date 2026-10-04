@@ -364,6 +364,13 @@ fun WarpedNavGraph() {
                             launchSingleTop = true
                         }
                     },
+                    onNavigateToEndpoints = {
+                        // 2026-10-04: the unified Models & Endpoints view
+                        // hosts the "Connect to an API" endpoint form.
+                        navController.navigate(Screen.Selector) {
+                            launchSingleTop = true
+                        }
+                    },
                     onNavigateToHelp = navigateToHelp
                 )
             }
@@ -379,6 +386,13 @@ fun WarpedNavGraph() {
                     },
                     onNavigateToCatalog = {
                         navController.navigate(Screen.HuggingFace) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToEndpoints = {
+                        // 2026-10-04: the unified Models & Endpoints view
+                        // hosts the "Connect to an API" endpoint form.
+                        navController.navigate(Screen.Selector) {
                             launchSingleTop = true
                         }
                     },
@@ -401,6 +415,13 @@ fun WarpedNavGraph() {
                     },
                     onNavigateToCatalog = {
                         navController.navigate(Screen.HuggingFace) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToEndpoints = {
+                        // 2026-10-04: the unified Models & Endpoints view
+                        // hosts the "Connect to an API" endpoint form.
+                        navController.navigate(Screen.Selector) {
                             launchSingleTop = true
                         }
                     },
