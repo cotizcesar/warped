@@ -82,8 +82,13 @@ class LMStudioProvider(
         .apply {
             if (!apiKey.isNullOrBlank()) {
                 addInterceptor { chain ->
+                    // Docs use `Authorization: Bearer` on the native REST
+                    // API and accept `x-api-key` too — send both so every
+                    // endpoint authenticates regardless of which header a
+                    // given server version checks.
                     val request = chain.request().newBuilder()
                         .header("x-api-key", apiKey)
+                        .header("Authorization", "Bearer $apiKey")
                         .build()
                     chain.proceed(request)
                 }
