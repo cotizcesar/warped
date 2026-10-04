@@ -112,11 +112,16 @@ class LmStudioHelper @Inject constructor(
         // Idempotency (user report 2026-10-03): every send calls
         // initialize(), which used to POST /models/load unconditionally —
         // the server reloaded (and OOM-killed) the model on every
-        // question. If this same model is already loaded server-side,
-        // skip the reload. Fail-safe direction: any doubt reloads
-        // (today's behavior), a skip needs a positive exact id match.
-        if (initializedModelId == modelPath && isModelLoaded(provider, modelPath)) {
-            Timber.d("LmStudioHelper: $modelPath already loaded server-side — skipping reload")
+        // question. Consult the server first on EVERY call (one cheap
+        // GET): if this model is loaded under any id form, skip the
+        // reload — this also covers fresh starts against an already
+        // holding server. Fail-safe direction: any doubt reloads
+        // (today's behavior), a skip needs a positive exact/slug match.
+        if (isModelLoaded(provider, modelPath)) {
+            if (initializedModelId != modelPath) {
+                Timber.d("LmStudioHelper: $modelPath already loaded server-side — skipping reload")
+            }
+            initializedModelId = modelPath
             return
         }
         Timber.d("LmStudioHelper: initialize(modelPath=$modelPath) — calling loadModel")

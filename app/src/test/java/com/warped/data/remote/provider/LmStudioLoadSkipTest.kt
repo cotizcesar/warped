@@ -87,9 +87,11 @@ class LmStudioLoadSkipTest {
 
     @Test
     fun `second initialize with same loaded model skips reload`() = runBlocking {
+        loadedKeys = emptyList()
         val h = helper(startServer())
 
         h.initialize("m1")
+        loadedKeys = listOf("m1")
         h.initialize("m1")
 
         assertThat(loadCount.get()).isEqualTo(1)
@@ -97,8 +99,11 @@ class LmStudioLoadSkipTest {
 
     @Test
     fun `initialize reloads after server-side eviction`() = runBlocking {
+        loadedKeys = emptyList()
         val h = helper(startServer())
 
+        h.initialize("m1")
+        loadedKeys = listOf("m1")
         h.initialize("m1")
         loadedKeys = emptyList()
         h.initialize("m1")
@@ -136,6 +141,7 @@ class LmStudioLoadSkipTest {
 
     @Test
     fun `second initialize with short id skips when full slug loaded`() = runBlocking {
+        loadedKeys = emptyList()
         val h = helper(startServer())
 
         h.initialize("m1")
