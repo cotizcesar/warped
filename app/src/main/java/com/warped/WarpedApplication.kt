@@ -83,6 +83,11 @@ class WarpedApplication : Application(), Configuration.Provider, SingletonImageL
         // Keystore/MasterKey IO must not block startup (ANR risk) — the
         // removal is idempotent so async timing is safe.
         backgroundScope.launch { cleanupOrphanedSearchAlias() }
+        // One-shot display-name heal: rows saved with the raw file stem
+        // get the catalog display name (or prettified stem). Idempotent —
+        // a no-op once healed — and never throwing (locked DB must not
+        // break launch).
+        backgroundScope.launch { healModelNames() }
         createNotificationChannels()
         // Chain the previous handler (lint DefaultUncaughtExceptionDelegation):
         // log first, then delegate so crash reporting still fires; only when
@@ -137,6 +142,25 @@ class WarpedApplication : Application(), Configuration.Provider, SingletonImageL
         }
     }
 
+    private fun healModelNames() {
+        try {
+            val entryPoint = EntryPointAccessors.fromApplication(
+                this,
+                ModelNameHealEntryPoint::class.java
+            )
+            backgroundScope.launch {
+                try {
+                    val renamed = entryPoint.localModelRepository().healModelNames()
+                    if (renamed > 0) Timber.d("WarpedApp: healed %d model names", renamed)
+                } catch (e: Exception) {
+                    Timber.w(e, "Model name heal skipped")
+                }
+            }
+        } catch (e: Throwable) {
+            Timber.w(e, "Model name heal skipped")
+        }
+    }
+
     private fun createNotificationChannels() {
         // minSdk is 28 — NotificationChannel always exists; no version gate.
         val channel = NotificationChannel(
@@ -184,6 +208,17 @@ class WarpedApplication : Application(), Configuration.Provider, SingletonImageL
 @InstallIn(SingletonComponent::class)
 interface OrphanedSearchCleanupEntryPoint {
     fun keystoreManager(): KeystoreManager
+}
+
+/**
+ * One-shot model-name heal entry point (user decision 2026-10-03).
+ * Hilt injection is available on the Application itself, hence the
+ * EntryPoint lookup.
+ */
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface ModelNameHealEntryPoint {
+    fun localModelRepository(): com.warped.domain.repository.LocalModelRepository
 }
 
 class RedactingTree : Timber.DebugTree() {

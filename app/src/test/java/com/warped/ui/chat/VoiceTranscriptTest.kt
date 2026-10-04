@@ -50,6 +50,7 @@ import java.io.File
 import java.time.Instant
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import org.junit.jupiter.api.Tag
 
 /**
  * Phase 69 Plan 02 (VMSG-07): parallel transcript STT session discipline,
@@ -58,6 +59,7 @@ import java.util.concurrent.TimeUnit
  * invokes); session start/stop wiring is verified against a MockK manager.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
+@Tag("slow")
 class VoiceTranscriptTest {
 
     private val testDispatcher = StandardTestDispatcher()

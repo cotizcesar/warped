@@ -175,7 +175,6 @@ fun UnifiedSelectorScreen(
                     LocalModelSelectorCard(
                         model = model,
                         capabilities = viewModel.effectiveCapabilities(model),
-                        isConnected = uiState.connectedLocalModelId == model.filePath && uiState.isLocalConnected,
                         onDelete = { viewModel.deleteModel(model) },
                         onEditParams = { editingModel = model }
                     )
@@ -201,7 +200,6 @@ fun UnifiedSelectorScreen(
                     items(uiState.endpoints, key = { "endpoint-${it.id}" }) { endpoint ->
                         EndpointSelectorCard(
                             endpoint = endpoint,
-                            isSelected = uiState.selectedRemoteEndpointId == endpoint.id,
                             onUseInChat = {
                                 viewModel.selectRemote(endpoint)
                                 onNavigateToChat()
@@ -229,7 +227,6 @@ fun UnifiedSelectorScreen(
 private fun LocalModelSelectorCard(
     model: LocalModel,
     capabilities: ModelCapabilities,
-    isConnected: Boolean,
     onDelete: () -> Unit,
     onEditParams: () -> Unit
 ) {
@@ -265,7 +262,6 @@ private fun LocalModelSelectorCard(
         audio = capabilities.audio,
         reasoning = capabilities.reasoning,
         tools = capabilities.tools,
-        dotConnected = isConnected,
         onParams = onEditParams,
         trailingActions = {
             IconButton(onClick = { showDeleteConfirm = true }) {
@@ -278,7 +274,6 @@ private fun LocalModelSelectorCard(
 @Composable
 private fun EndpointSelectorCard(
     endpoint: Endpoint,
-    isSelected: Boolean,
     onUseInChat: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
@@ -310,12 +305,6 @@ private fun EndpointSelectorCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (isSelected) {
-                    Box(
-                        modifier = Modifier.size(10.dp).clip(CircleShape).background(Color(0xFF4CAF50))
-                    )
-                    Spacer(Modifier.width(8.dp))
-                }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(endpoint.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(2.dp))

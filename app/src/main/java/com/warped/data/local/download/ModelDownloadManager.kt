@@ -257,10 +257,22 @@ class ModelDownloadManager @Inject constructor(
         _downloadStates.update { it - modelId }
     }
 
+    /**
+     * Drop download records for a deleted model file (called by every
+     * model-deletion path: catalog, Models screen, unified selector).
+     * Without this, a completed in-memory record keeps
+     * isEffectivelyDownloaded() true after the file + DB row are gone and
+     * the catalog shows a ghost "downloaded" card. Matching is by file
+     * name (record key suffix + state field); over-deletion is harmless
+     * because the Room-backed isOnDevice re-asserts real files.
+     */
+    fun forgetDownloadsForFile(fileName: String) {
+        _downloadStates.update { filterOutDeletedFile(it, fileName) }
+    }
+
     fun getDownloadState(modelId: String): DownloadState {
         return _downloadStates.value[modelId] ?: DownloadState(modelId = modelId)
     }
-
     private fun observeWorkProgress(modelId: String, workId: UUID) {
         val observer = Observer<WorkInfo?> { workInfo ->
             if (workInfo == null) return@Observer
@@ -382,3 +394,17 @@ class ModelDownloadManager @Inject constructor(
         }
     }
 }
+
+/**
+ * Pure helper behind [ModelDownloadManager.forgetDownloadsForFile]: drop
+ * every download record belonging to a deleted file, matched by record-key
+ * suffix (`repo/file`) or the record's own fileName. JVM-testable, no
+ * Android surface.
+ */
+internal fun filterOutDeletedFile(
+    records: Map<String, DownloadState>,
+    fileName: String,
+): Map<String, DownloadState> =
+    records.filterNot { (key, state) ->
+        key.substringAfterLast("/") == fileName || state.fileName == fileName
+    }

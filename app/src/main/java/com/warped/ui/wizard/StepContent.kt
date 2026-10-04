@@ -23,7 +23,6 @@ private val TextSecondary = Color(0xFF9CA3AF)
 fun StepContent(
     step: WizardStep,
     contextData: WizardContextData?,
-    onCtaClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -72,23 +71,6 @@ fun StepContent(
                 }
             }
         }
-
-        Spacer(Modifier.height(24.dp))
-
-        if (step.ctaRoute != null) {
-            Button(
-                onClick = onCtaClick,
-                colors = ButtonDefaults.buttonColors(containerColor = Accent),
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(
-                    text = stringResource(step.ctaLabelRes),
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
     }
 }
 
@@ -97,7 +79,7 @@ private fun ContextBadge(step: WizardStep, contextData: WizardContextData) {
     // Wizard shows no "nothing yet" empty states — badges render only when
     // there is something to count; otherwise the card is info-only.
     val text = when (step) {
-        WizardStep.LITERT_LM -> {
+        WizardStep.LOCAL_MODELS -> {
             if (contextData.litertlmModelCount > 0) {
                 val pluralRes = if (contextData.litertlmModelCount == 1) R.string.wizard_litertlm_singular else R.string.wizard_litertlm_plural
                 stringResource(R.string.wizard_badge_has_litertlm, contextData.litertlmModelCount, stringResource(pluralRes))
@@ -105,26 +87,10 @@ private fun ContextBadge(step: WizardStep, contextData: WizardContextData) {
                 ""
             }
         }
-        WizardStep.REMOTE_PROVIDERS -> {
+        WizardStep.NETWORK_MODELS -> {
             if (contextData.endpointCount > 0) {
                 val pluralRes = if (contextData.endpointCount == 1) R.string.wizard_endpoint_singular else R.string.wizard_endpoint_plural
                 stringResource(R.string.wizard_badge_has_endpoints, contextData.endpointCount, stringResource(pluralRes))
-            } else {
-                ""
-            }
-        }
-        WizardStep.PRESETS -> {
-            if (contextData.presetCount > 0) {
-                val pluralRes = if (contextData.presetCount == 1) R.string.wizard_preset_singular else R.string.wizard_preset_plural
-                stringResource(R.string.wizard_badge_has_presets, contextData.presetCount, stringResource(pluralRes))
-            } else {
-                ""
-            }
-        }
-        WizardStep.HISTORY -> {
-            if (contextData.chatCount > 0) {
-                val pluralRes = if (contextData.chatCount == 1) R.string.wizard_chat_singular else R.string.wizard_chat_plural
-                stringResource(R.string.wizard_badge_has_chats, contextData.chatCount, stringResource(pluralRes))
             } else {
                 ""
             }
@@ -156,7 +122,7 @@ private fun contextDescription(step: WizardStep, contextData: WizardContextData?
     if (contextData == null) return stringResource(step.descriptionRes)
 
     return when (step) {
-        WizardStep.LITERT_LM -> {
+        WizardStep.LOCAL_MODELS -> {
             if (contextData.litertlmModelCount > 0) {
                 val pluralRes = if (contextData.litertlmModelCount == 1) R.string.wizard_litertlm_singular else R.string.wizard_litertlm_plural
                 stringResource(R.string.wizard_step_4_desc_has, contextData.litertlmModelCount, stringResource(pluralRes))
@@ -164,26 +130,10 @@ private fun contextDescription(step: WizardStep, contextData: WizardContextData?
                 stringResource(step.descriptionRes)
             }
         }
-        WizardStep.REMOTE_PROVIDERS -> {
+        WizardStep.NETWORK_MODELS -> {
             if (contextData.endpointCount > 0) {
                 val pluralRes = if (contextData.endpointCount == 1) R.string.wizard_endpoint_singular else R.string.wizard_endpoint_plural
                 stringResource(R.string.wizard_step_6_desc_has, contextData.endpointCount, stringResource(pluralRes))
-            } else {
-                stringResource(step.descriptionRes)
-            }
-        }
-        WizardStep.PRESETS -> {
-            if (contextData.presetCount > 0) {
-                val pluralRes = if (contextData.presetCount == 1) R.string.wizard_preset_singular else R.string.wizard_preset_plural
-                stringResource(R.string.wizard_step_8_desc_has, contextData.presetCount, stringResource(pluralRes))
-            } else {
-                stringResource(step.descriptionRes)
-            }
-        }
-        WizardStep.HISTORY -> {
-            if (contextData.chatCount > 0) {
-                val pluralRes = if (contextData.chatCount == 1) R.string.wizard_chat_singular else R.string.wizard_chat_plural
-                stringResource(R.string.wizard_step_9_desc_has, contextData.chatCount, stringResource(pluralRes))
             } else {
                 stringResource(step.descriptionRes)
             }

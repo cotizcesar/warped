@@ -10,9 +10,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.HorizontalDivider
@@ -42,22 +43,22 @@ fun CapabilityIconRow(caps: ModelCapabilities) {
     if (!caps.vision && !caps.reasoning && !caps.tools && !caps.audio) return
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (caps.vision) CapabilityIconBadge(
-            icon = Icons.Filled.Visibility,
+            icon = rememberVectorPainter(image = Icons.Filled.Visibility),
             contentDescription = stringResource(R.string.badge_vision),
             color = Color(0xFF64B5F6)
         )
         if (caps.audio) CapabilityIconBadge(
-            icon = Icons.Filled.Audiotrack,
+            icon = rememberVectorPainter(image = Icons.Filled.Audiotrack),
             contentDescription = stringResource(R.string.badge_audio),
             color = Color(0xFF4CAF50)
         )
         if (caps.reasoning) CapabilityIconBadge(
-            icon = Icons.Filled.Psychology,
+            icon = painterResource(id = com.warped.R.drawable.neurology_24),
             contentDescription = stringResource(R.string.badge_thinking),
             color = Color(0xFFFF9800)
         )
         if (caps.tools) CapabilityIconBadge(
-            icon = Icons.Filled.Build,
+            icon = rememberVectorPainter(image = Icons.Filled.Build),
             contentDescription = stringResource(R.string.badge_tools),
             color = Color(0xFF2196F3)
         )
@@ -66,7 +67,7 @@ fun CapabilityIconRow(caps: ModelCapabilities) {
 
 @Composable
 fun CapabilityIconBadge(
-    icon: ImageVector,
+    icon: androidx.compose.ui.graphics.painter.Painter,
     contentDescription: String,
     color: Color
 ) {
@@ -75,7 +76,7 @@ fun CapabilityIconBadge(
         color = color.copy(alpha = 0.12f)
     ) {
         Icon(
-            imageVector = icon,
+            painter = icon,
             contentDescription = contentDescription,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp).size(14.dp),
             tint = color
@@ -102,28 +103,28 @@ fun CapabilityTable(
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         CapabilityTableRow(
-            icon = Icons.Filled.Audiotrack,
+            icon = rememberVectorPainter(image = Icons.Filled.Audiotrack),
             label = stringResource(R.string.badge_audio),
             status = if (audio) stringResource(R.string.cap_status_input) else "–"
         )
         CapabilityTableRow(
-            icon = Icons.Filled.Psychology,
+            icon = painterResource(id = com.warped.R.drawable.neurology_24),
             label = stringResource(R.string.badge_thinking),
             status = if (reasoning) "✓" else "–"
         )
         CapabilityTableRow(
-            icon = Icons.Filled.Visibility,
+            icon = rememberVectorPainter(image = Icons.Filled.Visibility),
             label = stringResource(R.string.badge_vision),
             status = if (vision) stringResource(R.string.cap_status_input) else "–"
         )
         CapabilityTableRow(
-            icon = Icons.Filled.Build,
+            icon = rememberVectorPainter(image = Icons.Filled.Build),
             label = stringResource(R.string.badge_tools),
             status = if (tools) "✓" else "–",
             showDivider = false
         )
         CapabilityTableRow(
-            icon = Icons.Filled.TextFields,
+            icon = rememberVectorPainter(image = Icons.Filled.TextFields),
             label = stringResource(R.string.cap_text),
             status = stringResource(R.string.cap_status_inout),
             showDivider = false
@@ -133,7 +134,7 @@ fun CapabilityTable(
 
 @Composable
 private fun CapabilityTableRow(
-    icon: ImageVector,
+    icon: androidx.compose.ui.graphics.painter.Painter,
     label: String,
     status: String,
     showDivider: Boolean = true
@@ -145,7 +146,7 @@ private fun CapabilityTableRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = icon,
+            painter = icon,
             contentDescription = null,
             modifier = Modifier.size(20.dp),
             tint = Color(0xFF9CA3AF)

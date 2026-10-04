@@ -239,4 +239,80 @@ class RemoteImageCarryTest {
             .containsExactly("a", "b", "c")
             .inOrder()
     }
+
+    // ------------------------------------------------------------------
+    // Current-turn images (user report 2026-10-03 — compat paths dropped
+    // the live photo and the model answered "no image attached")
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `openai current-turn images fuse onto the last user row`() {
+        val messages = listOf(
+            user("old", images = listOf(img("A"))),
+            assistant("a cat"),
+            user("describe esta imagen."),
+        )
+        val mapped = mapOpenAiHistory(
+            messages,
+            includeSystem = false,
+            sanitizeUser = sanitizer::sanitize,
+            currentImages = listOf(img("NOW")),
+        )
+        assertThat(mapped).hasSize(3)
+        assertThat(mapped[0].imageUrls).containsExactly(img("A"))
+        assertThat(mapped[2].imageUrls).containsExactly(img("NOW"))
+        assertThat(mapped[2].content).isEqualTo("describe esta imagen.")
+    }
+
+    @Test
+    fun `openai current image dedupes against history urls`() {
+        val messages = listOf(
+            user("old", images = listOf(img("A"))),
+            user("again"),
+        )
+        val mapped = mapOpenAiHistory(
+            messages,
+            includeSystem = false,
+            sanitizeUser = sanitizer::sanitize,
+            currentImages = listOf(img("A")),
+        )
+        assertThat(mapped[1].imageUrls).containsExactly(img("A"))
+    }
+
+    @Test
+    fun `ollama native carries current-turn images as raw base64`() {
+        val provider = OllamaProvider(
+            baseUrl = "http://localhost:11434",
+            modelId = "m",
+            inputSanitizer = mockk { every { sanitize(any()) } answers { firstArg() } },
+        )
+        val messages = listOf(
+            user("old", images = listOf(img("A"))),
+            user("describe esta imagen."),
+        )
+        val mapped = provider.mapNativeMessages(messages, currentImages = listOf(img("NOW")))
+        assertThat(mapped[0].images).containsExactly("A-payload")
+        assertThat(mapped[1].images).containsExactly("NOW-payload")
+    }
+
+    @Test
+    fun `anthropic current-turn images become native image blocks`() {
+        val msg = com.warped.data.remote.dto.AnthropicMessage.userWithImages(
+            "describe esta imagen.",
+            listOf("data:image/png;base64,QUJD", "  ", "notaurl"),
+        )
+        assertThat(msg.role).isEqualTo("user")
+        val blocks = msg.content.jsonArray
+        assertThat(blocks[0].jsonObject["type"]?.jsonPrimitive?.content).isEqualTo("text")
+        assertThat(blocks[0].jsonObject["text"]?.jsonPrimitive?.content)
+            .isEqualTo("describe esta imagen.")
+        val image = blocks[1].jsonObject
+        assertThat(image["type"]?.jsonPrimitive?.content).isEqualTo("image")
+        val source = image["source"]!!.jsonObject
+        assertThat(source["type"]?.jsonPrimitive?.content).isEqualTo("base64")
+        assertThat(source["media_type"]?.jsonPrimitive?.content).isEqualTo("image/png")
+        assertThat(source["data"]?.jsonPrimitive?.content).isEqualTo("QUJD")
+        // Blanks and prefix-less payloads are dropped, never sent.
+        assertThat(blocks).hasSize(2)
+    }
 }

@@ -27,6 +27,12 @@ sealed interface TurnStatus {
     data object Searching : TurnStatus
     data object ThinkingGap : TurnStatus
     data class LoadingModel(val modelName: String, val firstTime: Boolean) : TurnStatus
+    /**
+     * 2026-10-04 Caso 3: remote endpoint probe in flight (ping before
+     * the turn). Non-blocking like every other row — the input stays
+     * usable while the server is verified.
+     */
+    data class Connecting(val modelName: String) : TurnStatus
 }
 
 fun resolveTurnStatus(
@@ -37,8 +43,11 @@ fun resolveTurnStatus(
     isLoadingModel: Boolean = false,
     loadingModelName: String = "",
     loadingFirstTime: Boolean = false,
+    isProbingRemote: Boolean = false,
+    probingModelName: String = "",
 ): TurnStatus? {
     if (isLoadingModel) return TurnStatus.LoadingModel(loadingModelName, loadingFirstTime)
+    if (isProbingRemote) return TurnStatus.Connecting(probingModelName)
     if (toolCallActive != null) return TurnStatus.Tool(toolCallActive)
     if (isFetchingWeb) {
         if (progress == null) return TurnStatus.FetchSingle

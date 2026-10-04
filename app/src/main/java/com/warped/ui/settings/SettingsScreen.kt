@@ -291,6 +291,17 @@ private fun GeneralTab(uiState: SettingsUiState, viewModel: SettingsViewModel, o
         }
 
         item { Spacer(Modifier.height(24.dp)) }
+
+        // Build marker (debug aid): version + code so a screenshot proves
+        // which build is installed. No strings needed (numeric only).
+        item {
+            Text(
+                "v${com.warped.BuildConfig.VERSION_NAME} (${com.warped.BuildConfig.VERSION_CODE})",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 

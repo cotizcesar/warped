@@ -95,6 +95,7 @@ internal object CompatToolLoop {
         var callsUsed = 0
         var capFed = false
         var fallbackDone = false
+        var armedRetried = false
         val contextSize = request.parameters.contextSize
         while (true) {
             coroutineContext.ensureActive()
@@ -108,6 +109,19 @@ internal object CompatToolLoop {
                 return
             }
             if (round.toolsRejected && attachedTools != null && !fallbackDone) {
+                // Transient tolerance (device evidence 2026-10-03: LM
+                // Studio 400s a tools round intermittently, then accepts
+                // the identical body): ONE identical armed retry while no
+                // tool call has executed yet (stateless + store=false, so
+                // side-effect free). A second rejection concludes
+                // incapability → the locked fallback below. Mid-loop
+                // rejections (callsUsed > 0) skip straight to fallback —
+                // those are echo-format issues, not transients.
+                if (callsUsed == 0 && !armedRetried) {
+                    armedRetried = true
+                    Timber.d("$logTag: tools round rejected once — one identical armed retry")
+                    continue
+                }
                 // Locked: exactly one retry of the same turn with tools
                 // null and a clean plain-message replay (partial echoes
                 // dropped — strict servers reject unpaired role:tool),
@@ -213,7 +227,10 @@ internal object CompatToolLoop {
             // The cap string answers from gathered context — the answer
             // round needs no tools[].
             if (capFed) attachedTools = null
-            roundMessages += OpenAiMessage(role = "assistant", toolCalls = assistantEcho)
+            // Echo content must be an explicit empty string (never absent):
+            // LM Studio validates `content` as string-or-array even
+            // alongside tool_calls (device 400, 2026-10-03).
+            roundMessages += OpenAiMessage(role = "assistant", content = "", toolCalls = assistantEcho)
             roundMessages += toolResults
         }
     }
@@ -342,13 +359,21 @@ internal object CompatToolLoop {
         onCallCleared: () -> Unit,
     ): CompatRoundResult {
         coroutineContext.ensureActive()
+        // Docs-supported sampling params ride every round (top_k,
+        // repeat_penalty and seed were silently dropped here while the
+        // native path sent them — inconsistent sampling across paths).
+        // Seed -1 (random) encodes as absent; maxTokens<=0 is omitted
+        // rather than risking a server 400.
         val body = OpenAiChatRequest(
             model = modelId,
             messages = messages,
             stream = true,
             temperature = request.parameters.temperature,
             topP = request.parameters.topP,
-            maxTokens = request.parameters.maxTokens,
+            topK = request.parameters.topK,
+            repeatPenalty = request.parameters.repeatPenalty,
+            maxTokens = request.parameters.maxTokens.takeIf { it > 0 },
+            seed = request.parameters.seed.takeIf { it != -1 },
             tools = tools,
         )
         val call: Call

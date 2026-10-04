@@ -149,9 +149,10 @@ fun MessageBubble(
         } else {
             null
         }
-    if (isStreaming && !message.reasoning.isNullOrBlank()) {
-        showReasoning = true
-    }
+    // Live turns force the panel open (it grows with the trace); completed
+    // turns respect the manual toggle (default shut — the panel collapses
+    // when the answer lands, user decision 2026-10-03).
+    val reasoningExpanded = isStreaming || showReasoning
 
     @OptIn(ExperimentalFoundationApi::class)
     Column(
@@ -218,39 +219,26 @@ fun MessageBubble(
                         )
                         Spacer(Modifier.width(4.dp))
                         Icon(
-                            imageVector = if (showReasoning) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = if (showReasoning) stringResource(R.string.bubble_hide_reasoning) else stringResource(R.string.bubble_show_reasoning),
+                            imageVector = if (reasoningExpanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = if (reasoningExpanded) stringResource(R.string.bubble_hide_reasoning) else stringResource(R.string.bubble_show_reasoning),
                             tint = Color(0xFF545450),
                             modifier = Modifier.size(16.dp)
                         )
                     }
                     AnimatedVisibility(
-                        visible = showReasoning,
+                        visible = reasoningExpanded,
                         enter = expandVertically(),
                         exit = shrinkVertically()
                     ) {
-                        val scrollState = rememberScrollState()
-                        if (isStreaming) {
-                            LaunchedEffect(message.reasoning) {
-                                scrollState.animateScrollTo(scrollState.maxValue)
-                            }
-                        }
-                        val modifier = if (isStreaming) {
-                            Modifier
-                                .padding(start = 16.dp)
-                                .heightIn(max = 72.dp)
-                                .verticalScroll(scrollState)
-                        } else {
-                            Modifier.padding(start = 16.dp)
-                        }
                         Surface(
                             color = Color.Transparent,
-                            modifier = modifier
+                            modifier = Modifier.padding(start = 16.dp)
                         ) {
                             SelectionContainer {
                                 MarkdownText(
                                     text = message.reasoning,
                                     baseColor = Color(0xFF545450),
+                                    fontSize = 16f,
                                     modifier = Modifier
                                         .padding(vertical = 4.dp),
                                     fontStyle = FontStyle.Italic,

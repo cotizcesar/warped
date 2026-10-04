@@ -33,7 +33,7 @@ import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -70,6 +70,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.R
 import com.warped.data.local.inference.BackendType
+import com.warped.domain.model.ConnectionStatus
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.Role
 import kotlinx.coroutines.CancellationException
@@ -98,6 +99,7 @@ fun ChatScreen(
     onOpenDrawer: () -> Unit = {},
     onNavigateToSelector: () -> Unit = {},
     onNavigateToCatalog: () -> Unit = {},
+    onNavigateToEndpoints: () -> Unit = {},
     onNavigateToHelp: () -> Unit = {},
     conversationId: Long = 0L,
     newChat: Boolean = false
@@ -163,8 +165,17 @@ fun ChatScreen(
     // the current viewport.
     var snapToBottomOnNextContent by remember { mutableStateOf(false) }
     var attachedImages by remember { mutableStateOf<List<Uri>>(emptyList()) }
-    var overlayHeightPx by remember { mutableIntStateOf(0) }
+    var inputBarHeightPx by remember { mutableIntStateOf(0) }
     var audioBytes by remember { mutableStateOf<ByteArray?>(null) }
+    // 2026-10-04 leftover snapshots: what the composer held when the
+    // screen last left a chat. Lets the arrival effect below tell a
+    // genuine switch (previous chat's leftover → clear/apply stash)
+    // from a fresh-row transition (null → created id, same session —
+    // freshly typed/attached content must never be wiped).
+    var lastLeftText by remember { mutableStateOf<String?>(null) }
+    var lastLeftImages by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var lastLeftAudio by remember { mutableStateOf<ByteArray?>(null) }
+    var hasLeftChat by remember { mutableStateOf(false) }
     var isRecording by remember { mutableStateOf(false) }
     var showModelPicker by remember { mutableStateOf(false) }
     // Phase 65 (VOICE-02): first-tap rationale visibility. Shown only when
@@ -201,6 +212,10 @@ fun ChatScreen(
     // arriving chat's — so nothing is lost or leaked across chats.
     DisposableEffect(conversationId) {
         onDispose {
+            lastLeftText = input.inputText
+            lastLeftImages = attachedImages
+            lastLeftAudio = audioBytes
+            hasLeftChat = true
             viewModel.stashComposerDraft(
                 transcript.conversationId,
                 input.inputText,
@@ -211,6 +226,18 @@ fun ChatScreen(
     }
     LaunchedEffect(transcript.conversationId) {
         val draft = viewModel.popComposerDraft(transcript.conversationId)
+        // Fresh-row transition (null → newly created id, same composer
+        // session): the user may have typed/attached already — never
+        // wipe it when there is no stash to apply. Genuine switches
+        // always arrive carrying the leftover snapshotted above, which
+        // we clear/apply below.
+        val isLeftover = hasLeftChat &&
+            input.inputText == (lastLeftText ?: "") &&
+            attachedImages == lastLeftImages &&
+            audioBytes == lastLeftAudio
+        if (draft == null && !isLeftover) {
+            return@LaunchedEffect
+        }
         attachedImages = draft?.images.orEmpty()
         audioBytes = draft?.audioBytes
         viewModel.restoreComposerDraft(draft)
@@ -220,6 +247,11 @@ fun ChatScreen(
             snapToBottomOnNextContent = true
             if (newChat) {
                 viewModel.newConversation()
+                // 2026-10-04: a fresh chat starts model-less — open the
+                // existing picker right away so the pick is one tap.
+                // Dismissing without picking leaves the input locked
+                // (No model selected) until the user picks from the bar.
+                showModelPicker = true
             } else {
                 viewModel.loadLastConversation()
             }
@@ -278,13 +310,21 @@ fun ChatScreen(
         }
     }
 
-    // Memory warning dialog
+    // Memory warning dialog (app-styled card + warning icon).
     if (connection.memoryWarningModel != null) {
         val model = connection.memoryWarningModel!!
         val context = androidx.compose.ui.platform.LocalContext.current
         val info = com.warped.data.local.inference.MemoryChecker(context).getMemoryInfo()
-        AlertDialog(
+        WarpedAlertDialog(
             onDismissRequest = { viewModel.dismissMemoryWarning() },
+            icon = {
+                Icon(
+                    Icons.Filled.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(32.dp),
+                )
+            },
             title = { Text(stringResource(R.string.memory_warning_title)) },
             text = {
                 Text(stringResource(R.string.memory_warning_message,
@@ -554,7 +594,10 @@ fun ChatScreen(
         transcript.streamingReasoning.length,
     ) {
         if (totalItems == 0) return@LaunchedEffect
-        if (snapToBottomOnNextContent || isAtBottom) {
+        // User decision 2026-10-03: while generating, the list always
+        // follows live (thinking and answer alike). At rest, the
+        // at-bottom rule + pill apply as before.
+        if (transcript.isStreaming || snapToBottomOnNextContent || isAtBottom) {
             snapToBottomOnNextContent = false
             hasNewContentBelow = false
             listState.pinLastItemEnd(totalItems - 1)
@@ -574,7 +617,7 @@ fun ChatScreen(
 
     Scaffold(
         modifier = Modifier.imePadding(),
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState, modifier = Modifier.padding(bottom = with(density) { overlayHeightPx.toDp() } + 16.dp)) },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState, modifier = Modifier.padding(bottom = with(density) { inputBarHeightPx.toDp() } + 16.dp)) },
         topBar = { /* CHAT-02: removed TopAppBar — model picker is now inline above messages */
             // Drawer remains reachable via swipe (ModalNavigationDrawer around the Scaffold)
             // and the parent NavHost provides the drawer gesture.
@@ -613,16 +656,12 @@ fun ChatScreen(
 
             Box(modifier = Modifier.weight(1f)) {
                 if (isEmpty) {
-                    // Empty state
-                    // Optical centering: the floating input overlay covers
-                    // the bottom of this Box, so center within the area
-                    // above it (overlay height as bottom padding) — logo +
-                    // text sit truly centered in the visible space.
+                    // Empty state, truly centered — the bar is in-flow
+                    // below, nothing floats over this Box.
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .fillMaxWidth()
-                            .padding(bottom = with(density) { overlayHeightPx.toDp() }),
+                            .fillMaxWidth(),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -652,7 +691,7 @@ fun ChatScreen(
                                 start = 16.dp,
                                 end = 16.dp,
                                 top = 8.dp,
-                                bottom = with(density) { overlayHeightPx.toDp() } + 12.dp
+                                bottom = 8.dp
                             ),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
@@ -735,33 +774,20 @@ fun ChatScreen(
                             },
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
-                                .padding(end = 16.dp, bottom = with(density) { overlayHeightPx.toDp() } + 20.dp)
+                                .padding(end = 16.dp, bottom = 12.dp)
                         )
                     }
             }
-                // Floating input overlay (shared by empty + history states):
-                // the list scrolls UNDER a fade + the pill (transparent
-                // surround), so text visibly travels behind instead of
-                // clipping hard at an in-flow bar. Height is measured for
-                // the list's bottom padding + the jump-pill offset.
+            }
+                // In-flow input bar (user decision: no floating overlay —
+                // text never travels behind the bar, so nothing is ever
+                // covered). The measured height feeds the jump-pill and
+                // snackbar offsets only.
                 Column(
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .onSizeChanged { overlayHeightPx = it.height }
+                        .fillMaxWidth()
+                        .onSizeChanged { inputBarHeightPx = it.height }
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(64.dp)
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        Color(0xFF1F1F1E)
-                                    )
-                                )
-                            )
-                    )
                     // Unified turn status (quick-turn-status): ONE transient row
                     // above the input bar — priority model loading > tool >
                     // fetch/search > streaming gap. Never a transcript message, never
@@ -775,6 +801,11 @@ fun ChatScreen(
                         isLoadingModel = connection.isLoadingModel,
                         loadingModelName = connection.loadingModelName,
                         loadingFirstTime = connection.loadingFirstTime,
+                        // 2026-10-04 Caso 3: remote ping in flight — shows
+                        // the loading row without locking the input.
+                        isProbingRemote = connection.selectedRemoteModelId != null &&
+                            connection.connectionStatus == ConnectionStatus.Connecting,
+                        probingModelName = connection.selectedRemoteModelId.orEmpty(),
                     )
                     TurnStatusRow(status = turnStatus)
                     // Phase 68 (VMSG-02): the draft card sends voice + caption
@@ -802,6 +833,7 @@ fun ChatScreen(
                     }
                     ChatInputBar(
                     text = input.inputText,
+                    textGeneration = input.inputTextGeneration,
                     isGenerating = input.isGenerating,
                     canSend = (connection.selectedLocalModelId ?: connection.selectedRemoteModelId) != null,
                     onTextChange = { viewModel.updateInput(it) },
@@ -860,14 +892,26 @@ fun ChatScreen(
                     attachedDocTruncatedAt = readyDoc?.truncatedAt,
                     onRemoveDocument = { viewModel.clearDocument() },
                 )
-                }
             }
 
+            // 2026-10-04 silent-RED fix: load failures are durable states
+            // (missing file, short RAM — retrying blindly fails the same
+            // way), so this banner STICKS with an explicit Retry instead
+            // of auto-dismissing into an unexplained red light.
             if (connection.modelLoadError != null) {
                 Snackbar(
                     modifier = Modifier.padding(16.dp),
-                    action = { TextButton(onClick = { viewModel.clearModelLoadError() }) { Text(stringResource(R.string.dismiss)) } }
-                ) { Text(connection.modelLoadError ?: "") }
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    action = {
+                        Row {
+                            TextButton(onClick = { viewModel.retryLocalMount() }) { Text(stringResource(R.string.bubble_retry)) }
+                            TextButton(onClick = { viewModel.clearModelLoadError() }) { Text(stringResource(R.string.dismiss)) }
+                        }
+                    }
+                ) {
+                    Text(connection.modelLoadError ?: "")
+                }
             }
 
             if (transcript.error != null) {
@@ -989,7 +1033,8 @@ fun ChatScreen(
             onModelSelected = { modelId, providerType, endpointId ->
                 viewModel.launchModelSelection(modelId, providerType, endpointId)
             },
-            onNavigateToCatalog = { showModelPicker = false; onNavigateToCatalog() }
+            onNavigateToCatalog = { showModelPicker = false; onNavigateToCatalog() },
+            onNavigateToEndpoints = { showModelPicker = false; onNavigateToEndpoints() }
         )
     }
 }
@@ -1191,7 +1236,7 @@ private fun InlineModelSelectorBar(
                             modifier = Modifier.size(40.dp),
                         ) {
                             Icon(
-                                Icons.Filled.Psychology,
+                                painterResource(id = R.drawable.neurology_24),
                                 contentDescription = stringResource(R.string.cd_toggle_thinking),
                                 tint = if (thinkingEnabled) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
@@ -1244,6 +1289,10 @@ private fun TurnStatusRow(status: TurnStatus?) {
         } else {
             stringResource(R.string.loading_model, status.modelName.substringAfterLast("/"))
         }
+        // 2026-10-04 Caso 3: remote ping in flight — same "loading"
+        // copy the user asked for, non-blocking.
+        is TurnStatus.Connecting ->
+            stringResource(R.string.loading_model, status.modelName.substringAfterLast("/"))
     }
     val statusCd = when (status) {
         is TurnStatus.Tool -> stringResource(R.string.cd_running_tool, status.text)
@@ -1254,7 +1303,7 @@ private fun TurnStatusRow(status: TurnStatus?) {
         is TurnStatus.LoadingModel -> stringResource(
             if (status.firstTime) R.string.loading_model_first_cd else R.string.loading_model_cd
         )
-        is TurnStatus.LoadingModel -> stringResource(R.string.loading_model_cd)
+        is TurnStatus.Connecting -> stringResource(R.string.loading_model_cd)
     }
     Row(
         modifier = Modifier

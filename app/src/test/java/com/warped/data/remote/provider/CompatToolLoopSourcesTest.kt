@@ -23,11 +23,17 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.double
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.net.InetSocketAddress
+import org.junit.jupiter.api.Tag
 
 /**
  * Quick-task (agentic-rows): the shared compat loop surfaces per-call
@@ -39,6 +45,7 @@ import java.net.InetSocketAddress
  * final answer. The `web_search` executor is a mocked DDG repository with
  * known details.
  */
+@Tag("slow")
 class CompatToolLoopSourcesTest {
 
     private val ddg = mockk<DuckDuckGoSearchRepository>()
@@ -197,5 +204,187 @@ class CompatToolLoopSourcesTest {
         // images leg (all four loop executors populate from this).
         assertThat(LocalToolLoop.searchImages(outcome))
             .containsExactly("https://r.example/grid1.png")
+    }
+
+    /**
+     * Transient-rejection tolerance (device evidence 2026-10-03): a lone
+     * 400 naming tools is retried armed once before concluding
+     * incapability — the server accepts the identical body right after.
+     */
+    private fun startFlakyServer(firstCode: Int, firstBody: String, restBody: String) {
+        startFlakyServer(listOf(firstCode to firstBody), restBody)
+    }
+
+    /**
+     * Scripted rounds: each hit consumes the next (code, body); hits past
+     * the script replay the last entry. Lets the double-400 test fail the
+     * armed attempt AND the armed retry, then answer the model-only
+     * fallback cleanly.
+     */
+    private fun startFlakyServer(script: List<Pair<Int, String>>, restBody: String) {
+        val hits = java.util.concurrent.atomic.AtomicInteger(0)
+        server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/chat") { exchange ->
+            val n = hits.incrementAndGet()
+            val (code, body) = script.getOrElse(n - 1) { 200 to restBody }
+            val bytes = body.toByteArray()
+            exchange.sendResponseHeaders(code, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+        }
+        server.start()
+        postUrl = "http://127.0.0.1:${server.address.port}/chat"
+    }
+
+    private suspend fun runTurnTokens(): List<StreamToken> {
+        val request = ChatRequest(
+            messages = listOf(ChatMessage(role = Role.USER, content = "q")),
+        )
+        return kotlinx.coroutines.flow.flow<StreamToken> {
+            with(CompatToolLoop) {
+                runTurn(
+                    client = client,
+                    json = json,
+                    postUrl = postUrl,
+                    modelId = "test-model",
+                    baseMessages = listOf(OpenAiMessage(role = "user", content = "q")),
+                    request = request,
+                    ddg = ddg,
+                    multiUrlFetcher = multiUrlFetcher,
+                    webPageFetcher = webPageFetcher,
+                    logTag = "Test",
+                    onCallCreated = {},
+                    onCallCleared = {},
+                )
+            }
+        }.toList()
+    }
+
+    @Test
+    fun `transient tools four hundred retries armed without notice`() = runTest {
+        startFlakyServer(
+            firstCode = 400,
+            firstBody = """{"error":{"message":"tool call failed transiently","type":"invalid_request_error"}}""",
+            restBody = """{"choices":[{"message":{"content":"recovered answer"}}]}""",
+        )
+
+        val tokens = runTurnTokens()
+
+        assertThat(tokens.filterIsInstance<StreamToken.ToolsUnsupported>()).isEmpty()
+        assertThat(tokens.filterIsInstance<StreamToken.Delta>().map { it.content })
+            .contains("recovered answer")
+        assertThat(tokens.last()).isInstanceOf(StreamToken.Done::class.java)
+    }
+
+    @Test
+    fun `double tools four hundred falls back with exactly one notice`() = runTest {
+        val rejection = """{"error":{"message":"model does not support tool use","type":"invalid_request_error"}}"""
+        startFlakyServer(
+            script = listOf(
+                400 to rejection,
+                400 to rejection,
+            ),
+            restBody = """{"choices":[{"message":{"content":"model-only answer"}}]}""",
+        )
+
+        val tokens = runTurnTokens()
+
+        // Armed retry + model-only fallback both run to completion.
+        assertThat(tokens.filterIsInstance<StreamToken.ToolsUnsupported>()).hasSize(1)
+        assertThat(tokens.filterIsInstance<StreamToken.Delta>().map { it.content })
+            .contains("model-only answer")
+        assertThat(tokens.last()).isInstanceOf(StreamToken.Done::class.java)
+    }
+
+    @Test
+    fun `compat rounds carry full sampling params`() = runTest {
+        var capturedBody = ""
+        server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/chat") { exchange ->
+            capturedBody = exchange.requestBody.readAllBytes().toString(Charsets.UTF_8)
+            val body = """{"choices":[{"message":{"content":"ok"}}]}""".toByteArray()
+            exchange.sendResponseHeaders(200, body.size.toLong())
+            exchange.responseBody.use { it.write(body) }
+        }
+        server.start()
+        postUrl = "http://127.0.0.1:${server.address.port}/chat"
+
+        runTurnTokens()
+
+        // Docs-supported sampling (top_k, repeat_penalty, seed) must ride
+        // the compat rounds like the native path — silent drops here
+        // meant inconsistent sampling across paths.
+        val parsed = kotlinx.serialization.json.Json.parseToJsonElement(capturedBody).jsonObject
+        assertThat(parsed["top_k"]?.jsonPrimitive?.int).isEqualTo(40)
+        assertThat(parsed["repeat_penalty"]?.jsonPrimitive?.double ?: -1.0)
+            .isWithin(0.001).of(1.1)
+        assertThat(parsed["max_tokens"]?.jsonPrimitive?.int).isEqualTo(2048)
+        // Seed -1 (random) encodes null, never a literal -1 the server
+        // could pin.
+        val seed = parsed["seed"]
+        assertThat(seed == null || seed is kotlinx.serialization.json.JsonNull).isTrue()
+    }
+
+    @Test
+    fun `compat rounds carry the current-turn image as image_url`() = runTest {
+        var capturedBody = ""
+        server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/chat") { exchange ->
+            capturedBody = exchange.requestBody.readAllBytes().toString(Charsets.UTF_8)
+            val body = """{"choices":[{"message":{"content":"veo una foto"}}]}""".toByteArray()
+            exchange.sendResponseHeaders(200, body.size.toLong())
+            exchange.responseBody.use { it.write(body) }
+        }
+        server.start()
+        postUrl = "http://127.0.0.1:${server.address.port}/chat"
+
+        // History carry (last message excluded) + live turn images, like
+        // the LM Studio armed branch builds them.
+        val history = com.warped.domain.model.ChatMessage(
+            role = com.warped.domain.model.Role.USER,
+            content = "old",
+        )
+        val live = com.warped.domain.model.ChatMessage(
+            role = com.warped.domain.model.Role.USER,
+            content = "describe esta imagen.",
+        )
+        val base = mapOpenAiHistory(
+            listOf(history, live),
+            includeSystem = false,
+            sanitizeUser = { it },
+            currentImages = listOf("data:image/png;base64,QUJD"),
+        )
+        val request = ChatRequest(
+            messages = listOf(history, live),
+        )
+        kotlinx.coroutines.flow.flow<StreamToken> {
+            with(CompatToolLoop) {
+                runTurn(
+                    client = client,
+                    json = json,
+                    postUrl = postUrl,
+                    modelId = "test-model",
+                    baseMessages = base,
+                    request = request,
+                    ddg = ddg,
+                    multiUrlFetcher = multiUrlFetcher,
+                    webPageFetcher = webPageFetcher,
+                    logTag = "Test",
+                    onCallCreated = {},
+                    onCallCleared = {},
+                )
+            }
+        }.toList()
+
+        val parsed = kotlinx.serialization.json.Json.parseToJsonElement(capturedBody).jsonObject
+        val messages = parsed["messages"]!!.jsonArray
+        val last = messages.last().jsonObject
+        val parts = last["content"]!!.jsonArray
+        val images = parts.filter {
+            it.jsonObject["type"]?.jsonPrimitive?.content == "image_url"
+        }
+        assertThat(images).hasSize(1)
+        assertThat(
+            images.single().jsonObject["image_url"]!!.jsonObject["url"]?.jsonPrimitive?.content
+        ).isEqualTo("data:image/png;base64,QUJD")
     }
 }

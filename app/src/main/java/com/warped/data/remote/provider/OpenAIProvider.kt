@@ -128,6 +128,7 @@ class OpenAIProvider(
             request.messages,
             includeSystem = false,
             sanitizeUser = inputSanitizer::sanitize,
+            currentImages = request.images,
         )
         // Phase 57 (57-01): unarmed turns keep the exact pre-57 plain path;
         // armed turns run the tools[] round driver below.
@@ -453,7 +454,10 @@ class OpenAIProvider(
             stream = true,
             temperature = request.parameters.temperature,
             topP = request.parameters.topP,
-            maxTokens = request.parameters.maxTokens,
+            topK = request.parameters.topK,
+            repeatPenalty = request.parameters.repeatPenalty,
+            maxTokens = request.parameters.maxTokens.takeIf { it > 0 },
+            seed = request.parameters.seed.takeIf { it != -1 },
             tools = tools,
         )
         val call: Call

@@ -488,7 +488,10 @@ private fun DownloadCard(
                 onDeleteIncomplete = onDeleteIncomplete,
                 onPause = onPause,
                 onResume = onResume,
-                onRetry = onRetry
+                onRetry = onRetry,
+                // Standalone card: derive a short label from the download
+                // id (repo segment), never the raw file name.
+                title = download.modelId.substringBeforeLast("/").substringAfterLast("/"),
             )
         }
     }

@@ -85,7 +85,6 @@ class ActiveDownloadPauseTest {
             activeModelSelection = mockk(relaxed = true),
             engineManager = mockk(relaxed = true),
             modelImportManager = mockk(relaxed = true),
-            chatRepository = mockk(relaxed = true),
             context = mockk(relaxed = true),
         )
     }

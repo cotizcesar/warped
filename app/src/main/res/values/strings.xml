@@ -13,6 +13,8 @@
     <string name="connected">Connected</string>
     <string name="disconnected">Disconnected</string>
     <string name="connection_lost">Connection lost. Tap to retry.</string>
+    <string name="empty_answer_notice">The model didn\'t produce an answer. Try again.</string>
+    <string name="remote_probe_failed_fmt">Couldn\'t reach %1$s</string>
     <string name="new_chat">New Chat</string>
     <string name="type_message">Type a message…</string>
     <string name="select_model">Select a model</string>
@@ -20,8 +22,11 @@
     <string name="download_model_first">Download this model before using it for local chat.</string>
     <string name="thinking">Thinking</string>
     <string name="use_in_chat">Use in chat</string>
+    <string name="catalog_coming_soon">Coming soon</string>
+    <string name="preset_apply">Apply</string>
     <string name="hf_section_downloaded">Downloaded</string>
     <string name="hf_section_available">Available models</string>
+    <string name="hf_section_recommended">Recommended</string>
     <string name="active_downloads">Active Downloads</string>
     <string name="local_models">Local Models</string>
     <string name="network_endpoints">Network Endpoints</string>
@@ -131,6 +136,9 @@
     <string name="wizard_step_8_desc_no">Create your first generation preset. Define temperature, max tokens, seed, and more to reuse your favorite settings.</string>
     <string name="wizard_step_9_desc_has">You already have %1$d %2$s in your history. Pick up any of them from the conversation panel.</string>
     <string name="wizard_step_9_desc_no">Your conversation history will appear here. Each chat is automatically saved so you can return to it anytime.</string>
+    <!-- 2026-10-04 wizard privacy step -->
+    <string name="wizard_privacy_title">Private by Design</string>
+    <string name="wizard_privacy_desc">Local chats never leave your device — no account, no cloud, no tracking. Network chats go only to the provider you configure, with your API keys encrypted on-device.</string>
 
     <!-- Wizard context badges -->
     <string name="wizard_badge_has_litertlm">You have %1$d LiteRT-LM %2$s imported</string>
@@ -281,7 +289,9 @@
     <string name="doc_reader_attached">Document attached: %1$s</string>
     <string name="attach_menu_content_desc">Attach photos or files</string>
     <string name="attach_menu_photos">Photos</string>
+    <string name="attach_menu_photos_desc">Send images with your message</string>
     <string name="attach_menu_files">Files</string>
+    <string name="attach_menu_files_desc">Attach a text file to read</string>
 
     <!-- Capability badges -->
     <string name="badge_vision">Vision</string>
@@ -341,7 +351,6 @@
     <string name="hf_download_model">Download model</string>
     <string name="hf_load_failed">Couldn\'t load the model catalog. Restart the app and try again.</string>
     <string name="catalog_activation_failed">Couldn\'t open that model in chat. Try again.</string>
-    <string name="catalog_in_use">In use</string>
     <string name="hf_expand">Expand details</string>
     <string name="hf_collapse">Collapse details</string>
 
@@ -354,6 +363,7 @@
     <string name="models_memory_msg_fmt">This model needs ~%1$d MB, your device has %2$d MB available. Loading may cause instability.</string>
     <string name="selector_no_models">No models available. Download one to get started.</string>
     <string name="drawer_empty_download_cta">Download a model</string>
+    <string name="selector_add_endpoint">Add an Endpoint</string>
     <string name="models_empty_download_cta">Download a local model</string>
     <string name="models_empty_add_endpoint_cta">Add a new Endpoint</string>
     <string name="selector_no_local">No local models downloaded</string>
@@ -391,6 +401,7 @@
     <string name="param_seed">Seed</string>
     <string name="param_seed_hint">Seed (-1 for random)</string>
     <string name="param_threads">Threads</string>
+    <string name="param_thinking">Thinking</string>
     <string name="param_desc_temperature">Controls randomness. Lower = more deterministic.</string>
     <string name="param_desc_top_p">Nucleus sampling. Lower = more focused.</string>
     <string name="param_desc_top_k">Limits token selection to top K.</string>
@@ -398,6 +409,8 @@
     <string name="param_desc_maxtokens">Maximum output tokens per response.</string>
     <string name="param_desc_context">Maximum context window size.</string>
     <string name="param_desc_seed">Random seed. -1 = random each time.</string>
+    <string name="param_desc_threads">CPU threads for inference. More is faster until memory bandwidth saturates.</string>
+    <string name="param_desc_thinking">Lets capable models reason step by step before answering. No effect on models without thinking support.</string>
     <string name="param_random">Random</string>
     <string name="preset_unsupported_litertlm">Unsupported for LiteRT-LM</string>
     <string name="preset_reset">Reset</string>

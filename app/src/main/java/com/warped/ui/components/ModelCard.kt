@@ -16,9 +16,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
@@ -77,6 +78,7 @@ fun ModelCard(
     sizeText: String,
     ramText: String? = null,
     metaChips: List<String> = emptyList(),
+    textBadge: Boolean = true,
     vision: Boolean = false,
     audio: Boolean = false,
     reasoning: Boolean = false,
@@ -128,31 +130,35 @@ fun ModelCard(
                             )
                         }
                     }
-                    // Text badge always: every model chats (explicit per UX).
+                    // Text badge only when the model actually chats —
+                    // coming-soon non-chat entries (ASR/TTS/...) show no
+                    // badges at all, just the Próximamente pill.
                     Spacer(Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        CapabilityIconBadge(
-                            icon = Icons.Filled.TextFields,
-                            contentDescription = stringResource(R.string.cap_text),
-                            color = Color(0xFF9CA3AF)
-                        )
+                        if (textBadge) {
+                            CapabilityIconBadge(
+                                icon = rememberVectorPainter(image = Icons.Filled.TextFields),
+                                contentDescription = stringResource(R.string.cap_text),
+                                color = Color(0xFF9CA3AF)
+                            )
+                        }
                         if (vision) CapabilityIconBadge(
-                            icon = Icons.Filled.Visibility,
+                            icon = rememberVectorPainter(image = Icons.Filled.Visibility),
                             contentDescription = stringResource(R.string.badge_vision),
                             color = Color(0xFF64B5F6)
                         )
                         if (audio) CapabilityIconBadge(
-                            icon = Icons.Filled.Audiotrack,
+                            icon = rememberVectorPainter(image = Icons.Filled.Audiotrack),
                             contentDescription = stringResource(R.string.badge_audio),
                             color = Color(0xFF4CAF50)
                         )
                         if (reasoning) CapabilityIconBadge(
-                            icon = Icons.Filled.Psychology,
+                            icon = painterResource(id = com.warped.R.drawable.neurology_24),
                             contentDescription = stringResource(R.string.badge_thinking),
                             color = Color(0xFFFF9800)
                         )
                         if (tools) CapabilityIconBadge(
-                            icon = Icons.Filled.Build,
+                            icon = rememberVectorPainter(image = Icons.Filled.Build),
                             contentDescription = stringResource(R.string.badge_tools),
                             color = Color(0xFF2196F3)
                         )

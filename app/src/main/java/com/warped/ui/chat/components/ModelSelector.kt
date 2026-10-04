@@ -3,12 +3,12 @@ package com.warped.ui.chat.components
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
@@ -19,14 +19,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -42,7 +41,6 @@ import com.warped.R
 import com.warped.domain.model.Endpoint
 import com.warped.domain.model.LocalModel
 import com.warped.domain.model.ProviderType
-import com.warped.ui.theme.WarpedAccent
 import kotlinx.coroutines.launch
 
 /**
@@ -60,7 +58,9 @@ fun ModelSelectorSheet(
     endpointModels: Map<Long, List<String>> = emptyMap(),
     onDismiss: () -> Unit,
     onModelSelected: (String, ProviderType, Long?) -> Unit,
-    onNavigateToCatalog: () -> Unit = {}
+    onNavigateToCatalog: () -> Unit = {},
+    // 2026-10-04: footer action next to "Download a model".
+    onNavigateToEndpoints: () -> Unit = {}
 ) {
     if (!visible) return
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -167,21 +167,43 @@ fun ModelSelectorSheet(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(Modifier.height(16.dp))
-                    Button(
-                        onClick = {
-                            onDismiss()
-                            onNavigateToCatalog()
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = WarpedAccent),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            stringResource(R.string.drawer_empty_download_cta),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White
-                        )
-                    }
+                }
+            }
+
+            // 2026-10-04 footer: always-visible pair — download a local
+            // model or add a network endpoint. (The old empty-state-only
+            // download button is subsumed by this row.)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp, bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        onDismiss()
+                        onNavigateToCatalog()
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.drawer_empty_download_cta),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                OutlinedButton(
+                    onClick = {
+                        onDismiss()
+                        onNavigateToEndpoints()
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.selector_add_endpoint),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                 }
             }
         }

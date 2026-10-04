@@ -54,9 +54,11 @@ class EngineLifecycleRegressionTest {
 
         m.unloadCurrent()
 
-        verify(exactly = 1) { engine.close() }
+        // 2026-10-04 async-close contract: state flips synchronously,
+        // the native close lands shortly after, off-thread.
         assertThat(m.isEngineLoaded()).isFalse()
         assertThat(m.getActiveEngine()).isNull()
+        verify(timeout = 5000) { engine.close() }
     }
 
     @Test
@@ -66,6 +68,10 @@ class EngineLifecycleRegressionTest {
         val second = modelFile("e2b-b.litertlm")
         m.switchToLiteRT(first.absolutePath)
         m.unloadCurrent()
+        // Drain the pending async close first: deterministic sequencing
+        // (otherwise the close may land after the reload and stand down
+        // on seeing the fresh engine — also correct, but uncountable).
+        verify(timeout = 5000) { engine.close() }
         m.switchToLiteRT(second.absolutePath)
 
         // Two inits (one per load), exactly one close (the unload) — the
@@ -93,9 +99,9 @@ class EngineLifecycleRegressionTest {
 
         m.scheduleUnload()
 
-        verify(exactly = 1) { engine.close() }
         assertThat(m.isEngineLoaded()).isFalse()
         assertThat(m.getActiveEngine()).isNull()
+        verify(timeout = 5000) { engine.close() }
     }
 
     @Test

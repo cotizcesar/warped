@@ -3,6 +3,7 @@ package com.warped.data.local.inference
 import android.content.Context
 import android.net.Uri
 import com.warped.domain.model.LocalModel
+import com.warped.domain.model.prettyModelName
 import com.warped.domain.repository.LocalModelRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -45,7 +46,7 @@ class ModelImportManager @Inject constructor(
                 }
 
                 val localModel = LocalModel(
-                    name = fileName.removeSuffix(".litertlm"),
+                    name = prettyModelName(fileName),
                     filePath = destFile.absolutePath,
                     sizeBytes = destFile.length(),
                     quantization = "N/A",

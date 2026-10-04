@@ -210,10 +210,9 @@ class ChatLoopSourcesTest {
         vm.sendMessage("latest news")
         advanceUntilIdle()
 
-        // Always-on: the VM pre-search runs (stubbed model-only above)
-        // and the loop rows union with it — here the pre-search half is
-        // empty, so rows come from the loop only.
-        coVerify(exactly = 1) { ddgSearchRepository.search(any(), any(), any(), any()) }
+        // No VM pre-search (user decision 2026-10-03) — rows come from
+        // the loop only.
+        coVerify(exactly = 0) { ddgSearchRepository.search(any(), any(), any(), any()) }
         val messageSlot = slot<ChatMessage>()
         val sourcesSlot = slot<List<GroundedSource>>()
         coVerify(exactly = 1) {
@@ -300,11 +299,12 @@ class ChatLoopSourcesTest {
     }
 
     @Test
-    fun `history keeps originals - only the outgoing request carries augmented text`() = runTest {
+    fun `history keeps originals - outgoing request carries raw text (no pre-search)`() = runTest {
         // HISTORY-SEMANTICS DECISION (keep-as-is): Room persists the
-        // ORIGINAL user text; augmentation (SYSTEM_PROMPT, no fused block
-        // on model-only pre-search turns) lives only on the outgoing
-        // request's current message — never rewritten into history.
+        // ORIGINAL user text. Since user decision 2026-10-03 there is no
+        // VM pre-search, so the outgoing request's current message is
+        // the raw user text too — augmentation only ever comes from
+        // pasted-URL fetches (not this test) or the provider-side loop.
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
         helperTokens = listOf(
@@ -318,18 +318,13 @@ class ChatLoopSourcesTest {
         vm.sendMessage("latest news")
         advanceUntilIdle()
 
-        // Outgoing request: the single-turn history entry carries the
-        // augmented current message (SYSTEM_PROMPT prefix, original
-        // question preserved, no fused block on armed turns).
+        // Outgoing request: raw user text, no SYSTEM_PROMPT prefix, no
+        // fused block — the loop works provider-side on the same text.
         val requestSlot = slot<com.warped.domain.model.ChatRequest>()
         coVerify(exactly = 1) { lastHelper.runInference(capture(requestSlot), any()) }
         val sent = requestSlot.captured.messages
         assertThat(sent).hasSize(1)
-        assertThat(sent.single().content).startsWith(
-            com.warped.data.grounding.GroundingPrompt.SYSTEM_PROMPT,
-        )
-        assertThat(sent.single().content).contains("latest news")
-        // Model-only pre-search: no fused Source block injected.
+        assertThat(sent.single().content).isEqualTo("latest news")
         assertThat(sent.single().content).doesNotContain("--- Source [")
 
         // Persisted user row keeps the original — no augmentation leaks

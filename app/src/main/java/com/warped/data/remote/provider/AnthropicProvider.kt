@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
 import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -115,7 +116,7 @@ class AnthropicProvider(
 
     override fun chat(request: ChatRequest): Flow<StreamToken> = flow {
         val systemMessage = request.messages.firstOrNull { it.role.name == "SYSTEM" }?.content
-        val baseMessages = request.messages
+        val mapped = request.messages
             .filter { it.role.name != "SYSTEM" && it.content.isNotBlank() }
             .map {
                 // Phase 49 (DEL-01): Anthropic has no tool role (only
@@ -129,6 +130,23 @@ class AnthropicProvider(
                     AnthropicMessage.text(it.role.name.lowercase(), content)
                 }
             }
+        // Current-turn images ride as native `image` blocks on the last
+        // user message (user report 2026-10-03: the compat paths dropped
+        // them and the model answered "no image attached").
+        val baseMessages = if (request.images.isEmpty()) {
+            mapped
+        } else {
+            val lastUser = mapped.indexOfLast { it.role == "user" }
+            if (lastUser < 0) {
+                mapped
+            } else {
+                val current = mapped[lastUser]
+                val text = (current.content as? JsonPrimitive)?.content.orEmpty()
+                mapped.toMutableList().also {
+                    it[lastUser] = AnthropicMessage.userWithImages(text, request.images)
+                }
+            }
+        }
         // Phase 57 (57-02): unarmed turns keep the exact pre-57 plain path;
         // armed turns run the native tools/tool_use/tool_result round driver.
         if (!isLoopArmed(request.webOverride)) {
@@ -243,6 +261,7 @@ class AnthropicProvider(
         var callsUsed = 0
         var capFed = false
         var fallbackDone = false
+        var armedRetried = false
         val contextSize = request.parameters.contextSize
         while (true) {
             coroutineContext.ensureActive()
@@ -253,6 +272,16 @@ class AnthropicProvider(
                 return
             }
             if (round.toolsRejected && attachedTools != null && !fallbackDone) {
+                // Transient tolerance (CompatToolLoop parity, device
+                // evidence 2026-10-03): one identical armed retry while no
+                // tool call has executed yet. Mid-loop rejections go
+                // straight to fallback (echo-format issues, not
+                // transients).
+                if (callsUsed == 0 && !armedRetried) {
+                    armedRetried = true
+                    Timber.d("Anthropic: tools round rejected once — one identical armed retry")
+                    continue
+                }
                 // Locked: exactly one retry of the same turn without tools
                 // and a clean plain-message replay (partial echoes
                 // dropped), plus the visible notice through the
