@@ -33,7 +33,6 @@ import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -70,6 +69,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.warped.R
+import com.warped.ui.components.BrainIcon
 import com.warped.data.local.inference.BackendType
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.Role
@@ -164,7 +164,7 @@ fun ChatScreen(
     // the current viewport.
     var snapToBottomOnNextContent by remember { mutableStateOf(false) }
     var attachedImages by remember { mutableStateOf<List<Uri>>(emptyList()) }
-    var overlayHeightPx by remember { mutableIntStateOf(0) }
+    var inputBarHeightPx by remember { mutableIntStateOf(0) }
     var audioBytes by remember { mutableStateOf<ByteArray?>(null) }
     var isRecording by remember { mutableStateOf(false) }
     var showModelPicker by remember { mutableStateOf(false) }
@@ -583,7 +583,7 @@ fun ChatScreen(
 
     Scaffold(
         modifier = Modifier.imePadding(),
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState, modifier = Modifier.padding(bottom = with(density) { overlayHeightPx.toDp() } + 16.dp)) },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState, modifier = Modifier.padding(bottom = with(density) { inputBarHeightPx.toDp() } + 16.dp)) },
         topBar = { /* CHAT-02: removed TopAppBar — model picker is now inline above messages */
             // Drawer remains reachable via swipe (ModalNavigationDrawer around the Scaffold)
             // and the parent NavHost provides the drawer gesture.
@@ -622,16 +622,12 @@ fun ChatScreen(
 
             Box(modifier = Modifier.weight(1f)) {
                 if (isEmpty) {
-                    // Empty state
-                    // Optical centering: the floating input overlay covers
-                    // the bottom of this Box, so center within the area
-                    // above it (overlay height as bottom padding) — logo +
-                    // text sit truly centered in the visible space.
+                    // Empty state, truly centered — the bar is in-flow
+                    // below, nothing floats over this Box.
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .fillMaxWidth()
-                            .padding(bottom = with(density) { overlayHeightPx.toDp() }),
+                            .fillMaxWidth(),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -661,7 +657,7 @@ fun ChatScreen(
                                 start = 16.dp,
                                 end = 16.dp,
                                 top = 8.dp,
-                                bottom = with(density) { overlayHeightPx.toDp() } + 4.dp
+                                bottom = 8.dp
                             ),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
@@ -744,33 +740,20 @@ fun ChatScreen(
                             },
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
-                                .padding(end = 16.dp, bottom = with(density) { overlayHeightPx.toDp() } + 20.dp)
+                                .padding(end = 16.dp, bottom = with(density) { inputBarHeightPx.toDp() } + 20.dp)
                         )
                     }
             }
-                // Floating input overlay (shared by empty + history states):
-                // the list scrolls UNDER a fade + the pill (transparent
-                // surround), so text visibly travels behind instead of
-                // clipping hard at an in-flow bar. Height is measured for
-                // the list's bottom padding + the jump-pill offset.
+            }
+                // In-flow input bar (user decision: no floating overlay —
+                // text never travels behind the bar, so nothing is ever
+                // covered). The measured height feeds the jump-pill and
+                // snackbar offsets only.
                 Column(
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .onSizeChanged { overlayHeightPx = it.height }
+                        .fillMaxWidth()
+                        .onSizeChanged { inputBarHeightPx = it.height }
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(40.dp)
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        Color(0xFF1F1F1E)
-                                    )
-                                )
-                            )
-                    )
                     // Unified turn status (quick-turn-status): ONE transient row
                     // above the input bar — priority model loading > tool >
                     // fetch/search > streaming gap. Never a transcript message, never
@@ -869,7 +852,6 @@ fun ChatScreen(
                     attachedDocTruncatedAt = readyDoc?.truncatedAt,
                     onRemoveDocument = { viewModel.clearDocument() },
                 )
-                }
             }
 
             if (connection.modelLoadError != null) {
@@ -1200,7 +1182,7 @@ private fun InlineModelSelectorBar(
                             modifier = Modifier.size(40.dp),
                         ) {
                             Icon(
-                                Icons.Filled.Psychology,
+                                BrainIcon,
                                 contentDescription = stringResource(R.string.cd_toggle_thinking),
                                 tint = if (thinkingEnabled) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),

@@ -227,7 +227,10 @@ internal object CompatToolLoop {
             // The cap string answers from gathered context — the answer
             // round needs no tools[].
             if (capFed) attachedTools = null
-            roundMessages += OpenAiMessage(role = "assistant", toolCalls = assistantEcho)
+            // Echo content must be an explicit empty string (never absent):
+            // LM Studio validates `content` as string-or-array even
+            // alongside tool_calls (device 400, 2026-10-03).
+            roundMessages += OpenAiMessage(role = "assistant", content = "", toolCalls = assistantEcho)
             roundMessages += toolResults
         }
     }

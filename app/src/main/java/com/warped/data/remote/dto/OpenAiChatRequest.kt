@@ -167,9 +167,10 @@ data class OpenAiMessage(
      * Phase 49 (DEL-01): single-turn only. Legacy `role=tool` rows never hit
      * the wire as `role:"tool"` — providers replay them as plain user text.
      *
-     * IN-02: null content is omitted (never explicit `"content":null`) —
-     * the assistant tool_calls echo (content null) omits the key instead of
-     * sending explicit null — strict compat servers may 400 the latter.
+     * IN-02: null content is omitted (never explicit `"content":null`).
+     * The assistant tool_calls echo passes explicit "" instead — LM
+     * Studio 0.4 validates `content` as string-or-array even alongside
+     * tool_calls and 400s a missing key (device 2026-10-03).
      * Plain messages always carry non-null content, so they are unaffected.
      */
     val role: String,
@@ -275,7 +276,12 @@ object OpenAiMessageSerializer : KSerializer<OpenAiMessage> {
 @Serializable
 data class OpenAiCompletedToolCall(
     val id: String = "",
-    val type: String = "function",
+    /**
+     * ALWAYS-encoded (OpenAiTool.type precedent, device 400 2026-10-03):
+     * the echo must carry the literal or strict servers reject the
+     * follow-up round.
+     */
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val type: String = "function",
     val function: OpenAiFunctionCall = OpenAiFunctionCall(),
 )
 

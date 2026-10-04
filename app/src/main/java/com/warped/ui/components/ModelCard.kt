@@ -18,7 +18,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
@@ -152,7 +151,7 @@ fun ModelCard(
                             color = Color(0xFF4CAF50)
                         )
                         if (reasoning) CapabilityIconBadge(
-                            icon = Icons.Filled.Psychology,
+                            icon = BrainIcon,
                             contentDescription = stringResource(R.string.badge_thinking),
                             color = Color(0xFFFF9800)
                         )

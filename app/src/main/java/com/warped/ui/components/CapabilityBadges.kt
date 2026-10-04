@@ -12,7 +12,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.HorizontalDivider
@@ -52,7 +51,7 @@ fun CapabilityIconRow(caps: ModelCapabilities) {
             color = Color(0xFF4CAF50)
         )
         if (caps.reasoning) CapabilityIconBadge(
-            icon = Icons.Filled.Psychology,
+            icon = BrainIcon,
             contentDescription = stringResource(R.string.badge_thinking),
             color = Color(0xFFFF9800)
         )
@@ -107,7 +106,7 @@ fun CapabilityTable(
             status = if (audio) stringResource(R.string.cap_status_input) else "–"
         )
         CapabilityTableRow(
-            icon = Icons.Filled.Psychology,
+            icon = BrainIcon,
             label = stringResource(R.string.badge_thinking),
             status = if (reasoning) "✓" else "–"
         )
