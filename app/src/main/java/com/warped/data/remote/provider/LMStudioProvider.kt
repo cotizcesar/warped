@@ -36,6 +36,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaType
@@ -82,8 +83,13 @@ class LMStudioProvider(
         .apply {
             if (!apiKey.isNullOrBlank()) {
                 addInterceptor { chain ->
+                    // Docs use `Authorization: Bearer` on the native REST
+                    // API and accept `x-api-key` too — send both so every
+                    // endpoint authenticates regardless of which header a
+                    // given server version checks.
                     val request = chain.request().newBuilder()
                         .header("x-api-key", apiKey)
+                        .header("Authorization", "Bearer $apiKey")
                         .build()
                     chain.proceed(request)
                 }
@@ -112,6 +118,7 @@ class LMStudioProvider(
                 request.messages,
                 includeSystem = false,
                 sanitizeUser = inputSanitizer::sanitize,
+                currentImages = request.images,
             )
             val ddgRepo = ddg
             val fetchAll = multiUrlFetcher
@@ -281,7 +288,12 @@ class LMStudioProvider(
         val body = LmStudioChatRequest(
             model = modelId,
             input = allInput,
-            systemPrompt = systemMessage,
+            // Default remote persona (user report 2026-10-03): remote
+            // turns carried no system prompt, so weak models narrated
+            // their reasoning as answer text with nothing to route on.
+            // Short identity + language + directness; explicit history
+            // system messages still win.
+            systemPrompt = systemMessage ?: REMOTE_PERSONA,
             stream = true,
             temperature = request.parameters.temperature,
             topP = request.parameters.topP,
@@ -421,6 +433,13 @@ class LMStudioProvider(
             currentCall = null
             teardown.cancel()
         }
+        // 2026-10-04 terminal-close fix: the terminal Done/Error above is
+        // the end of the turn — close so collectors terminate (shareIn
+        // jobs complete, turn finally-blocks run). Without this the flow
+        // stayed open forever: production leaked one suspended
+        // collection per turn and `toList()`-style collectors hung.
+        // Cancellation rethrows above, so this runs only on completion.
+        close()
         awaitClose { currentCall = null }
     }.flowOn(Dispatchers.IO)
 
@@ -514,6 +533,57 @@ class LMStudioProvider(
         return Result.failure(lastError ?: IllegalStateException("No LM Studio endpoint responded with models"))
     }
 
+    /**
+     * Keys (plus selected variants) with at least one loaded instance,
+     * per `GET /api/v1/models` `loaded_instances` (docs: the list shows
+     * AVAILABLE models — presence alone never means loaded). Used by the
+     * load-skip check. Failure/empty → empty set (fail-safe: reload).
+     */
+    suspend fun listLoadedModelKeys(): Result<Set<String>> {
+        return try {
+            val response = api.listModelsByPath("api/v1/models")
+            if (!response.isSuccessful) {
+                return Result.failure(Exception("HTTP ${response.code()}"))
+            }
+            val keys = response.body()?.models.orEmpty()
+                .filter { it.loadedInstances.isNotEmpty() }
+                .flatMap { listOfNotNull(it.key, it.selectedVariant) }
+                .toSet()
+            Result.success(keys)
+        } catch (e: Exception) {
+            Timber.w(e, "LMStudioProvider.listLoadedModelKeys failed")
+            Result.failure(e)
+        }
+    }
+
+    companion object {
+        /**
+         * Default system prompt for remote turns without one. Mirrors the
+         * local identity line minus the on-device claim, plus a directness
+         * rule: narration-as-answer has no markers to route on, so it is
+         * prevented at the source instead.
+         */
+        internal const val REMOTE_PERSONA =
+            "You are Warped, a helpful AI assistant. " +
+                "Always reply in the same language the user writes in. " +
+                "Answer directly without narrating your internal reasoning."
+        /**
+         * Slug-aware loaded match: the endpoint id is often the short
+         * name (`gemma-4-12b-qat`) while the server keys the full slug
+         * (`google/gemma-4-12b-qat`). Exact match first, then slug-suffix
+         * on `/` boundaries (never substring: `other/bonsai-27b` must not
+         * match `prism-ml/bonsai-27b`). `@variant` suffixes are stripped
+         * on both sides. Pure — unit-tested.
+         */
+        fun isLoadedKeyMatch(loadedKey: String, modelPath: String): Boolean {
+            val base = loadedKey.substringBefore("@")
+            val want = modelPath.substringBefore("@")
+            if (base.equals(want, ignoreCase = true)) return true
+            return base.endsWith("/$want", ignoreCase = true) ||
+                want.endsWith("/$base", ignoreCase = true)
+        }
+    }
+
     suspend fun loadModel(modelKey: String): Result<String> {
         return try {
             val request = com.warped.data.remote.dto.LmStudioLoadRequest(model = modelKey)
@@ -521,7 +591,19 @@ class LMStudioProvider(
             if (response.isSuccessful) {
                 Result.success(response.body()?.instanceId ?: modelKey)
             } else {
-                Result.failure(Exception("Load failed: HTTP ${response.code()}"))
+                // Surface the server's reason (e.g. CUDA OOM,
+                // model_load_failed) — a bare HTTP code leaves the user
+                // guessing why the load died.
+                val detail = try {
+                    val raw = response.errorBody()?.string().orEmpty()
+                    val msg = json.parseToJsonElement(raw).jsonObject["error"]
+                        ?.jsonObject?.get("message")?.jsonPrimitive?.content
+                    msg?.takeIf { it.isNotBlank() } ?: raw.take(200).ifBlank { null }
+                } catch (_: Exception) {
+                    null
+                }
+                val suffix = detail?.let { ": $it" } ?: ""
+                Result.failure(Exception("Load failed: HTTP ${response.code()}$suffix"))
             }
         } catch (e: Exception) {
             Result.failure(e)

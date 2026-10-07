@@ -13,6 +13,18 @@ interface ChatRepository {
     suspend fun createConversation(title: String, providerType: ProviderType, modelId: String?, endpointId: Long): Long
     suspend fun saveMessage(conversationId: Long, message: ChatMessage)
     suspend fun updateConversationTitle(conversationId: Long, title: String)
+    /** 2026-10-04 title-heal: raw title read (no message load). */
+    suspend fun getConversationTitle(conversationId: Long): String?
+    /**
+     * 2026-10-04: bind a fresh (model-less) row to the model chosen on
+     * the first send. Never changes anything else.
+     */
+    suspend fun updateConversationBinding(
+        conversationId: Long,
+        providerType: ProviderType,
+        modelId: String?,
+        endpointId: Long,
+    )
     suspend fun deleteConversation(conversationId: Long)
     suspend fun deleteAllConversations()
     suspend fun deleteMessage(messageId: Long)

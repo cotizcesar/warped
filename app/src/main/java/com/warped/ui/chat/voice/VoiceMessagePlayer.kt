@@ -1,8 +1,10 @@
 package com.warped.ui.chat.voice
 
 import android.content.Context
+import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.MediaPlayer
+import androidx.annotation.VisibleForTesting
 import timber.log.Timber
 
 /**
@@ -114,6 +116,31 @@ class VoiceMessagePlayer(
         ) {
             pause()
         }
+    }
+
+    /**
+     * 2026-10-04 warning fix: the stream-based request/abandon APIs are
+     * deprecated since API 26 — use the AudioFocusRequest versions
+     * (minSdk is 28, no version gate needed).
+     *
+     * Test seam (override discipline, cf. voiceRecorderOverride): the
+     * framework class cannot be constructed in JVM unit tests
+     * (android.jar stubs throw), so tests inject a mock.
+     */
+    internal var focusRequestOverride: AudioFocusRequest? = null
+    private val focusRequest: AudioFocusRequest by lazy {
+        focusRequestOverride ?: AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            .setOnAudioFocusChangeListener(focusListener)
+            .build()
+    }
+
+    /**
+     * Test seam: drives the platform focus-loss path without the OS.
+     * (AudioFocusRequest does not expose its listener.)
+     */
+    @VisibleForTesting
+    internal fun simulateAudioFocusLoss() {
+        focusListener.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS)
     }
 
     /**
@@ -264,15 +291,10 @@ class VoiceMessagePlayer(
         abandonFocus()
     }
 
-    @Suppress("DEPRECATION")
     private fun requestFocus() {
         val manager = audioManager ?: return
         try {
-            manager.requestAudioFocus(
-                focusListener,
-                AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT,
-            )
+            manager.requestAudioFocus(focusRequest)
         } catch (e: Exception) {
             Timber.w(e, "VoicePlay: focus request failed (advisory)")
         }
@@ -280,7 +302,7 @@ class VoiceMessagePlayer(
 
     private fun abandonFocus() {
         try {
-            audioManager?.abandonAudioFocus(focusListener)
+            audioManager?.abandonAudioFocusRequest(focusRequest)
         } catch (e: Exception) {
             Timber.w(e, "VoicePlay: abandon focus failed")
         }

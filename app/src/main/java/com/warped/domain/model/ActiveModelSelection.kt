@@ -1,9 +1,13 @@
 package com.warped.domain.model
 
 import com.warped.data.local.security.KeystoreManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -50,6 +54,25 @@ class ActiveModelSelection @Inject constructor(
 
     private val json = Json
 
+    /**
+     * 2026-10-04 ANR guard: Keystore writes (EncryptedSharedPreferences,
+     * first-touch MasterKey unlock) must never run on Main — picks happen
+     * mid-interaction. In-memory flows update synchronously (UI + logic
+     * observe instantly); persistence is best-effort background. Worst
+     * case on process death before the write lands: the user re-picks.
+     */
+    private val persistScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private fun persistAsync(block: () -> Unit) {
+        persistScope.launch {
+            try {
+                block()
+            } catch (e: Exception) {
+                Timber.e(e, "ActiveModel: persist failed")
+            }
+        }
+    }
+
     init {
         try {
             keystoreManager.get(LAST_LOCAL_KEY)?.let { raw ->
@@ -74,19 +97,19 @@ class ActiveModelSelection @Inject constructor(
 
     fun connectLocal(modelId: String, providerType: ProviderType, instanceId: String? = null) {
         _localSelection.value = LocalSelection(modelId = modelId, isConnected = true, instanceId = instanceId, isLoading = false)
-        try { persistLocal() } catch (e: Exception) { Timber.e(e, "ActiveModel: persist local failed") }
+        persistAsync { persistLocal() }
         deriveActiveModel()
     }
 
     fun disconnectLocal() {
         _localSelection.value = LocalSelection()
-        try { keystoreManager.remove(LAST_LOCAL_KEY) } catch (e: Exception) { Timber.e(e, "ActiveModel: remove local failed") }
+        persistAsync { keystoreManager.remove(LAST_LOCAL_KEY) }
         deriveActiveModel()
     }
 
     fun markLocalLoading(modelId: String, instanceId: String? = null) {
         _localSelection.value = LocalSelection(modelId = modelId, isConnected = false, instanceId = instanceId, isLoading = true)
-        try { persistLocal() } catch (e: Exception) { Timber.e(e, "ActiveModel: persist local loading failed") }
+        persistAsync { persistLocal() }
         deriveActiveModel()
     }
 
@@ -98,7 +121,7 @@ class ActiveModelSelection @Inject constructor(
      */
     fun selectLocalPending(modelId: String, instanceId: String? = null) {
         _localSelection.value = LocalSelection(modelId = modelId, isConnected = false, instanceId = instanceId, isLoading = false)
-        try { persistLocal() } catch (e: Exception) { Timber.e(e, "ActiveModel: persist local pending failed") }
+        persistAsync { persistLocal() }
         deriveActiveModel()
     }
 
@@ -108,13 +131,13 @@ class ActiveModelSelection @Inject constructor(
 
     fun selectRemote(modelId: String, providerType: ProviderType, endpointId: Long) {
         _remoteSelection.value = RemoteSelection(modelId = modelId, providerType = providerType, endpointId = endpointId)
-        try { persistRemote() } catch (e: Exception) { Timber.e(e, "ActiveModel: persist remote failed") }
+        persistAsync { persistRemote() }
         deriveActiveModel()
     }
 
     fun clearRemote() {
         _remoteSelection.value = RemoteSelection()
-        try { keystoreManager.remove(LAST_REMOTE_KEY) } catch (e: Exception) { Timber.e(e, "ActiveModel: remove remote failed") }
+        persistAsync { keystoreManager.remove(LAST_REMOTE_KEY) }
         deriveActiveModel()
     }
 
@@ -124,7 +147,7 @@ class ActiveModelSelection @Inject constructor(
             connectLocal(modelId, providerType, instanceId)
         } else {
             _activeModel.value = ActiveModel(modelId = modelId, providerType = providerType, instanceId = instanceId)
-            try { persistLegacy() } catch (e: Exception) { Timber.e(e, "ActiveModel: persist failed") }
+            persistAsync { persistLegacy() }
         }
     }
 
@@ -133,8 +156,8 @@ class ActiveModelSelection @Inject constructor(
         _localSelection.value = LocalSelection()
         _remoteSelection.value = RemoteSelection()
         _activeModel.value = null
-        try { keystoreManager.remove(LAST_LOCAL_KEY) } catch (e: Exception) { Timber.e(e, "ActiveModel: remove model failed") }
-        try { keystoreManager.remove(LAST_REMOTE_KEY) } catch (e: Exception) { Timber.e(e, "ActiveModel: remove model failed") }
+        persistAsync { keystoreManager.remove(LAST_LOCAL_KEY) }
+        persistAsync { keystoreManager.remove(LAST_REMOTE_KEY) }
     }
 
     private fun deriveActiveModel() {
@@ -209,6 +232,6 @@ class ActiveModelSelection @Inject constructor(
     }
 
     fun clearLastConversation() {
-        try { keystoreManager.remove(LAST_CONVERSATION_KEY) } catch (e: Exception) { Timber.e(e, "ActiveModel: remove conversation failed") }
+        persistAsync { keystoreManager.remove(LAST_CONVERSATION_KEY) }
     }
 }

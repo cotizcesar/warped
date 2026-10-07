@@ -10,15 +10,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
@@ -29,8 +24,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +44,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.IntOffset
@@ -63,6 +61,13 @@ import com.warped.ui.chat.voice.GateState
 @Composable
 fun ChatInputBar(
     text: String,
+    /**
+     * External-write stamp from [com.warped.ui.chat.ChatInputState]
+     * .inputTextGeneration, bumped on every non-typing write
+     * (send-clear, draft restore, dictation commit). Typing never
+     * bumps it — see the adoption rule below.
+     */
+    textGeneration: Long = 0,
     isGenerating: Boolean,
     canSend: Boolean,
     onTextChange: (String) -> Unit,
@@ -137,8 +142,11 @@ fun ChatInputBar(
     Surface(
         color = Color(0xFF2B2B29),
         shape = MaterialTheme.shapes.extraLarge,
-        shadowElevation = 8.dp,
-        tonalElevation = 2.dp,
+        // Halo shadow hugging the rounded bar (user decision 2026-10-03):
+        // small elevation so the blur reads around the pill, never as a
+        // slab floating above it.
+        shadowElevation = 2.dp,
+        tonalElevation = 0.dp,
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 10.dp, end = 10.dp, top = 5.dp, bottom = 6.dp)
@@ -257,15 +265,33 @@ fun ChatInputBar(
 
             // Row 1: Input only. WR-03: TextFieldValue (not raw String) so
             // dictation inserts at the selection via onCursorChange.
-            // External text changes (dictation commits) snap the caret to
-            // the END only when the field is NOT focused (user decision
-            // 2026-10-02: never steal the caret mid-edit); when focused,
-            // the caret is preserved. Either way the position is reported
-            // so the ViewModel's lastKnownCursor stays in sync. Typing is
-            // untouched: this block only runs on external change.
+            // Single adoption rule (2026-10-04 input unification): the VM
+            // text is adopted EXACTLY ONCE per external-write stamp — the
+            // typing path never bumps the stamp, so mid-edit keystrokes
+            // (including IME compositions) can never be overwritten by a
+            // stale prop, the "undeletable last letter" class. Focus only
+            // decides caret placement (preserve when focused, snap to end
+            // when not), never whether to adopt. Deferred while the IME
+            // holds an active composition: the stamp still differs, so
+            // adoption runs on the commit that ends it — never lost (the
+            // old text-compare rule could never tell "stale prop" from
+            // "fresh external write"). Either way the position is
+            // reported so the ViewModel's lastKnownCursor stays in sync.
+            // Typing is untouched: onValueChange converges both states.
             var fieldValue by remember { mutableStateOf(TextFieldValue(text, TextRange(text.length))) }
+            var lastAdoptedGeneration by remember { mutableLongStateOf(textGeneration) }
             var inputFocused by remember { mutableStateOf(false) }
-            if (fieldValue.text != text) {
+            if (textGeneration != lastAdoptedGeneration && fieldValue.composition == null) {
+                // Never overwrite a buffer the IME is actively composing
+                // (autocorrect/predictions): fieldValue.text transiently
+                // differs from the VM text mid-composition, and forcing
+                // the prop in destroys the session — typed characters get
+                // stuck, duplicated, or undeletable, and yanking it provokes
+                // a repair-resend of the last char (stuck-letter). The IME
+                // commits the final text through onValueChange, which
+                // converges both states without any forced write here. The
+                // pending stamp survives until the commit, then adopts.
+                lastAdoptedGeneration = textGeneration
                 fieldValue = if (inputFocused) {
                     val kept = fieldValue.selection
                     fieldValue.copy(
@@ -297,7 +323,14 @@ fun ChatInputBar(
             // TextFieldValue overload has no onTextLayout — hence a
             // mirror instead of measuring the field itself.)
             var inputLines by remember { mutableIntStateOf(0) }
-            val expandedInput = inputLines > 1
+            // Slots relocate ONLY while unfocused: moving the field
+            // between slots mid-typing drops IME focus on real devices
+            // (keyboard closes, the refocus net below reopens it —
+            // the close/reopen flicker at line 2). While focused the
+            // compact overlay layout persists (rightCluster padding
+            // already reserves the buttons); the move happens on blur
+            // or clear, where no focus can be lost.
+            val expandedInput = inputLines > 1 && !inputFocused
             Text(
                 text = text.ifEmpty { " " },
                 style = MaterialTheme.typography.bodyLarge,
@@ -339,7 +372,7 @@ fun ChatInputBar(
                             },
                         ) {
                             Icon(
-                                Icons.Filled.AttachFile,
+                                painterResource(id = R.drawable.post_add_24),
                                 stringResource(
                                     if (attachedDocName != null) R.string.doc_reader_replace
                                     else R.string.doc_reader_attach
@@ -362,17 +395,48 @@ fun ChatInputBar(
                 BasicTextField(
                 value = fieldValue,
                 onValueChange = { next ->
-                    fieldValue = next
-                    if (next.text != text) onTextChange(next.text)
-                    onCursorChange(next.selection.start)
+                    // Soft-keyboard Enter committed as text (keyboards
+                    // that ignore imeAction on multiline fields): a lone
+                    // trailing newline appended to the buffer sends
+                    // instead of growing the field. Pasted/multi-char
+                    // edits and IME compositions take the normal path.
+                    if (shouldSendOnNewline(fieldValue.text, next.text, next.composition != null)) {
+                        val stripped = next.text.dropLast(1)
+                        fieldValue = next.copy(text = stripped)
+                        if (stripped != text) onTextChange(stripped)
+                        val hasContent = stripped.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip
+                        if (canSend && !isGenerating && !isLoadingModel && hasContent) {
+                            onSend()
+                        }
+                    } else if (next.text.isEmpty()) {
+                        // Clearing the field honors the IME session: when
+                        // the IME still owns an active composition the
+                        // empty state is accepted as-is — nuking the
+                        // session provokes a repair-resend of the last
+                        // char (stuck-letter, 2026-10-04). A
+                        // composition-free empty takes the clean reset
+                        // (user report 2026-10-03: deleting down to empty
+                        // kept resurrecting the last character and the
+                        // placeholder never came back).
+                        fieldValue = if (next.composition == null) clearedFieldValue() else next
+                        if (text.isNotEmpty()) onTextChange("")
+                        onCursorChange(0)
+                    } else {
+                        fieldValue = next
+                        if (next.text != text) onTextChange(next.text)
+                        onCursorChange(next.selection.start)
+                    }
                 },
                 modifier = mod
                     .focusRequester(focusRequester)
                     .padding(vertical = 10.dp)
                     .onFocusChanged { inputFocused = it.isFocused }
                     .onKeyEvent { event ->
+                        // KeyDown only: without the type check both press
+                        // and release would send (the release no-ops on
+                        // cleared text, but say what you mean).
                         val hasContent = text.isNotBlank() || attachedImages.isNotEmpty() || attachedDocName != null || hasVoiceClip
-                        if (event.key == Key.Enter && canSend && !isGenerating && !isLoadingModel && hasContent) {
+                        if (event.type == KeyEventType.KeyDown && event.key == Key.Enter && canSend && !isGenerating && !isLoadingModel && hasContent) {
                             onSend()
                             true
                         } else false
@@ -438,7 +502,7 @@ fun ChatInputBar(
                             Icon(Icons.Filled.Stop, stringResource(R.string.cd_stop_listening),
                                 tint = Color.White, modifier = Modifier.size(24.dp))
                         } else {
-                            Icon(Icons.Filled.Mic, stringResource(R.string.cd_dictate),
+                            Icon(painterResource(id = R.drawable.speech_to_text_24), stringResource(R.string.cd_dictate),
                                 tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
                         }
                     }
@@ -475,7 +539,7 @@ fun ChatInputBar(
                             else voiceTooltipState.dismiss()
                         }
                         TooltipBox(
-                            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
                             tooltip = {
                                 PlainTooltip {
                                     Text(
@@ -497,7 +561,7 @@ fun ChatInputBar(
                                 containerColor = if (isVoiceRecording) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent
                             )
                         ) {
-                            Icon(Icons.Filled.GraphicEq, stringResource(R.string.voice_msg_record),
+                            Icon(painterResource(id = R.drawable.mic_24), stringResource(R.string.voice_msg_record),
                                 tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(24.dp))
                         }
                         }
@@ -551,7 +615,10 @@ fun ChatInputBar(
             LaunchedEffect(expandedInput) {
                 if (!expandEffectArmed) {
                     expandEffectArmed = true
-                } else {
+                } else if (inputFocused) {
+                    // Refocus ONLY when still focused (send-clear while
+                    // typing): never yank the keyboard back after the
+                    // user dismissed it (blur flips expandedInput too).
                     withFrameNanos { }
                     try {
                         focusRequester.requestFocus()
@@ -687,7 +754,7 @@ private fun AttachMenuButton(
             modifier = Modifier.size(40.dp),
         ) {
             Icon(
-                Icons.Filled.Add,
+                painterResource(id = R.drawable.add_24),
                 stringResource(R.string.attach_menu_content_desc),
                 tint = Color.White.copy(alpha = 0.6f),
                 modifier = Modifier.size(24.dp),
@@ -699,23 +766,27 @@ private fun AttachMenuButton(
                 onDismissRequest = { expanded = false },
             ) {
                 Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    tonalElevation = 3.dp,
+                    // Same look as the input bar itself (Color 0xFF2B2B29,
+                    // extraLarge) so the menu reads as its extension.
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = Color(0xFF2B2B29),
+                    tonalElevation = 2.dp,
                     shadowElevation = 8.dp,
                 ) {
                     Column(modifier = Modifier.padding(vertical = 8.dp)) {
                         AttachMenuRow(
-                            icon = Icons.Filled.AddPhotoAlternate,
+                            icon = painterResource(id = R.drawable.add_photo_alternate_24),
                             label = stringResource(R.string.attach_menu_photos),
+                            description = stringResource(R.string.attach_menu_photos_desc),
                             onClick = {
                                 expanded = false
                                 onPickPhotos()
                             },
                         )
                         AttachMenuRow(
-                            icon = Icons.Filled.AttachFile,
+                            icon = painterResource(id = R.drawable.post_add_24),
                             label = stringResource(R.string.attach_menu_files),
+                            description = stringResource(R.string.attach_menu_files_desc),
                             onClick = {
                                 expanded = false
                                 onPickFiles()
@@ -730,17 +801,25 @@ private fun AttachMenuButton(
 
 @Composable
 private fun AttachMenuRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: androidx.compose.ui.graphics.painter.Painter,
     label: String,
+    description: String,
     onClick: () -> Unit,
 ) {
     DropdownMenuItem(
         text = {
-            Text(
-                label,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            Column {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         },
         leadingIcon = {
             Box(
@@ -855,3 +934,24 @@ private fun DraftPreviewCard(
         }
     }
 }
+
+/**
+ * Soft-keyboard Enter committed as a text newline (keyboards that ignore
+ * imeAction=Send on multiline fields): true only when the edit appends
+ * exactly one trailing "\n" outside an IME composition. Pasted blocks,
+ * mid-text newlines and composing buffers take the normal path.
+ * Pure — unit-tested.
+ */
+internal fun shouldSendOnNewline(prevText: String, nextText: String, composing: Boolean): Boolean {
+    if (composing) return false
+    if (nextText.length != prevText.length + 1) return false
+    if (!nextText.endsWith("\n")) return false
+    return nextText.dropLast(1) == prevText
+}
+
+/**
+ * Composition-free empty field for the clear path above: text empty,
+ * cursor at zero, no IME region to resurrect. Pure — unit-tested.
+ */
+internal fun clearedFieldValue(): TextFieldValue =
+    TextFieldValue("", TextRange.Zero, null)

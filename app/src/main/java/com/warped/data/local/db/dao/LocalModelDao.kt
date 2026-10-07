@@ -44,6 +44,9 @@ interface LocalModelDao {
         seed: Int
     )
 
+    @Query("UPDATE local_models SET name = :name WHERE id = :id")
+    suspend fun updateName(id: Long, name: String)
+
     @Query("DELETE FROM local_models WHERE id = :id")
     suspend fun deleteById(id: Long)
 

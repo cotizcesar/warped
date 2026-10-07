@@ -13,16 +13,13 @@ import androidx.lifecycle.viewModelScope
 import com.warped.data.grounding.DocumentPrompt
 import com.warped.data.grounding.DocumentReader
 import com.warped.data.grounding.DuckDuckGoSearchRepository
+// Retained for Hilt/test-fixture stability: the VM no longer pre-searches
+// (user decision 2026-10-03) — DDG serves the provider-side agentic loop.
 import com.warped.data.grounding.GroundingPrecedence
 import com.warped.data.grounding.GroundingPrompt
 import com.warped.data.grounding.GroundingResult
-import com.warped.data.grounding.ImageIntent
 import com.warped.data.grounding.MultiUrlFetcher
-import com.warped.data.grounding.CodeIntent
-import com.warped.data.grounding.AnaphoraAnchor
-import com.warped.data.grounding.NeedsWeb
 import com.warped.data.grounding.MultiUrlResult
-import com.warped.data.grounding.SearchOutcome
 import com.warped.data.grounding.UrlDetector
 import com.warped.data.grounding.WebPageFetcher
 import com.warped.data.local.inference.BackendType
@@ -30,6 +27,7 @@ import com.warped.data.local.inference.EngineManager
 import com.warped.data.local.inference.MemoryChecker
 import com.warped.data.local.preferences.AdvancedPreferences
 import com.warped.data.local.preferences.VoicePreferences
+import com.warped.data.remote.provider.LmStudioHelper
 import com.warped.data.remote.provider.ProviderRouter
 import com.warped.data.repository.ModelAllowlistRepository
 import com.warped.domain.llm.LlmModelHelper
@@ -55,6 +53,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import com.warped.R
 import timber.log.Timber
 import java.io.ByteArrayOutputStream
@@ -355,9 +354,9 @@ class ChatViewModel @Inject constructor(
                 val selectedId = _connection.value.selectedLocalModelId
                     ?: activeModelSelection.localSelection.value.modelId
                 pickAutoSelectModel(models, selectedId)
-                    ?.takeIf { it != autoSelectedModelPath }
+                    ?.takeIf { it !in autoSelectSeenPaths && !suppressAutoSelect }
                     ?.let { autoPick ->
-                        autoSelectedModelPath = autoPick
+                        autoSelectSeenPaths += autoPick
                         // Lazy load: mark pending only — the engine mounts
                         // on the first send. Never preload on selection.
                         activeModelSelection.selectLocalPending(autoPick)
@@ -408,7 +407,12 @@ class ChatViewModel @Inject constructor(
                 if (modelId == null) {
                     lastAutoAppliedModelId = null
                 }
-
+                // 2026-10-04: NO cold-start auto-mount. A fresh start with
+                // no chat to restore leaves the (rehydrated, pending)
+                // selection untouched and mounts nothing — the user picks
+                // from the selector (mount on pick / on send / on chat
+                // open covers every path: Casos 1-3). Auto-mounting here
+                // loaded a model before the user could choose.
                 updateConnection {
                     it.copy(
                         selectedLocalModelId = modelId,
@@ -439,6 +443,21 @@ class ChatViewModel @Inject constructor(
                 }
                 updateInput {
                     it.copy(supportsThinking = supportsThinkingFor(_connection.value.selectedLocalModelId, remote.modelId))
+                }
+                // Remote parity with the cold-start mount: probe once per
+                // endpoint so the light turns green by itself. Failures
+                // stay red with a snackbar; the next send surfaces the
+                // real error. Retry happens on reselection (or send).
+                val remoteEid = remote.endpointId
+                if (remote.modelId != null && remoteEid != null && remoteEid != lastProbedEndpointId) {
+                    lastProbedEndpointId = remoteEid
+                    updateConnection { it.copy(connectionStatus = ConnectionStatus.Connecting) }
+                    viewModelScope.launch(coroutineExceptionHandler) {
+                        probeRemoteEndpoint(remoteEid, remote.modelId)
+                    }
+                }
+                if (remote.modelId == null) {
+                    lastProbedEndpointId = null
                 }
             }
         }
@@ -472,7 +491,7 @@ class ChatViewModel @Inject constructor(
         }
         viewModelScope.launch(coroutineExceptionHandler) {
             advancedPreferences.thinkingEnabled.collect { enabled ->
-                updateInput { it.copy(enableThinking = enabled) }
+                updateInput { it.copy(enableThinking = enabled, reasoningEnabled = enabled) }
             }
         }
         viewModelScope.launch(coroutineExceptionHandler) {
@@ -619,7 +638,7 @@ class ChatViewModel @Inject constructor(
         updateTranscript { it.copy(messages = it.messages + userMessage, isStreaming = true) }
         // 56-02: fresh turn clears any stale tool row (same position as the
         // 47 toolCallActive reset).
-        updateInput { it.copy(inputText = "", isGenerating = true, toolCallActive = null) }
+        updateInputTextExternal { it.copy(inputText = "", isGenerating = true, toolCallActive = null) }
 
         // CR-02: cancel any in-flight turn before starting a new one — otherwise
         // two collectors interleave tokens into one bubble and activeHelper is
@@ -657,7 +676,7 @@ class ChatViewModel @Inject constructor(
                                 isStreaming = false
                             )
                         }
-                        updateInput { it.copy(isGenerating = false, inputText = text) }
+                        updateInputTextExternal { it.copy(isGenerating = false, inputText = text) }
                         return@launch
                     }
                     if (engineManager.getActiveEngine()?.modelPath != effectiveModelId) {
@@ -685,7 +704,7 @@ class ChatViewModel @Inject constructor(
                                 isStreaming = false
                             )
                         }
-                        updateInput { it.copy(isGenerating = false, inputText = text) }
+                        updateInputTextExternal { it.copy(isGenerating = false, inputText = text) }
                         return@launch
                     }
                 }
@@ -694,6 +713,32 @@ class ChatViewModel @Inject constructor(
                     hasMedia = images.isNotEmpty() || audioBytes != null || sendableDocument != null,
                 )
                 chatRepository.saveMessage(conversationId, userMessage)
+                // 2026-10-04: first send claims the fresh (model-less) row
+                // for the chosen model — history keeps which model served
+                // each chat. Best-effort: never breaks the turn.
+                if (conversationId == freshConversationId) {
+                    freshConversationId = null
+                    try {
+                        val bindEndpointId = if (effectiveProvider == ProviderType.LITE_RT_LM) {
+                            0L
+                        } else {
+                            state.endpoints.firstOrNull {
+                                it.apiType == effectiveProvider && it.modelId == effectiveModelId
+                            }?.id
+                                ?: endpointRepository.getActive()
+                                    ?.takeIf { it.apiType == effectiveProvider && it.modelId == effectiveModelId }?.id
+                                ?: 0L
+                        }
+                        chatRepository.updateConversationBinding(
+                            conversationId,
+                            effectiveProvider,
+                            effectiveModelId,
+                            bindEndpointId,
+                        )
+                    } catch (e: Exception) {
+                        Timber.w(e, "Chat: fresh row bind failed")
+                    }
+                }
 
                 // Phase 52 (FETCH-01..FETCH-03): multi-URL grounding fan-out —
                 // detect → fan-out → augment. Same position as the v2.2 hook
@@ -834,170 +879,12 @@ class ChatViewModel @Inject constructor(
                         } finally {
                             updateInput { it.copy(isFetchingWeb = false, webFetchProgress = null) }
                         }
-                    // Quick-task (attachments-skip-search): the no-URL
-                    // branch below runs ONLY on attachment-free turns.
-                    // Attachment turns (images/audio) skip the heuristic
-                    // no-URL pre-search entirely — v2.4 Phase 55
-                    // regression: blind text search on image/audio-question
-                    // turns injects junk context about the question words
-                    // while the question is about the attachment, and the
-                    // small model answers from the injected text ignoring
-                    // the attachment. Skipped turns keep requestUserText as
-                    // the original text with grounded*/notice empty/null
-                    // (no augment, no banner — the skip is deliberate, not
-                    // a failure). The URL branch above still fetches with
-                    // attachments; loop arming, the capability media gate,
-                    // and the provider attach path are untouched (the model
-                    // may still tool-search with full multimodal context).
-                    } else if (images.isEmpty() && audioBytes == null) {
-                        // Quick-task (code-intent-gate): social/identity OR
-                        // code-generation turns skip the pre-search entirely
-                        // — no socket, no credit, no notice, no progress
-                        // state. Identical to grounding-off for this turn.
-                        // This gate touches the heuristic pre-search ONLY:
-                        // the armed loop REMAINS the model's escape hatch —
-                        // it can still web_search mid-turn for versioned or
-                        // fresh API facts the weights don't cover.
-                        if (!NeedsWeb.needsWeb(userMessage.content) ||
-                            CodeIntent.isCodeTurn(userMessage.content)
-                        ) {
-                            Timber.d("Chat: social/code turn — skipping pre-search")
-                        } else {
-                        // Quick-task (DDG-default): DDG-primary search
-                        // branch. Runs ONLY when all hold — doGround (the
-                        // once-per-send GroundingPrecedence.shouldGround read
-                        // above, same precedence as fetch, never re-read
-                        // mid-turn), validated internet (offline yields the
-                        // existing OFFLINE model-only path with no socket
-                        // opened), and — NEW — no key gate at all: the DDG
-                        // repository searches keylessly, so a DDG-OK turn
-                        // is a silent success (no notice) and a DDG-fail
-                        // turn is the FETCH_FAILED notice.
-                        // Success fuses through the IDENTICAL downstream
-                        // path as URL grounding: GroundingPrompt.augment of
-                        // requestUserText, groundedSources/okUrls, the
-                        // details-union persist below, per-source OK/OMITIDA
-                        // progress snapshot, Fuentes/preview/citations
-                        // untouched. Runs on Dispatchers.IO inside the
-                        // repository (same as fetchAll) — never the UI
-                        // thread (T-55-06/T-55-07).
-                        val online = try {
-                            fetcher.hasValidatedInternet()
-                        } catch (e: Exception) {
-                            Timber.w(e, "Chat: connectivity check failed, treating as offline")
-                            false
-                        }
-                        // Always-on pre-search (quick-task always-search): the
-                        // DDG-primary branch runs on EVERY grounded no-URL
-                        // turn INCLUDING armed ones. DDG is free/keyless so
-                        // this adds 0 credits when DDG serves the turn; the
-                        // loop stays armed provider-side (computeArmSnapshot
-                        // / ConversationConfig.tools untouched) for deeper
-                        // model-driven fetch, and loop ToolCompleted rows
-                        // keep merging with pre-search details in the Done
-                        // union below. There is deliberately NO VM-level
-                        // direct keyed call and NO loop-cap change — the
-                        // DDG-only `DuckDuckGoSearchRepository.search`
-                        // serves every turn keylessly; image-intent turns
-                        // fuse zero images (DDG has no image API).
-                        if (!online) {
-                            modelOnlyNotice = ModelOnlyNotice.OFFLINE
-                            requestUserText = GroundingPrompt.augment(
-                                requestUserText,
-                                null,
-                                groundingEnabled = doGround,
-                            )
-                        } else {
-                            // Quick-task (image-grid): intent-gated
-                            // include_images — the DDG leg has no image API
-                            // and fuses zero images. Non-intent turns pass
-                            // false: byte-identical to today, no extra
-                            // payload.
-                            val wantImages = ImageIntent.hasImageIntent(userMessage.content)
-                            val searchCount = DuckDuckGoSearchRepository.DEFAULT_MAX_RESULTS
-                            updateInput {
-                                it.copy(
-                                    isFetchingWeb = true,
-                                    webFetchProgress = WebFetchProgress(
-                                        done = 0,
-                                        total = searchCount,
-                                        perSource = emptyList(),
-                                    ),
-                                )
-                            }
-                            try {
-                                val contextSize = state.generationParameters.contextSize
-                                // Quick-task (always-presearch-anchored):
-                                // anaphoric follow-ups ("Quien es su
-                                // hermanastro?") search the prior turn's
-                                // topic words, not the bare message — anchor
-                                // = most recent prior USER turn (else last
-                                // assistant), capped + deduped inside
-                                // AnaphoraAnchor. No-history turns return the
-                                // raw message (today's behavior,
-                                // byte-identical). Query-text only: DDG stays
-                                // free/keyless (latency, not credits),
-                                // loop cap untouched.
-                                val priorMessages = _transcript.value.messages.dropLast(1)
-                                val anchoredQuery = AnaphoraAnchor.buildQuery(
-                                    userMessage.content,
-                                    priorMessages.filter { it.role == Role.USER }.map { it.content },
-                                    priorMessages.lastOrNull { it.role == Role.ASSISTANT }?.content,
-                                )
-                                when (
-                                    val outcome = ddgSearchRepository.search(
-                                        query = anchoredQuery,
-                                        maxResults = searchCount,
-                                        contextSize = contextSize,
-                                        includeImages = wantImages,
-                                    )
-                                ) {
-                                    is SearchOutcome.Grounded -> {
-                                        val fused = outcome.fused
-                                        requestUserText = GroundingPrompt.augment(
-                                            requestUserText,
-                                            fused.block,
-                                            groundingEnabled = doGround,
-                                        )
-                                        groundedSources = fused.okUrls
-                                        groundedSourceDetails = fused.details
-                                        groundedImages = fused.images
-                                        val total =
-                                            fused.okUrls.size + fused.skippedUrls.size
-                                        updateInput { s ->
-                                            s.copy(
-                                                webFetchProgress = s.webFetchProgress?.copy(
-                                                    done = total,
-                                                    perSource = fused.okUrls.map { url ->
-                                                        SourceFetchState(url, PerSourceStatus.OK)
-                                                    } + fused.skippedUrls.map { url ->
-                                                        SourceFetchState(url, PerSourceStatus.OMITIDA)
-                                                    },
-                                                ),
-                                            )
-                                        }
-                                    }
-                                    is SearchOutcome.ModelOnly -> {
-                                        modelOnlyNotice = when (outcome.failed.reason) {
-                                            GroundingResult.Reason.OFFLINE -> ModelOnlyNotice.OFFLINE
-                                            GroundingResult.Reason.FETCH_FAILED -> ModelOnlyNotice.FETCH_FAILED
-                                        }
-                                        requestUserText = GroundingPrompt.augment(
-                                            requestUserText,
-                                            null,
-                                            groundingEnabled = doGround,
-                                        )
-                                    }
-                                }
-                                // Image-intent turns fuse zero images (DDG
-                                // has no image API) with text grounding
-                                // preserved — no notice attached.
-                            } finally {
-                                updateInput { it.copy(isFetchingWeb = false, webFetchProgress = null) }
-                            }
-                        }
-                        } // needs-web gate: social turns skip the block above
                     }
+                    // User decision 2026-10-03: no heuristic pre-search.
+                    // The app never searches on the model's behalf — only
+                    // user-pasted URLs fetch (branch above) and the armed
+                    // agentic loop (capable models only) searches mid-turn.
+                    // The model decides; the NeedsWeb gate is gone.
                 }
 
                 val selectedProvider = effectiveProvider
@@ -1124,8 +1011,8 @@ class ChatViewModel @Inject constructor(
                     )
                 }
                 val sentDocBlock: String? = sendableDocument?.block
-                if (sentDocBlock != null && sendableDocument != null) {
-                    requestUserText = DocumentPrompt.augmentWithDocument(requestUserText, sentDocBlock)
+                if (sendableDocument != null) {
+                    requestUserText = DocumentPrompt.augmentWithDocument(requestUserText, sendableDocument.block)
                     groundedSourceDetails = groundedSourceDetails + GroundedSource(
                         url = DOCUMENT_SOURCE_PREFIX + sendableDocument.filename,
                         extractedText = sendableDocument.text,
@@ -1176,7 +1063,35 @@ class ChatViewModel @Inject constructor(
                 val rawBuffer = StringBuilder()
                 val reasoningActive = _input.value.reasoningEnabled
                 val modelMayThink = state.localModels.firstOrNull { it.filePath == modelId }?.capabilities?.reasoning == true
-                Timber.d("ChatVM: sendMessage reasoningActive=%b modelMayThink=%b", reasoningActive, modelMayThink)
+                // Verified-only thinker gate (not the hardcoded
+                // LocalModel.capabilities above, true for everything):
+                // drives live think routing — provisional thought goes
+                // to the Thinking panel mid-stream only for models with
+                // observed in-band reasoning. R1 distills always think;
+                // the toggle governs display, never generation.
+                val modelThinks = modelId.substringAfterLast("/").let { fileName ->
+                    try {
+                        modelAllowlistRepository.findByModelFile(fileName)?.capabilities?.supportsThinking == true
+                    } catch (e: Exception) {
+                        Timber.w(e, "ChatVM: allowlist think lookup failed")
+                        false
+                    }
+                } == true
+                // Provisional live routing ONLY for dedicated reasoners:
+                // R1 distills always think, so tag-less mid-stream text
+                // is thought. Hybrids (SmolLM3, no name marker) answer
+                // directly when the question is simple — that text must
+                // stream in the bubble, reaching the panel only once
+                // think markers are actually seen.
+                val alwaysThinks = modelId.substringAfterLast("/").let { fileName ->
+                    try {
+                        val entryName = modelAllowlistRepository.findByModelFile(fileName)?.name ?: ""
+                        modelThinks && hasReasoningMarker(entryName)
+                    } catch (e: Exception) {
+                        false
+                    }
+                } == true
+                Timber.d("ChatVM: sendMessage reasoningActive=%b modelMayThink=%b modelThinks=%b", reasoningActive, modelMayThink, modelThinks)
                 // Quick-task (live-thinking): native thought deltas stream
                 // here DURING generation (Thinking), not just at Done.
                 // liveThought is the streamed authoritative mirror of the
@@ -1249,7 +1164,12 @@ class ChatViewModel @Inject constructor(
                             if (now - lastEmitTime >= 50) {
                                 val chunk = tokenBuffer.joinToString("")
                                 rawBuffer.append(chunk)
-                                val (cleanContent, reasoning) = parseThinkBlocks(rawBuffer.toString(), reasoningActive, modelMayThink)
+                                val (cleanContent, reasoning) = parseThinkBlocks(
+                                    rawBuffer.toString(),
+                                    reasoningActive,
+                                    live = true,
+                                    modelThinks = alwaysThinks,
+                                )
                                 // Quick-task (live-thinking): a text flush
                                 // must not blank an in-flight native thought
                                 // panel — fall back to the streamed thought
@@ -1286,7 +1206,7 @@ class ChatViewModel @Inject constructor(
                         }
                         is StreamToken.Done -> {
                             rawBuffer.append(tokenBuffer.joinToString(""))
-                            val (finalClean, finalReasoning) = parseThinkBlocks(rawBuffer.toString(), reasoningActive, modelMayThink)
+                            val (finalClean, finalReasoning) = parseThinkBlocks(rawBuffer.toString(), reasoningActive)
                             val content = if (finalClean.isBlank()) finalClean else finalClean.trimStart()
                             // Phase 49 (DEL-01): single-turn only — the turn
                             // persists exactly one assistant message. Legacy
@@ -1394,8 +1314,13 @@ class ChatViewModel @Inject constructor(
                                     }
                                 }
                             } else {
-                                // Silent turn: clear streaming state so the
-                                // bubble does not hang.
+                                // Silent turn (user report 2026-10-03: a
+                                // thought-only turn with the toggle off
+                                // vanished without a trace — no bubble, no
+                                // message, draft lost). Clear streaming
+                                // state so the bubble does not hang, say so
+                                // explicitly, and restore the draft so a
+                                // retry is one tap.
                                 updateTranscript {
                                     it.copy(
                                         streamingContent = "",
@@ -1403,7 +1328,18 @@ class ChatViewModel @Inject constructor(
                                         isStreaming = false
                                     )
                                 }
-                                updateInput { it.copy(isGenerating = false, toolCallActive = null) }
+                                updateInputTextExternal {
+                                    it.copy(
+                                        isGenerating = false,
+                                        toolCallActive = null,
+                                        inputText = text,
+                                    )
+                                }
+                                _events.tryEmit(
+                                    ChatEvent.Snackbar(
+                                        context.getString(R.string.empty_answer_notice)
+                                    )
+                                )
                             }
                         }
                         is StreamToken.Error -> {
@@ -1668,6 +1604,23 @@ class ChatViewModel @Inject constructor(
                         error = null,
                     )
                 }
+                // 2026-10-04 title-heal on open: a row still titled "New
+                // Chat" while carrying user text is retitled from its
+                // first user message — the drawer shows the beginning of
+                // what was written, never a stale placeholder.
+                if (isDefaultTitle(conversation.title)) {
+                    messages.firstOrNull { it.role == Role.USER }
+                        ?.content?.takeIf { it.isNotBlank() }?.let { firstText ->
+                            try {
+                                chatRepository.updateConversationTitle(
+                                    conversation.id,
+                                    conversationTitle(firstText, hasMedia = false),
+                                )
+                            } catch (e: Exception) {
+                                Timber.w(e, "Chat: open-time retitle failed")
+                            }
+                        }
+                }
                 updateConnection {
                     val isLocalConv = conversation.providerType == ProviderType.LITE_RT_LM
                     it.copy(
@@ -1682,10 +1635,37 @@ class ChatViewModel @Inject constructor(
                 }
                 if (conversation.modelId != null && !modelMissing) {
                     if (conversation.providerType == ProviderType.LITE_RT_LM) {
-                        // Lazy load: mark pending only — the engine mounts
-                        // on the first send. Never preload on open.
+                        // Mark pending first; the background mount below
+                        // (Caso 2) takes it from here.
                         activeModelSelection.selectLocalPending(conversation.modelId)
+                        // 2026-10-04 single-selection invariant: opening a
+                        // local chat drops any stale remote selection at the
+                        // SOURCE (flow), or its next emission resurrects a
+                        // second active model (phantom probe, wrong-engine
+                        // sends). Future remote picks re-probe fresh.
+                        activeModelSelection.clearRemote()
+                        lastProbedEndpointId = null
                     } else {
+                        // 2026-10-04 stuck-RED fix: opening a chat ALWAYS
+                        // re-pings its endpoint (server may have come up
+                        // since the last probe). The collector skips the
+                        // probe when the endpoint id matches the last
+                        // probed one, so reset the guard first — otherwise
+                        // a once-failed probe stays red forever.
+                        lastProbedEndpointId = null
+                        // 2026-10-04 single-selection invariant (mirror):
+                        // opening a remote chat drops any stale LOCAL
+                        // selection at the source — or its next emission
+                        // resurrects a phantom mount/Loading row mid-chat
+                        // (and a double selection routes sends wrong).
+                        // The device engine is freed outright (a no-op
+                        // when idle): remote turns never need it.
+                        activeModelSelection.disconnectLocal()
+                        try {
+                            engineManager.scheduleUnload()
+                        } catch (e: Exception) {
+                            Timber.e(e, "Chat: open-remote unload failed")
+                        }
                         val endpoint = if (conversation.endpointId != 0L) {
                             endpointRepository.getById(conversation.endpointId)
                         } else {
@@ -1696,11 +1676,36 @@ class ChatViewModel @Inject constructor(
                                 endpointRepository.activateEndpoint(endpoint.id)
                             }
                             activeModelSelection.selectRemote(conversation.modelId, conversation.providerType, endpoint.id)
+                            // Probe directly: reselecting identical values
+                            // conflates in the flow (no emission), so the
+                            // collector alone would skip the re-ping.
+                            // Exactly-once either way: the guard below makes
+                            // a concurrent collector emission stand down.
+                            updateConnection {
+                                it.copy(connectionStatus = ConnectionStatus.Connecting)
+                            }
+                            lastProbedEndpointId = endpoint.id
+                            viewModelScope.launch(coroutineExceptionHandler) {
+                                probeRemoteEndpoint(endpoint.id, conversation.modelId)
+                            }
                         }
                     }
-                    // Lazy load: no preload on open — the traffic light
-                    // shows selected-not-loaded until the first send
-                    // mounts the engine.
+                    // User decision: opening a chat ALWAYS loads its local
+                    // model in the background (loading indicator on, input
+                    // locked until mounted). The first send never waits
+                    // on a cold mount. Already-mounted same model is
+                    // skipped; remote conversations mount nothing (helpers
+                    // resolve per send). The memory guard inside preload
+                    // reports via banner instead of loading when RAM is
+                    // short.
+                    if (conversation.providerType == ProviderType.LITE_RT_LM &&
+                        engineManager.getActiveEngine()?.modelPath != conversation.modelId) {
+                        val mountPath = conversation.modelId
+                        activeModelSelection.markLocalLoading(mountPath)
+                        viewModelScope.launch(coroutineExceptionHandler) {
+                            preloadLocalModel(mountPath)
+                        }
+                    }
                 }
                 activeModelSelection.saveLastConversation(conversation.id)
                 refreshActiveBackend()
@@ -1709,7 +1714,46 @@ class ChatViewModel @Inject constructor(
     }
 
     fun newConversation() {
+        // 2026-10-04: New chat stops everything first — an in-flight
+        // turn must never stream its answer into the fresh chat (nor
+        // keep the transport/engine busy while the user picks).
+        stopGeneration()
+        // 2026-10-04: free EVERYTHING, server-side included — a previous
+        // remote model must not linger on the server GPU. Fire-and-forget
+        // off-main (cleanUp blocks on the unload call); the state below
+        // already reads unloaded, so nothing waits on it.
+        val loadedInstance = _connection.value.loadedInstanceId
+        val remoteProvider = _connection.value.selectedRemoteProvider
+        val remoteModel = _connection.value.selectedRemoteModelId
+        if (loadedInstance != null && remoteProvider == ProviderType.LM_STUDIO && remoteModel != null) {
+            viewModelScope.launch(coroutineExceptionHandler + Dispatchers.IO) {
+                try {
+                    val endpoint = endpointRepository.getActive()
+                        ?.takeIf { it.apiType == remoteProvider && it.modelId == remoteModel }
+                        ?: return@launch
+                    val helper = providerRouter.resolveHelper(endpoint, remoteModel)
+                    val lm = helper as? LmStudioHelper ?: return@launch
+                    if (lm.getInstanceId() == loadedInstance) lm.cleanUp()
+                } catch (e: Exception) {
+                    Timber.e(e, "Chat: new-chat server unload failed")
+                }
+            }
+        }
         unloadLocalModels()
+        // 2026-10-04: New chat drops the model entirely — memory is
+        // freed above and BOTH selections clear, so the user must pick
+        // from the existing selector (collectors drive the connection
+        // to unselected: input locked, traffic light GRAY). Persisted
+        // selections are removed too, so a restart also opens unselected.
+        activeModelSelection.disconnectLocal()
+        activeModelSelection.clearRemote()
+        // 2026-10-04: freeze the auto-select seen-set on today's files
+        // so the observeModels hook does NOT reselect behind the user's
+        // back; a genuinely NEW download/import (path never seen) still
+        // auto-selects. Remote re-probes on next pick.
+        autoSelectSeenPaths += _connection.value.localModels.map { it.filePath }
+        suppressAutoSelect = true
+        lastProbedEndpointId = null
         pendingWebOverride = null
         // Phase 70 fix (WR-03): see selectConversation — same leak guard.
         _attachedDocument.value = null
@@ -1728,12 +1772,49 @@ class ChatViewModel @Inject constructor(
                 conversationProviderType = null,
                 modelUnavailable = false,
                 webOverride = null,
+                // The server instance is being unloaded above; drop the
+                // handle now so a later switch never unloads it twice.
+                loadedInstanceId = null,
             )
+        }
+        // 2026-10-04: the fresh chat exists in DB immediately — UNBOUND
+        // (no model). The picker opens with nothing preselected; the
+        // first send claims the row for the chosen model (see
+        // sendMessage). An already-empty fresh row is reused instead of
+        // littering one empty row per tap.
+        viewModelScope.launch(coroutineExceptionHandler) {
+            try {
+                val reuse = freshConversationId?.takeIf {
+                    chatRepository.loadConversation(it) != null
+                }
+                val id = reuse ?: chatRepository.createConversation(
+                    title = context.getString(R.string.new_chat),
+                    providerType = ProviderType.LITE_RT_LM,
+                    modelId = null,
+                    endpointId = 0,
+                ).also { freshConversationId = it }
+                activeModelSelection.saveLastConversation(id)
+                updateTranscript { it.copy(conversationId = id) }
+            } catch (e: Exception) {
+                Timber.e(e, "Chat: fresh row creation failed")
+            }
         }
     }
 
     fun updateInput(text: String) {
         updateInput { it.copy(inputText = text) }
+    }
+
+    /**
+     * External input-text write (2026-10-04): send-clear, draft restore,
+     * dictation commit, empty-answer restore. Bumps [ChatInputState]
+     * .inputTextGeneration so the input bar adopts the text exactly once;
+     * the typing path ([updateInput]) never bumps, so mid-edit keystrokes
+     * (including IME compositions) can never be overwritten by a stale
+     * prop — the "undeletable last letter" class. Internal for tests.
+     */
+    internal fun updateInputTextExternal(op: (ChatInputState) -> ChatInputState) {
+        updateInput { state -> op(state).copy(inputTextGeneration = state.inputTextGeneration + 1) }
     }
 
     /**
@@ -1821,11 +1902,11 @@ class ChatViewModel @Inject constructor(
      */
     fun restoreComposerDraft(draft: ChatDraft?) {
         stopPlaybackInternal()
-        updateInput { it.copy(inputText = draft?.text.orEmpty()) }
+        updateInputTextExternal { it.copy(inputText = draft?.text.orEmpty()) }
         _attachedDocument.value = draft?.document
         val voice = draft?.voice
         val clip = voice?.let { java.io.File(it.path).takeIf { f -> f.exists() } }
-        if (clip != null && voice != null) {
+        if (voice != null && clip != null) {
             voiceClipFile = clip
             _draftDurationMs.value = voice.durationMs
             lastSentVoiceTranscript = voice.transcript
@@ -1861,7 +1942,7 @@ class ChatViewModel @Inject constructor(
         if (!_isListening.value) return
         val trimmed = hypothesis.trim()
         if (trimmed.isEmpty()) return
-        updateInput { state ->
+        updateInputTextExternal { state ->
             val current = state.inputText
             val anchor = partialAnchor
             if (anchor != null && lastPartial.isNotEmpty() &&
@@ -1904,7 +1985,7 @@ class ChatViewModel @Inject constructor(
         lastPartial = ""
         partialAnchor = null
         if (trimmed.isEmpty()) return
-        updateInput { state ->
+        updateInputTextExternal { state ->
             val current = state.inputText
             if (anchor != null && standing.isNotEmpty() &&
                 anchor <= current.length &&
@@ -2416,6 +2497,14 @@ class ChatViewModel @Inject constructor(
         // WR-02: invalidate any trailing callbacks from the previous
         // session alongside the reset.
         transcriptSession.incrementAndGet()
+        // 2026-10-04 race fix: the new live session must invalidate
+        // in-flight duration validations SYNCHRONOUSLY here on the
+        // caller thread — the transcript STT start inside the IO block
+        // below is slow, and a stop racing it used to capture the old
+        // session, then get stood down by the late bump landing
+        // mid-validation (kept clip never materialized, Turbine timeout
+        // in tests, lost draft for users).
+        voiceClipSession++
         transcriptFinalized = ""
         _voiceTranscriptLive.value = ""
         transcriptUnavailable = false
@@ -2498,9 +2587,8 @@ class ChatViewModel @Inject constructor(
                     Timber.w(e, "VoiceMsg: transcript STT start failed")
                     transcriptUnavailable = true
                 }
-                // WR-03: a new live session invalidates any in-flight
-                // duration validation from the previous stop.
-                voiceClipSession++
+                // (Session invalidation already happened synchronously
+                // at startVoiceRecording entry — see above.)
                 voiceSessionJob?.cancel()
                 voiceSessionJob = viewModelScope.launch(coroutineExceptionHandler) {
                     // WR-03: the 100 ms amplitude sampler is binder IPC —
@@ -3120,6 +3208,35 @@ class ChatViewModel @Inject constructor(
             conversationModelId = null,
             conversationProviderType = null
         ) }
+        // 2026-10-04: dismissing also drops the dangling selection —
+        // otherwise the light sits red with no message and no way
+        // forward (silent RED). The user re-picks from the selector.
+        activeModelSelection.disconnectLocal()
+        activeModelSelection.clearRemote()
+    }
+
+    /**
+     * 2026-10-04: re-attempt the local mount for the current conversation
+     * (or selection) after a load failure — memory freed or file restored
+     * since. Clears the sticky load banner first; success heals to GREEN
+     * via the normal connect path, failure re-reports via banner.
+     * No-op without a local model bound. Never blocks: the mount runs
+     * off-main inside [preloadLocalModel].
+     */
+    fun retryLocalMount() {
+        val modelId = _connection.value.conversationModelId
+            ?.takeIf { _connection.value.conversationProviderType == ProviderType.LITE_RT_LM }
+            ?: _connection.value.selectedLocalModelId
+            ?: return
+        updateConnection { it.copy(modelLoadError = null) }
+        if (engineManager.getActiveEngine()?.modelPath == modelId) {
+            refreshActiveBackend()
+            return
+        }
+        activeModelSelection.markLocalLoading(modelId)
+        viewModelScope.launch(coroutineExceptionHandler) {
+            preloadLocalModel(modelId)
+        }
     }
 
     fun confirmLoadMemoryWarning() {
@@ -3136,13 +3253,14 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun setSelectedModel(modelId: String, providerType: ProviderType, endpointId: Long?, isSameModel: Boolean) {
+        // Explicit user pick lifts the New-chat auto-select suppression —
+        // from here on the hook only fires when nothing is selected.
+        suppressAutoSelect = false
         val oldLocalId = _connection.value.selectedLocalModelId
         val oldRemoteId = _connection.value.selectedRemoteModelId
         val oldInstance = _connection.value.loadedInstanceId
 
         if (providerType == ProviderType.LITE_RT_LM) {
-            // Lazy load: mark pending only — the engine mounts on the
-            // first send. Never preload on selection.
             activeModelSelection.selectLocalPending(modelId)
             updateConnection {
                 it.copy(
@@ -3150,6 +3268,21 @@ class ChatViewModel @Inject constructor(
                     selectedRemoteModelId = null,
                     selectedRemoteProvider = null
                 )
+            }
+            // 2026-10-04 Caso 1: picking a model mounts it in the
+            // background (loading indicator on, input locked until
+            // mounted) — the choice lands in memory, the first send
+            // never waits on a cold mount. Skipped when the engine
+            // already serves it, and never for a file missing from
+            // disk (the send path surfaces DownloadModelFirst).
+            // Runs off-main inside preload; the screen never freezes.
+            if (java.io.File(modelId).exists() &&
+                engineManager.getActiveEngine()?.modelPath != modelId
+            ) {
+                activeModelSelection.markLocalLoading(modelId)
+                viewModelScope.launch(coroutineExceptionHandler) {
+                    preloadLocalModel(modelId)
+                }
             }
         } else {
             viewModelScope.launch(coroutineExceptionHandler) {
@@ -3196,55 +3329,64 @@ class ChatViewModel @Inject constructor(
             }
             activeModelSelection.disconnectLocal()
         }
-        if (oldRemoteId != null && oldRemoteId != modelId) {
-            viewModelScope.launch(coroutineExceptionHandler) {
+        // 2026-10-04 Casos 1-2 ordered server switch (single coroutine):
+        // unload the previous server-side model BEFORE selecting and
+        // loading the new one — never hold two server models (server
+        // GPU), and never unload the just-loaded one (the old split
+        // launches raced). Same-model repicks skip both sides.
+        viewModelScope.launch(coroutineExceptionHandler) {
+            if (oldRemoteId != null && oldRemoteId != modelId && oldInstance != null) {
                 try {
-                    if (oldInstance != null) {
-                        val endpoint = endpointRepository.getActive()
-                        if (endpoint != null) {
-                            // RUNTIME-04: cleanUp() unloads the model on the helper
-                            // (the helper stores the instanceId internally after
-                            // initialize() returned).
-                            val helper = providerRouter.resolveHelper(endpoint, oldRemoteId)
-                            helper.cleanUp()
-                        }
+                    endpointRepository.getActive()?.let { endpoint ->
+                        // RUNTIME-04: cleanUp() unloads the model on the helper
+                        // (the helper stores the instanceId internally after
+                        // initialize() returned).
+                        providerRouter.resolveHelper(endpoint, oldRemoteId).cleanUp()
                     }
                 } catch (e: Exception) { Timber.e(e, "Chat: LMStudio unload failed") }
             }
-            activeModelSelection.clearRemote()
+            if (providerType == ProviderType.LITE_RT_LM) {
+                // Leaving remote behind: drop the stale remote selection
+                // (no selectRemote follows to overwrite it).
+                if (oldRemoteId != null && oldRemoteId != modelId) {
+                    activeModelSelection.clearRemote()
+                }
+                return@launch
+            }
+            if (providerType == ProviderType.LM_STUDIO) {
+                try {
+                    updateConnection { it.copy(loadedInstanceId = null) }
+                    val endpoint = endpointRepository.getActive()
+                    if (endpoint != null) {
+                        // RUNTIME-04: route through the unified LlmModelHelper surface.
+                        val helper = providerRouter.resolveHelper(endpoint, modelId)
+                        helper.initialize(modelId)
+                        // Stale-load guard (mirror of the local mount
+                        // guard): the selection moved on mid-load — store
+                        // nothing for a model nobody wants anymore.
+                        if (activeModelSelection.remoteSelection.value.modelId != modelId) {
+                            return@launch
+                        }
+                        val instanceId =
+                            (helper as? com.warped.data.remote.provider.LmStudioHelper)
+                                ?.getInstanceId()
+                        if (instanceId != null) {
+                            updateConnection { it.copy(loadedInstanceId = instanceId) }
+                        }
+                        // A successful load proves reachability: mark
+                        // Connected now instead of waiting for a probe
+                        // (and align the probe guard so the collector
+                        // does not redundantly re-probe).
+                        updateConnection {
+                            it.copy(connectionStatus = ConnectionStatus.Connected)
+                        }
+                        lastProbedEndpointId = endpoint.id
+                        loadGeneration.incrementAndGet()
+                    }
+                } catch (e: Exception) { Timber.e(e, "Chat: LMStudio load failed") }
+            }
         }
 
-        // Load new model
-        when (providerType) {
-            ProviderType.LM_STUDIO -> {
-                viewModelScope.launch(coroutineExceptionHandler) {
-                    try {
-                        updateConnection { it.copy(loadedInstanceId = null) }
-                        val endpoint = endpointRepository.getActive()
-                        if (endpoint != null) {
-                            // RUNTIME-04: route through the unified LlmModelHelper surface.
-                            val helper = providerRouter.resolveHelper(endpoint, modelId)
-                            helper.initialize(modelId)
-                            val instanceId =
-                                (helper as? com.warped.data.remote.provider.LmStudioHelper)
-                                    ?.getInstanceId()
-                            if (instanceId != null) {
-                                updateConnection { it.copy(loadedInstanceId = instanceId) }
-                                activeModelSelection.connectLocal(
-                                    modelId, providerType, instanceId,
-                                )
-                            }
-                        }
-                    } catch (e: Exception) { Timber.e(e, "Chat: LMStudio load failed") }
-                }
-            }
-            ProviderType.LITE_RT_LM -> {
-                // Lazy load: the model mounts on the first send
-                // (sendMessage drives markLocalLoading + preloadLocalModel
-                // when the engine path mismatches the selection).
-            }
-            else -> {}
-        }
         refreshActiveBackend()
     }
 
@@ -3252,8 +3394,10 @@ class ChatViewModel @Inject constructor(
         updateConnection { it.copy(generationParameters = params) }
     }
 
+    /** @deprecated Use [toggleThinking]: the header toggle is the single thinking switch. */
+    @Deprecated("Use toggleThinking", ReplaceWith("toggleThinking()"))
     fun toggleReasoning() {
-        updateInput { it.copy(reasoningEnabled = !it.reasoningEnabled) }
+        toggleThinking()
     }
 
     /**
@@ -3294,7 +3438,13 @@ class ChatViewModel @Inject constructor(
      * state value is updated by the AdvancedPreferences collector in init().
      */
     fun toggleThinking() {
+        // Single source of truth: the header toggle drives BOTH the
+        // persisted enableThinking (local helper init) and the live
+        // reasoningEnabled that travels in every ChatRequest (providers
+        // + think-panel parsing). A split-brain here sent thinking
+        // params with the toggle off (user report 2026-10-03).
         val next = !_input.value.enableThinking
+        updateInput { it.copy(enableThinking = next, reasoningEnabled = next) }
         viewModelScope.launch(coroutineExceptionHandler) {
             advancedPreferences.setThinkingEnabled(next)
         }
@@ -3304,6 +3454,14 @@ class ChatViewModel @Inject constructor(
         val lastId = activeModelSelection.getLastConversation()
         if (lastId > 0) {
             selectConversation(lastId)
+        } else {
+            // 2026-10-04: fresh start with no chat to restore — drop any
+            // stale (rehydrated) selection instead of mounting it. The
+            // user picks from the selector; Casos 2-3 auto-load only
+            // applies to an existing chat bound to a model.
+            activeModelSelection.disconnectLocal()
+            activeModelSelection.clearRemote()
+            suppressAutoSelect = true
         }
     }
 
@@ -3446,15 +3604,53 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Lazy-load driver (quick-task lazy-model-load): mounts [filePath] into
-     * the engine. Called ONLY from the send path (after `markLocalLoading`)
-     * — never from selection sites. State flows ONLY through
+     * Mount driver: mounts [filePath] into the engine. Called from the
+     * send path (after `markLocalLoading`) and from chat open (user
+     * decision: opening a chat always loads its local model) — never
+     * from selection sites. State flows ONLY through
      * [ActiveModelSelection] (`connectLocal` / `markLocalDisconnected`);
-     * the selection collector owns `isLoadingModel`/`loadingModelName`.
-     * This function writes `modelLoadError` only. Failures keep the
-     * selection (pending) so retrying just works.
+     * the selection collector owns `isLoadingModel`/`loadingModelName`
+     * (input locked while loading). This function writes `modelLoadError`
+     * only. Failures keep the selection (pending) so retrying just works.
      */
     private suspend fun preloadLocalModel(filePath: String) {
+        // 2026-10-04 mount dedup: pick+immediate-send (and open+send)
+        // otherwise stack two concurrent native inits for the same file.
+        // The second caller JOINS the in-flight one (bounded wait) and
+        // returns — the send's post-check below verifies the engine, so
+        // a still-missing engine surfaces the normal load-failed path
+        // instead of hanging. Never blocks the UI thread (all callers
+        // are off-main) and never waits forever (timeout).
+        if (!mountsInFlight.add(filePath)) {
+            withTimeoutOrNull(MOUNT_JOIN_TIMEOUT_MS) {
+                while (mountsInFlight.contains(filePath)) {
+                    kotlinx.coroutines.delay(100)
+                }
+            }
+            return
+        }
+        try {
+            mountBody(filePath)
+        } finally {
+            mountsInFlight.remove(filePath)
+        }
+    }
+
+    /**
+     * Paths with a mount currently running. Send/pick/open/retry all
+     * funnel through [preloadLocalModel], which joins instead of
+     * stacking duplicates. Main-confined in practice (all launches are
+     * viewModelScope); synchronized set for the cross-thread reads.
+     */
+    private val mountsInFlight =
+        java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+    /** Bounded join window for a duplicate mount (slow mounts keep their lane). */
+    private companion object {
+        const val MOUNT_JOIN_TIMEOUT_MS = 30_000L
+    }
+
+    private suspend fun mountBody(filePath: String) {
         val model = _connection.value.localModels.firstOrNull { it.filePath == filePath }
         if (model != null && !memoryChecker.canLoadModel(model.sizeBytes)) {
             val memInfo = memoryChecker.getMemoryInfo()
@@ -3480,53 +3676,41 @@ class ChatViewModel @Inject constructor(
             withContext(Dispatchers.Default) {
                 engineManager.switchToLiteRT(filePath)
             }
+            // Stale-mount guard: the selection moved on while mounting
+            // (new chat, repick) — do NOT connect a model nobody wants
+            // anymore. Without this the late completion resurrects a dead
+            // selection (wrong-engine sends, phantom loading, locked input
+            // on a chat the user already left).
+            if (activeModelSelection.localSelection.value.modelId != filePath) {
+                Timber.d("ChatVM: stale mount for $filePath ignored (selection moved on)")
+                return
+            }
             activeModelSelection.connectLocal(filePath, ProviderType.LITE_RT_LM)
             everLoadedPaths.add(filePath)
             refreshActiveBackend()
         } catch (e: Exception) {
-            activeModelSelection.markLocalDisconnected()
-            updateConnection { it.copy(modelLoadError = e.message) }
+            // Same staleness rule on failure: never clear another turn's
+            // loading flag nor banner a chat the user already left.
+            if (activeModelSelection.localSelection.value.modelId == filePath) {
+                activeModelSelection.markLocalDisconnected()
+                updateConnection { it.copy(modelLoadError = e.message) }
+            }
+            if (e is CancellationException) throw e
+        } catch (t: Throwable) {
+            // 2026-10-04 stuck-Loading fix: Errors (notably OOM) are not
+            // Exceptions — without this the loading flag (and the
+            // "Loading model" row) stayed up forever with no message.
+            if (activeModelSelection.localSelection.value.modelId == filePath) {
+                activeModelSelection.markLocalDisconnected()
+                updateConnection {
+                    it.copy(modelLoadError = t.message ?: t.javaClass.simpleName)
+                }
+            }
         }
     }
 
     private fun LocalModel.isLiteRtLm(): Boolean =
         modelFormat.equals("LITERTLM", ignoreCase = true) || filePath.endsWith(".litertlm", ignoreCase = true)
-
-    private fun parseThinkBlocks(raw: String, enabled: Boolean = true, @Suppress("UNUSED_PARAMETER") modelMayThink: Boolean = false): Pair<String, String> {
-        if (!enabled) {
-            val clean = Regex("<[/]?think>|<[/]?channel\\|?>", setOf(RegexOption.IGNORE_CASE))
-                .replace(raw, "").trim()
-            return Pair(clean, "")
-        }
-        val reasoning = StringBuilder()
-        var clean = raw
-
-        val channelRegex = Regex("<channel\\|>([\\s\\S]*?)<\\|channel>",
-            setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE))
-        channelRegex.findAll(clean).forEach { m -> reasoning.append(m.groupValues[1].trim()).append("\n") }
-        clean = channelRegex.replace(clean, "")
-
-        val thinkRegex = Regex("<think>([\\s\\S]*?)</think>",
-            setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE))
-        thinkRegex.findAll(clean).forEach { m -> reasoning.append(m.groupValues[1].trim()).append("\n") }
-        clean = thinkRegex.replace(clean, "")
-
-        val openIdx = clean.lowercase().lastIndexOf("<think>")
-        if (openIdx >= 0) {
-            reasoning.append(clean.substring(openIdx + "<think>".length).trim())
-            clean = clean.substring(0, openIdx)
-        }
-
-        // Untagged output is the answer, not reasoning: without explicit
-        // <think>/<channel|> markers there is no evidence the model was thinking,
-        // and routing plain replies into the collapsed Thinking panel produces
-        // empty assistant bubbles (local-empty-response, 2026-09-28). Genuine
-        // 0.17.x thought-channel streaming stays a later-phase wire-up
-        // (LiteRTLmProvider.extractThoughtContent) — never inferred from absence.
-
-        Timber.d("ChatVM: parseThinkBlocks result — clean=%d reasoning=%d", clean.length, reasoning.length)
-        return Pair(clean.trim(), reasoning.toString().trim())
-    }
 
     /**
      * Phase 53 (SRC-02): union of all N fetched sources in fetch-block order
@@ -3553,8 +3737,18 @@ class ChatViewModel @Inject constructor(
             // Quick-task (activation-new-chat): activation-created rows
             // arrive titled "New Chat" with zero messages — title from the
             // first message so history keeps the first-message convention.
-            // Rows that already carry messages are never retitled.
-            if (state.messages.isEmpty()) {
+            // 2026-10-04 title-heal: a row still carrying the default title
+            // while holding text (ghost-turn spill, legacy rows) is
+            // retitled too — "New Chat" shows only for textless chats.
+            // Fail-open: a title lookup must never kill the turn.
+            val needsTitle = state.messages.isEmpty() || isDefaultTitle(
+                try {
+                    chatRepository.getConversationTitle(state.conversationId)
+                } catch (e: Exception) {
+                    null
+                },
+            )
+            if (needsTitle) {
                 try {
                     chatRepository.updateConversationTitle(
                         state.conversationId,
@@ -3610,13 +3804,33 @@ class ChatViewModel @Inject constructor(
         else -> firstMessage
     }
 
+    /**
+     * 2026-10-04 title-heal: the default "New Chat" title (or a blank one)
+     * is a placeholder — it must never survive next to real text.
+     * Compared against resources so EN/ES installs both match.
+     */
+    private fun isDefaultTitle(title: String?): Boolean {
+        if (title.isNullOrBlank()) return true
+        return try {
+            title == context.getString(R.string.new_chat)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     private suspend fun isModelAvailable(modelId: String, providerType: ProviderType): Boolean {
         // The LOCAL branch below is a mandatory exhaustive reference to the
         // deprecated legacy entry (persisted rows may still carry it) — not new use.
         @Suppress("DEPRECATION")
         val available = when (providerType) {
             ProviderType.LOCAL, ProviderType.LITE_RT_LM -> {
-                localModelRepository.existsByFilePath(modelId)
+                // 2026-10-04 silent-RED fix: the DB row is not enough — the
+                // file itself must exist on disk (wiped app storage leaves
+                // a row pointing at nothing; the mount then fails instantly
+                // and the transient banner left a silent red behind).
+                // stat() is Main-safe; this runs in suspend context anyway.
+                localModelRepository.existsByFilePath(modelId) &&
+                    java.io.File(modelId).exists()
             }
             else -> {
                 _connection.value.endpoints.any { it.modelId == modelId && it.apiType == providerType }
@@ -3628,11 +3842,84 @@ class ChatViewModel @Inject constructor(
     private var lastAutoAppliedModelId: String? = null
 
     /**
-     * Last model auto-selected by the observeModels hook (loop guard — the
-     * selection flow round-trips asynchronously, so the guard above could
-     * re-fire on the next emission before the collector delivers).
+     * Endpoint id the remote probe already attempted (same once-per-
+     * session contract as the cold-start mount). Null clears on
+     * deselection so reselecting probes again.
      */
-    private var autoSelectedModelPath: String? = null
+    private var lastProbedEndpointId: Long? = null
+
+    /**
+     * Bumped on every successful server-side load ([setSelectedModel]
+     * LM Studio branch). Lets an in-flight [probeRemoteEndpoint] stand
+     * down when the load proved reachability more recently.
+     */
+    private val loadGeneration = AtomicLong(0L)
+
+    /**
+     * One-shot reachability probe for a remote endpoint. TestConnection
+     * never throws (providers map failures to Disconnected); the
+     * timeout + stale-selection guards are ours. Main-thread confined
+     * state writes only.
+     */
+    private suspend fun probeRemoteEndpoint(endpointId: Long, modelId: String) {
+        // A load that lands mid-probe supersedes it: the load proved
+        // reachability more recently than this probe started, so a late
+        // Disconnected must not overwrite the fresh Connected.
+        val genAtStart = loadGeneration.get()
+        val status = try {
+            val endpoint = endpointRepository.getById(endpointId) ?: return
+            // No IO hop: Room + Retrofit suspend fns are main-safe; the
+            // timeout bounds the whole probe (also keeps the flow
+            // deterministic under test dispatchers).
+            val result = kotlinx.coroutines.withTimeoutOrNull(15_000L) {
+                providerRouter.resolve(endpoint, modelId).testConnection()
+            }
+            result?.getOrNull() ?: ConnectionStatus.Disconnected
+        } catch (e: Exception) {
+            Timber.w(e, "ChatVM: remote probe failed")
+            ConnectionStatus.Disconnected
+        }
+        // Stale guard: only apply if the selection hasn't moved on and
+        // no successful load landed while this probe was in flight.
+        if (activeModelSelection.remoteSelection.value.endpointId == endpointId &&
+            genAtStart == loadGeneration.get()
+        ) {
+            updateConnection { it.copy(connectionStatus = status) }
+            if (status != ConnectionStatus.Connected) {
+                val name = activeModelSelection.remoteSelection.value.modelId ?: modelId
+                _events.tryEmit(
+                    ChatEvent.Snackbar(context.getString(R.string.remote_probe_failed_fmt, name))
+                )
+            }
+        }
+    }
+
+    /**
+     * Model paths the auto-select hook has already seen (loop guard —
+     * the selection flow round-trips asynchronously). New chat freezes
+     * today's files into the set so nothing reselects behind the user's
+     * back; only a genuinely NEW path (download/import) auto-selects.
+     */
+    private var autoSelectSeenPaths = mutableSetOf<String>()
+
+    /**
+     * Hard auto-select kill-switch (2026-10-04): set on New chat (and
+     * fresh start with no chat) — while set, NOTHING preselects, not
+     * even a late first-emission of the models list or a download that
+     * lands mid-picker. Cleared only by an explicit user pick
+     * ([setSelectedModel]) — opening an existing chat drives its own
+     * selection and needs no clearing. Fresh installs (never pressed)
+     * still auto-pick the first model for immediate usability.
+     */
+    private var suppressAutoSelect = false
+
+    /**
+     * Fresh (model-less) row created by the latest [newConversation],
+     * claimed for the chosen model on the first send. Null once claimed
+     * or when opening an existing chat — at most one empty row exists.
+     */
+    @Volatile
+    private var freshConversationId: Long? = null
 
     /**
      * Model paths that completed at least one engine load in this process
@@ -3652,7 +3939,14 @@ class ChatViewModel @Inject constructor(
                 val models = localModelRepository.observeModels().first()
                 val model = models.firstOrNull { it.filePath == modelId } ?: return@launch
                 val memInfo = memoryChecker.getMemoryInfo()
-                val result = SmartPresetCalculator.calculate(memInfo, model.sizeBytes)
+                val result = SmartPresetCalculator.calculate(
+                    memInfo,
+                    model.sizeBytes,
+                    modelName = model.name,
+                    // Verified-only thinking flag: selects the thinking row
+                    // of the vendor family table (e.g. Qwen3 0.6 vs 0.7).
+                    thinking = modelAllowlistRepository.supportsThinking(model.name),
+                )
                 parameterStore.update(result.parameters)
                 Timber.d("ChatVM: auto-applied smart preset — tier=${result.tier} context=${result.parameters.contextSize} threads=${result.parameters.threads}")
             } catch (e: Exception) {

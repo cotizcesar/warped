@@ -20,7 +20,6 @@ import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -34,6 +33,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -75,22 +75,9 @@ import com.warped.ui.theme.WarpedAccent
 fun HuggingFaceScreen(
     viewModel: CatalogViewModel = hiltViewModel(),
     onNavigateToModels: () -> Unit = {},
-    onUseInChat: (conversationId: Long) -> Unit = {}
 ) {
     val downloadStates by viewModel.downloadStates.collectAsStateWithLifecycle()
     val downloadedFileNames by viewModel.downloadedFileNames.collectAsStateWithLifecycle()
-    val activeLocalModelId by viewModel.activeLocalModelId.collectAsStateWithLifecycle()
-
-    // FUN-01: activation creates the bound conversation asynchronously —
-    // navigate once its id lands, then consume so a later recomposition
-    // never re-navigates (same chain as ModelsScreen).
-    val pendingChatId by viewModel.pendingChatId.collectAsStateWithLifecycle()
-    LaunchedEffect(pendingChatId) {
-        pendingChatId?.let { id ->
-            onUseInChat(id)
-            viewModel.consumePendingChat()
-        }
-    }
 
     // WR-01: surface activation failures (missing file, chat creation
     // throw) via Snackbar — same show-then-clear pattern as ModelsScreen.
@@ -137,12 +124,21 @@ fun HuggingFaceScreen(
             }
         } else {
             // Smallest-first display order comes from the ViewModel; sections
-            // split downloaded from available within that order.
-            val downloaded = remember(viewModel.models, downloadedFileNames) {
-                viewModel.models.filter { it.modelFile in downloadedFileNames }
+            // split downloaded from available within that order. Recommended
+            // entries (curated in the allowlist) get their own top section
+            // with the same cards/actions — excluded below so each model
+            // renders exactly once.
+            val recommended = remember(viewModel.models) {
+                viewModel.models.filter { it.recommended && !it.comingSoon }
             }
-            val available = remember(viewModel.models, downloadedFileNames) {
-                viewModel.models.filter { it.modelFile !in downloadedFileNames }
+            val rest = remember(viewModel.models, recommended) {
+                viewModel.models.filter { it !in recommended }
+            }
+            val downloaded = remember(rest, downloadedFileNames) {
+                rest.filter { it.modelFile in downloadedFileNames }
+            }
+            val available = remember(rest, downloadedFileNames) {
+                rest.filter { it.modelFile !in downloadedFileNames }
             }
             LazyColumn(
                 modifier = Modifier
@@ -152,6 +148,24 @@ fun HuggingFaceScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp)
             ) {
+                if (recommended.isNotEmpty()) {
+                    item(key = "section-recommended") {
+                        CatalogSectionHeader(
+                            title = stringResource(R.string.hf_section_recommended),
+                            count = recommended.size
+                        )
+                    }
+                    items(recommended, key = { "rec-${it.name}" }) { entry ->
+                        val onDevice = entry.modelFile in downloadedFileNames
+                        CatalogCardItem(
+                            entry = entry,
+                            viewModel = viewModel,
+                            downloadStates = downloadStates,
+                            isOnDevice = onDevice,
+                            onDeleteDownloaded = { viewModel.deleteDownloaded(entry) }
+                        )
+                    }
+                }
                 if (downloaded.isNotEmpty()) {
                     item(key = "section-downloaded") {
                         CatalogSectionHeader(
@@ -165,9 +179,7 @@ fun HuggingFaceScreen(
                             viewModel = viewModel,
                             downloadStates = downloadStates,
                             isOnDevice = true,
-                            isInUse = isEntryInUse(activeLocalModelId, entry),
-                            onDeleteDownloaded = { viewModel.deleteDownloaded(entry) },
-                            onUseInChat = { viewModel.useDownloadedModel(entry) }
+                            onDeleteDownloaded = { viewModel.deleteDownloaded(entry) }
                         )
                     }
                 }
@@ -220,23 +232,19 @@ private fun CatalogCardItem(
     viewModel: CatalogViewModel,
     downloadStates: Map<String, DownloadState>,
     isOnDevice: Boolean,
-    isInUse: Boolean = false,
     onDeleteDownloaded: () -> Unit = {},
-    onUseInChat: () -> Unit = {}
 ) {
     val downloadId = viewModel.downloadId(entry)
     CatalogModelCard(
         entry = entry,
         downloadState = downloadStates[downloadId],
         isOnDevice = isOnDevice,
-        isInUse = isInUse,
         onDownload = { viewModel.startDownload(entry) },
         onCancel = { viewModel.cancelDownload(downloadId) },
         onPause = { viewModel.pauseDownload(downloadId) },
         onResume = { viewModel.resumeDownload(downloadId) },
         onRetry = { viewModel.resumeDownload(downloadId) },
         onDeleteDownloaded = onDeleteDownloaded,
-        onUseInChat = onUseInChat
     )
 }
 
@@ -282,23 +290,25 @@ private fun CatalogModelCard(
     entry: AllowlistedModel,
     downloadState: DownloadState?,
     isOnDevice: Boolean = false,
-    isInUse: Boolean = false,
     onDownload: () -> Unit,
     onCancel: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onRetry: () -> Unit = {},
     onDeleteDownloaded: () -> Unit = {},
-    onUseInChat: () -> Unit = {}
 ) {
     // A "Cancelled" error is terminal-idle: the partial file is deleted and a
-    // fresh Download restarts cleanly.
-    val active = downloadState != null &&
-        (downloadState.isDownloading || downloadState.isPaused) &&
-        downloadState.error != "Cancelled"
+    // fresh Download restarts cleanly. Non-null takeIfs below (instead of
+    // `active && downloadState != null` chains) so nullability is proven
+    // once at the source — no redundant checks downstream.
+    val activeDownload: DownloadState? = downloadState?.takeIf {
+        (it.isDownloading || it.isPaused) && it.error != "Cancelled"
+    }
+    val active = activeDownload != null
     val downloaded = isEffectivelyDownloaded(downloadState, isOnDevice)
     val failed = !active && !downloaded &&
         downloadState?.error != null && downloadState.error != "Cancelled"
+    val failureError: String? = downloadState?.error?.takeIf { failed && it != "Cancelled" }
     var showCancelConfirm by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     val details = remember(entry) { expandedText(entry) }
@@ -347,21 +357,35 @@ private fun CatalogModelCard(
     // trailing slot and the Use-in-chat CTA renders full-width at the
     // BOTTOM of the card (downloadContent slot below), so every card is
     // distinguishable by name and the action sits where the thumb expects
-    // it. The active model additionally carries an "In use" pill.
-    val inUseLabel = stringResource(R.string.catalog_in_use)
+    // it.
     com.warped.ui.components.ModelCard(
         title = entry.displayName,
         sizeText = formatFileSize(entry.sizeInBytes),
         ramText = entry.ramNote,
-        metaChips = if (downloaded && isInUse) listOf(inUseLabel) else emptyList(),
+        textBadge = entry.capabilities.text,
         vision = entry.capabilities.vision,
         audio = entry.capabilities.audio,
         reasoning = entry.capabilities.supportsThinking,
         tools = entry.capabilities.supportsFunctionCalling,
-        dotConnected = downloaded,
         expandable = expandable,
         trailingActions = {
-            if (downloaded) {
+            if (entry.comingSoon) {
+                // Coming-soon entries list for discovery but expose no
+                // actions — their pipeline doesn't exist in the app yet.
+                // Never downloadable, never deletable, never usable.
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                ) {
+                    Text(
+                        text = stringResource(R.string.catalog_coming_soon),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+            } else if (downloaded) {
                 IconButton(onClick = { showDeleteConfirm = true }) {
                     Icon(
                         imageVector = Icons.Filled.Delete,
@@ -380,13 +404,15 @@ private fun CatalogModelCard(
             }
         },
         downloadContent = {
+            // Coming-soon: no download CTA ever (nothing to download into).
+            if (!entry.comingSoon) {
             // Active download: shared linear-bar + status-line + Cancel look.
             // Cancel goes through the cancel-confirm dialog — cancelling
             // deletes the partial file (see dialog copy).
-            if (active && downloadState != null) {
-                Spacer(Modifier.height(6.dp))
+            if (activeDownload != null) {
+                Spacer(Modifier.height(12.dp))
                 ActiveDownloadContent(
-                    download = downloadState,
+                    download = activeDownload,
                     onCancel = { showCancelConfirm = true },
                     onDeleteIncomplete = { showCancelConfirm = true },
                     onPause = onPause,
@@ -394,26 +420,11 @@ private fun CatalogModelCard(
                     onRetry = onRetry
                 )
             }
-            // Downloaded CTA: full-width bottom action, same accent as the
-            // Available download affordance.
-            if (downloaded) {
-                Spacer(Modifier.height(10.dp))
-                Button(
-                    onClick = onUseInChat,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = WarpedAccent),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = if (isInUse) inUseLabel else stringResource(R.string.use_in_chat),
-                        color = Color.White
-                    )
-                }
-            }
+            } // end if (!entry.comingSoon)
         },
         // Retained error text (icon form keeps the message for a11y;
         // retry = download icon tap).
-        errorText = if (failed) downloadState?.error else null,
+        errorText = failureError,
         detailsContent = {
             // Blurb constrained to two lines, separated above and below so
             // it never blends into the header or the table. RAM guidance
@@ -425,6 +436,18 @@ private fun CatalogModelCard(
                     text = entry.blurb,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            // Coming-soon reason line (only on coming-soon entries).
+            val soonNote = entry.localizedComingSoonNote()
+            if (entry.comingSoon && !soonNote.isNullOrBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = soonNote,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )

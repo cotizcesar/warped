@@ -42,6 +42,16 @@ data class ChatTranscriptState(
 @Immutable
 data class ChatInputState(
     val inputText: String = "",
+    /**
+     * Monotonic stamp bumped on every EXTERNAL inputText write
+     * (send-clear, draft restore, dictation commit, empty-answer
+     * restore) — never on typing. The input bar adopts prop text
+     * exactly once per stamp, so mid-edit keystrokes (including IME
+     * compositions) can never be overwritten by a stale prop — the
+     * "undeletable last letter" class (2026-10-04). Owner: the same
+     * external writers; readers: ChatInputBar only.
+     */
+    val inputTextGeneration: Long = 0,
     val reasoningEnabled: Boolean = true,
     val enableThinking: Boolean = false,
     val supportsThinking: Boolean = false,
@@ -329,6 +339,12 @@ fun trafficLightState(
         transcript.isStreaming -> TrafficLightState.YELLOW
         connection.memoryWarningModel != null -> TrafficLightState.RED
         transcript.error != null -> TrafficLightState.RED
+        // 2026-10-04 transitional loading: local mount and remote ping
+        // both read YELLOW (work in flight) instead of RED, settling to
+        // GREEN on success. The input lock (local) / free continue
+        // (remote probe) behavior is unchanged.
+        isLocal && connection.isLoadingModel -> TrafficLightState.YELLOW
+        isRemote && connection.connectionStatus == ConnectionStatus.Connecting -> TrafficLightState.YELLOW
         isLocal && connection.isLocalModelLoaded -> TrafficLightState.GREEN
         isRemote && connection.connectionStatus == ConnectionStatus.Connected -> TrafficLightState.GREEN
         isLocal || isRemote -> TrafficLightState.RED
@@ -348,7 +364,8 @@ fun trafficLightStatusText(
     val remoteName = connection.selectedRemoteModelId?.substringAfterLast("/") ?: "Unknown model"
     val error = transcript.error
     return when {
-        light == TrafficLightState.YELLOW -> "Generating response…"
+        light == TrafficLightState.YELLOW && transcript.isStreaming -> "Generating response…"
+        light == TrafficLightState.YELLOW -> "Connecting…"
         light == TrafficLightState.GREEN && isLocal -> "Local: $localName — Connected"
         light == TrafficLightState.GREEN && isRemote -> "Remote: $remoteName — Connected"
         light == TrafficLightState.RED && error != null -> "Error: ${

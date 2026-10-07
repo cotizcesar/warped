@@ -86,8 +86,48 @@ data class AllowlistedModel(
      * lacking these fields.
      */
     val ramNote: String? = null,
-    val blurb: String? = null
+    val blurb: String? = null,
+    /**
+     * Coming-soon flag: the entry is listed for discovery but cannot be
+     * downloaded or used yet — its pipeline doesn't exist in the app
+     * (on-device STT/TTS, semantic search, image generation, OCR tooling).
+     * [comingSoonNote] names the missing piece (shown under the badge).
+     *
+     * Back-compat: absent → false (existing entries behave unchanged).
+     */
+    val comingSoon: Boolean = false,
+    val comingSoonNote: String? = null,
+    /**
+     * Spanish twin of [comingSoonNote]. The app is fully EN+ES: UI copy
+     * always resolves through resources or locale-paired fields, never a
+     * hardcoded language. See [localizedComingSoonNote].
+     */
+    val comingSoonNoteEs: String? = null,
+    /**
+     * Curated pick: the most capable + usable models for the catalog's
+     * Recommended section (verified flags + family track record — see
+     * model_allowlist.json). Display-only curation, no behavior change.
+     *
+     * Back-compat: absent → false.
+     */
+    val recommended: Boolean = false
 ) {
+    /**
+     * Locale-aware coming-soon reason: Spanish note on es locales,
+     * English otherwise (falling back across when one side is absent).
+     */
+    fun localizedComingSoonNote(): String? {
+        val spanish = try {
+            java.util.Locale.getDefault().language.startsWith("es")
+        } catch (_: Exception) {
+            false
+        }
+        return if (spanish) {
+            comingSoonNoteEs ?: comingSoonNote
+        } else {
+            comingSoonNote ?: comingSoonNoteEs
+        }
+    }
     /**
      * Effective repo slug for download URL construction.
      * Explicit [repo] wins; legacy `warped-community/$name` applies ONLY
@@ -137,6 +177,15 @@ class ModelAllowlistRepository @Inject constructor(
 
     fun findByModelFile(fileName: String): AllowlistedModel? =
         models.firstOrNull { it.modelFile.equals(fileName, ignoreCase = true) }
+
+    /**
+     * Reverse download-id lookup (`repoSlug/modelFile`, see
+     * [CatalogViewModel.downloadId]) — resolves the worker's display name
+     * so saved rows carry "SmolLM3 3B" instead of the quant-suffixed file
+     * stem. Null for imports (no catalog entry).
+     */
+    fun findByDownloadId(downloadId: String): AllowlistedModel? =
+        models.firstOrNull { "${it.repoSlug}/${it.modelFile}".equals(downloadId, ignoreCase = true) }
 
     /** True only if thinking was verified for this model on 0.17.x Android. */
     fun supportsThinking(name: String): Boolean =

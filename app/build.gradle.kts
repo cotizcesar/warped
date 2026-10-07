@@ -12,8 +12,8 @@ android {
     compileSdk = 36
 
     val versionMajor = 3
-    val versionMinor = 1
-    val versionPatch = 1
+    val versionMinor = 2
+    val versionPatch = 0
     val baseVersionCode = versionMajor * 10000 + versionMinor * 100 + versionPatch // 30100
 
     // CI build number from GitHub Actions (always increments per workflow run)
@@ -290,7 +290,17 @@ dependencies {
 }
 
 tasks.withType<Test> {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        // 2026-10-04 sub-minute dev loop: -Pfast skips @Tag("slow")
+        // (loopback-socket/timeout tests). Default and CI run everything.
+        if (providers.gradleProperty("fast").isPresent) excludeTags("slow")
+    }
+    // 2026-10-04: 117 classes ran SEQUENTIALLY in one fork (Gradle
+    // default maxParallelForks=1), so suite wall-time grew linearly
+    // with every socket/timeout test. Fork test classes across N/2
+    // cores (cap 4 — each fork loads the native test .so, and separate
+    // processes stay isolated). ~3-4x faster on multi-core CI/dev.
+    maxParallelForks = Runtime.getRuntime().availableProcessors().div(2).coerceIn(1, 4)
 }
 
 ksp {

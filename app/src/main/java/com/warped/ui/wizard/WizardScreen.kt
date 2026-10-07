@@ -7,7 +7,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -54,53 +53,6 @@ fun WizardScreen(
         if (pagerState.currentPage != uiState.currentPage) {
             viewModel.goToPage(pagerState.currentPage)
         }
-    }
-
-    if (uiState.showSkipAllConfirm) {
-        WarpedAlertDialog(
-            onDismissRequest = { viewModel.dismissSkipAllConfirm() },
-            title = {
-                Text(
-                    text = stringResource(
-                        if (uiState.isReEntry) R.string.wizard_close_confirm_title
-                        else R.string.wizard_skip_confirm_title
-                    ),
-                    color = TextPrimary
-                )
-            },
-            text = {
-                Text(
-                    text = stringResource(
-                        if (uiState.isReEntry) R.string.wizard_close_confirm_text
-                        else R.string.wizard_skip_confirm_text
-                    ),
-                    color = TextSecondary
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.confirmSkipAll()
-                    if (uiState.isReEntry) {
-                        onBackFromReEntry()
-                    } else {
-                        onWizardComplete()
-                    }
-                }) {
-                    Text(
-                        text = stringResource(
-                            if (uiState.isReEntry) R.string.wizard_close
-                            else R.string.wizard_skip
-                        ),
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.dismissSkipAllConfirm() }) {
-                    Text(stringResource(R.string.wizard_cancel))
-                }
-            }
-        )
     }
 
     if (uiState.showExitConfirm) {
@@ -157,47 +109,6 @@ fun WizardScreen(
                         )
                     }
                 },
-                navigationIcon = {
-                    if (isFirstPage) {
-                        if (uiState.isReEntry) {
-                            IconButton(onClick = onBackFromReEntry) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = stringResource(R.string.wizard_back),
-                                    tint = TextPrimary
-                                )
-                            }
-                        } else {
-                            IconButton(onClick = { viewModel.showExitDialog() }) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = stringResource(R.string.wizard_exit),
-                                    tint = TextPrimary
-                                )
-                            }
-                        }
-                    } else {
-                        IconButton(onClick = { viewModel.goToPreviousPage() }) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.wizard_back),
-                                tint = TextPrimary
-                            )
-                        }
-                    }
-                },
-                actions = {
-                    TextButton(onClick = { viewModel.showSkipAllConfirm() }) {
-                        Text(
-                            text = when {
-                                uiState.isReEntry -> stringResource(R.string.wizard_close)
-                                isFirstPage -> stringResource(R.string.wizard_skip_all)
-                                else -> stringResource(R.string.wizard_skip)
-                            },
-                            color = Accent
-                        )
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent
                 )
@@ -208,21 +119,15 @@ fun WizardScreen(
                 color = Color(0xFF1F1F1E),
                 shadowElevation = 8.dp
             ) {
+                // 2026-10-04 Next-only flow: no Back/Skip buttons on
+                // screen (system back and pager swipe still browse back).
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (!isFirstPage) {
-                        TextButton(onClick = { viewModel.goToPreviousPage() }) {
-                            Text(stringResource(R.string.wizard_back), color = TextSecondary)
-                        }
-                    } else {
-                        Spacer(Modifier.width(64.dp))
-                    }
-
                     if (isLastPage) {
                         Button(
                             onClick = {
@@ -272,9 +177,6 @@ fun WizardScreen(
             StepContent(
                 step = step,
                 contextData = uiState.contextData,
-                onCtaClick = {
-                    step.ctaRoute?.let(onNavigate)
-                }
             )
         }
     }

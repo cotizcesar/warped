@@ -237,6 +237,8 @@ class UnifiedSelectorViewModel @Inject constructor(
                     disconnectLocal()
                 }
                 modelImportManager.deleteModel(model)
+                // Same ghost-card guard as ModelsViewModel.deleteModel.
+                modelDownloadManager.forgetDownloadsForFile(model.filePath.substringAfterLast("/"))
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message) }
             }

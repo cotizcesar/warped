@@ -120,6 +120,10 @@ class ModelsViewModel @Inject constructor(
                     activeModelSelection.disconnectLocal()
                 }
                 modelImportManager.deleteModel(model)
+                // Drop the completed download record too, or the catalog
+                // keeps showing a ghost "downloaded" card off the stale
+                // in-memory state (file + DB row are already gone).
+                modelDownloadManager.forgetDownloadsForFile(model.filePath.substringAfterLast("/"))
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message) }
             }

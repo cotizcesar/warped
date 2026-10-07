@@ -346,7 +346,7 @@ class ChatCancellationTest {
 
         vm.sendMessage("hi")
         runCurrent()
-        assertThat(vm.uiState.value.isStreaming).isTrue()
+        assertThat(vm.transcriptState.value.isStreaming).isTrue()
 
         advanceTimeBy(120)
         vm.stopGeneration()
@@ -354,9 +354,9 @@ class ChatCancellationTest {
 
         // RUNTIME-14: transport-stop must be reached on Stop.
         verify(exactly = 1) { helper.stopResponse() }
-        assertThat(vm.uiState.value.isStreaming).isFalse()
-        assertThat(vm.uiState.value.streamingContent).isEmpty()
-        assertThat(vm.uiState.value.streamingReasoning).isEmpty()
+        assertThat(vm.transcriptState.value.isStreaming).isFalse()
+        assertThat(vm.transcriptState.value.streamingContent).isEmpty()
+        assertThat(vm.transcriptState.value.streamingReasoning).isEmpty()
     }
 
     @Test
@@ -380,16 +380,16 @@ class ChatCancellationTest {
         // Turn 1: stop mid-stream.
         vm.sendMessage("first")
         runCurrent()
-        assertThat(vm.uiState.value.isStreaming).isTrue()
+        assertThat(vm.transcriptState.value.isStreaming).isTrue()
         vm.stopGeneration()
         runCurrent()
-        assertThat(vm.uiState.value.isStreaming).isFalse()
+        assertThat(vm.transcriptState.value.isStreaming).isFalse()
 
         // Turn 2: full sequence, assistant message persisted, spinner cleared.
         vm.sendMessage("second")
         advanceUntilIdle()
-        assertThat(vm.uiState.value.isStreaming).isFalse()
-        val assistants = vm.uiState.value.messages.filter { it.role == Role.ASSISTANT }
+        assertThat(vm.transcriptState.value.isStreaming).isFalse()
+        val assistants = vm.transcriptState.value.messages.filter { it.role == Role.ASSISTANT }
         assertThat(assistants).hasSize(1)
         assertThat(assistants.single().content).isEqualTo("xy")
         coVerify(atLeast = 1) { helper.stopResponse() }
@@ -434,14 +434,14 @@ class ChatCancellationTest {
         vm.sendMessage("fresh news?")
         runCurrent()
         // Transient row shows the query while the tool runs.
-        assertThat(vm.uiState.value.toolCallActive).isEqualTo("Searching for \"android release\"…")
+        assertThat(vm.inputState.value.toolCallActive).isEqualTo("Searching for \"android release\"…")
 
         advanceUntilIdle()
         // Cleared on completion; never persisted to the transcript.
-        assertThat(vm.uiState.value.toolCallActive).isNull()
-        assertThat(vm.uiState.value.isStreaming).isFalse()
-        assertThat(vm.uiState.value.messages.map { it.role })
+        assertThat(vm.inputState.value.toolCallActive).isNull()
+        assertThat(vm.transcriptState.value.isStreaming).isFalse()
+        assertThat(vm.transcriptState.value.messages.map { it.role })
             .containsExactly(Role.USER, Role.ASSISTANT)
-        assertThat(vm.uiState.value.messages.last().content).isEqualTo("hi")
+        assertThat(vm.transcriptState.value.messages.last().content).isEqualTo("hi")
     }
 }

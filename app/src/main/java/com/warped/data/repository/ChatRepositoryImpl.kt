@@ -75,6 +75,29 @@ class ChatRepositoryImpl @Inject constructor(
         conversationDao.upsert(entity.copy(title = title, updatedAt = System.currentTimeMillis()))
     }
 
+    override suspend fun getConversationTitle(conversationId: Long): String? {
+        return try {
+            conversationDao.getTitle(conversationId)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    override suspend fun updateConversationBinding(
+        conversationId: Long,
+        providerType: ProviderType,
+        modelId: String?,
+        endpointId: Long,
+    ) {
+        conversationDao.updateBinding(
+            id = conversationId,
+            providerType = providerType.name,
+            modelId = modelId,
+            endpointId = endpointId,
+            timestamp = System.currentTimeMillis(),
+        )
+    }
+
     override suspend fun deleteConversation(conversationId: Long) {
         conversationDao.deleteById(conversationId)
     }

@@ -111,6 +111,7 @@ class CustomProvider(
                 request.messages,
                 includeSystem = true,
                 sanitizeUser = { inputSanitizer?.sanitize(it) ?: it },
+                currentImages = request.images,
             )
             val ddgRepo = ddg
             val fetchAll = multiUrlFetcher
@@ -185,6 +186,7 @@ class CustomProvider(
             request.messages,
             includeSystem = true,
             sanitizeUser = { inputSanitizer?.sanitize(it) ?: it },
+            currentImages = request.images,
         )
         val body = OpenAiChatRequest(
             model = modelId,
@@ -192,7 +194,10 @@ class CustomProvider(
             stream = true,
             temperature = request.parameters.temperature,
             topP = request.parameters.topP,
-            maxTokens = request.parameters.maxTokens
+            topK = request.parameters.topK,
+            repeatPenalty = request.parameters.repeatPenalty,
+            maxTokens = request.parameters.maxTokens.takeIf { it > 0 },
+            seed = request.parameters.seed.takeIf { it != -1 },
         )
         try {
             val response = api.chatCompletions(chatPath, body)

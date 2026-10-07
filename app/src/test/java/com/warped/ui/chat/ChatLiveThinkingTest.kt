@@ -45,6 +45,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import org.junit.jupiter.api.Tag
 
 /**
  * Quick-task (live-thinking): native thought deltas update
@@ -59,6 +60,7 @@ import java.io.File
  * then releases one more delta to trigger the flush.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
+@Tag("slow")
 class ChatLiveThinkingTest {
 
     private val testDispatcher = StandardTestDispatcher()

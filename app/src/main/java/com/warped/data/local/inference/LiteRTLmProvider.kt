@@ -29,6 +29,7 @@ import com.warped.domain.model.GenerationParameters
 import com.warped.domain.model.ModelInfo
 import com.warped.domain.model.ProviderType
 import com.warped.domain.model.Role
+import com.warped.domain.model.SmartPresetCalculator
 import com.warped.domain.model.StreamToken
 import com.warped.domain.provider.LlmProvider
 import kotlinx.coroutines.Dispatchers
@@ -350,6 +351,16 @@ class LiteRTLmProvider @Inject constructor(
             seed = if (params.seed != -1) params.seed else 0
         )
 
+        // Precision guidance by model size (small models ramble and loop
+        // greetings at default sampling — the strict hint coaches them;
+        // big models need none). Resolved off the allowlist by active file;
+        // imported/non-allowlist models get no hint (null-safe default).
+        val precisionHint = activeModelSelection.activeModel.value?.modelId
+            ?.substringAfterLast("/")
+            ?.let { allowlist.findByModelFile(it)?.sizeInBytes }
+            ?.let { SmartPresetCalculator.precisionHintFor(it) }
+        val precisionSection = precisionHint?.let { "$it " } ?: ""
+
         // Step 6: Create conversation config — plain single-turn chat unless
         // the 56-02 agentic loop is armed (capable model + grounding on +
         // validated internet). Unarmed stays byte-identical to Phase 49
@@ -370,14 +381,14 @@ class LiteRTLmProvider @Inject constructor(
                 // 47 precedent: FRESH ToolSet instances per creation — never singletons.
                 tools = listOf(tool(WebSearchToolSet()), tool(WebFetchToolSet()), tool(ReadTextToolSet())),
                 automaticToolCalling = false,
-                systemInstruction = Contents.of("$IDENTITY_LINE $TOOL_USE_SYSTEM_HINT"),
+                systemInstruction = Contents.of("$IDENTITY_LINE $precisionSection$TOOL_USE_SYSTEM_HINT"),
                 extraContext = emptyMap()
             )
         } else {
             ConversationConfig(
                 initialMessages = historyMessages,
                 samplerConfig = samplerConfig,
-                systemInstruction = Contents.of(IDENTITY_LINE),
+                systemInstruction = Contents.of("$IDENTITY_LINE $precisionSection".trim()),
                 extraContext = emptyMap()
             )
         }
@@ -399,12 +410,12 @@ class LiteRTLmProvider @Inject constructor(
             // binding never leaks across turns (T-70-04).
             bindDocumentBlock(request.documentBlock)
             try {
-                sendAgenticWithRetry(currentContents, conversationConfig, armSnapshot, params.contextSize, 0)
+                sendAgenticWithRetry(currentContents, conversationConfig, armSnapshot, params.contextSize, params.maxTokens, 0)
             } finally {
                 clearDocumentBlock()
             }
         } else {
-            sendContentsWithRetry(currentContents, conversationConfig, armSnapshot, 0)
+            sendContentsWithRetry(currentContents, conversationConfig, armSnapshot, params.maxTokens, 0)
         }
     }
 
@@ -463,8 +474,8 @@ class LiteRTLmProvider @Inject constructor(
      * to the 0.17.x engine config. Non-null (channel enabled) only when the
      * upstream-gated flag is true; null selects engine defaults (channel
      * off) for toggle-off or incapable models. Pure function —
-     * unit-testable without the native engine. `maxOutputToken` stays null
-     * (out of scope).
+     * unit-testable without the native engine. `maxOutputToken` is threaded
+     * separately (see acquireConversation) from the tiered smart preset.
      */
     internal fun thinkingConfigFor(reasoningEnabled: Boolean): ThinkingConfig? =
         if (reasoningEnabled) ThinkingConfig(true, THINKING_TOKEN_BUDGET) else null
@@ -479,6 +490,7 @@ class LiteRTLmProvider @Inject constructor(
     private fun acquireConversation(
         conversationConfig: ConversationConfig,
         snapshot: LoopArmSnapshot,
+        maxOutputTokens: Int,
     ): Conversation = synchronized(this@LiteRTLmProvider) {
         val existing = activeConversation
         if (existing != null && existing.isAlive && activeLoopArm == snapshot) {
@@ -493,6 +505,10 @@ class LiteRTLmProvider @Inject constructor(
             engineManager.createLiteRTConversation(
                 conversationConfig,
                 thinkingConfigFor(snapshot.thinking),
+                // Cap runaway generations (canned loops) at the tiered
+                // maxTokens; thinking turns get floor room for the trace
+                // budget plus the answer.
+                maxOutputToken = maxOutputTokens.coerceAtLeast(if (snapshot.thinking) 2048 else 1),
             ).also {
                 activeConversation = it
                 activeConversationConfig = conversationConfig
@@ -789,6 +805,7 @@ class LiteRTLmProvider @Inject constructor(
         conversationConfig: ConversationConfig,
         snapshot: LoopArmSnapshot,
         contextSize: Int,
+        maxOutputTokens: Int,
         attempt: Int
     ) {
         val maxRetries = 2
@@ -799,7 +816,7 @@ class LiteRTLmProvider @Inject constructor(
                 throw IllegalStateException("Engine not initialized")
             }
 
-            val conversation = acquireConversation(conversationConfig, snapshot)
+            val conversation = acquireConversation(conversationConfig, snapshot, maxOutputTokens)
             runToolLoop(ConversationTurnTransport(conversation), contents, contextSize)
         } catch (e: CancellationException) {
             // Stop means stop: same contract as the plain path — terminate,
@@ -818,7 +835,7 @@ class LiteRTLmProvider @Inject constructor(
                 activeLoopArm = null
                 recoverEngine()
                 Timber.w("LiteRTLmProvider: Engine recovered, retrying agentic turn... (attempt ${attempt + 1})")
-                sendAgenticWithRetry(contents, conversationConfig, snapshot, contextSize, attempt + 1)
+                sendAgenticWithRetry(contents, conversationConfig, snapshot, contextSize, maxOutputTokens, attempt + 1)
             } else if (isEngineError) {
                 Timber.e(e, "LiteRTLmProvider: agentic engine failed to recover after $maxRetries retries")
                 emit(StreamToken.Error("Engine failed to recover. Please reload the model manually."))
@@ -866,6 +883,7 @@ class LiteRTLmProvider @Inject constructor(
         contents: Contents,
         conversationConfig: ConversationConfig,
         snapshot: LoopArmSnapshot,
+        maxOutputTokens: Int,
         attempt: Int
     ) {
         val maxRetries = 2
@@ -883,7 +901,7 @@ class LiteRTLmProvider @Inject constructor(
             // (see acquireConversation — tools must never linger with grounding off).
             // Initial history is set on first creation; subsequent
             // calls append to the conversation in-place.
-            val conversation = acquireConversation(conversationConfig, snapshot)
+            val conversation = acquireConversation(conversationConfig, snapshot, maxOutputTokens)
 
             conversation.sendMessageAsync(contents).collect { responseMsg ->
                 val content = extractTextContent(responseMsg)
@@ -923,7 +941,7 @@ class LiteRTLmProvider @Inject constructor(
                 activeLoopArm = null
                 recoverEngine()
                 Timber.w("LiteRTLmProvider: Engine recovered, retrying... (attempt ${attempt + 1})")
-                sendContentsWithRetry(contents, conversationConfig, snapshot, attempt + 1)
+                sendContentsWithRetry(contents, conversationConfig, snapshot, maxOutputTokens, attempt + 1)
             } else if (isEngineError) {
                 Timber.e(e, "LiteRTLmProvider: engine failed to recover after $maxRetries retries")
                 emit(StreamToken.Error("Engine failed to recover. Please reload the model manually."))

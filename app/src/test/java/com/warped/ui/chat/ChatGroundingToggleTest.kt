@@ -173,29 +173,26 @@ class ChatGroundingToggleTest {
     )
 
     @Test
-    fun `grounded turn with no urls still sends system-prompt-prefixed text`() = runTest {
+    fun `grounded turn with no urls sends original text (no pre-search)`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val modelFile = File(tempDir, "tiny.litertlm").apply { writeText("fake") }
         val vm = buildViewModel(modelFile.absolutePath)
         runCurrent()
 
-        // Quick-task (needs-web-gate): non-social fixture — "hola" is a
-        // locked social token and would skip the pre-search by design.
-        // Quick-task (langdetect-library): the detector is warmed
-        // synchronously so the directive below is deterministic (the
-        // tildeless fixture now — correctly — yields the SPANISH directive).
+        // User decision 2026-10-03: the app never pre-searches. No URLs
+        // means no fetch and no augment — the outgoing request carries
+        // the raw user text for the model to judge (tools or weights).
         LanguageDetectorHolder.resetForTest()
         LanguageDetectorHolder.ensureLoadedBlocking()
         vm.sendMessage("pregunta sin urls")
         advanceUntilIdle()
 
-        // No URLs pasted, so no fetch runs — but the outgoing request still
-        // carries the always-on SYSTEM_PROMPT.
+        // No URLs pasted, so no fetch runs — and no pre-search either.
         coVerify(exactly = 0) { multiUrlFetcher.fetchAll(any(), any(), any()) }
         val requestSlot = slot<com.warped.domain.model.ChatRequest>()
         coVerify(exactly = 1) { lastHelper.runInference(capture(requestSlot), any()) }
         assertThat(requestSlot.captured.messages.last().content).isEqualTo(
-            "${com.warped.data.grounding.GroundingPrompt.SYSTEM_PROMPT}\n\npregunta sin urls\n\nResponde en español, aunque las fuentes estén en inglés.",
+            "pregunta sin urls",
         )
         assertThat(
             vm.transcriptState.value.messages.any { it.role == Role.ASSISTANT && it.content == "hola" },

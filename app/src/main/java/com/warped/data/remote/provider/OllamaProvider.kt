@@ -105,6 +105,7 @@ class OllamaProvider(
                 request.messages,
                 includeSystem = true,
                 sanitizeUser = inputSanitizer::sanitize,
+                currentImages = request.images,
             )
             val ddgRepo = ddg
             val fetchAll = multiUrlFetcher
@@ -179,8 +180,12 @@ class OllamaProvider(
      * stripped per the Ollama wire format); every other row stays
      * text-only and byte-identical on the wire.
      */
-    internal fun mapNativeMessages(messages: List<ChatMessage>): List<OllamaMessage> {
+    internal fun mapNativeMessages(
+        messages: List<ChatMessage>,
+        currentImages: List<String> = emptyList(),
+    ): List<OllamaMessage> {
         val kept = HistoryImageCarry.selectKeptUrls(messages)
+        val lastIndex = messages.lastIndex
         return messages.mapIndexedNotNull { index, msg ->
             if (msg.content.isBlank()) return@mapIndexedNotNull null
             if (msg.role == Role.TOOL) {
@@ -188,10 +193,14 @@ class OllamaProvider(
                 OllamaMessage(role = role, content = text)
             } else {
                 val content = if (msg.role == Role.USER) inputSanitizer.sanitize(msg.content) else msg.content
+                val extra = if (index == lastIndex && msg.role == Role.USER) {
+                    currentImages.mapNotNull(::ollamaRawImage)
+                } else emptyList()
                 OllamaMessage(
                     role = msg.role.name.lowercase(),
                     content = content,
-                    images = kept[index]?.mapNotNull(::ollamaRawImage)?.takeIf { it.isNotEmpty() },
+                    images = (kept[index]?.mapNotNull(::ollamaRawImage).orEmpty() + extra)
+                        .distinct().takeIf { it.isNotEmpty() },
                 )
             }
         }
@@ -201,7 +210,7 @@ class OllamaProvider(
     private suspend fun FlowCollector<StreamToken>.postNativeTurn(
         request: ChatRequest,
     ) {
-        val messages = mapNativeMessages(request.messages)
+        val messages = mapNativeMessages(request.messages, request.images)
         val body = OllamaChatRequest(
             model = modelId,
             messages = messages,

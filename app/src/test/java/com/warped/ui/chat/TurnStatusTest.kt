@@ -185,4 +185,36 @@ class TurnStatusTest {
             ),
         ).isNull()
     }
+
+    @Test
+    fun `remote probe shows connecting without locking`() {
+        // 2026-10-04 Caso 3: second priority (after model loading),
+        // ahead of tool/fetch/gap rows.
+        assertThat(
+            resolveTurnStatus(
+                toolCallActive = "Searching for cats…",
+                isFetchingWeb = true,
+                progress = fanoutProgress(),
+                isStreamingGap = true,
+                isProbingRemote = true,
+                probingModelName = "qwen3-4b",
+            ),
+        ).isEqualTo(TurnStatus.Connecting("qwen3-4b"))
+    }
+
+    @Test
+    fun `loading model still wins over probe`() {
+        assertThat(
+            resolveTurnStatus(
+                toolCallActive = null,
+                isFetchingWeb = false,
+                progress = null,
+                isStreamingGap = false,
+                isLoadingModel = true,
+                loadingModelName = "gemma.litertlm",
+                isProbingRemote = true,
+                probingModelName = "qwen3-4b",
+            ),
+        ).isEqualTo(TurnStatus.LoadingModel("gemma.litertlm", false))
+    }
 }

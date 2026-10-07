@@ -15,6 +15,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -22,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -112,6 +114,20 @@ fun ModelParamsDialog(
                     description = stringResource(R.string.param_desc_seed),
                     format = { if (it.toInt() == -1) randomText else it.toInt().toString() }
                 ) { params = params.copy(seed = it.toInt()) }
+
+                ParamSlider(
+                    label = stringResource(R.string.param_threads),
+                    value = params.threads.toFloat(),
+                    range = 1f..16f,
+                    steps = 14,
+                    description = stringResource(R.string.param_desc_threads),
+                    format = { it.toInt().toString() }
+                ) { params = params.copy(threads = it.toInt()) }
+
+                ThinkingRow(
+                    checked = params.reasoningEnabled,
+                    onCheckedChange = { params = params.copy(reasoningEnabled = it) }
+                )
             }
         },
         confirmButton = {
@@ -157,6 +173,38 @@ private fun ParamSlider(
             )
             Text(
                 description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun ThinkingRow(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2B2B29)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    stringResource(R.string.param_thinking),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Switch(checked = checked, onCheckedChange = onCheckedChange)
+            }
+            Text(
+                stringResource(R.string.param_desc_thinking),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

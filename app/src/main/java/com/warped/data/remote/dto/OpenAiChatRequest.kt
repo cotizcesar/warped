@@ -40,6 +40,8 @@ data class OpenAiChatRequest(
     @EncodeDefault(EncodeDefault.Mode.ALWAYS) val stream: Boolean = true,
     val temperature: Float? = null,
     @SerialName("top_p") val topP: Float? = null,
+    @SerialName("top_k") val topK: Int? = null,
+    @SerialName("repeat_penalty") val repeatPenalty: Float? = null,
     @SerialName("max_tokens") val maxTokens: Int? = null,
     val stop: List<String>? = null,
     val seed: Int? = null,
@@ -65,7 +67,12 @@ data class OpenAiChatRequest(
  */
 @Serializable
 data class OpenAiTool(
-    val type: String = "function",
+    /**
+     * ALWAYS-encoded: kotlinx omits defaulted values, and LM Studio
+     * validates the literal (`invalid_literal, expected "function"` on
+     * absence → every armed turn 400d, device-proven 2026-10-03).
+     */
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val type: String = "function",
     val function: OpenAiFunctionDef,
 )
 
@@ -160,9 +167,10 @@ data class OpenAiMessage(
      * Phase 49 (DEL-01): single-turn only. Legacy `role=tool` rows never hit
      * the wire as `role:"tool"` — providers replay them as plain user text.
      *
-     * IN-02: null content is omitted (never explicit `"content":null`) —
-     * the assistant tool_calls echo (content null) omits the key instead of
-     * sending explicit null — strict compat servers may 400 the latter.
+     * IN-02: null content is omitted (never explicit `"content":null`).
+     * The assistant tool_calls echo passes explicit "" instead — LM
+     * Studio 0.4 validates `content` as string-or-array even alongside
+     * tool_calls and 400s a missing key (device 2026-10-03).
      * Plain messages always carry non-null content, so they are unaffected.
      */
     val role: String,
@@ -268,7 +276,12 @@ object OpenAiMessageSerializer : KSerializer<OpenAiMessage> {
 @Serializable
 data class OpenAiCompletedToolCall(
     val id: String = "",
-    val type: String = "function",
+    /**
+     * ALWAYS-encoded (OpenAiTool.type precedent, device 400 2026-10-03):
+     * the echo must carry the literal or strict servers reject the
+     * follow-up round.
+     */
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val type: String = "function",
     val function: OpenAiFunctionCall = OpenAiFunctionCall(),
 )
 

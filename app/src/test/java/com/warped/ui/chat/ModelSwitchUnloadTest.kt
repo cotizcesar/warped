@@ -198,7 +198,7 @@ class ModelSwitchUnloadTest {
     }
 
     @Test
-    fun `selecting a model never touches the engine`() = runTest {
+    fun `selecting a model mounts it in background`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val pathA = File(tempDir, "a.litertlm").apply { writeText("fake") }.absolutePath
         val pathB = File(tempDir, "b.litertlm").apply { writeText("fake") }.absolutePath
@@ -213,14 +213,23 @@ class ModelSwitchUnloadTest {
         fixture.vm.launchModelSelection(pathA, ProviderType.LITE_RT_LM)
         advanceUntilIdle()
         fixture.vm.launchModelSelection(pathB, ProviderType.LITE_RT_LM)
+        // Mounts hop to Dispatchers.Default (a real thread under runTest)
+        // — yield until B is served and flags settle before asserting.
+        var attempts = 0
+        while ((fixture.vm.connectionState.value.isLoadingModel ||
+            fixture.engineManager.getActiveEngine()?.modelPath != pathB) && attempts++ < 200
+        ) {
+            kotlinx.coroutines.delay(10)
+        }
         advanceUntilIdle()
 
-        // Selection only marks pending — no mount, no unload, no spinner.
-        verify(exactly = 0) { fixture.engineManager.switchToLiteRT(any()) }
+        // User decision: red turns green by itself — selection mounts in
+        // background, no send needed. No explicit unload call (switch
+        // unloads atomically inside the engine).
+        verify { fixture.engineManager.switchToLiteRT(pathB) }
         verify(exactly = 0) { fixture.engineManager.unloadCurrent() }
         assertThat(fixture.vm.connectionState.value.selectedLocalModelId).isEqualTo(pathB)
         assertThat(fixture.vm.connectionState.value.isLoadingModel).isFalse()
-        assertThat(fixture.vm.connectionState.value.isLocalModelLoaded).isFalse()
         assertThat(fixture.selection.localSelection.value.isLoading).isFalse()
     }
 
@@ -250,12 +259,12 @@ class ModelSwitchUnloadTest {
 
         fixture.vm.launchModelSelection(path, ProviderType.LITE_RT_LM)
         advanceUntilIdle()
-        assertThat(fixture.engineManager.getActiveEngine()).isNull()
 
         fixture.vm.sendMessage("hello")
         awaitMount(fixture)
 
-        // Mounted on first send, then generated.
+        // Mounted on selection (background), send reuses it — exactly one
+        // mount total, then generated.
         verify(exactly = 1) { fixture.engineManager.switchToLiteRT(path) }
         assertThat(fixture.selection.localSelection.value.isConnected).isTrue()
         val messages = fixture.vm.transcriptState.value.messages
@@ -333,11 +342,16 @@ class ModelSwitchUnloadTest {
         fixture.vm.launchModelSelection(path, ProviderType.LITE_RT_LM)
         advanceUntilIdle()
         fixture.vm.sendMessage("hello")
-        advanceUntilIdle()
-        // The throw hops off Dispatchers.Default — yield, then assert.
-        var attempts = 0
-        while (fixture.vm.connectionState.value.modelLoadError == null && attempts++ < 100) {
-            kotlinx.coroutines.delay(10)
+        // Mount dedup (pick+send share one init): wait until no mount
+        // is running AND the failure is reported — the send-triggered
+        // duplicate used to interleave here and flake the flags.
+        var deadline = System.currentTimeMillis() + 5000
+        while ((fixture.vm.connectionState.value.isLoadingModel ||
+            fixture.vm.connectionState.value.modelLoadError == null) &&
+            System.currentTimeMillis() < deadline
+        ) {
+            advanceUntilIdle()
+            Thread.sleep(25)
         }
         advanceUntilIdle()
 
